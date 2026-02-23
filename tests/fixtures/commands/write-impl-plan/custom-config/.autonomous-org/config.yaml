@@ -1,0 +1,29 @@
+# Autonomous Organization — Project Configuration
+# Customized for HealthCheck API Gateway
+# Adds security-reviewer to the review panel for security-sensitive API work
+
+implementation_plan:
+  reviewers:
+    - agent: architect
+      enabled: true
+      focus: "Technical architecture, scalability, reliability patterns, database design"
+
+    - agent: designer
+      enabled: true
+      focus: "Dashboard UX, API ergonomics, developer experience"
+
+    - agent: tech-lead
+      enabled: true
+      focus: "Task clarity, acceptance criteria, parallelizability, dependency accuracy"
+
+    - agent: security-reviewer
+      enabled: true
+      focus: "API authentication design, key management, network security, input validation"
+
+  max_review_cycles: 3
+  min_severity_to_address: high
+
+documents:
+  requirements: docs/reqs/main.md
+  implementation_plan: docs/plans/main.md
+  specs: docs/specs

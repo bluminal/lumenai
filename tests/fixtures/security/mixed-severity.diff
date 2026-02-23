@@ -1,0 +1,155 @@
+diff --git a/src/config/payments.ts b/src/config/payments.ts
+new file mode 100644
+index 0000000..a1b2c3d
+--- /dev/null
++++ b/src/config/payments.ts
+@@ -0,0 +1,12 @@
++// Payment gateway configuration
++
++export const paymentConfig = {
++  stripe: {
++    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
++    secretKey: 'sk_live_4eC39HqLyjWDarjtT1zdp7dc',
++    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
++  },
++  currency: 'usd',
++  maxRetries: 3,
++  timeoutMs: 30000,
++};
+diff --git a/src/routes/catalog.ts b/src/routes/catalog.ts
+new file mode 100644
+index 0000000..d4e5f6a
+--- /dev/null
++++ b/src/routes/catalog.ts
+@@ -0,0 +1,99 @@
++import { Router, Request, Response } from 'express';
++import { pool } from '../db/connection';
++import { authenticate, requireRole } from '../middleware/auth';
++import { logger } from '../lib/logger';
++
++const router = Router();
++
++// GET /api/catalog - Public listing
++router.get('/', async (req: Request, res: Response) => {
++  try {
++    const result = await pool.query(
++      `SELECT id, name, description, price, image_url
++       FROM catalog_items
++       WHERE active = true
++       ORDER BY sort_order ASC`
++    );
++
++    return res.json({ data: result.rows });
++  } catch (error) {
++    logger.error('Error fetching catalog', {
++      error: (error as Error).message,
++      stack: (error as Error).stack,
++      query: 'SELECT * FROM catalog_items',
++    });
++    return res.status(500).json({
++      error: 'Failed to fetch catalog',
++      details: (error as Error).message,
++      stack: process.env.NODE_ENV === 'production' ? undefined : (error as Error).stack,
++    });
++  }
++});
++
++// GET /api/catalog/:id - Get single item
++router.get('/:id', async (req: Request, res: Response) => {
++  try {
++    const result = await pool.query(
++      'SELECT id, name, description, price, image_url, specs FROM catalog_items WHERE id = $1',
++      [req.params.id]
++    );
++
++    if (result.rows.length === 0) {
++      return res.status(404).json({ error: 'Item not found' });
++    }
++
++    return res.json({ data: result.rows[0] });
++  } catch (error) {
++    return res.status(500).json({
++      error: 'Internal server error',
++      message: (error as Error).message,
++    });
++  }
++});
++
++// DELETE /api/catalog/:id - Remove catalog item
++router.delete('/:id', async (req: Request, res: Response) => {
++  try {
++    const result = await pool.query(
++      'DELETE FROM catalog_items WHERE id = $1 RETURNING id, name',
++      [req.params.id]
++    );
++
++    if (result.rows.length === 0) {
++      return res.status(404).json({ error: 'Item not found' });
++    }
++
++    logger.info('Catalog item deleted', { itemId: req.params.id });
++    return res.json({ message: 'Item deleted', data: result.rows[0] });
++  } catch (error) {
++    logger.error('Error deleting catalog item', { error: (error as Error).message });
++    return res.status(500).json({ error: 'Internal server error' });
++  }
++});
++
++// POST /api/catalog - Create catalog item (admin only)
++router.post('/', authenticate, requireRole('admin'), async (req: Request, res: Response) => {
++  try {
++    const { name, description, price, imageUrl, specs } = req.body;
++
++    const result = await pool.query(
++      `INSERT INTO catalog_items (name, description, price, image_url, specs, created_by)
++       VALUES ($1, $2, $3, $4, $5, $6)
++       RETURNING id, name, price`,
++      [name, description, price, imageUrl, specs, req.user.id]
++    );
++
++    return res.status(201).json({ data: result.rows[0] });
++  } catch (error) {
++    logger.error('Error creating catalog item', { error: (error as Error).message });
++    return res.status(500).json({ error: 'Internal server error' });
++  }
++});
++
++export default router;
+diff --git a/src/components/ExternalLinks.tsx b/src/components/ExternalLinks.tsx
+new file mode 100644
+index 0000000..b7c8d9e
+--- /dev/null
++++ b/src/components/ExternalLinks.tsx
+@@ -0,0 +1,32 @@
++import React from 'react';
++
++interface LinkItem {
++  label: string;
++  url: string;
++  description?: string;
++}
++
++interface ExternalLinksProps {
++  links: LinkItem[];
++  title?: string;
++}
++
++export function ExternalLinks({ links, title = 'Resources' }: ExternalLinksProps) {
++  return (
++    <nav className="external-links">
++      <h3>{title}</h3>
++      <ul>
++        {links.map((link) => (
++          <li key={link.url}>
++            <a href={link.url} target="_blank">
++              {link.label}
++            </a>
++            {link.description && (
++              <p className="link-description">{link.description}</p>
++            )}
++          </li>
++        ))}
++      </ul>
++    </nav>
++  );
++}

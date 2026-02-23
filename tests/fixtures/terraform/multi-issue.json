@@ -1,0 +1,416 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_db_instance.analytics",
+          "mode": "managed",
+          "type": "aws_db_instance",
+          "name": "analytics",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 2,
+          "values": {
+            "identifier": "analytics-db",
+            "instance_class": "db.r6g.xlarge",
+            "engine": "postgres",
+            "engine_version": "16.4",
+            "allocated_storage": 200,
+            "max_allocated_storage": 500,
+            "db_name": "analytics",
+            "username": "analytics_admin",
+            "publicly_accessible": true,
+            "storage_encrypted": false,
+            "multi_az": false,
+            "backup_retention_period": 1,
+            "skip_final_snapshot": true,
+            "deletion_protection": false,
+            "auto_minor_version_upgrade": true,
+            "port": 5432,
+            "storage_type": "gp3",
+            "tags": {
+              "Name": "analytics-db",
+              "Environment": "production",
+              "Owner": "analytics-team",
+              "Project": "data-platform"
+            }
+          }
+        },
+        {
+          "address": "aws_iam_policy.analytics_full_access",
+          "mode": "managed",
+          "type": "aws_iam_policy",
+          "name": "analytics_full_access",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 0,
+          "values": {
+            "name": "analytics-full-access",
+            "path": "/",
+            "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"*\",\"Resource\":\"*\"}]}",
+            "tags": {
+              "Name": "analytics-full-access",
+              "Environment": "production",
+              "Project": "data-platform"
+            }
+          }
+        },
+        {
+          "address": "aws_iam_role.analytics_role",
+          "mode": "managed",
+          "type": "aws_iam_role",
+          "name": "analytics_role",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 0,
+          "values": {
+            "name": "analytics-service-role",
+            "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}",
+            "max_session_duration": 3600,
+            "tags": {
+              "Name": "analytics-service-role",
+              "Environment": "production",
+              "Project": "data-platform"
+            }
+          }
+        },
+        {
+          "address": "aws_iam_role_policy_attachment.analytics_attach",
+          "mode": "managed",
+          "type": "aws_iam_role_policy_attachment",
+          "name": "analytics_attach",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 0,
+          "values": {
+            "role": "analytics-service-role"
+          }
+        },
+        {
+          "address": "aws_instance.analytics_worker",
+          "mode": "managed",
+          "type": "aws_instance",
+          "name": "analytics_worker",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 1,
+          "values": {
+            "ami": "ami-0c55b159cbfafe1f0",
+            "instance_type": "c5.2xlarge",
+            "associate_public_ip_address": false,
+            "monitoring": false,
+            "ebs_optimized": true,
+            "subnet_id": "subnet-0abc123def456789a",
+            "key_name": "analytics-keypair",
+            "tags": {
+              "Name": "analytics-worker",
+              "Environment": "production",
+              "Owner": "analytics-team",
+              "Project": "data-platform"
+            },
+            "root_block_device": [
+              {
+                "volume_size": 100,
+                "volume_type": "gp3",
+                "encrypted": true,
+                "delete_on_termination": true
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_security_group.analytics_sg",
+          "mode": "managed",
+          "type": "aws_security_group",
+          "name": "analytics_sg",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 1,
+          "values": {
+            "name": "analytics-sg",
+            "vpc_id": "vpc-0a1b2c3d4e5f67890",
+            "ingress": [
+              {
+                "from_port": 443,
+                "to_port": 443,
+                "protocol": "tcp",
+                "cidr_blocks": ["10.0.0.0/8"],
+                "ipv6_cidr_blocks": [],
+                "description": "HTTPS from internal network",
+                "security_groups": [],
+                "prefix_list_ids": [],
+                "self": false
+              },
+              {
+                "from_port": 5432,
+                "to_port": 5432,
+                "protocol": "tcp",
+                "cidr_blocks": ["10.0.0.0/8"],
+                "ipv6_cidr_blocks": [],
+                "description": "PostgreSQL from internal network",
+                "security_groups": [],
+                "prefix_list_ids": [],
+                "self": false
+              }
+            ],
+            "egress": [
+              {
+                "from_port": 0,
+                "to_port": 0,
+                "protocol": "-1",
+                "cidr_blocks": ["0.0.0.0/0"],
+                "ipv6_cidr_blocks": ["::/0"],
+                "description": "Allow all outbound traffic",
+                "security_groups": [],
+                "prefix_list_ids": [],
+                "self": false
+              }
+            ],
+            "tags": {
+              "Name": "analytics-sg",
+              "Environment": "production",
+              "Project": "data-platform"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "aws_db_instance.analytics",
+      "mode": "managed",
+      "type": "aws_db_instance",
+      "name": "analytics",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "identifier": "analytics-db",
+          "instance_class": "db.r6g.xlarge",
+          "engine": "postgres",
+          "engine_version": "16.4",
+          "allocated_storage": 200,
+          "max_allocated_storage": 500,
+          "db_name": "analytics",
+          "username": "analytics_admin",
+          "publicly_accessible": true,
+          "storage_encrypted": false,
+          "multi_az": false,
+          "backup_retention_period": 1,
+          "skip_final_snapshot": true,
+          "deletion_protection": false,
+          "auto_minor_version_upgrade": true,
+          "port": 5432,
+          "storage_type": "gp3",
+          "tags": {
+            "Name": "analytics-db",
+            "Environment": "production",
+            "Owner": "analytics-team",
+            "Project": "data-platform"
+          }
+        },
+        "after_unknown": {
+          "address": true,
+          "arn": true,
+          "endpoint": true,
+          "hosted_zone_id": true,
+          "id": true,
+          "resource_id": true,
+          "status": true,
+          "vpc_security_group_ids": true
+        }
+      }
+    },
+    {
+      "address": "aws_iam_policy.analytics_full_access",
+      "mode": "managed",
+      "type": "aws_iam_policy",
+      "name": "analytics_full_access",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "analytics-full-access",
+          "path": "/",
+          "description": null,
+          "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"*\",\"Resource\":\"*\"}]}",
+          "tags": {
+            "Name": "analytics-full-access",
+            "Environment": "production",
+            "Project": "data-platform"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "policy_id": true
+        }
+      }
+    },
+    {
+      "address": "aws_iam_role.analytics_role",
+      "mode": "managed",
+      "type": "aws_iam_role",
+      "name": "analytics_role",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "analytics-service-role",
+          "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ec2.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}",
+          "max_session_duration": 3600,
+          "tags": {
+            "Name": "analytics-service-role",
+            "Environment": "production",
+            "Project": "data-platform"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "unique_id": true
+        }
+      }
+    },
+    {
+      "address": "aws_iam_role_policy_attachment.analytics_attach",
+      "mode": "managed",
+      "type": "aws_iam_role_policy_attachment",
+      "name": "analytics_attach",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "role": "analytics-service-role"
+        },
+        "after_unknown": {
+          "id": true,
+          "policy_arn": true
+        }
+      }
+    },
+    {
+      "address": "aws_instance.analytics_worker",
+      "mode": "managed",
+      "type": "aws_instance",
+      "name": "analytics_worker",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "ami": "ami-0c55b159cbfafe1f0",
+          "instance_type": "c5.2xlarge",
+          "associate_public_ip_address": false,
+          "monitoring": false,
+          "ebs_optimized": true,
+          "subnet_id": "subnet-0abc123def456789a",
+          "key_name": "analytics-keypair",
+          "tags": {
+            "Name": "analytics-worker",
+            "Environment": "production",
+            "Owner": "analytics-team",
+            "Project": "data-platform"
+          },
+          "root_block_device": [
+            {
+              "volume_size": 100,
+              "volume_type": "gp3",
+              "encrypted": true,
+              "delete_on_termination": true
+            }
+          ]
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "instance_state": true,
+          "primary_network_interface_id": true,
+          "private_dns": true,
+          "private_ip": true,
+          "public_dns": true,
+          "public_ip": true,
+          "vpc_security_group_ids": true
+        }
+      }
+    },
+    {
+      "address": "aws_security_group.analytics_sg",
+      "mode": "managed",
+      "type": "aws_security_group",
+      "name": "analytics_sg",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "name": "analytics-sg",
+          "description": null,
+          "vpc_id": "vpc-0a1b2c3d4e5f67890",
+          "ingress": [
+            {
+              "from_port": 443,
+              "to_port": 443,
+              "protocol": "tcp",
+              "cidr_blocks": ["10.0.0.0/8"],
+              "ipv6_cidr_blocks": [],
+              "description": "HTTPS from internal network",
+              "security_groups": [],
+              "prefix_list_ids": [],
+              "self": false
+            },
+            {
+              "from_port": 5432,
+              "to_port": 5432,
+              "protocol": "tcp",
+              "cidr_blocks": ["10.0.0.0/8"],
+              "ipv6_cidr_blocks": [],
+              "description": "PostgreSQL from internal network",
+              "security_groups": [],
+              "prefix_list_ids": [],
+              "self": false
+            }
+          ],
+          "egress": [
+            {
+              "from_port": 0,
+              "to_port": 0,
+              "protocol": "-1",
+              "cidr_blocks": ["0.0.0.0/0"],
+              "ipv6_cidr_blocks": ["::/0"],
+              "description": "Allow all outbound traffic",
+              "security_groups": [],
+              "prefix_list_ids": [],
+              "self": false
+            }
+          ],
+          "tags": {
+            "Name": "analytics-sg",
+            "Environment": "production",
+            "Project": "data-platform"
+          }
+        },
+        "after_unknown": {
+          "arn": true,
+          "id": true,
+          "owner_id": true
+        }
+      }
+    }
+  ],
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws",
+        "version_constraint": "~> 5.0",
+        "expressions": {
+          "region": {
+            "constant_value": "us-east-1"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "acme-payments-service",
+  "version": "2.3.1",
+  "description": "Payment processing service",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "stripe": "^17.5.0",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.16"
+  }
+}

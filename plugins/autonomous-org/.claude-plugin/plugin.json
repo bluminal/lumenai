@@ -1,0 +1,20 @@
+{
+  "name": "autonomous-org",
+  "version": "0.1.0",
+  "description": "AI agents modeled after a software startup org chart — specialized roles that collaborate to deliver complete, production-quality software.",
+  "author": "Bluminal Labs",
+  "license": "UNLICENSED",
+  "keywords": ["agents", "organization", "orchestration", "delivery", "autonomous"],
+  "commands": [
+    "init.md",
+    "next-priority.md",
+    "write-implementation-plan.md"
+  ],
+  "agents": [
+    "terraform-plan-reviewer",
+    "lead-frontend-engineer",
+    "tech-lead",
+    "security-reviewer",
+    "product-manager"
+  ]
+}

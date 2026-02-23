@@ -1,0 +1,23 @@
+{
+  "name": "autonomous-org-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Automated testing framework for Autonomous Organization agents and commands",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:schemas": "vitest run tests/schemas/",
+    "test:behavioral": "promptfoo eval --config promptfoo.config.yaml --filter-pattern 'B[0-9]'",
+    "test:semantic": "promptfoo eval --config promptfoo.config.yaml",
+    "test:all": "npm run test:schemas && npm run test:behavioral",
+    "snapshots:generate": "node helpers/generate-snapshots.js",
+    "snapshots:update": "node helpers/generate-snapshots.js --update",
+    "cache:clear": "rm -rf .cache/"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.16",
+    "promptfoo": "^0.120.24",
+    "typescript": "^5.9.3"
+  }
+}

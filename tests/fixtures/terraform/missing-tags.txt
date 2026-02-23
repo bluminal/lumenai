@@ -1,0 +1,125 @@
+
+Terraform used the selected providers to generate the following execution plan.
+Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # aws_instance.web_server will be created
+  + resource "aws_instance" "web_server" {
+      + ami                                  = "ami-0c55b159cbfafe1f0"
+      + arn                                  = (known after apply)
+      + associate_public_ip_address          = false
+      + availability_zone                    = (known after apply)
+      + disable_api_termination              = true
+      + ebs_optimized                        = true
+      + get_password_data                    = false
+      + id                                   = (known after apply)
+      + instance_state                       = (known after apply)
+      + instance_type                        = "t3.medium"
+      + key_name                             = "web-keypair"
+      + monitoring                           = true
+      + subnet_id                            = "subnet-0abc123def456789a"
+      + tags                                 = {
+          + "Name" = "web-server"
+        }
+      + vpc_security_group_ids               = [
+          + "sg-0a1b2c3d4e5f60001",
+        ]
+
+      + root_block_device {
+          + delete_on_termination = true
+          + encrypted             = true
+          + kms_key_id            = "arn:aws:kms:us-east-1:123456789012:key/mrk-a1b2c3d4e5f6"
+          + volume_size           = 50
+          + volume_type           = "gp3"
+        }
+    }
+
+  # aws_instance.worker will be created
+  + resource "aws_instance" "worker" {
+      + ami                                  = "ami-0c55b159cbfafe1f0"
+      + arn                                  = (known after apply)
+      + associate_public_ip_address          = false
+      + availability_zone                    = (known after apply)
+      + disable_api_termination              = true
+      + ebs_optimized                        = true
+      + get_password_data                    = false
+      + id                                   = (known after apply)
+      + instance_state                       = (known after apply)
+      + instance_type                        = "c5.xlarge"
+      + key_name                             = "worker-keypair"
+      + monitoring                           = true
+      + subnet_id                            = "subnet-0def456789abc1230"
+      + tags                                 = {}
+      + vpc_security_group_ids               = [
+          + "sg-0a1b2c3d4e5f60002",
+        ]
+
+      + root_block_device {
+          + delete_on_termination = true
+          + encrypted             = true
+          + kms_key_id            = "arn:aws:kms:us-east-1:123456789012:key/mrk-a1b2c3d4e5f6"
+          + volume_size           = 100
+          + volume_type           = "gp3"
+        }
+    }
+
+  # aws_s3_bucket.data_pipeline will be created
+  + resource "aws_s3_bucket" "data_pipeline" {
+      + acceleration_status         = (known after apply)
+      + acl                         = (known after apply)
+      + arn                         = (known after apply)
+      + bucket                      = "acme-data-pipeline-artifacts"
+      + bucket_domain_name          = (known after apply)
+      + bucket_regional_domain_name = (known after apply)
+      + force_destroy               = false
+      + hosted_zone_id              = (known after apply)
+      + id                          = (known after apply)
+      + object_lock_enabled         = false
+      + region                      = (known after apply)
+      + request_payer               = (known after apply)
+      + tags                        = {
+          + "Name" = "data-pipeline-artifacts"
+        }
+      + tags_all                    = {
+          + "Name" = "data-pipeline-artifacts"
+        }
+    }
+
+  # aws_s3_bucket_versioning.data_pipeline will be created
+  + resource "aws_s3_bucket_versioning" "data_pipeline" {
+      + bucket = (known after apply)
+      + id     = (known after apply)
+
+      + versioning_configuration {
+          + mfa_delete = "Disabled"
+          + status     = "Enabled"
+        }
+    }
+
+  # aws_s3_bucket_server_side_encryption_configuration.data_pipeline will be created
+  + resource "aws_s3_bucket_server_side_encryption_configuration" "data_pipeline" {
+      + bucket = (known after apply)
+      + id     = (known after apply)
+
+      + rule {
+          + bucket_key_enabled = true
+
+          + apply_server_side_encryption_by_default {
+              + sse_algorithm = "aws:kms"
+            }
+        }
+    }
+
+  # aws_s3_bucket_public_access_block.data_pipeline will be created
+  + resource "aws_s3_bucket_public_access_block" "data_pipeline" {
+      + block_public_acls       = true
+      + block_public_policy     = true
+      + bucket                  = (known after apply)
+      + id                      = (known after apply)
+      + ignore_public_acls      = true
+      + restrict_public_buckets = true
+    }
+
+Plan: 6 to add, 0 to change, 0 to destroy.

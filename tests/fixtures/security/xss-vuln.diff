@@ -1,0 +1,95 @@
+diff --git a/src/components/CommentSection.tsx b/src/components/CommentSection.tsx
+new file mode 100644
+index 0000000..e5f8b2a
+--- /dev/null
++++ b/src/components/CommentSection.tsx
+@@ -0,0 +1,85 @@
++import React, { useState, useEffect } from 'react';
++
++interface Comment {
++  id: string;
++  author: string;
++  content: string;
++  avatarUrl: string;
++  createdAt: string;
++}
++
++interface CommentSectionProps {
++  postId: string;
++}
++
++export function CommentSection({ postId }: CommentSectionProps) {
++  const [comments, setComments] = useState<Comment[]>([]);
++  const [newComment, setNewComment] = useState('');
++  const [loading, setLoading] = useState(true);
++
++  useEffect(() => {
++    fetchComments();
++  }, [postId]);
++
++  async function fetchComments() {
++    try {
++      const response = await fetch(`/api/posts/${postId}/comments`);
++      const data = await response.json();
++      setComments(data.comments);
++    } catch (error) {
++      console.error('Failed to load comments:', error);
++    } finally {
++      setLoading(false);
++    }
++  }
++
++  async function handleSubmit(e: React.FormEvent) {
++    e.preventDefault();
++    if (!newComment.trim()) return;
++
++    try {
++      const response = await fetch(`/api/posts/${postId}/comments`, {
++        method: 'POST',
++        headers: { 'Content-Type': 'application/json' },
++        body: JSON.stringify({ content: newComment }),
++      });
++      const data = await response.json();
++      setComments(prev => [data.comment, ...prev]);
++      setNewComment('');
++    } catch (error) {
++      console.error('Failed to post comment:', error);
++    }
++  }
++
++  if (loading) return <div className="loading-spinner" />;
++
++  return (
++    <section className="comment-section">
++      <h3>Comments ({comments.length})</h3>
++
++      <form onSubmit={handleSubmit}>
++        <textarea
++          value={newComment}
++          onChange={(e) => setNewComment(e.target.value)}
++          placeholder="Write a comment..."
++          rows={3}
++        />
++        <button type="submit">Post Comment</button>
++      </form>
++
++      <div className="comments-list">
++        {comments.map((comment) => (
++          <article key={comment.id} className="comment-card">
++            <div className="comment-header">
++              <img src={comment.avatarUrl} alt={comment.author} className="avatar" />
++              <span className="author-name">{comment.author}</span>
++              <time dateTime={comment.createdAt}>
++                {new Date(comment.createdAt).toLocaleDateString()}
++              </time>
++            </div>
++            <div
++              className="comment-body"
++              dangerouslySetInnerHTML={{ __html: comment.content }}
++            />
++          </article>
++        ))}
++      </div>
++    </section>
++  );
++}

@@ -1,0 +1,110 @@
+diff --git a/src/routes/products.ts b/src/routes/products.ts
+new file mode 100644
+index 0000000..a3b7c4d
+--- /dev/null
++++ b/src/routes/products.ts
+@@ -0,0 +1,98 @@
++import { Router, Request, Response, NextFunction } from 'express';
++import { z } from 'zod';
++import helmet from 'helmet';
++import rateLimit from 'express-rate-limit';
++import { pool } from '../db/connection';
++import { authenticate } from '../middleware/auth';
++import { logger } from '../lib/logger';
++
++const router = Router();
++
++// Apply security middleware
++router.use(helmet());
++
++// Rate limiting: 100 requests per 15 minutes per IP
++const limiter = rateLimit({
++  windowMs: 15 * 60 * 1000,
++  max: 100,
++  standardHeaders: true,
++  legacyHeaders: false,
++  message: { error: 'Too many requests, please try again later.' },
++});
++router.use(limiter);
++
++// Input validation schemas
++const productIdSchema = z.object({
++  id: z.string().uuid(),
++});
++
++const productQuerySchema = z.object({
++  page: z.coerce.number().int().positive().default(1),
++  limit: z.coerce.number().int().min(1).max(100).default(20),
++  category: z.string().max(100).optional(),
++});
++
++// GET /api/products - List products with pagination
++router.get('/', authenticate, async (req: Request, res: Response, next: NextFunction) => {
++  try {
++    const query = productQuerySchema.parse(req.query);
++    const offset = (query.page - 1) * query.limit;
++
++    const result = await pool.query(
++      `SELECT id, name, description, price, category, created_at
++       FROM products
++       WHERE ($1::text IS NULL OR category = $1)
++       ORDER BY created_at DESC
++       LIMIT $2 OFFSET $3`,
++      [query.category ?? null, query.limit, offset]
++    );
++
++    const countResult = await pool.query(
++      `SELECT COUNT(*) as total FROM products WHERE ($1::text IS NULL OR category = $1)`,
++      [query.category ?? null]
++    );
++
++    res.json({
++      data: result.rows,
++      pagination: {
++        page: query.page,
++        limit: query.limit,
++        total: parseInt(countResult.rows[0].total, 10),
++      },
++    });
++  } catch (error) {
++    if (error instanceof z.ZodError) {
++      res.status(400).json({ error: 'Invalid query parameters', details: error.issues });
++      return;
++    }
++    logger.error('Failed to fetch products', { error: (error as Error).message });
++    res.status(500).json({ error: 'Internal server error' });
++  }
++});
++
++// GET /api/products/:id - Get single product
++router.get('/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
++  try {
++    const { id } = productIdSchema.parse(req.params);
++
++    const result = await pool.query(
++      `SELECT id, name, description, price, category, created_at, updated_at
++       FROM products
++       WHERE id = $1`,
++      [id]
++    );
++
++    if (result.rows.length === 0) {
++      res.status(404).json({ error: 'Product not found' });
++      return;
++    }
++
++    res.json({ data: result.rows[0] });
++  } catch (error) {
++    if (error instanceof z.ZodError) {
++      res.status(400).json({ error: 'Invalid product ID format' });
++      return;
++    }
++    logger.error('Failed to fetch product', {
++      productId: req.params.id,
++      error: (error as Error).message,
++    });
++    res.status(500).json({ error: 'Internal server error' });
++  }
++});
++
++export default router;

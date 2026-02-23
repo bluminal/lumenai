@@ -1,0 +1,27 @@
+# Autonomous Organization — Project Configuration
+# Customized for the payments service
+
+implementation_plan:
+  reviewers:
+    - agent: architect
+      enabled: true
+      focus: "Technical architecture, payment flow correctness, idempotency"
+
+    - agent: designer
+      enabled: false
+
+    - agent: tech-lead
+      enabled: true
+      focus: "Task clarity, acceptance criteria, PCI compliance tasks"
+
+    - agent: security-reviewer
+      enabled: true
+      focus: "PCI DSS compliance, payment data handling, encryption, tokenization"
+
+  max_review_cycles: 5
+  min_severity_to_address: medium
+
+documents:
+  requirements: docs/reqs/main.md
+  implementation_plan: docs/plans/main.md
+  specs: docs/specs

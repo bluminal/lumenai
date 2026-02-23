@@ -1,0 +1,112 @@
+diff --git a/src/routes/admin.ts b/src/routes/admin.ts
+new file mode 100644
+index 0000000..b9c3d5e
+--- /dev/null
++++ b/src/routes/admin.ts
+@@ -0,0 +1,78 @@
++import { Router, Request, Response } from 'express';
++import { pool } from '../db/connection';
++import { logger } from '../lib/logger';
++
++const router = Router();
++
++// GET /api/admin/users - List all users with full details
++router.get('/users', async (req: Request, res: Response) => {
++  try {
++    const page = parseInt(req.query.page as string) || 1;
++    const limit = parseInt(req.query.limit as string) || 50;
++    const offset = (page - 1) * limit;
++
++    const result = await pool.query(
++      `SELECT id, name, email, role, phone, address, last_login_at, created_at
++       FROM users
++       ORDER BY created_at DESC
++       LIMIT $1 OFFSET $2`,
++      [limit, offset]
++    );
++
++    const countResult = await pool.query('SELECT COUNT(*) as total FROM users');
++
++    return res.json({
++      data: result.rows,
++      pagination: {
++        page,
++        limit,
++        total: parseInt(countResult.rows[0].total, 10),
++      },
++    });
++  } catch (error) {
++    logger.error('Error listing users', { error: (error as Error).message });
++    return res.status(500).json({ error: 'Internal server error' });
++  }
++});
++
++// GET /api/admin/users/:id - Get user detail
++router.get('/users/:id', async (req: Request, res: Response) => {
++  try {
++    const result = await pool.query(
++      `SELECT id, name, email, role, phone, address, last_login_at,
++              login_count, email_verified, two_factor_enabled, created_at, updated_at
++       FROM users
++       WHERE id = $1`,
++      [req.params.id]
++    );
++
++    if (result.rows.length === 0) {
++      return res.status(404).json({ error: 'User not found' });
++    }
++
++    return res.json({ data: result.rows[0] });
++  } catch (error) {
++    logger.error('Error fetching user', { error: (error as Error).message });
++    return res.status(500).json({ error: 'Internal server error' });
++  }
++});
++
++// PUT /api/admin/users/:id/role - Update user role
++router.put('/users/:id/role', async (req: Request, res: Response) => {
++  try {
++    const { role } = req.body;
++    const validRoles = ['user', 'moderator', 'admin', 'super_admin'];
++
++    if (!validRoles.includes(role)) {
++      return res.status(400).json({ error: 'Invalid role' });
++    }
++
++    const result = await pool.query(
++      `UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, email, role`,
++      [role, req.params.id]
++    );
++
++    if (result.rows.length === 0) {
++      return res.status(404).json({ error: 'User not found' });
++    }
++
++    logger.info('User role updated', { userId: req.params.id, newRole: role });
++    return res.json({ data: result.rows[0] });
++  } catch (error) {
++    logger.error('Error updating user role', { error: (error as Error).message });
++    return res.status(500).json({ error: 'Internal server error' });
++  }
++});
++
++export default router;
+diff --git a/src/app.ts b/src/app.ts
+index 1a2b3c4..d5e6f7a 100644
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -8,6 +8,7 @@ import helmet from 'helmet';
+ import cors from 'cors';
+ import productsRouter from './routes/products';
+ import ordersRouter from './routes/orders';
++import adminRouter from './routes/admin';
+
+ const app = express();
+
+@@ -18,6 +19,7 @@ app.use(express.json({ limit: '10kb' }));
+
+ app.use('/api/products', productsRouter);
+ app.use('/api/orders', ordersRouter);
++app.use('/api/admin', adminRouter);
+
+ export default app;

@@ -1,0 +1,13 @@
+aws_s3_bucket.application_assets: Refreshing state... [id=acme-prod-application-assets-us-east-1]
+aws_s3_bucket_versioning.application_assets: Refreshing state... [id=acme-prod-application-assets-us-east-1]
+aws_s3_bucket_server_side_encryption_configuration.application_assets: Refreshing state... [id=acme-prod-application-assets-us-east-1]
+aws_s3_bucket_public_access_block.application_assets: Refreshing state... [id=acme-prod-application-assets-us-east-1]
+aws_s3_bucket_logging.application_assets: Refreshing state... [id=acme-prod-application-assets-us-east-1]
+aws_s3_bucket_lifecycle_configuration.application_assets: Refreshing state... [id=acme-prod-application-assets-us-east-1]
+aws_db_instance.primary: Refreshing state... [id=acme-prod-primary-db]
+aws_security_group.app_sg: Refreshing state... [id=sg-0a1b2c3d4e5f67890]
+
+No changes. Your infrastructure matches the configuration.
+
+Terraform has compared your real infrastructure against your configuration
+and found no differences, so no changes are needed.

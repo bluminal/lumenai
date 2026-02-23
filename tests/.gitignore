@@ -1,0 +1,13 @@
+# LLM output cache — regenerated on demand, not version-controlled
+.cache/
+
+# Build artifacts
+dist/
+node_modules/
+
+# Promptfoo output (generated reports)
+promptfoo-output/
+.promptfoo/
+
+# OS files
+.DS_Store

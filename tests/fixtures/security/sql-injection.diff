@@ -1,0 +1,78 @@
+diff --git a/src/routes/users.ts b/src/routes/users.ts
+new file mode 100644
+index 0000000..c4d9e7a
+--- /dev/null
++++ b/src/routes/users.ts
+@@ -0,0 +1,72 @@
++import { Router, Request, Response } from 'express';
++import { db } from '../db/connection';
++import { authenticate } from '../middleware/auth';
++import { logger } from '../lib/logger';
++
++const router = Router();
++
++// GET /api/users/:id - Get user by ID
++router.get('/:id', authenticate, async (req: Request, res: Response) => {
++  try {
++    const query = `SELECT id, name, email, role, created_at FROM users WHERE id = ${req.params.id}`;
++    const result = await db.query(query);
++
++    if (result.rows.length === 0) {
++      return res.status(404).json({ error: 'User not found' });
++    }
++
++    return res.json({ data: result.rows[0] });
++  } catch (error) {
++    logger.error('Error fetching user', { error });
++    return res.status(500).json({ error: 'Internal server error' });
++  }
++});
++
++// GET /api/users/search - Search users by name
++router.get('/search', authenticate, async (req: Request, res: Response) => {
++  try {
++    const { name, email, role } = req.query;
++
++    let query = 'SELECT id, name, email, role, created_at FROM users WHERE 1=1';
++
++    if (name) {
++      query += ` AND name LIKE '%${name}%'`;
++    }
++    if (email) {
++      query += ` AND email = '${email}'`;
++    }
++    if (role) {
++      query += ` AND role = '${role}'`;
++    }
++
++    query += ' ORDER BY created_at DESC LIMIT 50';
++
++    const result = await db.query(query);
++    return res.json({ data: result.rows });
++  } catch (error) {
++    logger.error('Error searching users', { error });
++    return res.status(500).json({ error: 'Internal server error' });
++  }
++});
++
++// POST /api/users/:id/notes - Add a note to a user
++router.post('/:id/notes', authenticate, async (req: Request, res: Response) => {
++  try {
++    const userId = req.params.id;
++    const { content } = req.body;
++
++    const insertQuery = `
++      INSERT INTO user_notes (user_id, content, created_by, created_at)
++      VALUES ('${userId}', '${content}', '${req.user.id}', NOW())
++      RETURNING id, content, created_at
++    `;
++
++    const result = await db.query(insertQuery);
++    return res.status(201).json({ data: result.rows[0] });
++  } catch (error) {
++    logger.error('Error adding user note', { error });
++    return res.status(500).json({ error: 'Internal server error' });
++  }
++});
++
++export default router;

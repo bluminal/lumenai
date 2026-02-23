@@ -1,0 +1,26 @@
+{
+  "name": "acme-inventory-service",
+  "version": "1.0.0",
+  "description": "Inventory management microservice for the ACME platform",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "tsx": "^4.19.3",
+    "vitest": "^4.0.16",
+    "@types/express": "^5.0.1",
+    "@types/pg": "^8.11.10",
+    "eslint": "^9.20.0"
+  }
+}

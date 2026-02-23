@@ -1,0 +1,407 @@
+# Autonomous Organization — Agent Behavioral Test Suite
+#
+# Uses promptfoo to invoke agents via claude -p and validate
+# behavioral rules through deterministic assertions.
+#
+# Usage:
+#   npx promptfoo eval                                    # Run all tests
+#   npx promptfoo eval --filter-pattern "B[0-9]"          # Layer 2: behavioral only
+#   npx promptfoo eval --filter-pattern "S[0-9]"          # Layer 3: semantic only
+
+description: "Autonomous Organization Agent Tests"
+
+# Provider wraps `claude -p` to invoke agents with their .md as system prompt
+providers:
+  - id: exec:node tests/helpers/claude-provider.js
+    config:
+      maxTurns: 1
+      model: sonnet
+
+# ---------------------------------------------------------------------------
+# Layer 2: Behavioral Assertions
+# Each test invokes the agent once and runs multiple deterministic assertions.
+# ---------------------------------------------------------------------------
+
+tests:
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # TERRAFORM PLAN REVIEWER
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "TF-B1: Requests project context when not provided"
+    vars:
+      agent: terraform-plan-reviewer
+      input_file: tests/fixtures/terraform/destructive-rds.txt
+    assert:
+      - type: icontains
+        value: "project context"
+      - type: regex
+        value: "## Terraform Plan Review Verdict: (PASS|WARN|FAIL)"
+
+  - description: "TF-B4: RDS destroy without snapshot = FAIL + CRITICAL"
+    vars:
+      agent: terraform-plan-reviewer
+      input_file: tests/fixtures/terraform/destructive-rds.txt
+      extra_context: "This is a production database for user data. Project: acme-saas."
+    assert:
+      - type: regex
+        value: "## Terraform Plan Review Verdict: FAIL"
+      - type: icontains
+        value: "CRITICAL"
+      - type: icontains
+        value: "Findings Detail"
+      - type: javascript
+        value: |
+          // First finding should be CRITICAL
+          const findings = output.match(/####\s+\[?(CRITICAL|HIGH|MEDIUM|LOW)\]?/g);
+          return findings && findings[0].includes('CRITICAL');
+      - type: icontains
+        value: "skip_final_snapshot"
+
+  - description: "TF-B5: Missing tags only = WARN verdict"
+    vars:
+      agent: terraform-plan-reviewer
+      input_file: tests/fixtures/terraform/missing-tags.txt
+      extra_context: "Project: acme-analytics. Environment: production."
+    assert:
+      - type: regex
+        value: "## Terraform Plan Review Verdict: (WARN|FAIL)"
+      - type: not-icontains
+        value: "CRITICAL"
+
+  - description: "TF-B6: Clean plan = PASS verdict"
+    vars:
+      agent: terraform-plan-reviewer
+      input_file: tests/fixtures/terraform/clean-plan.txt
+      extra_context: "Project: acme-data. Environment: production."
+    assert:
+      - type: regex
+        value: "## Terraform Plan Review Verdict: PASS"
+      - type: not-icontains
+        value: "CRITICAL"
+      - type: not-icontains
+        value: "HIGH"
+
+  - description: "TF-B7: Findings sorted by severity (multi-issue)"
+    vars:
+      agent: terraform-plan-reviewer
+      input_file: tests/fixtures/terraform/multi-issue.json
+      extra_context: "Project: data-platform. Environment: production."
+    assert:
+      - type: regex
+        value: "## Terraform Plan Review Verdict: FAIL"
+      - type: javascript
+        value: |
+          // Verify severity ordering: all CRITICAL before HIGH before MEDIUM before LOW
+          const order = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+          const findings = [...output.matchAll(/####\s+\[?(CRITICAL|HIGH|MEDIUM|LOW)\]?/g)]
+            .map(m => m[1]);
+          if (findings.length < 2) return { pass: false, reason: 'Expected multiple findings' };
+          for (let i = 1; i < findings.length; i++) {
+            if (order[findings[i]] < order[findings[i-1]]) {
+              return { pass: false, reason: `${findings[i]} appears after ${findings[i-1]}` };
+            }
+          }
+          return { pass: true };
+
+  - description: "TF-B8: Recommendations include terraform code snippets"
+    vars:
+      agent: terraform-plan-reviewer
+      input_file: tests/fixtures/terraform/wide-open-sg.txt
+      extra_context: "Project: web-platform. Environment: production."
+    assert:
+      - type: regex
+        value: "## Terraform Plan Review Verdict: FAIL"
+      - type: contains
+        value: "```"
+
+  - description: "TF-B10: Advisory only — never blocks"
+    vars:
+      agent: terraform-plan-reviewer
+      input_file: tests/fixtures/terraform/destructive-rds.txt
+      extra_context: "Production database."
+    assert:
+      - type: not-icontains
+        value: "blocking this"
+      - type: not-icontains
+        value: "refusing to"
+      - type: not-icontains
+        value: "cannot allow"
+
+  - description: "TF-B11: Empty plan = PASS"
+    vars:
+      agent: terraform-plan-reviewer
+      input_file: tests/fixtures/terraform/empty-plan.txt
+    assert:
+      - type: regex
+        value: "## Terraform Plan Review Verdict: PASS"
+
+  - description: "TF-B12: JSON format auto-detected"
+    vars:
+      agent: terraform-plan-reviewer
+      input_file: tests/fixtures/terraform/clean-plan.json
+      extra_context: "Project: analytics-platform."
+    assert:
+      - type: regex
+        value: "## Terraform Plan Review Verdict: (PASS|WARN)"
+      - type: icontains
+        value: "Summary"
+      - type: icontains
+        value: "Cost Impact"
+
+  - description: "TF-B13: Surprise cost detection on POC naming"
+    vars:
+      agent: terraform-plan-reviewer
+      input_file: tests/fixtures/terraform/surprise-cost-poc.txt
+      extra_context: "Quick proof of concept for demo next week."
+    assert:
+      - type: javascript
+        value: |
+          // Should mention cost concern given POC naming + expensive instances
+          const hasCostAlert = /cost alert|surprise|unexpected|disproportionate|poc/i.test(output);
+          const mentionsExpensive = /m5\.4xlarge|r5\.2xlarge|expensive|high.cost/i.test(output);
+          return { pass: hasCostAlert || mentionsExpensive };
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # SECURITY REVIEWER
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "SR-B1: CWE references in all findings"
+    vars:
+      agent: security-reviewer
+      input_file: tests/fixtures/security/hardcoded-secret.diff
+    assert:
+      - type: regex
+        value: "CWE-\\d+"
+      - type: regex
+        value: "## Security Review Verdict: FAIL"
+
+  - description: "SR-B2: Secrets Scan section always present (clean code)"
+    vars:
+      agent: security-reviewer
+      input_file: tests/fixtures/security/clean-code.diff
+    assert:
+      - type: icontains
+        value: "Secrets Scan"
+      - type: icontains
+        value: "Dependency Audit"
+      - type: regex
+        value: "## Security Review Verdict: PASS"
+
+  - description: "SR-B3: Dependency Audit section always present"
+    vars:
+      agent: security-reviewer
+      input_file: tests/fixtures/security/clean-code.diff
+    assert:
+      - type: icontains
+        value: "Dependency Audit"
+
+  - description: "SR-B4: Hardcoded AWS key AKIA = FAIL/CRITICAL"
+    vars:
+      agent: security-reviewer
+      input_file: tests/fixtures/security/hardcoded-secret.diff
+    assert:
+      - type: regex
+        value: "## Security Review Verdict: FAIL"
+      - type: icontains
+        value: "CRITICAL"
+      - type: regex
+        value: "AKIA|AWS|access.key|credential"
+
+  - description: "SR-B6: SQL injection remediation includes parameterized query"
+    vars:
+      agent: security-reviewer
+      input_file: tests/fixtures/security/sql-injection.diff
+    assert:
+      - type: regex
+        value: "## Security Review Verdict: FAIL"
+      - type: icontains
+        value: "CRITICAL"
+      - type: javascript
+        value: |
+          // Remediation should mention parameterized queries or prepared statements
+          const hasRemedy = /parameteriz|prepared.statement|\$\d|placeholder/i.test(output);
+          return { pass: hasRemedy, reason: hasRemedy ? '' : 'No parameterized query in remediation' };
+
+  - description: "SR-B8: Detects AKIA pattern as CRITICAL"
+    vars:
+      agent: security-reviewer
+      input_file: tests/fixtures/security/hardcoded-secret.diff
+    assert:
+      - type: icontains
+        value: "CRITICAL"
+      - type: javascript
+        value: |
+          // Should specifically call out the AWS key pattern
+          return /AKIA|access.key.id|aws.*credential/i.test(output);
+
+  - description: "SR-B11: Advisory only — never blocks"
+    vars:
+      agent: security-reviewer
+      input_file: tests/fixtures/security/hardcoded-secret.diff
+    assert:
+      - type: not-icontains
+        value: "blocking this"
+      - type: not-icontains
+        value: "refusing to"
+
+  - description: "SR-B5: Mixed severity findings are sorted"
+    vars:
+      agent: security-reviewer
+      input_file: tests/fixtures/security/mixed-severity.diff
+    assert:
+      - type: regex
+        value: "## Security Review Verdict: FAIL"
+      - type: javascript
+        value: |
+          const order = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+          const findings = [...output.matchAll(/####\s+\[?(CRITICAL|HIGH|MEDIUM|LOW)\]?/g)]
+            .map(m => m[1]);
+          if (findings.length < 2) return { pass: false, reason: 'Expected multiple findings' };
+          for (let i = 1; i < findings.length; i++) {
+            if (order[findings[i]] < order[findings[i-1]]) {
+              return { pass: false, reason: `${findings[i]} after ${findings[i-1]}` };
+            }
+          }
+          return { pass: true };
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # PRODUCT MANAGER
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "PM-B1: Never auto-generates PRD without questions"
+    vars:
+      agent: product-manager
+      input: "Create a PRD for a social media analytics dashboard that helps marketing teams track engagement metrics across platforms."
+    assert:
+      - type: javascript
+        value: |
+          // Must ask questions, NOT produce a complete PRD
+          const hasQuestions = (output.match(/\?/g) || []).length >= 2;
+          const hasFullPRD = output.includes('## 3. Functional Requirements') ||
+                            output.includes('## 4. Non-Functional');
+          return {
+            pass: hasQuestions && !hasFullPRD,
+            reason: hasQuestions
+              ? (hasFullPRD ? 'Auto-generated PRD without asking first' : 'Correctly asked questions')
+              : 'Did not ask clarifying questions'
+          };
+
+  - description: "PM-B2: Asks clarifying questions"
+    vars:
+      agent: product-manager
+      input: "Create a PRD for an API key management tool for developers."
+    assert:
+      - type: javascript
+        value: |
+          const questionCount = (output.match(/\?/g) || []).length;
+          return { pass: questionCount >= 2, reason: `Found ${questionCount} questions` };
+
+  - description: "PM-B3: Questions in batches of 3-7"
+    vars:
+      agent: product-manager
+      input: "I want to build a real-time collaborative code editor for remote engineering teams."
+    assert:
+      - type: javascript
+        value: |
+          const questions = output.match(/\?/g) || [];
+          const count = questions.length;
+          return {
+            pass: count >= 3 && count <= 10,
+            reason: `${count} questions (expected 3-10 in first batch)`
+          };
+
+  - description: "PM-B8: Never suggests placing plan in CLAUDE.md"
+    vars:
+      agent: product-manager
+      input: "Create a PRD for a notification service."
+    assert:
+      - type: javascript
+        value: |
+          // Should not suggest writing plans to CLAUDE.md
+          const mentionsClaude = /write.*CLAUDE\.md|plan.*CLAUDE\.md|CLAUDE\.md.*plan/i.test(output);
+          return { pass: !mentionsClaude };
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Layer 3: SEMANTIC EVALUATION (LLM-as-Judge)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "TF-S1: Catches planted SSH exposure (semantic accuracy)"
+    vars:
+      agent: terraform-plan-reviewer
+      input_file: tests/fixtures/terraform/wide-open-sg.txt
+      extra_context: "Production web application."
+    assert:
+      - type: llm-rubric
+        value: |
+          The terraform plan creates a security group that opens port 22 (SSH)
+          to 0.0.0.0/0 and ::/0 (the entire internet). The reviewer should:
+          1. Identify this as a CRITICAL or HIGH severity finding
+          2. Reference the specific security group resource by name
+          3. Recommend restricting the CIDR block to specific IPs or a VPN
+          4. Explain the SSH exposure risk to the business
+          Score 1.0 if all four criteria are met, 0.75 if 3/4, 0.5 if vague, 0.0 if missed.
+        threshold: 0.75
+
+  - description: "SR-S1: Catches planted SQL injection (semantic accuracy)"
+    vars:
+      agent: security-reviewer
+      input_file: tests/fixtures/security/sql-injection.diff
+    assert:
+      - type: llm-rubric
+        value: |
+          The code diff contains multiple SQL injection vulnerabilities where user input
+          is concatenated directly into SQL query strings (e.g., string interpolation
+          of req.params.id, req.query.name, req.body.content into SQL).
+
+          The reviewer should:
+          1. Identify SQL injection (CWE-89) as the primary vulnerability
+          2. Rate it as CRITICAL severity
+          3. Identify multiple injection points (at least the GET /:id route and search route)
+          4. Provide remediation using parameterized queries ($1, $2 placeholders)
+          5. Show a corrected code example with proper parameterization
+
+          Score 1.0 if all criteria met. 0.75 if catches the issue but misses some injection points.
+          0.5 if only partially identifies the issue. 0.0 if missed entirely.
+        threshold: 0.75
+
+  - description: "SR-S2: Catches planted XSS vulnerability (semantic accuracy)"
+    vars:
+      agent: security-reviewer
+      input_file: tests/fixtures/security/xss-vuln.diff
+    assert:
+      - type: llm-rubric
+        value: |
+          The React component uses dangerouslySetInnerHTML with unsanitized user-generated
+          comment content, creating a stored XSS vulnerability.
+
+          The reviewer should:
+          1. Identify stored XSS (CWE-79) as the vulnerability
+          2. Rate it as HIGH or CRITICAL severity
+          3. Reference the dangerouslySetInnerHTML usage
+          4. Recommend sanitization (DOMPurify or similar) or safe rendering
+          5. Provide a remediated code example
+
+          Score 1.0 if all criteria met. Score 0.0 if missed.
+        threshold: 0.75
+
+  - description: "PM-S1: PM asks insightful questions (semantic quality)"
+    vars:
+      agent: product-manager
+      input: "Create a PRD for a real-time collaborative code editor targeting remote engineering teams."
+    assert:
+      - type: llm-rubric
+        value: |
+          The Product Manager was given a brief description of a collaborative code editor.
+          Evaluate the quality of the clarifying questions asked:
+
+          GOOD questions probe: target scale, conflict resolution strategy, language support
+          scope, offline requirements, security/compliance needs, integration with existing
+          tools, latency requirements, pricing model.
+
+          BAD questions are obvious (answerable from the brief) or too generic.
+
+          Score based on: question depth, coverage of Vision/Users/Scope/Success/Constraints/
+          Non-functional areas, and whether questions are batched in manageable groups.
+
+          Score 1.0 for excellent questions. Score 0.5 for adequate. Score 0.0 for poor.
+        threshold: 0.6

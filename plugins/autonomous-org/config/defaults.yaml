@@ -1,0 +1,58 @@
+# Autonomous Organization — Project Configuration
+#
+# This is the default configuration for the Autonomous Organization plugin.
+# To customize for your project, copy this file to:
+#   .autonomous-org/config.yaml
+# in your project root.
+#
+# You only need to include sections you want to override.
+# Unspecified values use the defaults shown here.
+#
+# To create this file automatically, run the `init` command.
+
+# -------------------------------------------------------------------
+# Implementation Plan Settings
+# Used by the `write-implementation-plan` command
+# -------------------------------------------------------------------
+implementation_plan:
+
+  # Sub-agents that review the draft implementation plan.
+  # Each reviewer provides structured feedback (CRITICAL/HIGH/MEDIUM/LOW)
+  # that the Product Manager must address before the plan is finalized.
+  #
+  # You can:
+  #   - Add project-specific reviewers (e.g., security-reviewer, compliance)
+  #   - Disable default reviewers by setting enabled: false
+  #   - Customize the focus area for each reviewer
+  reviewers:
+    - agent: architect
+      enabled: true
+      focus: "Technical architecture, feasibility, NFR coverage, missing technical tasks"
+
+    - agent: designer
+      enabled: true
+      focus: "Design tasks, UX impact, visual/interaction design clarity"
+
+    - agent: tech-lead
+      enabled: true
+      focus: "Task clarity, acceptance criteria, parallelizability, dependency accuracy"
+
+  # Maximum number of review loop iterations before forcing completion.
+  # Each cycle: reviewers provide feedback → PM addresses it → re-review.
+  # If unresolved findings remain after max cycles, they go to Open Questions.
+  max_review_cycles: 3
+
+  # Minimum severity level that the Product Manager must address.
+  # Options: critical, high, medium, low
+  # Default "high" means all CRITICAL and HIGH findings must be resolved.
+  min_severity_to_address: high
+
+# -------------------------------------------------------------------
+# Document Paths
+# Default locations for key project documents.
+# These can also be overridden via command parameters.
+# -------------------------------------------------------------------
+documents:
+  requirements: docs/reqs/main.md
+  implementation_plan: docs/plans/main.md
+  specs: docs/specs

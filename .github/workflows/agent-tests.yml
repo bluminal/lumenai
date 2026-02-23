@@ -1,0 +1,139 @@
+# Autonomous Organization — Agent Testing Pipeline
+#
+# Three-tier CI pipeline matching the testing pyramid:
+#   1. Schema Validation  — Every PR, instant, zero LLM cost
+#   2. Behavioral Tests   — Manual trigger only, cached LLM outputs
+#   3. Semantic Evaluation — Manual trigger only, LLM-as-judge rubrics
+#
+# All layers beyond schema validation are manual-only to control costs.
+# The cache layer ensures behavioral tests only call the LLM when the agent
+# definition or fixture has changed. All subsequent runs use cached outputs.
+
+name: Agent Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_behavioral:
+        description: 'Run behavioral assertions (Layer 2)'
+        type: boolean
+        default: false
+      run_semantic:
+        description: 'Run semantic evaluation (Layer 3, LLM-as-judge)'
+        type: boolean
+        default: false
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # Layer 1: Schema Validation (every PR, instant, free)
+  # ─────────────────────────────────────────────────────────────────
+  schema-validation:
+    name: "Layer 1: Schema Validation"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run schema tests
+        run: npx vitest run schemas/
+
+  # ─────────────────────────────────────────────────────────────────
+  # Layer 2: Behavioral Assertions (manual trigger only)
+  # ─────────────────────────────────────────────────────────────────
+  behavioral-assertions:
+    name: "Layer 2: Behavioral Assertions"
+    needs: schema-validation
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.run_behavioral == 'true'
+    defaults:
+      run:
+        working-directory: tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Restore LLM output cache from previous runs
+      - name: Restore LLM cache
+        uses: actions/cache@v4
+        with:
+          path: tests/.cache
+          key: llm-cache-${{ hashFiles('plugins/autonomous-org/agents/**', 'tests/fixtures/**') }}
+          restore-keys: |
+            llm-cache-
+
+      - name: Run behavioral tests
+        run: npx promptfoo eval --config promptfoo.config.yaml --filter-pattern "B[0-9]"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  # ─────────────────────────────────────────────────────────────────
+  # Layer 3: Semantic Evaluation (manual trigger only)
+  # ─────────────────────────────────────────────────────────────────
+  semantic-evaluation:
+    name: "Layer 3: Semantic Evaluation"
+    needs: schema-validation
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.run_semantic == 'true'
+    defaults:
+      run:
+        working-directory: tests
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Restore LLM output cache
+      - name: Restore LLM cache
+        uses: actions/cache@v4
+        with:
+          path: tests/.cache
+          key: llm-cache-${{ hashFiles('plugins/autonomous-org/agents/**', 'tests/fixtures/**') }}
+          restore-keys: |
+            llm-cache-
+
+      - name: Run full evaluation (behavioral + semantic)
+        run: npx promptfoo eval --config promptfoo.config.yaml
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

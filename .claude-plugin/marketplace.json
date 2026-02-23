@@ -1,0 +1,17 @@
+{
+  "name": "bluminal-labs-marketplace",
+  "owner": "Bluminal Labs",
+  "version": "0.1.0",
+  "pluginRoot": "./plugins",
+  "description": "Internal marketplace for Bluminal Labs Claude plugins — collections of AI agents, commands, and skills for autonomous software delivery.",
+  "plugins": [
+    {
+      "name": "autonomous-org",
+      "source": "./plugins/autonomous-org",
+      "version": "0.1.0",
+      "category": "productivity",
+      "keywords": ["agents", "organization", "orchestration", "delivery", "autonomous"],
+      "description": "AI agents modeled after a software startup org chart — specialized roles that collaborate to deliver complete, production-quality software."
+    }
+  ]
+}

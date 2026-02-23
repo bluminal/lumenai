@@ -1,0 +1,115 @@
+
+Terraform used the selected providers to generate the following execution plan.
+Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  # aws_db_instance.production_users will be destroyed
+  # (because aws_db_instance.production_users is not in configuration)
+  - resource "aws_db_instance" "production_users" {
+      - address                               = "prod-users-db.c9aksdjf8e2z.us-east-1.rds.amazonaws.com" -> null
+      - allocated_storage                     = 500 -> null
+      - auto_minor_version_upgrade            = true -> null
+      - availability_zone                     = "us-east-1a" -> null
+      - backup_retention_period               = 7 -> null
+      - backup_window                         = "03:00-04:00" -> null
+      - ca_cert_identifier                    = "rds-ca-rsa2048-g1" -> null
+      - copy_tags_to_snapshot                 = true -> null
+      - db_name                               = "users_production" -> null
+      - db_subnet_group_name                  = "prod-db-subnet-group" -> null
+      - delete_automated_backups              = true -> null
+      - deletion_protection                   = false -> null
+      - enabled_cloudwatch_logs_exports       = [
+          - "audit",
+          - "error",
+          - "general",
+          - "slowquery",
+        ] -> null
+      - endpoint                              = "prod-users-db.c9aksdjf8e2z.us-east-1.rds.amazonaws.com:5432" -> null
+      - engine                                = "postgres" -> null
+      - engine_version                        = "16.4" -> null
+      - iam_database_authentication_enabled   = true -> null
+      - id                                    = "prod-users-db" -> null
+      - identifier                            = "prod-users-db" -> null
+      - instance_class                        = "db.r6g.2xlarge" -> null
+      - iops                                  = 3000 -> null
+      - kms_key_id                            = "arn:aws:kms:us-east-1:123456789012:key/mrk-d7e8f9a0b1c2" -> null
+      - maintenance_window                    = "sun:05:00-sun:06:00" -> null
+      - max_allocated_storage                 = 1000 -> null
+      - monitoring_interval                   = 60 -> null
+      - monitoring_role_arn                    = "arn:aws:iam::123456789012:role/rds-monitoring-role" -> null
+      - multi_az                              = true -> null
+      - parameter_group_name                  = "prod-postgres16-params" -> null
+      - performance_insights_enabled          = true -> null
+      - performance_insights_kms_key_id       = "arn:aws:kms:us-east-1:123456789012:key/mrk-d7e8f9a0b1c2" -> null
+      - performance_insights_retention_period = 731 -> null
+      - port                                  = 5432 -> null
+      - publicly_accessible                   = false -> null
+      - skip_final_snapshot                   = true -> null
+      - storage_encrypted                     = true -> null
+      - storage_type                          = "gp3" -> null
+      - tags                                  = {
+          - "CostCenter"  = "CC-1234"
+          - "Environment" = "production"
+          - "Name"        = "prod-users-db"
+          - "Owner"       = "backend-team"
+          - "Project"     = "acme-platform"
+        } -> null
+      - username                              = "dbadmin" -> null
+      - vpc_security_group_ids                = [
+          - "sg-0a1b2c3d4e5f67890",
+        ] -> null
+    }
+
+  # aws_security_group.production_db will be destroyed
+  # (because aws_security_group.production_db is not in configuration)
+  - resource "aws_security_group" "production_db" {
+      - arn                    = "arn:aws:ec2:us-east-1:123456789012:security-group/sg-0a1b2c3d4e5f67890" -> null
+      - description            = "Security group for production users database" -> null
+      - egress                 = [
+          - {
+              - cidr_blocks      = [
+                  - "0.0.0.0/0",
+                ]
+              - description      = "Allow all outbound traffic"
+              - from_port        = 0
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "-1"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 0
+            },
+        ] -> null
+      - id                     = "sg-0a1b2c3d4e5f67890" -> null
+      - ingress                = [
+          - {
+              - cidr_blocks      = []
+              - description      = "PostgreSQL from application servers"
+              - from_port        = 5432
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "tcp"
+              - security_groups  = [
+                  - "sg-0f1e2d3c4b5a69780",
+                ]
+              - self             = false
+              - to_port          = 5432
+            },
+        ] -> null
+      - name                   = "prod-users-db-sg" -> null
+      - name_prefix            = "" -> null
+      - owner_id               = "123456789012" -> null
+      - revoke_rules_on_delete = false -> null
+      - tags                   = {
+          - "CostCenter"  = "CC-1234"
+          - "Environment" = "production"
+          - "Name"        = "prod-users-db-sg"
+          - "Owner"       = "backend-team"
+          - "Project"     = "acme-platform"
+        } -> null
+      - vpc_id                 = "vpc-0a1b2c3d4e5f67890" -> null
+    }
+
+Plan: 0 to add, 0 to change, 2 to destroy.

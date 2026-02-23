@@ -1,0 +1,314 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.9.5",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "aws_s3_bucket.application_assets",
+          "mode": "managed",
+          "type": "aws_s3_bucket",
+          "name": "application_assets",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 0,
+          "values": {
+            "bucket": "acme-prod-application-assets-us-east-1",
+            "force_destroy": false,
+            "object_lock_enabled": false,
+            "tags": {
+              "CostCenter": "CC-1234",
+              "Environment": "production",
+              "Name": "acme-prod-application-assets",
+              "Owner": "platform-team",
+              "Project": "acme-web"
+            }
+          }
+        },
+        {
+          "address": "aws_s3_bucket_versioning.application_assets",
+          "mode": "managed",
+          "type": "aws_s3_bucket_versioning",
+          "name": "application_assets",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 0,
+          "values": {
+            "versioning_configuration": [
+              {
+                "mfa_delete": "Disabled",
+                "status": "Enabled"
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_s3_bucket_server_side_encryption_configuration.application_assets",
+          "mode": "managed",
+          "type": "aws_s3_bucket_server_side_encryption_configuration",
+          "name": "application_assets",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 0,
+          "values": {
+            "rule": [
+              {
+                "bucket_key_enabled": true,
+                "apply_server_side_encryption_by_default": [
+                  {
+                    "kms_master_key_id": "arn:aws:kms:us-east-1:123456789012:key/mrk-a1b2c3d4e5f6",
+                    "sse_algorithm": "aws:kms"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "address": "aws_s3_bucket_public_access_block.application_assets",
+          "mode": "managed",
+          "type": "aws_s3_bucket_public_access_block",
+          "name": "application_assets",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 0,
+          "values": {
+            "block_public_acls": true,
+            "block_public_policy": true,
+            "ignore_public_acls": true,
+            "restrict_public_buckets": true
+          }
+        },
+        {
+          "address": "aws_s3_bucket_logging.application_assets",
+          "mode": "managed",
+          "type": "aws_s3_bucket_logging",
+          "name": "application_assets",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 0,
+          "values": {
+            "target_bucket": "acme-prod-access-logs-us-east-1",
+            "target_prefix": "s3/application-assets/"
+          }
+        },
+        {
+          "address": "aws_s3_bucket_lifecycle_configuration.application_assets",
+          "mode": "managed",
+          "type": "aws_s3_bucket_lifecycle_configuration",
+          "name": "application_assets",
+          "provider_name": "registry.terraform.io/hashicorp/aws",
+          "schema_version": 0,
+          "values": {
+            "rule": [
+              {
+                "id": "transition-to-ia",
+                "status": "Enabled",
+                "filter": [
+                  {
+                    "prefix": ""
+                  }
+                ],
+                "transition": [
+                  {
+                    "days": 90,
+                    "storage_class": "STANDARD_IA"
+                  },
+                  {
+                    "days": 180,
+                    "storage_class": "GLACIER"
+                  }
+                ],
+                "noncurrent_version_expiration": [
+                  {
+                    "noncurrent_days": 365
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "resource_changes": [
+    {
+      "address": "aws_s3_bucket.application_assets",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "application_assets",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "bucket": "acme-prod-application-assets-us-east-1",
+          "force_destroy": false,
+          "object_lock_enabled": false,
+          "tags": {
+            "CostCenter": "CC-1234",
+            "Environment": "production",
+            "Name": "acme-prod-application-assets",
+            "Owner": "platform-team",
+            "Project": "acme-web"
+          }
+        },
+        "after_unknown": {
+          "acceleration_status": true,
+          "acl": true,
+          "arn": true,
+          "bucket_domain_name": true,
+          "bucket_regional_domain_name": true,
+          "hosted_zone_id": true,
+          "id": true,
+          "region": true,
+          "request_payer": true,
+          "tags_all": true
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket_versioning.application_assets",
+      "mode": "managed",
+      "type": "aws_s3_bucket_versioning",
+      "name": "application_assets",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "versioning_configuration": [
+            {
+              "mfa_delete": "Disabled",
+              "status": "Enabled"
+            }
+          ]
+        },
+        "after_unknown": {
+          "bucket": true,
+          "id": true
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket_server_side_encryption_configuration.application_assets",
+      "mode": "managed",
+      "type": "aws_s3_bucket_server_side_encryption_configuration",
+      "name": "application_assets",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "rule": [
+            {
+              "bucket_key_enabled": true,
+              "apply_server_side_encryption_by_default": [
+                {
+                  "kms_master_key_id": "arn:aws:kms:us-east-1:123456789012:key/mrk-a1b2c3d4e5f6",
+                  "sse_algorithm": "aws:kms"
+                }
+              ]
+            }
+          ]
+        },
+        "after_unknown": {
+          "bucket": true,
+          "id": true
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket_public_access_block.application_assets",
+      "mode": "managed",
+      "type": "aws_s3_bucket_public_access_block",
+      "name": "application_assets",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "block_public_acls": true,
+          "block_public_policy": true,
+          "ignore_public_acls": true,
+          "restrict_public_buckets": true
+        },
+        "after_unknown": {
+          "bucket": true,
+          "id": true
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket_logging.application_assets",
+      "mode": "managed",
+      "type": "aws_s3_bucket_logging",
+      "name": "application_assets",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "target_bucket": "acme-prod-access-logs-us-east-1",
+          "target_prefix": "s3/application-assets/"
+        },
+        "after_unknown": {
+          "bucket": true,
+          "id": true
+        }
+      }
+    },
+    {
+      "address": "aws_s3_bucket_lifecycle_configuration.application_assets",
+      "mode": "managed",
+      "type": "aws_s3_bucket_lifecycle_configuration",
+      "name": "application_assets",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": ["create"],
+        "before": null,
+        "after": {
+          "rule": [
+            {
+              "id": "transition-to-ia",
+              "status": "Enabled",
+              "filter": [
+                {
+                  "prefix": ""
+                }
+              ],
+              "transition": [
+                {
+                  "days": 90,
+                  "storage_class": "STANDARD_IA"
+                },
+                {
+                  "days": 180,
+                  "storage_class": "GLACIER"
+                }
+              ],
+              "noncurrent_version_expiration": [
+                {
+                  "noncurrent_days": 365
+                }
+              ]
+            }
+          ]
+        },
+        "after_unknown": {
+          "bucket": true,
+          "id": true
+        }
+      }
+    }
+  ],
+  "configuration": {
+    "provider_config": {
+      "aws": {
+        "name": "aws",
+        "full_name": "registry.terraform.io/hashicorp/aws",
+        "version_constraint": "~> 5.0",
+        "expressions": {
+          "region": {
+            "constant_value": "us-east-1"
+          }
+        }
+      }
+    }
+  }
+}
