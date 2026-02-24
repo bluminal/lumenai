@@ -4,7 +4,7 @@
 
 If you discover a security vulnerability in LumenAI or the Synthex plugin, please report it responsibly.
 
-**Do not open a public issue.** Instead, email security concerns to: **aj@ajbrown.org**
+**Do not open a public issue.** Instead, email security concerns to: **security@bluminal.com**
 
 We will acknowledge receipt within 48 hours and provide an estimated timeline for a fix.
 
