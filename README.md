@@ -116,4 +116,4 @@ See [CLAUDE.md](./CLAUDE.md) for instructions on adding new agents, commands, an
 
 ## License
 
-UNLICENSED — Internal Bluminal Labs use only.
+Apache 2.0 — See [LICENSE](./LICENSE) for details.

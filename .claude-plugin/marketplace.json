@@ -3,6 +3,7 @@
   "owner": "Bluminal Labs",
   "version": "0.1.0",
   "pluginRoot": "./plugins",
+  "license": "Apache-2.0",
   "description": "Bluminal Labs AI plugin marketplace for Claude Code — collections of AI agents, commands, and skills for autonomous software delivery.",
   "plugins": [
     {

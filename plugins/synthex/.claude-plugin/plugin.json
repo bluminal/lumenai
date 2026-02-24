@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "description": "AI agents modeled after a software startup org chart — specialized roles that synthesize to discover, build, ship, operate, and learn from complete, production-quality software.",
   "author": "Bluminal Labs",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "keywords": ["agents", "organization", "orchestration", "delivery", "synthesis", "product-discovery", "sre", "metrics"],
   "commands": [
     "init.md",
