@@ -1,0 +1,81 @@
+diff --git a/src/api/orders.ts b/src/api/orders.ts
+new file mode 100644
+index 0000000..c7d2e1a
+--- /dev/null
++++ b/src/api/orders.ts
+@@ -0,0 +1,68 @@
++import { Router } from 'express';
++import { db } from '../db';
++import { stripe } from '../lib/stripe';
++
++const router = Router();
++
++// Create an order
++router.post('/', async (req, res) => {
++  const { userId, items, paymentMethodId } = req.body;
++
++  // No input validation on userId, items, or paymentMethodId
++
++  const order = await db.order.create({
++    data: {
++      userId,
++      items: { create: items },
++      status: 'pending',
++    },
++  });
++
++  // Calculate total without checking for negative quantities or prices
++  let total = 0;
++  for (const item of items) {
++    const product = await db.product.findUnique({ where: { id: item.productId } });
++    total += product.price * item.quantity; // product could be null
++  }
++
++  // Charge immediately without try/catch
++  const charge = await stripe.paymentIntents.create({
++    amount: total * 100,
++    currency: 'usd',
++    payment_method: paymentMethodId,
++    confirm: true,
++  });
++
++  await db.order.update({
++    where: { id: order.id },
++    data: { status: 'paid', stripePaymentId: charge.id },
++  });
++
++  res.json(order);
++});
++
++// Get order by ID
++router.get('/:id', async (req, res) => {
++  const order = await db.order.findUnique({
++    where: { id: req.params.id },
++    include: { items: true },
++  });
++
++  // No check if order belongs to the requesting user
++  // No null check on order
++  res.json(order);
++});
++
++// Delete order - no authorization check
++router.delete('/:id', async (req, res) => {
++  await db.order.delete({ where: { id: req.params.id } });
++  res.json({ deleted: true });
++});
++
++// Bulk update prices - no pagination, loads all products into memory
++router.post('/bulk-update-prices', async (req, res) => {
++  const { multiplier } = req.body;
++  const allProducts = await db.product.findMany();
++  for (const product of allProducts) {
++    await db.product.update({
++      where: { id: product.id },
++      data: { price: product.price * multiplier },
++    });
++  }
++  res.json({ updated: allProducts.length });
++});
++
++export default router;

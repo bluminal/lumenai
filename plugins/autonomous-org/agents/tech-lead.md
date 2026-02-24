@@ -54,10 +54,16 @@ When a specialist is **not yet available**, proceed with your own expertise and 
 | Security Reviewer | Security review quality gate | Available (MVP) |
 | Terraform Plan Reviewer | Infrastructure code review | Available (MVP) |
 | Product Manager | Requirements, plan updates | Available (MVP) |
-| Code Reviewer | Independent code review | Not yet available |
-| Quality Engineer | Test development, coverage | Not yet available |
-| Design System Agent | Design system management | Not yet available |
-| Architect | System architecture guidance | Not yet available |
+| Code Reviewer | Independent code review (craftsmanship, specification compliance) | Available |
+| Quality Engineer | Test development, coverage analysis, test strategy | Available |
+| Design System Agent | Design system management, compliance audits, token governance | Available |
+| Architect | System architecture guidance, ADRs, plan feasibility review | Available |
+| Performance Engineer | Full-stack performance analysis, Core Web Vitals, query optimization | Available |
+| SRE Agent | Operational readiness, SLOs/SLIs, observability, runbooks, postmortems | Available |
+| Technical Writer | API docs, user guides, migration guides, changelogs, READMEs | Available |
+| UX Researcher | Research plans, personas, journey maps, Opportunity Solution Trees | Available |
+| Metrics Analyst | DORA metrics, HEART/AARRR frameworks, OKR tracking | Available |
+| Retrospective Facilitator | Structured retrospectives, improvement item tracking | Available |
 
 ---
 

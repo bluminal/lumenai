@@ -1,0 +1,162 @@
+diff --git a/src/utils/app-manager.ts b/src/utils/app-manager.ts
+new file mode 100644
+index 0000000..e9a1f3c
+--- /dev/null
++++ b/src/utils/app-manager.ts
+@@ -0,0 +1,145 @@
++// AppManager handles everything in the application
++export class AppManager {
++  private db: any;
++  private cache: any;
++  private emailService: any;
++  private logger: any;
++  private config: any;
++  private analyticsClient: any;
++  private paymentGateway: any;
++  private notificationService: any;
++
++  constructor() {
++    this.db = require('../db');
++    this.cache = require('../cache');
++    this.emailService = require('../email');
++    this.logger = console;
++    this.config = require('../config');
++    this.analyticsClient = require('../analytics');
++    this.paymentGateway = require('../payments');
++    this.notificationService = require('../notifications');
++  }
++
++  // User management
++  async createUser(name: string, email: string, password: string) {
++    const user = await this.db.query('INSERT INTO users (name, email, password) VALUES ($1, $2, $3)', [name, email, password]);
++    await this.emailService.sendWelcomeEmail(email, name);
++    await this.analyticsClient.track('user_created', { email });
++    this.cache.del('users:all');
++    return user;
++  }
++
++  async getUser(id: string) {
++    const cached = this.cache.get(`user:${id}`);
++    if (cached) return cached;
++    const user = this.db.query('SELECT * FROM users WHERE id = $1', [id]);
++    this.cache.set(`user:${id}`, user, 300);
++    return user;
++  }
++
++  async deleteUser(id: string) {
++    await this.db.query('DELETE FROM users WHERE id = $1', [id]);
++    await this.cancelAllSubscriptions(id);
++    await this.deleteAllOrders(id);
++    this.cache.del(`user:${id}`);
++    this.cache.del('users:all');
++  }
++
++  // Order management
++  async createOrder(userId: string, items: any[], shippingAddress: any) {
++    let total = 0;
++    for (const item of items) {
++      const product = await this.db.query('SELECT price FROM products WHERE id = $1', [item.productId]);
++      total += product.price * item.quantity;
++    }
++
++    const order = await this.db.query(
++      'INSERT INTO orders (user_id, total, status, shipping_address) VALUES ($1, $2, $3, $4)',
++      [userId, total, 'pending', JSON.stringify(shippingAddress)]
++    );
++
++    for (const item of items) {
++      await this.db.query(
++        'INSERT INTO order_items (order_id, product_id, quantity) VALUES ($1, $2, $3)',
++        [order.id, item.productId, item.quantity]
++      );
++    }
++
++    await this.notificationService.send(userId, `Order ${order.id} created`);
++    await this.analyticsClient.track('order_created', { orderId: order.id, total });
++    return order;
++  }
++
++  async getOrder(id: string) {
++    return this.db.query('SELECT * FROM orders WHERE id = $1', [id]);
++  }
++
++  async deleteAllOrders(userId: string) {
++    await this.db.query('DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE user_id = $1)', [userId]);
++    await this.db.query('DELETE FROM orders WHERE user_id = $1', [userId]);
++  }
++
++  // Payment processing
++  async processPayment(orderId: string, paymentMethodId: string) {
++    const order = await this.getOrder(orderId);
++    const result = await this.paymentGateway.charge(paymentMethodId, order.total * 100);
++
++    if (result.success) {
++      await this.db.query('UPDATE orders SET status = $1, payment_id = $2 WHERE id = $3', ['paid', result.paymentId, orderId]);
++      await this.emailService.sendOrderConfirmation(order.userId, orderId);
++      await this.analyticsClient.track('payment_processed', { orderId, amount: order.total });
++    } else {
++      await this.db.query('UPDATE orders SET status = $1 WHERE id = $2', ['payment_failed', orderId]);
++      await this.notificationService.send(order.userId, `Payment failed for order ${orderId}`);
++    }
++
++    return result;
++  }
++
++  async refundPayment(orderId: string) {
++    const order = await this.getOrder(orderId);
++    await this.paymentGateway.refund(order.paymentId);
++    await this.db.query('UPDATE orders SET status = $1 WHERE id = $2', ['refunded', orderId]);
++    await this.emailService.sendRefundConfirmation(order.userId, orderId);
++  }
++
++  // Subscription management
++  async createSubscription(userId: string, planId: string, paymentMethodId: string) {
++    const plan = await this.db.query('SELECT * FROM plans WHERE id = $1', [planId]);
++    const sub = await this.paymentGateway.createSubscription(paymentMethodId, plan.stripePriceId);
++    await this.db.query(
++      'INSERT INTO subscriptions (user_id, plan_id, stripe_sub_id, status) VALUES ($1, $2, $3, $4)',
++      [userId, planId, sub.id, 'active']
++    );
++    await this.analyticsClient.track('subscription_created', { userId, planId });
++    return sub;
++  }
++
++  async cancelAllSubscriptions(userId: string) {
++    const subs = await this.db.query('SELECT * FROM subscriptions WHERE user_id = $1 AND status = $2', [userId, 'active']);
++    for (const sub of subs) {
++      await this.paymentGateway.cancelSubscription(sub.stripeSubId);
++      await this.db.query('UPDATE subscriptions SET status = $1 WHERE id = $2', ['cancelled', sub.id]);
++    }
++  }
++
++  // Analytics and reporting
++  async getDashboardMetrics() {
++    const users = await this.db.query('SELECT COUNT(*) as count FROM users');
++    const orders = await this.db.query('SELECT COUNT(*) as count, SUM(total) as revenue FROM orders WHERE status = $1', ['paid']);
++    const subs = await this.db.query('SELECT COUNT(*) as count FROM subscriptions WHERE status = $1', ['active']);
++
++    return {
++      totalUsers: users.count,
++      totalOrders: orders.count,
++      totalRevenue: orders.revenue,
++      activeSubscriptions: subs.count,
++    };
++  }
++
++  // Email operations
++  async sendBulkEmail(subject: string, body: string, userIds: string[]) {
++    for (const userId of userIds) {
++      const user = await this.getUser(userId);
++      await this.emailService.send(user.email, subject, body);
++    }
++  }
++
++  // Configuration
++  getConfig(key: string) {
++    return this.config[key];
++  }
++
++  setConfig(key: string, value: any) {
++    this.config[key] = value;
++  }
++}

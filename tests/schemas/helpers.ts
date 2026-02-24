@@ -10,7 +10,7 @@
 export interface ParsedOutput {
   verdictLine: string | null;
   verdict: 'PASS' | 'WARN' | 'FAIL' | null;
-  agentType: 'terraform' | 'security' | 'implementation-plan' | 'unknown';
+  agentType: 'terraform' | 'security' | 'implementation-plan' | 'code-review' | 'design-system' | 'architecture' | 'performance' | 'reliability' | 'unknown';
   sections: Section[];
   findings: Finding[];
   tables: Table[];
@@ -170,6 +170,16 @@ export function parseMarkdownOutput(text: string): ParsedOutput {
     agentType = 'security';
   } else if (text.match(/^#\s+Implementation Plan:/m)) {
     agentType = 'implementation-plan';
+  } else if (text.match(/code review|craftsmanship|specification compliance/i)) {
+    agentType = 'code-review';
+  } else if (text.match(/design system|compliance review|token violation/i)) {
+    agentType = 'design-system';
+  } else if (text.match(/implementation plan review.*architect|architect.*review/i) || (text.match(/architecture|adr|decision record/i) && text.match(/feasibility|NFR|alternative/i))) {
+    agentType = 'architecture';
+  } else if (text.match(/performance|core web vitals|bundle|LCP|CLS/i) && text.match(/audit|budget|optimization/i)) {
+    agentType = 'performance';
+  } else if (text.match(/reliability|SLO|SLI|observability|runbook/i)) {
+    agentType = 'reliability';
   }
 
   const sections = parseSections(lines);

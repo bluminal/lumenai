@@ -11,7 +11,7 @@ Set up the Autonomous Organization plugin configuration for a project. This comm
 ## What This Command Does
 
 1. **Creates the project configuration file** at `.autonomous-org/config.yaml` (or custom path)
-2. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`) if they don't exist
+2. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`, `docs/specs/decisions/`, `docs/specs/rfcs/`, `docs/runbooks/`, `docs/retros/`) if they don't exist
 3. **Provides guidance** on customizing the configuration for your project
 
 ## Workflow
@@ -35,6 +35,10 @@ Create the following directories if they don't already exist:
 - `docs/reqs/` — Product requirements documents
 - `docs/plans/` — Implementation plans
 - `docs/specs/` — Technical specifications
+- `docs/specs/decisions/` — Architecture Decision Records (ADRs)
+- `docs/specs/rfcs/` — Requests for Comments (RFCs)
+- `docs/runbooks/` — Operational runbooks
+- `docs/retros/` — Retrospective documents
 
 Do NOT create any files inside these directories — just the directories.
 
@@ -46,20 +50,37 @@ Inform the user what was created and provide guidance:
 Autonomous Organization initialized for this project.
 
 Created:
-  .autonomous-org/config.yaml  — Project configuration
-  docs/reqs/                   — Product requirements (PRDs)
-  docs/plans/                  — Implementation plans
-  docs/specs/                  — Technical specifications
+  .autonomous-org/config.yaml    — Project configuration
+  docs/reqs/                     — Product requirements (PRDs)
+  docs/plans/                    — Implementation plans
+  docs/specs/                    — Technical specifications
+  docs/specs/decisions/          — Architecture Decision Records (ADRs)
+  docs/specs/rfcs/               — Requests for Comments (RFCs)
+  docs/runbooks/                 — Operational runbooks
+  docs/retros/                   — Retrospective documents
 
 Next steps:
-  1. Review .autonomous-org/config.yaml and customize reviewers if needed
+  1. Review .autonomous-org/config.yaml and customize for your project
   2. Create your PRD with the `write-implementation-plan` command
   3. Or write your PRD manually at docs/reqs/main.md
+
+Available commands:
+  /write-implementation-plan   — Transform a PRD into an implementation plan
+  /next-priority               — Execute the next highest-priority tasks
+  /review-code                 — Multi-perspective code review
+  /write-adr                   — Create an Architecture Decision Record
+  /write-rfc                   — Create a Request for Comments
+  /test-coverage-analysis      — Analyze test gaps, optionally write tests
+  /design-system-audit         — Audit frontend for design system compliance
+  /retrospective               — Facilitate a structured retrospective
+  /reliability-review          — Assess operational readiness
+  /performance-audit           — Full-stack performance analysis
 
 Configuration guide:
   - Add reviewers:    Add entries to implementation_plan.reviewers
   - Remove reviewers: Set enabled: false on any default reviewer
   - Adjust rigor:     Change max_review_cycles or min_severity_to_address
+  - Full reference:   See .autonomous-org/config.yaml for all settings
 ```
 
 ## Configuration Overview
@@ -118,6 +139,10 @@ implementation_plan:
 | `documents.requirements` | `docs/reqs/main.md` | Default PRD location |
 | `documents.implementation_plan` | `docs/plans/main.md` | Default plan location |
 | `documents.specs` | `docs/specs` | Technical specs directory |
+| `documents.decisions` | `docs/specs/decisions` | Architecture Decision Records |
+| `documents.rfcs` | `docs/specs/rfcs` | Requests for Comments |
+| `documents.runbooks` | `docs/runbooks` | Operational runbooks |
+| `documents.retros` | `docs/retros` | Retrospective documents |
 
 ## Design Philosophy
 

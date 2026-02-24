@@ -1,0 +1,59 @@
+diff --git a/src/services/user-service.ts b/src/services/user-service.ts
+new file mode 100644
+index 0000000..b4c8e2f
+--- /dev/null
++++ b/src/services/user-service.ts
+@@ -0,0 +1,52 @@
++import { db } from '../db/connection';
++import { hashPassword, verifyPassword } from '../lib/crypto';
++import { logger } from '../lib/logger';
++import type { User, CreateUserInput } from '../types/user';
++
++/**
++ * Service layer for user management operations.
++ * Handles business logic between the API layer and database.
++ */
++export class UserService {
++  /**
++   * Create a new user with hashed password.
++   * @throws {ConflictError} if email already exists
++   */
++  async createUser(input: CreateUserInput): Promise<User> {
++    const existing = await db.user.findUnique({
++      where: { email: input.email },
++    });
++
++    if (existing) {
++      throw new ConflictError(`User with email ${input.email} already exists`);
++    }
++
++    const hashedPassword = await hashPassword(input.password);
++
++    const user = await db.user.create({
++      data: {
++        email: input.email,
++        name: input.name,
++        passwordHash: hashedPassword,
++      },
++    });
++
++    logger.info('User created', { userId: user.id });
++    return this.sanitize(user);
++  }
++
++  /**
++   * Find user by ID. Returns null if not found.
++   */
++  async findById(id: string): Promise<User | null> {
++    const user = await db.user.findUnique({ where: { id } });
++    return user ? this.sanitize(user) : null;
++  }
++
++  /**
++   * Remove sensitive fields before returning user data.
++   */
++  private sanitize(user: any): User {
++    const { passwordHash, ...safe } = user;
++    return safe as User;
++  }
++}
