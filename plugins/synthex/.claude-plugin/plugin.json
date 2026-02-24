@@ -1,10 +1,10 @@
 {
-  "name": "autonomous-org",
+  "name": "synthex",
   "version": "0.2.0",
-  "description": "AI agents modeled after a software startup org chart — specialized roles that collaborate to discover, build, ship, operate, and learn from complete, production-quality software.",
+  "description": "AI agents modeled after a software startup org chart — specialized roles that synthesize to discover, build, ship, operate, and learn from complete, production-quality software.",
   "author": "Bluminal Labs",
   "license": "UNLICENSED",
-  "keywords": ["agents", "organization", "orchestration", "delivery", "autonomous", "product-discovery", "sre", "metrics"],
+  "keywords": ["agents", "organization", "orchestration", "delivery", "synthesis", "product-discovery", "sre", "metrics"],
   "commands": [
     "init.md",
     "next-priority.md",

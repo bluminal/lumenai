@@ -7,7 +7,7 @@ Create a Request for Comments (RFC) document for a significant technical proposa
 | Parameter | Description | Default | Required |
 |-----------|-------------|---------|----------|
 | `title` | Short title describing the proposal | None | Yes |
-| `config_path` | Path to autonomous-org project config | `.autonomous-org/config.yaml` | No |
+| `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
 
 ## Core Responsibilities
 

@@ -1,16 +1,16 @@
-# Initialize Autonomous Organization
+# Initialize Synthex
 
-Set up the Autonomous Organization plugin configuration for a project. This command scaffolds the configuration file and document directories needed for the plugin to operate.
+Set up the Synthex plugin configuration for a project. This command scaffolds the configuration file and document directories needed for the plugin to operate.
 
 ## Parameters
 
 | Parameter | Description | Default | Required |
 |-----------|-------------|---------|----------|
-| `config_path` | Where to create the config file | `.autonomous-org/config.yaml` | No |
+| `config_path` | Where to create the config file | `.synthex/config.yaml` | No |
 
 ## What This Command Does
 
-1. **Creates the project configuration file** at `.autonomous-org/config.yaml` (or custom path)
+1. **Creates the project configuration file** at `.synthex/config.yaml` (or custom path)
 2. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`, `docs/specs/decisions/`, `docs/specs/rfcs/`, `docs/runbooks/`, `docs/retros/`) if they don't exist
 3. **Provides guidance** on customizing the configuration for your project
 
@@ -27,7 +27,7 @@ Check if `@{config_path}` already exists.
 
 Read the default configuration template from the plugin's `config/defaults.yaml` file (located relative to this command at `../config/defaults.yaml`).
 
-Create the directory `.autonomous-org/` in the project root if it doesn't exist, then write the defaults template to `@{config_path}`.
+Create the directory `.synthex/` in the project root if it doesn't exist, then write the defaults template to `@{config_path}`.
 
 ### 3. Create Document Directories
 
@@ -47,10 +47,10 @@ Do NOT create any files inside these directories — just the directories.
 Inform the user what was created and provide guidance:
 
 ```
-Autonomous Organization initialized for this project.
+Synthex initialized for this project.
 
 Created:
-  .autonomous-org/config.yaml    — Project configuration
+  .synthex/config.yaml    — Project configuration
   docs/reqs/                     — Product requirements (PRDs)
   docs/plans/                    — Implementation plans
   docs/specs/                    — Technical specifications
@@ -60,7 +60,7 @@ Created:
   docs/retros/                   — Retrospective documents
 
 Next steps:
-  1. Review .autonomous-org/config.yaml and customize for your project
+  1. Review .synthex/config.yaml and customize for your project
   2. Create your PRD with the `write-implementation-plan` command
   3. Or write your PRD manually at docs/reqs/main.md
 
@@ -80,12 +80,12 @@ Configuration guide:
   - Add reviewers:    Add entries to implementation_plan.reviewers
   - Remove reviewers: Set enabled: false on any default reviewer
   - Adjust rigor:     Change max_review_cycles or min_severity_to_address
-  - Full reference:   See .autonomous-org/config.yaml for all settings
+  - Full reference:   See .synthex/config.yaml for all settings
 ```
 
 ## Configuration Overview
 
-The configuration file controls how the Autonomous Organization plugin behaves in this project. Key settings:
+The configuration file controls how the Synthex plugin behaves in this project. Key settings:
 
 ### Implementation Plan Reviewers
 
@@ -146,8 +146,8 @@ implementation_plan:
 
 ## Design Philosophy
 
-The Autonomous Organization uses a **convention over configuration** approach:
+The Synthex uses a **convention over configuration** approach:
 
 - **Without a config file:** All commands and agents use sensible embedded defaults. Everything works out of the box.
 - **With a config file:** Projects can override specific settings. Only include what you want to change — unspecified values use defaults.
-- **Config lives in the repo:** `.autonomous-org/config.yaml` is a project file, version-controlled alongside code, so the team shares the same configuration.
+- **Config lives in the repo:** `.synthex/config.yaml` is a project file, version-controlled alongside code, so the team shares the same configuration.

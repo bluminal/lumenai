@@ -2,7 +2,7 @@
  * Schema validator for Metrics Analyst output.
  *
  * Validates output against the Metrics Report structure
- * defined in plugins/autonomous-org/agents/metrics-analyst.md.
+ * defined in plugins/synthex/agents/metrics-analyst.md.
  *
  * The Metrics Analyst produces structured reports covering
  * DORA metrics, HEART/AARRR frameworks, and OKR tracking.

@@ -1,16 +1,24 @@
-# Bluminal Labs Marketplace
+# LumenAI
 
-An internal marketplace for Claude Code plugins by Bluminal Labs.
+A Claude Code plugin marketplace by Bluminal Labs.
 
 ## What is this?
 
-The Bluminal Labs Marketplace is a structured registry of Claude Code plugins — collections of AI agents and commands that work together to accomplish complex software delivery tasks.
+LumenAI is a structured registry of Claude Code plugins — collections of AI agents and commands that work together to accomplish complex software delivery tasks.
+
+```bash
+/plugin marketplace add bluminal/lumenai
+```
 
 ## Plugins
 
-### Autonomous Organization
+### Synthex
 
-The first plugin in the marketplace. The **Autonomous Organization** models a software startup's org chart as a collection of AI agents that collaborate via prompts, skills, and delegation to deliver complete, production-quality software.
+The first plugin in the marketplace. **Synthex** models a software startup's org chart as a collection of AI agents that synthesize to deliver complete, production-quality software.
+
+```bash
+/plugin install synthex
+```
 
 The organization spans the full software lifecycle: **discover, build, ship, operate, and learn** — with 15 agents organized into three layers and 11 commands that orchestrate them.
 
@@ -81,9 +89,9 @@ cd tests && npx vitest run schemas/   # Layer 1: instant, free
 ## Project Structure
 
 ```
-claude-plugins/
+lumenai/
 ├── .claude-plugin/marketplace.json     # Marketplace registry
-├── plugins/autonomous-org/             # Autonomous Organization plugin
+├── plugins/synthex/                    # Synthex plugin
 │   ├── .claude-plugin/plugin.json      # Plugin manifest (15 agents, 11 commands)
 │   ├── agents/                         # Agent definitions (.md files)
 │   ├── commands/                       # Command definitions (.md files)

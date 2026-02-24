@@ -8,7 +8,7 @@ Facilitate a structured retrospective at the end of a delivery cycle, phase, or 
 |-----------|-------------|---------|----------|
 | `scope` | What period/milestone this retrospective covers | current phase in implementation plan | No |
 | `implementation_plan_path` | Path to the implementation plan | `docs/plans/main.md` | No |
-| `config_path` | Path to autonomous-org project config | `.autonomous-org/config.yaml` | No |
+| `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
 
 ## Core Responsibilities
 
@@ -116,7 +116,7 @@ Full retrospective written to: [path]
 ## Configuration
 
 ```yaml
-# .autonomous-org/config.yaml (retrospective section)
+# .synthex/config.yaml (retrospective section)
 retrospective:
   # Where retrospective documents are stored
   output_path: docs/retros

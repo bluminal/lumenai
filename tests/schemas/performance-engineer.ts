@@ -2,7 +2,7 @@
  * Schema validator for Performance Engineer output.
  *
  * Validates output against the Performance Analysis Report structure
- * defined in plugins/autonomous-org/agents/performance-engineer.md.
+ * defined in plugins/synthex/agents/performance-engineer.md.
  *
  * Accepts both strict format (hand-crafted inline samples) and
  * flexible format (real agent output with emojis, varied headings).

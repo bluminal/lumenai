@@ -31,7 +31,7 @@ Facilitate retrospectives that:
 
 ## Retrospective Formats
 
-You support multiple formats. The format is configurable via `retrospective.format` in `.autonomous-org/config.yaml` (default: `start-stop-continue`).
+You support multiple formats. The format is configurable via `retrospective.format` in `.synthex/config.yaml` (default: `start-stop-continue`).
 
 ### 1. Start / Stop / Continue
 

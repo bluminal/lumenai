@@ -1,20 +1,20 @@
-# Bluminal Labs Claude Plugins — Developer Instructions
+# LumenAI — Developer Instructions
 
 ## Project Overview
 
-This is the **Bluminal Labs Marketplace** — an internal marketplace for Claude Code plugins. The first plugin is the **Autonomous Organization**, a collection of AI agents modeled after a software startup org chart.
+This is **LumenAI** — a Claude Code plugin marketplace by Bluminal Labs. The first plugin is **Synthex**, a collection of AI agents modeled after a software startup org chart.
 
 ## Directory Structure
 
 ```
-claude-plugins/
+lumenai/
 ├── .claude-plugin/
 │   └── marketplace.json        # Marketplace registry (lists all plugins)
 ├── .github/
 │   └── workflows/
 │       └── agent-tests.yml     # CI pipeline (3-tier agent testing)
 ├── plugins/
-│   └── autonomous-org/         # First plugin: Autonomous Organization
+│   └── synthex/                # First plugin: Synthex
 │       ├── .claude-plugin/
 │       │   └── plugin.json     # Plugin manifest (lists agents + commands)
 │       ├── agents/             # Agent definitions (.md files)
@@ -71,7 +71,7 @@ claude-plugins/
 - PRDs go in `docs/reqs/`, implementation plans go in `docs/plans/`
 - NEVER place implementation plans or progress tracking in this file (CLAUDE.md)
 
-## Agents (Autonomous Organization)
+## Agents (Synthex)
 
 ### Orchestration Layer
 
@@ -123,12 +123,12 @@ See `docs/agent-interactions.md` for the complete interaction map and `docs/rese
 
 ## Project Configuration Framework
 
-The Autonomous Organization uses a **convention over configuration** approach for project-level customization.
+Synthex uses a **convention over configuration** approach for project-level customization.
 
 ### How It Works
 
 - **Without a config file:** Commands and agents use sensible embedded defaults. Everything works out of the box.
-- **With a config file:** Projects override specific settings in `.autonomous-org/config.yaml`. Only include what you want to change.
+- **With a config file:** Projects override specific settings in `.synthex/config.yaml`. Only include what you want to change.
 - **Config lives in the repo:** Version-controlled alongside code, so the team shares the same configuration.
 
 ### Initialization
@@ -139,7 +139,7 @@ Run the `init` command to create the configuration file and document directories
 ```
 
 This creates:
-- `.autonomous-org/config.yaml` — Project configuration (copied from `plugins/autonomous-org/config/defaults.yaml`)
+- `.synthex/config.yaml` — Project configuration (copied from `plugins/synthex/config/defaults.yaml`)
 - `docs/reqs/` — Product requirements directory
 - `docs/plans/` — Implementation plans directory
 - `docs/specs/` — Technical specifications directory
@@ -152,7 +152,7 @@ This creates:
 
 ```
 your-project/
-├── .autonomous-org/
+├── .synthex/
 │   └── config.yaml         # Project-level config (overrides defaults)
 ├── docs/
 │   ├── reqs/main.md        # PRD
@@ -167,7 +167,7 @@ your-project/
 
 ### What's Configurable
 
-See `plugins/autonomous-org/config/defaults.yaml` for the full reference. Key settings:
+See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 
 | Setting | Default | Description |
 |---------|---------|-------------|

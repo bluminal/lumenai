@@ -1,4 +1,4 @@
-# Autonomous Organization — Agent Behavioral Test Suite
+# Synthex — Agent Behavioral Test Suite
 #
 # Uses promptfoo to invoke agents via claude -p and validate
 # behavioral rules through deterministic assertions.
@@ -8,7 +8,7 @@
 #   npx promptfoo eval --filter-pattern "B[0-9]"          # Layer 2: behavioral only
 #   npx promptfoo eval --filter-pattern "S[0-9]"          # Layer 3: semantic only
 
-description: "Autonomous Organization Agent Tests"
+description: "Synthex Agent Tests"
 
 # Provider wraps `claude -p` to invoke agents with their .md as system prompt
 providers:

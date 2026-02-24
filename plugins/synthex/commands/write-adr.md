@@ -7,7 +7,7 @@ Create an Architecture Decision Record (ADR) through an interactive process with
 | Parameter | Description | Default | Required |
 |-----------|-------------|---------|----------|
 | `title` | Short title describing the decision | None | Yes |
-| `config_path` | Path to autonomous-org project config | `.autonomous-org/config.yaml` | No |
+| `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
 
 ## Core Responsibilities
 

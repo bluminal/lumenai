@@ -2,7 +2,7 @@
  * Schema validator for Terraform Plan Reviewer output.
  *
  * Validates output against the structure defined in
- * plugins/autonomous-org/agents/terraform-plan-reviewer.md.
+ * plugins/synthex/agents/terraform-plan-reviewer.md.
  *
  * Accepts both strict format (hand-crafted inline samples) and
  * flexible format (real agent output with emojis, varied headings).

@@ -2,7 +2,7 @@
  * Schema validator for Technical Writer output.
  *
  * Validates output against the documentation type structures
- * defined in plugins/autonomous-org/agents/technical-writer.md.
+ * defined in plugins/synthex/agents/technical-writer.md.
  *
  * The Technical Writer produces various document types:
  * 1. API Documentation

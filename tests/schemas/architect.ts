@@ -2,7 +2,7 @@
  * Schema validator for Architect output (Plan Review mode).
  *
  * Validates output against the Mode 1: Plan Review structure
- * defined in plugins/autonomous-org/agents/architect.md.
+ * defined in plugins/synthex/agents/architect.md.
  *
  * The Architect operates in two modes: Plan Review and ADR authoring.
  * This validator focuses on the Plan Review mode, which produces

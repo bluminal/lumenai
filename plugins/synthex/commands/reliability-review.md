@@ -7,7 +7,7 @@ Assess the operational readiness of a service or feature before deployment — c
 | Parameter | Description | Default | Required |
 |-----------|-------------|---------|----------|
 | `scope` | Service, feature, or module to assess | entire project | No |
-| `config_path` | Path to autonomous-org project config | `.autonomous-org/config.yaml` | No |
+| `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
 
 ## Core Responsibilities
 
@@ -153,7 +153,7 @@ Top priority items:
 ## Configuration
 
 ```yaml
-# .autonomous-org/config.yaml (reliability section)
+# .synthex/config.yaml (reliability section)
 reliability:
   # Path to SLO/SLI definitions
   slo_document: docs/specs/slos.md

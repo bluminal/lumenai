@@ -9,7 +9,7 @@ Transform a Product Requirements Document (PRD) into a prioritized, value-driven
 | `requirements_path` | Path to the PRD markdown file | `docs/reqs/main.md` | No |
 | `plan_path` | Path where the implementation plan will be written | `docs/plans/main.md` | No |
 | `specs_path` | Path to technical specifications directory | `docs/specs` | No |
-| `config_path` | Path to autonomous-org project config | `.autonomous-org/config.yaml` | No |
+| `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
 
 ## Core Responsibilities
 
@@ -29,7 +29,7 @@ Check for a project configuration file at `@{config_path}`. If it exists, load t
 **How configuration works:**
 
 1. The plugin ships a complete default configuration at `config/defaults.yaml`
-2. Projects can override any setting by creating `.autonomous-org/config.yaml` in their repo root (use the `init` command to scaffold this file)
+2. Projects can override any setting by creating `.synthex/config.yaml` in their repo root (use the `init` command to scaffold this file)
 3. Only settings present in the project config override the defaults — unspecified values fall through to `config/defaults.yaml`
 
 **Default values** (from `config/defaults.yaml`):
@@ -43,7 +43,7 @@ Check for a project configuration file at `@{config_path}`. If it exists, load t
 | `documents.implementation_plan` | `docs/plans/main.md` |
 | `documents.specs` | `docs/specs` |
 
-Projects can customize by running `init` to create `.autonomous-org/config.yaml`, then editing it. They can add reviewers (e.g., a security reviewer, compliance reviewer), disable defaults that aren't relevant, adjust max review cycles, or change the minimum severity threshold. See the Project Configuration section below for full details.
+Projects can customize by running `init` to create `.synthex/config.yaml`, then editing it. They can add reviewers (e.g., a security reviewer, compliance reviewer), disable defaults that aren't relevant, adjust max review cycles, or change the minimum severity threshold. See the Project Configuration section below for full details.
 
 ### 2. Read and Understand Requirements
 
@@ -254,14 +254,14 @@ Items requiring further discovery that could lead to future decisions and plan c
 
 ## Project Configuration
 
-The `write-implementation-plan` command reads its configuration from `.autonomous-org/config.yaml` in the project root. This is part of the Autonomous Organization's project configuration framework — a standard mechanism for projects to customize agent behavior.
+The `write-implementation-plan` command reads its configuration from `.synthex/config.yaml` in the project root. This is part of the Synthex's project configuration framework — a standard mechanism for projects to customize agent behavior.
 
 ### Configuration Schema
 
 ```yaml
-# .autonomous-org/config.yaml
+# .synthex/config.yaml
 #
-# Project-level configuration for the Autonomous Organization plugin.
+# Project-level configuration for the Synthex plugin.
 # When this file is absent, defaults are used.
 # Only include sections you want to override — unspecified values use defaults.
 

@@ -8,7 +8,7 @@ Analyze the project's test suite for coverage gaps, test quality, and strategy a
 |-----------|-------------|---------|----------|
 | `scope` | File path, directory, or module to analyze | entire project | No |
 | `write_tests` | Whether to write tests for identified gaps | `false` | No |
-| `config_path` | Path to autonomous-org project config | `.autonomous-org/config.yaml` | No |
+| `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
 
 ## Core Responsibilities
 
@@ -130,7 +130,7 @@ Top remaining gaps:
 ## Configuration
 
 ```yaml
-# .autonomous-org/config.yaml (quality section)
+# .synthex/config.yaml (quality section)
 quality:
   # Coverage thresholds — new code should not drop below these
   coverage_thresholds:

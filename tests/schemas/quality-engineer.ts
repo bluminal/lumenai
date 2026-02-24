@@ -2,7 +2,7 @@
  * Schema validator for Quality Engineer output (Coverage Analysis mode).
  *
  * Validates output against the Mode 2: Coverage Analysis structure
- * defined in plugins/autonomous-org/agents/quality-engineer.md.
+ * defined in plugins/synthex/agents/quality-engineer.md.
  *
  * The Quality Engineer operates in three modes:
  * 1. Test Writing (execution — produces code)

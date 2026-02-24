@@ -81,7 +81,7 @@ A critical part of your review is ensuring code adheres to the project's technic
 
 ### Configuration
 
-The paths to specification documents are configurable in `.autonomous-org/config.yaml`:
+The paths to specification documents are configurable in `.synthex/config.yaml`:
 
 ```yaml
 code_review:
@@ -120,7 +120,7 @@ If you detect that the code intentionally deviates from a specification (e.g., t
 |-----------|---------|--------|
 | Specification Relevance Analyzer | Determines which project specs are relevant to the code under review | Built-in (spawned automatically) |
 
-Additional code review specialists can be configured per project via `code_review.specialists` in `.autonomous-org/config.yaml`. This allows projects to add domain-specific reviewers for specialized review needs.
+Additional code review specialists can be configured per project via `code_review.specialists` in `.synthex/config.yaml`. This allows projects to add domain-specific reviewers for specialized review needs.
 
 ---
 

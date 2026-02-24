@@ -1,4 +1,4 @@
-# Autonomous Organization — Agent Testing Pipeline
+# Synthex — Agent Testing Pipeline
 #
 # Three-tier CI pipeline matching the testing pyramid:
 #   1. Schema Validation  — Every PR, instant, zero LLM cost
@@ -89,7 +89,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: tests/.cache
-          key: llm-cache-${{ hashFiles('plugins/autonomous-org/agents/**', 'tests/fixtures/**') }}
+          key: llm-cache-${{ hashFiles('plugins/synthex/agents/**', 'tests/fixtures/**') }}
           restore-keys: |
             llm-cache-
 
@@ -129,7 +129,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: tests/.cache
-          key: llm-cache-${{ hashFiles('plugins/autonomous-org/agents/**', 'tests/fixtures/**') }}
+          key: llm-cache-${{ hashFiles('plugins/synthex/agents/**', 'tests/fixtures/**') }}
           restore-keys: |
             llm-cache-
 

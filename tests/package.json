@@ -1,8 +1,8 @@
 {
-  "name": "autonomous-org-tests",
+  "name": "synthex-tests",
   "version": "0.1.0",
   "private": true,
-  "description": "Automated testing framework for Autonomous Organization agents and commands",
+  "description": "Automated testing framework for Synthex agents and commands",
   "type": "module",
   "scripts": {
     "test": "vitest run",

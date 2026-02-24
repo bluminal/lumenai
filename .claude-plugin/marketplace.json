@@ -1,17 +1,17 @@
 {
-  "name": "bluminal-labs-marketplace",
+  "name": "lumenai",
   "owner": "Bluminal Labs",
   "version": "0.1.0",
   "pluginRoot": "./plugins",
-  "description": "Internal marketplace for Bluminal Labs Claude plugins — collections of AI agents, commands, and skills for autonomous software delivery.",
+  "description": "Bluminal Labs AI plugin marketplace for Claude Code — collections of AI agents, commands, and skills for autonomous software delivery.",
   "plugins": [
     {
-      "name": "autonomous-org",
-      "source": "./plugins/autonomous-org",
+      "name": "synthex",
+      "source": "./plugins/synthex",
       "version": "0.1.0",
       "category": "productivity",
-      "keywords": ["agents", "organization", "orchestration", "delivery", "autonomous"],
-      "description": "AI agents modeled after a software startup org chart — specialized roles that collaborate to deliver complete, production-quality software."
+      "keywords": ["agents", "organization", "orchestration", "delivery", "autonomous", "synthesis"],
+      "description": "AI agents modeled after a software startup org chart — specialized roles that synthesize to discover, build, ship, operate, and learn from production-quality software."
     }
   ]
 }

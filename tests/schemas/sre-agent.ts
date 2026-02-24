@@ -2,7 +2,7 @@
  * Schema validator for SRE Agent output (Reliability Review mode).
  *
  * Validates output against the Reliability Review structure
- * defined in plugins/autonomous-org/agents/sre-agent.md.
+ * defined in plugins/synthex/agents/sre-agent.md.
  *
  * Accepts both strict format (hand-crafted inline samples) and
  * flexible format (real agent output with emojis, varied headings).

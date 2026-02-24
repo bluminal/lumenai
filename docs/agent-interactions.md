@@ -1,6 +1,6 @@
 # Agent Interaction Map
 
-This document describes how the 15 agents in the Autonomous Organization interact with each other, the commands that orchestrate them, and the user. It serves as a reference for understanding delegation patterns, quality gates, and information flow across the organization.
+This document describes how the 15 agents in the Synthex interact with each other, the commands that orchestrate them, and the user. It serves as a reference for understanding delegation patterns, quality gates, and information flow across the organization.
 
 ---
 

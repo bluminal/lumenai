@@ -185,4 +185,4 @@ Or use a data source: `data "aws_kms_key" "s3"`.
 
 ---
 
-*Terraform Plan Reviewer — Autonomous Organization | Bluminal Labs*
+*Terraform Plan Reviewer — Synthex | Bluminal Labs*

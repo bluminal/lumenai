@@ -1,12 +1,12 @@
-# Product Requirements Document: Bluminal Labs Marketplace & Autonomous Organization
+# Product Requirements Document: Bluminal Labs Marketplace & Synthex
 
 ## 1. Vision & Purpose
 
-**Why this exists:** Software teams need consistent, high-quality execution across many disciplines — frontend, backend, security, infrastructure, product management. Individual AI agents are powerful but isolated. The Autonomous Organization brings them together as a coordinated team, modeled after the roles a real software startup would hire, so they can collaboratively deliver complete, production-quality work products.
+**Why this exists:** Software teams need consistent, high-quality execution across many disciplines — frontend, backend, security, infrastructure, product management. Individual AI agents are powerful but isolated. The Synthex brings them together as a coordinated team, modeled after the roles a real software startup would hire, so they can collaboratively deliver complete, production-quality work products.
 
 **The Marketplace** is the distribution mechanism — a structured registry where Claude plugins (collections of agents + commands) can be published, discovered, and installed.
 
-**The Autonomous Organization** is the first plugin — a proof-of-concept that a well-designed team of specialized AI agents, with clear roles, delegation patterns, and quality gates, can autonomously execute complex software delivery tasks.
+**The Synthex** is the first plugin — a proof-of-concept that a well-designed team of specialized AI agents, with clear roles, delegation patterns, and quality gates, can autonomously execute complex software delivery tasks.
 
 ---
 
@@ -33,7 +33,7 @@ claude-plugins/
 ├── .claude-plugin/
 │   └── marketplace.json        # Marketplace registry
 ├── plugins/
-│   └── autonomous-org/
+│   └── synthex/
 │       ├── .claude-plugin/
 │       │   └── plugin.json     # Plugin manifest
 │       ├── agents/             # Agent definitions (.md)
@@ -48,8 +48,8 @@ claude-plugins/
 ```
 
 **Acceptance Criteria:**
-- marketplace.json registers the autonomous-org plugin with name, version, description, category, keywords
-- plugin.json lists all agents and commands within the autonomous-org plugin
+- marketplace.json registers the synthex plugin with name, version, description, category, keywords
+- plugin.json lists all agents and commands within the synthex plugin
 - Agents are auto-discoverable from the agents/ directory
 - Commands are explicitly registered in plugin.json
 
@@ -57,7 +57,7 @@ claude-plugins/
 
 ```json
 {
-  "name": "bluminal-labs-marketplace",
+  "name": "lumenai",
   "owner": "Bluminal Labs",
   "version": "0.1.0",
   "description": "Internal marketplace for Bluminal Labs Claude plugins",
@@ -70,7 +70,7 @@ claude-plugins/
 
 ```json
 {
-  "name": "autonomous-org",
+  "name": "synthex",
   "version": "0.1.0",
   "description": "AI agents modeled after a software startup org chart",
   "author": "Bluminal Labs",
@@ -399,8 +399,8 @@ Defense in Depth, Least Privilege, Fail Securely, Zero Trust, Security by Design
 - Parameters: requirements_path, plan_path, specs_path
 
 **FR-CMD3: init**
-- Initializes Autonomous Organization configuration for a project
-- Creates `.autonomous-org/config.yaml` from defaults
+- Initializes Synthex configuration for a project
+- Creates `.synthex/config.yaml` from defaults
 - Creates standard document directories (`docs/reqs/`, `docs/plans/`, `docs/specs/`)
 
 ---
@@ -988,7 +988,7 @@ Defense in Depth, Least Privilege, Fail Securely, Zero Trust, Security by Design
 - Agents that reference sub-agents should degrade gracefully if the sub-agent is not available, noting the gap in their output
 
 **NFR-9: Configuration-Driven Behavior**
-- Agent and command behavior that varies by project context should be configurable via `.autonomous-org/config.yaml`
+- Agent and command behavior that varies by project context should be configurable via `.synthex/config.yaml`
 - New configurable settings must include sensible defaults in `defaults.yaml` so that the zero-config experience remains functional
 - Configuration changes should not require modifying agent definitions
 

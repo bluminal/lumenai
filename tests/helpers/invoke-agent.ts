@@ -20,7 +20,7 @@ const AGENTS_DIR = join(
   '..',
   '..',
   'plugins',
-  'autonomous-org',
+  'synthex',
   'agents',
 );
 
@@ -55,7 +55,7 @@ export interface InvokeResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Invoke an Autonomous Organization agent via the Claude CLI.
+ * Invoke an Synthex agent via the Claude CLI.
  *
  * The agent's markdown file is passed as the system prompt. The input is
  * piped through stdin. The raw output and its parsed form are returned.

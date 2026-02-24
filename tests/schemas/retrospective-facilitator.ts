@@ -2,7 +2,7 @@
  * Schema validator for Retrospective Facilitator output.
  *
  * Validates output against the Retrospective Document structure
- * defined in plugins/autonomous-org/agents/retrospective-facilitator.md.
+ * defined in plugins/synthex/agents/retrospective-facilitator.md.
  *
  * The Retrospective Facilitator produces structured retrospective
  * documents that include planned-vs-actual analysis, format-specific

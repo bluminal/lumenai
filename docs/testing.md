@@ -1,8 +1,8 @@
-# Autonomous Organization — Testing Guide
+# Synthex — Testing Guide
 
 ## Overview
 
-The Autonomous Organization agents are pure markdown prompt definitions — there's no runtime code to unit test. Instead, we use **eval-driven testing**: invoke agents with synthetic inputs via `claude -p`, then validate the outputs structurally, behaviorally, and semantically.
+The Synthex agents are pure markdown prompt definitions — there's no runtime code to unit test. Instead, we use **eval-driven testing**: invoke agents with synthetic inputs via `claude -p`, then validate the outputs structurally, behaviorally, and semantically.
 
 The framework is built on a **three-layer testing pyramid** that balances thoroughness against cost:
 
@@ -176,7 +176,7 @@ For quality checks that regex can't capture, promptfoo's `llm-rubric` assertion 
       }
 
    c. claude-provider.js resolves paths:
-      - Agent: plugins/autonomous-org/agents/terraform-plan-reviewer.md
+      - Agent: plugins/synthex/agents/terraform-plan-reviewer.md
       - Fixture: tests/fixtures/terraform/destructive-rds.txt
 
    d. Computes cache key: SHA-256(agentContent + input + "sonnet")[0:16]
@@ -282,10 +282,10 @@ Fixtures are synthetic but realistic inputs with **deliberately planted issues**
 
 | Scenario | Files | Tests |
 |----------|-------|-------|
-| `init/fresh-project/` | `package.json`, `src/index.ts` | `init` should create `.autonomous-org/config.yaml` and `docs/` dirs |
-| `init/existing-config/` | `package.json`, `.autonomous-org/config.yaml` | `init` should detect existing config and prompt before overwriting |
+| `init/fresh-project/` | `package.json`, `src/index.ts` | `init` should create `.synthex/config.yaml` and `docs/` dirs |
+| `init/existing-config/` | `package.json`, `.synthex/config.yaml` | `init` should detect existing config and prompt before overwriting |
 | `write-impl-plan/default-config/` | `docs/reqs/main.md` | Command should use default reviewer panel (3 reviewers) |
-| `write-impl-plan/custom-config/` | `docs/reqs/main.md`, `.autonomous-org/config.yaml` | Command should use custom 4-reviewer panel |
+| `write-impl-plan/custom-config/` | `docs/reqs/main.md`, `.synthex/config.yaml` | Command should use custom 4-reviewer panel |
 
 ---
 
@@ -311,7 +311,7 @@ The GitHub Actions workflow (`.github/workflows/agent-tests.yml`) runs the three
 
 To trigger Layers 2 or 3, go to **Actions > Agent Tests > Run workflow** and check the appropriate boxes.
 
-**Cache persistence in CI:** The LLM output cache is stored via `actions/cache@v4` with key `llm-cache-${{ hashFiles('plugins/autonomous-org/agents/**', 'tests/fixtures/**') }}`. When agent definitions or fixtures change, the cache key changes and fresh invocations happen. Otherwise, cached outputs are restored from the previous run.
+**Cache persistence in CI:** The LLM output cache is stored via `actions/cache@v4` with key `llm-cache-${{ hashFiles('plugins/synthex/agents/**', 'tests/fixtures/**') }}`. When agent definitions or fixtures change, the cache key changes and fresh invocations happen. Otherwise, cached outputs are restored from the previous run.
 
 ---
 

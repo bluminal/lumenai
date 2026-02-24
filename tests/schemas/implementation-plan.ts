@@ -2,8 +2,8 @@
  * Schema validator for Implementation Plan output.
  *
  * Validates output against the template defined in
- * plugins/autonomous-org/agents/product-manager.md and
- * plugins/autonomous-org/commands/write-implementation-plan.md (lines 212-251).
+ * plugins/synthex/agents/product-manager.md and
+ * plugins/synthex/commands/write-implementation-plan.md (lines 212-251).
  */
 
 import {

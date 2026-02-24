@@ -2,7 +2,7 @@
  * Schema validator for Security Reviewer output.
  *
  * Validates output against the structure defined in
- * plugins/autonomous-org/agents/security-reviewer.md.
+ * plugins/synthex/agents/security-reviewer.md.
  *
  * Accepts both strict format (hand-crafted inline samples) and
  * flexible format (real agent output with emojis, varied headings).

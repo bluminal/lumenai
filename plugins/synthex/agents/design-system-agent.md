@@ -173,7 +173,7 @@ You may delegate to design system implementation specialists for framework-speci
 
 When a sub-agent is **not yet available**, proceed with your own expertise and note the gap in your output.
 
-The registry of available sub-agents is configurable per project via `design_system.specialists` in `.autonomous-org/config.yaml`. Projects can add framework-specific specialists (e.g., a Storybook expert as the default for React-based frontends).
+The registry of available sub-agents is configurable per project via `design_system.specialists` in `.synthex/config.yaml`. Projects can add framework-specific specialists (e.g., a Storybook expert as the default for React-based frontends).
 
 ---
 

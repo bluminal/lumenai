@@ -54,7 +54,7 @@ const CLAUDE_BIN = findClaudeBin();
 // Paths
 // ---------------------------------------------------------------------------
 
-const AGENTS_DIR = join(__dirname, '..', '..', 'plugins', 'autonomous-org', 'agents');
+const AGENTS_DIR = join(__dirname, '..', '..', 'plugins', 'synthex', 'agents');
 const FIXTURES_DIR = join(__dirname, '..', 'fixtures');
 const CACHE_DIR = join(__dirname, '..', '.cache');
 

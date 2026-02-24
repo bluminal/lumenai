@@ -1,8 +1,8 @@
-# Autonomous Organization — Project Configuration
+# Synthex — Project Configuration
 #
-# This is the default configuration for the Autonomous Organization plugin.
+# This is the default configuration for the Synthex plugin.
 # To customize for your project, copy this file to:
-#   .autonomous-org/config.yaml
+#   .synthex/config.yaml
 # in your project root.
 #
 # You only need to include sections you want to override.

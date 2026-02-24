@@ -7,7 +7,7 @@ Comprehensive, multi-perspective code review combining craftsmanship review, sec
 | Parameter | Description | Default | Required |
 |-----------|-------------|---------|----------|
 | `target` | File paths, directory, or git diff range to review | staged changes (`git diff --cached`) | No |
-| `config_path` | Path to autonomous-org project config | `.autonomous-org/config.yaml` | No |
+| `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
 
 ## Core Responsibilities
 
@@ -130,7 +130,7 @@ Present the consolidated report to the user. If the verdict is FAIL or WARN, pro
 ## Configuration
 
 ```yaml
-# .autonomous-org/config.yaml (code_review section)
+# .synthex/config.yaml (code_review section)
 code_review:
   # Reviewers to run in parallel
   reviewers:

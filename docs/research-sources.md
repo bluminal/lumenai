@@ -1,6 +1,6 @@
 # Research Sources & Design Rationale
 
-This document catalogs the research, methodologies, and industry practices that informed the design of each agent in the Autonomous Organization. Every behavioral rule, output format, and interaction pattern traces back to established frameworks and proven practices.
+This document catalogs the research, methodologies, and industry practices that informed the design of each agent in the Synthex. Every behavioral rule, output format, and interaction pattern traces back to established frameworks and proven practices.
 
 ---
 

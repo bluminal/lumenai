@@ -2,7 +2,7 @@
  * Schema validator for Code Reviewer output.
  *
  * Validates output against the structure defined in
- * plugins/autonomous-org/agents/code-reviewer.md.
+ * plugins/synthex/agents/code-reviewer.md.
  *
  * Accepts both strict format (hand-crafted inline samples) and
  * flexible format (real agent output with emojis, varied headings).

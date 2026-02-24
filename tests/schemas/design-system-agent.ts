@@ -2,7 +2,7 @@
  * Schema validator for Design System Agent output (Compliance Review mode).
  *
  * Validates output against the Mode 2: Compliance Review structure
- * defined in plugins/autonomous-org/agents/design-system-agent.md.
+ * defined in plugins/synthex/agents/design-system-agent.md.
  *
  * Accepts both strict format (hand-crafted inline samples) and
  * flexible format (real agent output with emojis, varied headings).

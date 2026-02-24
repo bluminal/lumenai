@@ -2,7 +2,7 @@
  * Schema validator for UX Researcher output.
  *
  * Validates output against the research artifact structures
- * defined in plugins/autonomous-org/agents/ux-researcher.md.
+ * defined in plugins/synthex/agents/ux-researcher.md.
  *
  * The UX Researcher produces various artifact types:
  * 1. Opportunity Solution Trees (OSTs)

@@ -7,7 +7,7 @@ Audit the frontend codebase for design system compliance — identifying hardcod
 | Parameter | Description | Default | Required |
 |-----------|-------------|---------|----------|
 | `scope` | File paths or directory to audit | configured `design_system.scan_paths` | No |
-| `config_path` | Path to autonomous-org project config | `.autonomous-org/config.yaml` | No |
+| `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
 
 ## Core Responsibilities
 
@@ -43,7 +43,7 @@ No design system specification found at [spec_path].
 To create one, you can:
 1. Ask the Design System Agent to generate an initial spec from your existing codebase
 2. Create one manually at [spec_path]
-3. Update the path in .autonomous-org/config.yaml under design_system.spec_path
+3. Update the path in .synthex/config.yaml under design_system.spec_path
 ```
 
 ### 3. Identify Files to Audit
@@ -120,7 +120,7 @@ Top priority fixes:
 ## Configuration
 
 ```yaml
-# .autonomous-org/config.yaml (design_system section)
+# .synthex/config.yaml (design_system section)
 design_system:
   # Path to the design system specification document
   spec_path: docs/specs/design-system.md

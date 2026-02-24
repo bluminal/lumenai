@@ -8,7 +8,7 @@ Conduct a full-stack performance analysis — quantifying bottlenecks, measuring
 |-----------|-------------|---------|----------|
 | `scope` | Specific area to audit (e.g., `frontend`, `api`, `database`, `full-stack`) | `full-stack` | No |
 | `url` | URL to audit for frontend performance (Core Web Vitals) | None | No |
-| `config_path` | Path to autonomous-org project config | `.autonomous-org/config.yaml` | No |
+| `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
 
 ## Core Responsibilities
 
