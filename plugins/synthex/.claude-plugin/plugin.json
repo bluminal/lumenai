@@ -2,37 +2,11 @@
   "name": "synthex",
   "version": "0.2.0",
   "description": "AI agents modeled after a software startup org chart — specialized roles that synthesize to discover, build, ship, operate, and learn from complete, production-quality software.",
-  "author": "Bluminal Labs",
+  "author": {
+    "name": "Bluminal Labs"
+  },
   "license": "Apache-2.0",
   "keywords": ["agents", "organization", "orchestration", "delivery", "synthesis", "product-discovery", "sre", "metrics"],
-  "commands": [
-    "init.md",
-    "next-priority.md",
-    "write-implementation-plan.md",
-    "review-code.md",
-    "write-adr.md",
-    "test-coverage-analysis.md",
-    "design-system-audit.md",
-    "retrospective.md",
-    "reliability-review.md",
-    "write-rfc.md",
-    "performance-audit.md"
-  ],
-  "agents": [
-    "terraform-plan-reviewer",
-    "lead-frontend-engineer",
-    "tech-lead",
-    "security-reviewer",
-    "product-manager",
-    "architect",
-    "design-system-agent",
-    "code-reviewer",
-    "quality-engineer",
-    "ux-researcher",
-    "technical-writer",
-    "sre-agent",
-    "performance-engineer",
-    "metrics-analyst",
-    "retrospective-facilitator"
-  ]
+  "commands": "./commands/",
+  "agents": "./agents/"
 }
