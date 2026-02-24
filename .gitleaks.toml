@@ -1,0 +1,20 @@
+# Gitleaks configuration for LumenAI
+#
+# The test fixtures in tests/fixtures/security/ contain intentionally
+# fake credentials designed to test the security-reviewer agent.
+# These are non-functional values taken from vendor documentation
+# (e.g., AWS example keys, Stripe test keys) or are obviously fake
+# (e.g., "FakeSecretKeyNotRealAtAll").
+#
+# This configuration suppresses false-positive alerts from those fixtures
+# and their corresponding golden snapshot outputs.
+
+title = "LumenAI Gitleaks Config"
+
+[allowlist]
+  description = "Intentionally fake credentials in security test fixtures"
+  paths = [
+    '''tests/fixtures/security/.*''',
+    '''tests/__snapshots__/security-reviewer--.*\.snap\.md''',
+    '''tests/schemas/security-reviewer\.test\.ts''',
+  ]

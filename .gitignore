@@ -20,7 +20,13 @@ Thumbs.db
 # Credentials
 *.pem
 *.key
+*.p12
+*.pfx
+*.jks
 credentials.*
+
+# Claude Code local settings
+.claude/settings.local.json
 
 # Test cache (LLM output cache for agent testing)
 tests/.cache/
