@@ -1,6 +1,8 @@
 {
   "name": "lumenai",
-  "owner": "Bluminal Labs",
+  "owner": {
+    "name": "Bluminal Labs"
+  },
   "version": "0.1.0",
   "pluginRoot": "./plugins",
   "license": "Apache-2.0",
