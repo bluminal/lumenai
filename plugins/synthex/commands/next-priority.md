@@ -42,11 +42,13 @@ Immediately update the implementation plan marking selected tasks as "in progres
 
 ### 4. Set Up Work Environments
 
-For each selected task, create a git worktree in `/tmp/` with a branch name prefixed with `feature/`:
+For each selected task, create a git worktree using the configured base path and branch prefix:
 
 ```bash
-git worktree add /tmp/feature/[task-id]-[short-description] -b feature/[task-id]-[short-description]
+git worktree add {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short-description] -b {worktrees.branch_prefix}[task-id]-[short-description]
 ```
+
+> **Default:** `.claude/worktrees/` (aligns with Claude Code's own convention). Override via `worktrees.base_path` in `.synthex/config.yaml`. Ensure the base path is in your `.gitignore`.
 
 ### 5. Delegate to Tech Lead
 
@@ -86,7 +88,7 @@ For each completed task:
 After successful completion and validation:
 
 ```bash
-git merge --ff-only feature/[task-id]-[short-description]
+git merge --ff-only {worktrees.branch_prefix}[task-id]-[short-description]
 ```
 
 If fast-forward merge is not possible, attempt a merge commit. If conflicts arise, resolve them carefully.
@@ -94,7 +96,7 @@ If fast-forward merge is not possible, attempt a merge commit. If conflicts aris
 After merging, clean up the worktree:
 
 ```bash
-git worktree remove /tmp/feature/[task-id]-[short-description]
+git worktree remove {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short-description]
 ```
 
 ### 9. Update the Plan

@@ -187,6 +187,8 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 | `reliability.runbooks_path` | `docs/runbooks` | Operational runbooks |
 | `retrospective.format` | start-stop-continue | Retrospective format |
 | `retrospective.max_improvement_items` | 3 | Max items per cycle |
+| `worktrees.base_path` | `.claude/worktrees` | Base directory for parallel execution worktrees |
+| `worktrees.branch_prefix` | `feature/` | Branch name prefix for worktree branches |
 | `documents.requirements` | `docs/reqs/main.md` | Default PRD path |
 | `documents.implementation_plan` | `docs/plans/main.md` | Default plan path |
 | `documents.specs` | `docs/specs` | Specs directory |

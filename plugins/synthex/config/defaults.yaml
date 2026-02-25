@@ -165,6 +165,23 @@ retrospective:
   max_improvement_items: 3
 
 # -------------------------------------------------------------------
+# Worktree Settings
+# Used by the `next-priority` command for parallel task execution
+# -------------------------------------------------------------------
+worktrees:
+
+  # Base directory for git worktrees created during parallel execution.
+  # Relative paths resolve from the repository root.
+  # Use an absolute path (e.g., /tmp/) to place worktrees outside the repo.
+  #
+  # Default aligns with Claude Code's own convention (.claude/worktrees/).
+  # Ensure this path is in your .gitignore.
+  base_path: .claude/worktrees
+
+  # Prefix for worktree branch names.
+  branch_prefix: "feature/"
+
+# -------------------------------------------------------------------
 # Document Paths
 # Default locations for key project documents.
 # These can also be overridden via command parameters.
