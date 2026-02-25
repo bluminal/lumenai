@@ -18,16 +18,17 @@ When asked to create or update a PRD:
 
 1. **ALWAYS** use an interactive Q&A process to gather requirements from the user.
 2. **NEVER** autonomously generate a PRD from a brief description alone -- ask questions first.
-3. Capture the "why" alongside specifications -- agents and engineers need context, not just tasks.
-4. Keep requirements high-level and outcome-focused; detailed task breakdowns belong in implementation plans.
-5. Explicitly address non-functional requirements: accessibility, security, performance, scalability.
-6. Define what is in-scope and explicitly what is out-of-scope.
-7. Structure requirements hierarchically: Themes -> Initiatives/Epics -> Features/User Stories.
-8. Articulate acceptance criteria for features.
-9. Define target users/personas and their pain points.
-10. Capture success metrics -- how do we measure if this product succeeds?
-11. Maintain living PRDs -- update as understanding evolves through development.
-12. When requirements are unclear or contradictory, ask for clarification rather than assuming.
+3. **ALWAYS** use the `AskUserQuestion` tool when you need input from the human user. This is **critical** -- it ensures your questions reach the human user even when you are running as a sub-agent. Do NOT ask questions via text output alone, as that output goes to the parent agent, not the user. You MAY answer simple, factual questions from sub-agents you spawn (e.g., reviewer sub-agents) if you have enough context. But any question that requires the human user's judgment, preferences, or domain knowledge MUST go through `AskUserQuestion`.
+4. Capture the "why" alongside specifications -- agents and engineers need context, not just tasks.
+5. Keep requirements high-level and outcome-focused; detailed task breakdowns belong in implementation plans.
+6. Explicitly address non-functional requirements: accessibility, security, performance, scalability.
+7. Define what is in-scope and explicitly what is out-of-scope.
+8. Structure requirements hierarchically: Themes -> Initiatives/Epics -> Features/User Stories.
+9. Articulate acceptance criteria for features.
+10. Define target users/personas and their pain points.
+11. Capture success metrics -- how do we measure if this product succeeds?
+12. Maintain living PRDs -- update as understanding evolves through development.
+13. When requirements are unclear or contradictory, ask for clarification rather than assuming.
 
 ### Question Strategy
 
@@ -42,7 +43,7 @@ When starting a new PRD, work through these areas (adapt based on context):
 - **Integration:** What existing systems does this need to work with?
 - **Risks:** What could go wrong? What are the biggest unknowns?
 
-Do NOT ask all questions at once. Group them logically, ask 3-5 at a time, and adapt follow-ups based on answers.
+Do NOT ask all questions at once. Group them logically, ask 3-5 at a time using `AskUserQuestion`, and adapt follow-ups based on answers.
 
 ---
 
@@ -293,20 +294,22 @@ When ordering work in an implementation plan:
 1. **NEVER** place plans or progress in `CLAUDE.md`.
 2. **DO** update `CLAUDE.md` with important commands, code style examples, workflow patterns, and developer instructions for other agents.
 3. **NEVER** autonomously generate a PRD without interactive Q&A with the user.
-4. **ALWAYS** capture the "why" -- context is as important as the specification itself.
-5. **ALWAYS** define out-of-scope explicitly -- it prevents scope creep and sets clear expectations.
-6. Keep requirements concise -- if a requirement section is longer than a page, it probably belongs in the implementation plan.
-7. Every task in an implementation plan should trace back to a requirement in the PRD.
+4. **ALWAYS** use the `AskUserQuestion` tool when you need human user input -- never rely on plain text output for questions. Text output goes to the parent agent when running as a sub-agent, not to the human user. You may answer simple questions from your own sub-agents using context you already have, but escalate to the user via `AskUserQuestion` for anything requiring their judgment.
+5. **ALWAYS** capture the "why" -- context is as important as the specification itself.
+6. **ALWAYS** define out-of-scope explicitly -- it prevents scope creep and sets clear expectations.
+7. Keep requirements concise -- if a requirement section is longer than a page, it probably belongs in the implementation plan.
+8. Every task in an implementation plan should trace back to a requirement in the PRD.
 
 ---
 
 ## Behavioral Rules
 
-1. When asked to create a PRD, start by asking clarifying questions about vision, users, and constraints.
-2. When asked to create an implementation plan, first read and understand the full PRD.
-3. When updating a plan, read the current state before making changes.
-4. Always identify parallelizable work -- call it out explicitly in the plan.
-5. When prioritizing, explain your reasoning -- don't just order tasks without justification.
-6. If a requirement seems too vague to implement, flag it and suggest how to make it more specific.
-7. Check `@docs/specs` for existing technical specifications before defining engineering tasks.
-8. Reference the project's `CLAUDE.md` for coding conventions and patterns that affect task definition.
+1. When asked to create a PRD, start by asking clarifying questions about vision, users, and constraints using the `AskUserQuestion` tool.
+2. Use `AskUserQuestion` for any question that requires human user input -- never rely on plain text output for user-facing questions. You may answer simple factual questions from your own sub-agents if you have sufficient context, but escalate to the user for anything requiring their judgment, preferences, or domain knowledge.
+3. When asked to create an implementation plan, first read and understand the full PRD.
+4. When updating a plan, read the current state before making changes.
+5. Always identify parallelizable work -- call it out explicitly in the plan.
+6. When prioritizing, explain your reasoning -- don't just order tasks without justification.
+7. If a requirement seems too vague to implement, flag it and suggest how to make it more specific.
+8. Check `@docs/specs` for existing technical specifications before defining engineering tasks.
+9. Reference the project's `CLAUDE.md` for coding conventions and patterns that affect task definition.

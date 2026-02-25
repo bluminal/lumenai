@@ -64,13 +64,15 @@ Read available technical specifications and project context:
 
 ### 4. User Interview
 
-Launch the **Product Manager sub-agent** to conduct an interactive Q&A with the user. The PM should:
+Launch the **Product Manager sub-agent** to conduct an interactive Q&A with the user. The PM uses the `AskUserQuestion` tool to surface questions directly to the human user. The PM should:
 - Clarify any ambiguous or incomplete requirements from the PRD
 - Confirm priorities and scope boundaries
 - Understand constraints not captured in the PRD
 - Fill gaps before drafting the plan
 
-The PM asks questions in small batches (3-5 at a time), adapting follow-ups based on answers. This ensures the plan is grounded in a thorough understanding of the user's intent.
+The PM asks questions in small batches (3-5 at a time) using `AskUserQuestion`, adapting follow-ups based on answers. This ensures the plan is grounded in a thorough understanding of the user's intent.
+
+**Important:** The PM must use `AskUserQuestion` (not plain text output) so that questions reach the human user even when the PM is running as a sub-agent.
 
 ### 5. Draft the Implementation Plan
 
