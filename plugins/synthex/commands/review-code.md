@@ -28,6 +28,10 @@ Check for a project configuration file at `@{config_path}`. If it exists, load t
 | `code_review.reviewers` | `[code-reviewer, security-reviewer]` |
 | `code_review.max_diff_lines` | `300` |
 | `code_review.convention_sources` | `[CLAUDE.md, .eslintrc, .prettierrc]` |
+| `code_review.review_loops.max_cycles` | inherited from global `review_loops.max_cycles` (2) |
+| `code_review.review_loops.min_severity_to_address` | inherited from global `review_loops.min_severity_to_address` (high) |
+
+**Review loop config resolution order:** `code_review.review_loops` > global `review_loops` > hardcoded default (max_cycles: 2, min_severity_to_address: high).
 
 ### 2. Determine Review Scope
 
@@ -121,9 +125,42 @@ Merge all reviewer outputs into a unified report:
 - **WARN** if ANY reviewer returns WARN (MEDIUM findings only)
 - **PASS** if ALL reviewers return PASS
 
-### 6. Present Results
+### 6. Review Loop
 
-Present the consolidated report to the user. If the verdict is FAIL or WARN, provide clear guidance on which findings to address first (ordered by severity, then by reviewer priority).
+If the overall verdict is **FAIL** (any CRITICAL or HIGH findings), enter a fix-and-re-review loop. **WARN does NOT trigger the loop** — MEDIUM-only findings are informational.
+
+This loop runs up to `review_loops.max_cycles` iterations (default: 2):
+
+**Step 6a: Present Findings**
+
+Present the consolidated report to the caller (Tech Lead, user) with clear guidance on which CRITICAL and HIGH findings must be addressed.
+
+**Step 6b: Caller Fixes**
+
+The caller applies fixes to the code. This command does NOT apply fixes — it waits for the caller to make changes and signal readiness for re-review.
+
+**Step 6c: Re-Review**
+
+Spawn **fresh** reviewer sub-agent instances (new Task calls — never resume prior agents) on the updated diff. Provide each reviewer with:
+1. The updated diff (full text)
+2. Project context (same as Step 3)
+3. A compact summary of unresolved findings from the prior cycle: one line per finding with severity, title, and reviewer
+
+Do NOT carry forward full reviewer outputs or the consolidated report from prior cycles. This prevents context exhaustion across multiple review iterations.
+
+Re-consolidate results using the same rules from Step 5.
+
+**Step 6d: Check Exit Conditions**
+
+Exit the loop when:
+- The overall verdict is PASS or WARN (all CRITICAL and HIGH findings addressed), OR
+- `review_loops.max_cycles` is reached
+
+If max cycles are reached with an overall FAIL verdict, present the remaining findings and note that the review loop has been exhausted.
+
+### 7. Present Results
+
+Present the final consolidated report to the user. If the verdict is FAIL or WARN, provide clear guidance on which findings to address first (ordered by severity, then by reviewer priority).
 
 ---
 

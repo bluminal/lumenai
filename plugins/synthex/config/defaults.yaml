@@ -11,6 +11,26 @@
 # To create this file automatically, run the `init` command.
 
 # -------------------------------------------------------------------
+# Review Loop Settings (Global)
+# Shared defaults for all commands that run reviewer sub-agents.
+# Individual commands can override these under their own section.
+# Resolution order: per-command override > global > hardcoded default.
+# -------------------------------------------------------------------
+review_loops:
+
+  # Maximum review loop iterations before forcing completion.
+  # Each cycle: reviewers provide findings → caller fixes → re-review.
+  # If unresolved findings remain after max cycles, they are documented
+  # in the output (e.g., Open Questions, Summary).
+  max_cycles: 2
+
+  # Minimum severity level that must be addressed before exiting the loop.
+  # Options: critical, high, medium, low
+  # Default "high" means all CRITICAL and HIGH findings must be resolved.
+  # WARN-only results (MEDIUM and below) do NOT trigger the loop.
+  min_severity_to_address: high
+
+# -------------------------------------------------------------------
 # Implementation Plan Settings
 # Used by the `write-implementation-plan` command
 # -------------------------------------------------------------------
@@ -37,15 +57,10 @@ implementation_plan:
       enabled: true
       focus: "Task clarity, acceptance criteria, parallelizability, dependency accuracy"
 
-  # Maximum number of review loop iterations before forcing completion.
-  # Each cycle: reviewers provide feedback → PM addresses it → re-review.
-  # If unresolved findings remain after max cycles, they go to Open Questions.
-  max_review_cycles: 3
-
-  # Minimum severity level that the Product Manager must address.
-  # Options: critical, high, medium, low
-  # Default "high" means all CRITICAL and HIGH findings must be resolved.
-  min_severity_to_address: high
+  # Override: higher max_cycles for high-stakes implementation plans.
+  # (Global default is 2; plans get 3 because they affect many downstream tasks.)
+  review_loops:
+    max_cycles: 3
 
 # -------------------------------------------------------------------
 # Code Review Settings
@@ -82,6 +97,10 @@ code_review:
   #   - agent: compliance-reviewer
   #     focus: "Regulatory compliance, audit trail requirements"
 
+  # Per-command review loop overrides (inherits global review_loops defaults).
+  # review_loops:
+  #   max_cycles: 2
+
 # -------------------------------------------------------------------
 # Quality / Testing Settings
 # Used by the `test-coverage-analysis` command
@@ -113,6 +132,10 @@ architecture:
   # Where RFCs (Request for Comments) are stored.
   rfcs_path: docs/specs/rfcs
 
+  # Per-command review loop overrides (inherits global review_loops defaults).
+  # review_loops:
+  #   max_cycles: 2
+
 # -------------------------------------------------------------------
 # Design System Settings
 # Used by `design-system-audit` command and Design System Agent
@@ -135,6 +158,10 @@ design_system:
   #   - agent: figma-expert
   #     focus: "Design token sync, Figma plugin guidance, handoff workflows"
 
+  # Per-command review loop overrides (inherits global review_loops defaults).
+  # review_loops:
+  #   max_cycles: 2
+
 # -------------------------------------------------------------------
 # Reliability Settings
 # Used by `reliability-review` command and SRE Agent
@@ -146,6 +173,20 @@ reliability:
 
   # Path to operational runbooks directory.
   runbooks_path: docs/runbooks
+
+  # Per-command review loop overrides (inherits global review_loops defaults).
+  # review_loops:
+  #   max_cycles: 2
+
+# -------------------------------------------------------------------
+# Performance Audit Settings
+# Used by the `performance-audit` command
+# -------------------------------------------------------------------
+performance_audit:
+
+  # Per-command review loop overrides (inherits global review_loops defaults).
+  # review_loops:
+  #   max_cycles: 2
 
 # -------------------------------------------------------------------
 # Retrospective Settings
@@ -163,6 +204,16 @@ retrospective:
   # Maximum improvement items per cycle.
   # More than 3 competing for attention means none get done.
   max_improvement_items: 3
+
+# -------------------------------------------------------------------
+# Next Priority Settings
+# Used by the `next-priority` command
+# -------------------------------------------------------------------
+next_priority:
+
+  # Maximum number of tasks to execute in parallel.
+  # Can be overridden per-invocation via the `concurrent_tasks` parameter.
+  concurrent_tasks: 3
 
 # -------------------------------------------------------------------
 # Worktree Settings

@@ -95,7 +95,7 @@ Available commands:
 Configuration guide:
   - Add reviewers:    Add entries to implementation_plan.reviewers
   - Remove reviewers: Set enabled: false on any default reviewer
-  - Adjust rigor:     Change max_review_cycles or min_severity_to_address
+  - Adjust rigor:     Change review_loops.max_cycles or review_loops.min_severity_to_address
   - Full reference:   See .synthex/config.yaml for all settings
 ```
 
@@ -145,8 +145,9 @@ implementation_plan:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `max_review_cycles` | 3 | Maximum review loop iterations before forcing completion |
-| `min_severity_to_address` | high | Minimum severity the PM must resolve (critical, high, medium, low) |
+| `review_loops.max_cycles` | 2 | Global max review loop iterations (all commands) |
+| `review_loops.min_severity_to_address` | high | Global minimum severity that must be resolved |
+| `implementation_plan.review_loops.max_cycles` | 3 | Per-command override for implementation plans |
 
 ### Document Paths
 

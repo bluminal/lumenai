@@ -30,6 +30,10 @@ Check for a project configuration file at `@{config_path}`. Load the architectur
 | Setting | Default |
 |---------|---------|
 | `architecture.rfcs_path` | `docs/specs/rfcs` |
+| `architecture.review_loops.max_cycles` | inherited from global `review_loops.max_cycles` (2) |
+| `architecture.review_loops.min_severity_to_address` | inherited from global `review_loops.min_severity_to_address` (high) |
+
+**Review loop config resolution order:** `architecture.review_loops` > global `review_loops` > hardcoded default (max_cycles: 2, min_severity_to_address: high).
 
 ### 2. Determine RFC Number
 
@@ -68,7 +72,11 @@ The Architect conducts an interactive session:
 
 ### 5. RFC Review Loop
 
-Launch reviewers IN PARALLEL:
+This step runs up to `review_loops.max_cycles` iterations (default: 2). Each cycle:
+
+**Step 5a: Launch Reviewers**
+
+Launch **fresh** reviewer sub-agents IN PARALLEL (new instances each cycle — never resume prior agents):
 
 **Architect sub-agent (self-review):**
 - Technical feasibility, architectural consistency, scalability
@@ -82,9 +90,26 @@ Launch reviewers IN PARALLEL:
 **Security Reviewer sub-agent:**
 - Security implications, threat model changes, compliance impact
 
-Each reviewer provides structured feedback in the standard format (CRITICAL/HIGH/MEDIUM/LOW findings).
+Each reviewer receives the current RFC draft and provides structured feedback in the standard format (CRITICAL/HIGH/MEDIUM/LOW findings). On cycles 2+, reviewers also receive a compact summary of unresolved findings from the prior cycle (see Context Management below).
 
-The Architect addresses all CRITICAL and HIGH findings, revising the RFC as needed.
+**Step 5b: Address Findings**
+
+The Architect addresses all CRITICAL and HIGH findings (per `review_loops.min_severity_to_address`), revising the RFC as needed. MEDIUM and LOW findings may be addressed at the Architect's discretion.
+
+**Step 5c: Check Exit Conditions**
+
+Exit the loop when:
+- All CRITICAL and HIGH findings are addressed, OR
+- `review_loops.max_cycles` is reached
+
+If max cycles are reached with unresolved CRITICAL or HIGH findings, document them in the RFC's Open Questions section with a note that they require resolution before the RFC can be accepted.
+
+**Context Management:** Each cycle spawns new sub-agent instances to prevent context exhaustion across multiple review iterations. Between cycles, the orchestrating command carries forward only:
+1. The updated RFC draft (full text)
+2. A compact findings summary: one line per unresolved finding with severity, title, and reviewer
+3. The current cycle number
+
+Do NOT carry forward full reviewer outputs or resolution notes from prior cycles.
 
 ### 6. Write the RFC
 

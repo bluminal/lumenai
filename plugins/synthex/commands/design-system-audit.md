@@ -27,6 +27,10 @@ Check for a project configuration file at `@{config_path}`. Load the design syst
 |---------|---------|
 | `design_system.spec_path` | `docs/specs/design-system.md` |
 | `design_system.scan_paths` | `[src/]` |
+| `design_system.review_loops.max_cycles` | inherited from global `review_loops.max_cycles` (2) |
+| `design_system.review_loops.min_severity_to_address` | inherited from global `review_loops.min_severity_to_address` (high) |
+
+**Review loop config resolution order:** `design_system.review_loops` > global `review_loops` > hardcoded default (max_cycles: 2, min_severity_to_address: high).
 
 ### 2. Locate Design System Specification
 
@@ -96,9 +100,40 @@ The Design System Agent produces a compliance report:
 [General suggestions for better design system utilization]
 ```
 
-### 5. Present Results
+### 5. Compliance Loop
 
-Present the compliance report to the user with a summary:
+If the verdict is **FAIL** (any CRITICAL or HIGH findings), enter a fix-and-re-audit loop. **WARN does NOT trigger the loop** — MEDIUM-only findings are informational.
+
+This loop runs up to `review_loops.max_cycles` iterations (default: 2):
+
+**Step 5a: Present Findings**
+
+Present the compliance report to the caller with clear guidance on which CRITICAL and HIGH findings must be addressed (e.g., hardcoded values that have design tokens, accessibility violations).
+
+**Step 5b: Caller Fixes**
+
+The caller applies fixes to the frontend code. This command does NOT apply fixes — it waits for the caller to make changes and signal readiness for re-audit.
+
+**Step 5c: Re-Audit**
+
+Spawn a **fresh** Design System Agent sub-agent instance (new Task call — never resume the prior agent) on the updated files. Provide:
+1. The design system specification document
+2. The updated files to audit
+3. A compact summary of unresolved findings from the prior cycle: one line per finding with severity, location, and violation type
+
+Do NOT carry forward the full prior compliance report. This prevents context exhaustion across multiple review iterations.
+
+**Step 5d: Check Exit Conditions**
+
+Exit the loop when:
+- The verdict is PASS or WARN (all CRITICAL and HIGH findings addressed), OR
+- `review_loops.max_cycles` is reached
+
+If max cycles are reached with a FAIL verdict, present the remaining findings and note that the compliance loop has been exhausted.
+
+### 6. Present Results
+
+Present the final compliance report to the user with a summary:
 
 ```
 Design System Audit Complete

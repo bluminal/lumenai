@@ -20,8 +20,8 @@ implementation_plan:
       enabled: true
       focus: "API authentication design, key management, network security, input validation"
 
-  max_review_cycles: 3
-  min_severity_to_address: high
+  review_loops:
+    max_cycles: 3
 
 documents:
   requirements: docs/reqs/main.md

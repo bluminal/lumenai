@@ -22,6 +22,15 @@ You invoke the **Performance Engineer sub-agent** to perform a quantitative perf
 
 Check for a project configuration file at `@{config_path}`. Load any performance-related configuration.
 
+**Default values:**
+
+| Setting | Default |
+|---------|---------|
+| `performance_audit.review_loops.max_cycles` | inherited from global `review_loops.max_cycles` (2) |
+| `performance_audit.review_loops.min_severity_to_address` | inherited from global `review_loops.min_severity_to_address` (high) |
+
+**Review loop config resolution order:** `performance_audit.review_loops` > global `review_loops` > hardcoded default (max_cycles: 2, min_severity_to_address: high).
+
 ### 2. Determine Audit Scope
 
 Resolve what to audit based on the `scope` parameter:
@@ -124,9 +133,40 @@ The Performance Engineer produces a structured audit:
 sample size, measurement methodology limitations]
 ```
 
-### 5. Present Results
+### 5. Optimization Loop
 
-Present the audit to the user:
+If any CRITICAL or HIGH findings exist, enter an optimize-and-re-audit loop. MEDIUM-only findings do NOT trigger the loop.
+
+This loop runs up to `review_loops.max_cycles` iterations (default: 2):
+
+**Step 5a: Present Findings**
+
+Present the performance audit to the caller with clear guidance on which CRITICAL and HIGH findings to address first (ordered by impact/effort ratio).
+
+**Step 5b: Caller Optimizes**
+
+The caller applies optimizations to the code or infrastructure. This command does NOT apply fixes — it waits for the caller to make changes and signal readiness for re-audit.
+
+**Step 5c: Re-Audit**
+
+Spawn a **fresh** Performance Engineer sub-agent instance (new Task call — never resume the prior agent) on the updated scope. Provide:
+1. The audit scope and project context
+2. Any available performance data (same sources as Step 3)
+3. A compact summary of unresolved findings from the prior cycle: one line per finding with severity, category, and quantified current/target values
+
+Do NOT carry forward the full prior audit output. This prevents context exhaustion across multiple review iterations.
+
+**Step 5d: Check Exit Conditions**
+
+Exit the loop when:
+- No CRITICAL or HIGH findings remain, OR
+- `review_loops.max_cycles` is reached
+
+If max cycles are reached with remaining CRITICAL or HIGH findings, present the findings and note that the optimization loop has been exhausted.
+
+### 6. Present Results
+
+Present the final audit to the user:
 
 ```
 Performance Audit Complete: [scope]

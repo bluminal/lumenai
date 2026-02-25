@@ -117,6 +117,9 @@ User → Determine scope → Launch reviewers (in parallel):
                           ├── Performance Engineer (optional)
                           └── Design System Agent (if UI changes)
                        → Consolidate → Unified PASS/WARN/FAIL verdict
+                       → If FAIL: Review Loop (up to review_loops.max_cycles):
+                           Caller fixes → Re-review all → Re-consolidate → Check exit
+                       → Present final results
 ```
 
 ### `write-adr`
@@ -135,12 +138,12 @@ User → Architect (interactive session):
 ```
 User → PM provides product context
      → Architect leads technical design (interactive)
-     → Review loop (in parallel):
+     → Review loop (up to review_loops.max_cycles, in parallel):
          ├── Architect (self-review)
          ├── PM (product alignment)
          ├── Tech Lead (implementation feasibility)
          └── Security Reviewer (security implications)
-     → Address feedback → Write RFC document
+     → Architect addresses CRITICAL/HIGH → Re-review if needed → Write RFC document
 ```
 
 ### `test-coverage-analysis`
@@ -163,6 +166,9 @@ User → Locate design system spec → Design System Agent:
                                       ├── Accessibility check (WCAG 2.1 AA)
                                       └── Recommendations
                                     → Compliance report (PASS/WARN/FAIL)
+                                    → If FAIL: Compliance Loop (up to review_loops.max_cycles):
+                                        Caller fixes → Re-audit → Check exit
+                                    → Present final results
 ```
 
 ### `retrospective`
@@ -189,6 +195,8 @@ User → Gather service context → SRE Agent:
                                   ├── Deployment assessment
                                   ├── Runbook coverage
                                   └── Incident response readiness
+                                → If NOT READY: Remediation Loop (up to review_loops.max_cycles):
+                                    Caller remediates → Re-review → Check exit
                                 → Optional: Terraform Plan Reviewer (if IaC exists)
                                 → Readiness verdict (READY / READY WITH RISKS / NOT READY)
 ```
@@ -204,6 +212,8 @@ User → Determine scope (frontend/api/database/full-stack)
          ├── API performance assessment
          ├── Caching analysis
          └── Optimization priority matrix
+     → If CRITICAL/HIGH findings: Optimization Loop (up to review_loops.max_cycles):
+         Caller optimizes → Re-audit → Check exit
      → Quantified findings with impact estimates
 ```
 

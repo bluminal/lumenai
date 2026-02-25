@@ -100,9 +100,10 @@ See [`config/defaults.yaml`](config/defaults.yaml) for the full reference. Key s
 
 | Setting | Default | Description |
 |---------|---------|-------------|
+| `review_loops.max_cycles` | 2 | Global max review loop iterations for all commands |
+| `review_loops.min_severity_to_address` | high | Global minimum severity that must be resolved |
 | `implementation_plan.reviewers` | architect, designer, tech-lead | Sub-agents that review draft implementation plans |
-| `implementation_plan.max_review_cycles` | 3 | Max review iterations |
-| `implementation_plan.min_severity_to_address` | high | Minimum severity PM must resolve |
+| `implementation_plan.review_loops.max_cycles` | 3 | Per-command override (higher for high-stakes plans) |
 | `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `/review-code` |
 | `code_review.max_diff_lines` | 300 | Warn when diff exceeds this size |
 | `code_review.spec_paths` | `[docs/specs]` | Specifications for compliance checking |

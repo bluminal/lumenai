@@ -18,8 +18,9 @@ implementation_plan:
       enabled: true
       focus: "PCI DSS compliance, payment data handling, encryption, tokenization"
 
-  max_review_cycles: 5
-  min_severity_to_address: medium
+  review_loops:
+    max_cycles: 5
+    min_severity_to_address: medium
 
 documents:
   requirements: docs/reqs/main.md

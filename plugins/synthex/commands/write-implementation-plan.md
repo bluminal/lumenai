@@ -37,11 +37,13 @@ Check for a project configuration file at `@{config_path}`. If it exists, load t
 | Setting | Default |
 |---------|---------|
 | Reviewers | architect, designer, tech-lead (all enabled) |
-| `max_review_cycles` | 3 |
-| `min_severity_to_address` | high |
+| `review_loops.max_cycles` | 3 (per-command override; global default is 2) |
+| `review_loops.min_severity_to_address` | high (inherited from global) |
 | `documents.requirements` | `docs/reqs/main.md` |
 | `documents.implementation_plan` | `docs/plans/main.md` |
 | `documents.specs` | `docs/specs` |
+
+**Review loop config resolution order:** `implementation_plan.review_loops` > global `review_loops` > hardcoded default (max_cycles: 2, min_severity_to_address: high).
 
 Projects can customize by running `init` to create `.synthex/config.yaml`, then editing it. They can add reviewers (e.g., a security reviewer, compliance reviewer), disable defaults that aren't relevant, adjust max review cycles, or change the minimum severity threshold. See the Project Configuration section below for full details.
 
@@ -96,9 +98,9 @@ This is the core quality mechanism. The draft plan is reviewed by specialist sub
 └────────┬────────┘
          │
          ▼
-┌─────────────────┐     Spawn reviewers IN PARALLEL
-│  Peer Review     │──── Each reviewer provides structured
-│  (all reviewers) │     feedback with severity levels
+┌─────────────────┐     Spawn FRESH reviewers IN PARALLEL
+│  Peer Review     │──── Each reviewer is a new sub-agent
+│  (all reviewers) │     (never resumed from prior cycle)
 └────────┬────────┘
          │
          ▼
@@ -110,7 +112,7 @@ This is the core quality mechanism. The draft plan is reviewed by specialist sub
          ▼
 ┌─────────────────┐
 │  All CRITICAL/   │── No ──► Loop back to Peer Review
-│  HIGH addressed? │         (up to max_review_cycles)
+│  HIGH addressed? │         (up to review_loops.max_cycles)
 └────────┬────────┘
          │ Yes
          ▼
@@ -128,11 +130,19 @@ This is the core quality mechanism. The draft plan is reviewed by specialist sub
 
 **Step 6a: Spawn Reviewers**
 
-For each enabled reviewer in the configuration, launch a sub-agent IN PARALLEL with:
-- The full draft implementation plan
+For each enabled reviewer in the configuration, launch a **fresh** sub-agent IN PARALLEL with:
+- The full draft implementation plan (current version)
 - The PRD for reference
 - The reviewer's specific focus area
 - Instructions to provide structured feedback
+- On cycles 2+: a compact summary of unresolved findings from the prior cycle (see Context Management below)
+
+**Context Management:** Each review cycle spawns **new** sub-agent instances — never resume prior reviewer agents. This prevents context exhaustion across multiple cycles. Between cycles, the orchestrating command carries forward only:
+1. The updated plan (full text — this is the artifact under review)
+2. A compact findings summary: for each unresolved finding, one line with severity, title, and which reviewer raised it
+3. The current cycle number
+
+Do NOT carry forward full reviewer outputs, the PM's resolution notes from prior cycles, or the raw feedback history. The fresh reviewers will independently evaluate the current plan state.
 
 **Step 6b: Reviewer Feedback Format**
 
@@ -172,7 +182,7 @@ Each reviewer must produce feedback in this structure:
 **Step 6c: Product Manager Addresses Feedback**
 
 The Product Manager receives all reviewer feedback and:
-1. **Must address** all CRITICAL and HIGH findings (per `min_severity_to_address` config)
+1. **Must address** all CRITICAL and HIGH findings (per `review_loops.min_severity_to_address` config)
 2. **May address** MEDIUM and LOW findings at its discretion
 3. **Has final say** on requirements content — if a reviewer suggests changing *what* to build, the PM decides. But feedback on *clarity* (is this task clear enough to execute?) carries high weight.
 4. **Asks the user** for guidance when unsure how to handle feedback — especially architectural trade-offs, scope questions, or conflicting reviewer opinions
@@ -180,9 +190,9 @@ The Product Manager receives all reviewer feedback and:
 
 **Step 6d: Re-review if Needed**
 
-If the PM made significant changes, submit the revised plan for another review cycle. Continue until:
+If the PM made significant changes, submit the revised plan for another review cycle by returning to Step 6a (spawning fresh reviewer sub-agents). Continue until:
 - All CRITICAL and HIGH findings are addressed, OR
-- `max_review_cycles` is reached (default: 3)
+- `review_loops.max_cycles` is reached (default: 3 for implementation plans)
 
 If max cycles are reached with unresolved findings, document them in the Open Questions section.
 
@@ -267,6 +277,11 @@ The `write-implementation-plan` command reads its configuration from `.synthex/c
 # When this file is absent, defaults are used.
 # Only include sections you want to override — unspecified values use defaults.
 
+# Global review loop defaults (apply to all commands with review loops)
+review_loops:
+  max_cycles: 2
+  min_severity_to_address: high
+
 implementation_plan:
   # Sub-agents that review the draft implementation plan
   # Each reviewer provides structured feedback that the Product Manager addresses
@@ -275,12 +290,9 @@ implementation_plan:
       enabled: true             # Set to false to skip this reviewer
       focus: "..."              # What this reviewer should focus on
 
-  # Maximum review loop iterations (default: 3)
-  max_review_cycles: 3
-
-  # Minimum severity the PM must address (default: high)
-  # Options: critical, high, medium, low
-  min_severity_to_address: high
+  # Per-command override: higher max_cycles for high-stakes plans
+  review_loops:
+    max_cycles: 3
 ```
 
 ### Adding a Custom Reviewer
