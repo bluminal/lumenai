@@ -11,8 +11,9 @@ Set up the Synthex plugin configuration for a project. This command scaffolds th
 ## What This Command Does
 
 1. **Creates the project configuration file** at `.synthex/config.yaml` (or custom path)
-2. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`, `docs/specs/decisions/`, `docs/specs/rfcs/`, `docs/runbooks/`, `docs/retros/`) if they don't exist
-3. **Provides guidance** on customizing the configuration for your project
+2. **Updates `.gitignore`** to exclude the worktrees directory (`.claude/worktrees/`) if not already present
+3. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`, `docs/specs/decisions/`, `docs/specs/rfcs/`, `docs/runbooks/`, `docs/retros/`) if they don't exist
+4. **Provides guidance** on customizing the configuration for your project
 
 ## Workflow
 
@@ -29,7 +30,21 @@ Read the default configuration template from the plugin's `config/defaults.yaml`
 
 Create the directory `.synthex/` in the project root if it doesn't exist, then write the defaults template to `@{config_path}`.
 
-### 3. Create Document Directories
+### 3. Update .gitignore
+
+Check if `.gitignore` exists in the project root. If it does, check whether it already contains an entry for the worktrees base path (`.claude/worktrees` by default, or the value from the config file).
+
+- **If `.gitignore` exists and does NOT contain the worktrees path:** Append the following block to the end of the file:
+
+```
+# Synthex worktrees (parallel task execution)
+.claude/worktrees/
+```
+
+- **If `.gitignore` exists and already contains the path:** Do nothing.
+- **If `.gitignore` does not exist:** Create it with the worktrees entry above.
+
+### 4. Create Document Directories
 
 Create the following directories if they don't already exist:
 - `docs/reqs/` — Product requirements documents
@@ -42,7 +57,7 @@ Create the following directories if they don't already exist:
 
 Do NOT create any files inside these directories — just the directories.
 
-### 4. Confirm and Guide
+### 5. Confirm and Guide
 
 Inform the user what was created and provide guidance:
 
@@ -50,7 +65,8 @@ Inform the user what was created and provide guidance:
 Synthex initialized for this project.
 
 Created:
-  .synthex/config.yaml    — Project configuration
+  .synthex/config.yaml           — Project configuration
+  .gitignore                     — Added worktrees path (if not present)
   docs/reqs/                     — Product requirements (PRDs)
   docs/plans/                    — Implementation plans
   docs/specs/                    — Technical specifications
