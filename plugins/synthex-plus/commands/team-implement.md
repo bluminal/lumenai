@@ -546,3 +546,35 @@ Run `team-init --cleanup` to remove stale resources.
 #### 10e. Remove team name record
 
 Remove the team name from the recorded active team list. This supports the orphan prevention system (FR-LM4) — the team name was recorded during Step 5 (team creation) and must be removed so that future `team-implement` invocations do not flag this team as an orphan during pre-flight checks (Step 3c).
+
+## Error Handling
+
+### Teammate failure
+
+When a teammate stops unexpectedly (crash, disconnect, or unhandled error), the lead detects the failure through lack of `TaskUpdate` activity or an explicit error signal. The lead sends a `SendMessage` to check on the stopped teammate. If the teammate is unresponsive:
+
+- Mark the teammate's `in_progress` tasks as `pending` via `TaskUpdate` (unclaiming them)
+- Reassign the tasks to another teammate with the matching role, or take them on directly
+- Record the failure incident in the next progress summary
+
+### Lead failure
+
+If the lead stops unexpectedly, the command attempts best-effort cleanup: send shutdown signals to all remaining teammates. If cleanup succeeds, report the team name for reference so the user can verify the state of work. If cleanup also fails, fall through to the cleanup failure case below.
+
+### Cleanup failure
+
+If cleanup itself fails (teammates unreachable, resources undeletable), report the team name and resource locations so the user can intervene manually:
+
+```
+Error: Team cleanup failed for "{team_name}".
+Manual cleanup required:
+  - Team config: ~/.claude/teams/{team_name}/
+  - Task data:   ~/.claude/tasks/{team_name}/
+  - Mailboxes:   ~/.claude/teams/{team_name}/inboxes/
+```
+
+Do NOT retry cleanup automatically. Manual intervention is safer than automated retry loops, which risk partial state corruption or resource contention.
+
+### Stuck task detection
+
+If a task shows no progress for longer than `lifecycle.stuck_task_timeout_minutes` (default 30 minutes), the lead messages the assigned teammate via `SendMessage` to check status. If the teammate responds, allow them to continue working. If the teammate is unresponsive, recover using the same procedure as teammate failure: unclaim the task and reassign it to a capable teammate or handle it directly. Log the stuck task incident for inclusion in the next progress summary.
