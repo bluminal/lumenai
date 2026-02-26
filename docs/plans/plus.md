@@ -74,8 +74,8 @@ All implementation work for Synthex+ is committed to the **`plus`** long-lived f
 ### Milestone 1.3: team-init Command
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 11 | Write `plugins/synthex-plus/commands/team-init.md` implementing FR-CF2: check Synthex installed, verify experimental flag, check for orphans (using verification strategy from spike Q2), create `.synthex-plus/config.yaml` from defaults, add to .gitignore, print summary of available commands/templates. **AC from FR-CF2:** warns (not fails) if Synthex missing, warns if experimental flag missing, detects/reports orphaned team resources, config includes setting comments | M | M1.1, spike Q2 result | FR-CF2 | pending |
-| 12 | Add `team-init` to plugin.json commands array | S | Task 11 | FR-SP3 | pending |
+| 11 | Write `plugins/synthex-plus/commands/team-init.md` implementing FR-CF2: check Synthex installed, verify experimental flag, check for orphans (using verification strategy from spike Q2), create `.synthex-plus/config.yaml` from defaults, add to .gitignore, print summary of available commands/templates. **AC from FR-CF2:** warns (not fails) if Synthex missing, warns if experimental flag missing, detects/reports orphaned team resources, config includes setting comments | M | M1.1, spike Q2 result | FR-CF2 | done |
+| 12 | Add `team-init` to plugin.json commands array | S | Task 11 | FR-SP3 | done |
 
 **Parallelizable:** None within this milestone. Can overlap with M1.2 spike execution (Task 11 depends on Q2 resolution for orphan detection strategy).
 **Milestone Value:** Users can initialize Synthex+ in their projects. Config framework operational.
@@ -87,7 +87,7 @@ All implementation work for Synthex+ is committed to the **`plus`** long-lived f
 ### Milestone 2.1: Implementation Team Template
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 13 | Write `plugins/synthex-plus/templates/implementation.md` conforming to _skeleton.md: team name/purpose, agent references table (Lead=`plugins/synthex/agents/tech-lead.md`, Frontend=`plugins/synthex/agents/lead-frontend-engineer.md`, Quality=`plugins/synthex/agents/quality-engineer.md`, Reviewer=`plugins/synthex/agents/code-reviewer.md` + `plugins/synthex/agents/security-reviewer.md`), team-specific behavioral overlay per role (mailbox usage patterns, task list conventions, how each role communicates with the lead, acceptance criteria reporting), communication patterns, task decomposition guidance, quality gates. "When to use / when NOT to use" section uses concrete thresholds (e.g., "4+ hours estimated work", "multi-component spanning frontend + backend + tests") | L | Task 5 | FR-TC2, D2 | pending |
+| 13 | Write `plugins/synthex-plus/templates/implementation.md` conforming to _skeleton.md: team name/purpose, agent references table (Lead=`plugins/synthex/agents/tech-lead.md`, Frontend=`plugins/synthex/agents/lead-frontend-engineer.md`, Quality=`plugins/synthex/agents/quality-engineer.md`, Reviewer=`plugins/synthex/agents/code-reviewer.md` + `plugins/synthex/agents/security-reviewer.md`), team-specific behavioral overlay per role (mailbox usage patterns, task list conventions, how each role communicates with the lead, acceptance criteria reporting), communication patterns, task decomposition guidance, quality gates. "When to use / when NOT to use" section uses concrete thresholds (e.g., "4+ hours estimated work", "multi-component spanning frontend + backend + tests") | L | Task 5 | FR-TC2, D2 | done |
 
 **Parallelizable:** Depends only on skeleton (Task 5).
 **Milestone Value:** Implementation team template ready for use by the team-implement command.
@@ -95,7 +95,7 @@ All implementation work for Synthex+ is committed to the **`plus`** long-lived f
 ### Milestone 2.2: team-implement Command -- Core Workflow
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 14 | Write `plugins/synthex-plus/commands/team-implement.md` -- parameters section: implementation_plan_path, template, milestone, config_path with defaults per FR-CMD1 | S | None | FR-CMD1 | pending |
+| 14 | Write `plugins/synthex-plus/commands/team-implement.md` -- parameters section: implementation_plan_path, template, milestone, config_path with defaults per FR-CMD1 | S | None | FR-CMD1 | done |
 | 15 | Write team-implement workflow step 1-2: load config (resolution: project > plugin defaults > hardcoded), read implementation plan, identify target milestone and tasks. Include milestone task count check against `lifecycle.max_tasks_per_invocation` (warn if >15) | M | Task 14 | FR-CMD1, FR-CW1 | pending |
 | 16 | Write team-implement workflow step 3: pre-flight checks -- one-team-per-session check, Synthex dependency check, orphan detection (using verification strategy from spike Q2). Reference FR-LM1 behavior. Produce clear error messages for each failure mode | M | Task 15 | FR-LM1 | pending |
 | 17 | Write team-implement workflow step 4: cost estimate display referencing canonical format in `plugins/synthex-plus/docs/output-formats.md`. Include caveat that formula assumes all teammates interact with all tasks -- conservative upper bound for implementation teams. **AC:** Displays both formulas using config values; labeled as approximate; user confirmation prompt present; `cost_guidance.show_cost_comparison: false` skips display | M | Task 15, Task 6 | FR-CG2 | pending |
