@@ -578,3 +578,30 @@ Do NOT retry cleanup automatically. Manual intervention is safer than automated 
 ### Stuck task detection
 
 If a task shows no progress for longer than `lifecycle.stuck_task_timeout_minutes` (default 30 minutes), the lead messages the assigned teammate via `SendMessage` to check status. If the teammate responds, allow them to continue working. If the teammate is unresponsive, recover using the same procedure as teammate failure: unclaim the task and reassign it to a capable teammate or handle it directly. Log the stuck task incident for inclusion in the next progress summary.
+
+## Graceful Degradation
+
+Agent Teams requires the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` environment variable. This check runs **before Step 3 (Pre-Flight Checks)** — if the flag is missing, none of the team creation steps are reached.
+
+**Detection:** Check whether `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is set to `1`. If it is not set or has any other value, abort with the following message:
+
+```
+Agent Teams requires the experimental feature flag.
+Set the following environment variable and restart Claude Code:
+
+  export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+
+This flag enables the Agent Teams API used by Synthex+ commands.
+```
+
+Then offer the standard Synthex fallback as an alternative — do **not** force it:
+
+```
+Alternatively, you can use the standard Synthex command:
+
+  /synthex:next-priority @{implementation_plan_path}
+
+This uses sequential subagent execution instead of persistent teams.
+```
+
+Present both options and let the user decide how to proceed.
