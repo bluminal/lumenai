@@ -1,0 +1,144 @@
+# Synthex+ — Project Configuration
+#
+# Default configuration for the Synthex+ teams plugin.
+# To customize for your project, copy this file to:
+#   .synthex-plus/config.yaml
+# in your project root.
+#
+# You only need to include sections you want to override.
+# Unspecified values use the defaults shown here.
+#
+# To create this file automatically, run the `team-init` command.
+
+# -------------------------------------------------------------------
+# Team Creation Defaults
+# Used by all team commands (team-implement, team-review, team-plan)
+# -------------------------------------------------------------------
+teams:
+
+  # Default team template for implementation tasks.
+  # Templates define which roles are spawned and their responsibilities.
+  default_implementation_template: implementation
+
+  # Default team template for code review tasks.
+  default_review_template: review
+
+  # Default team template for planning tasks.
+  default_planning_template: planning
+
+# -------------------------------------------------------------------
+# Hook Configuration
+# Quality gate hooks for team task completion and idle detection.
+# Hook behavior is documented in companion markdown files in hooks/.
+# -------------------------------------------------------------------
+hooks:
+
+  # Fires when a teammate marks a task as completed.
+  # The review gate ensures quality before the task is accepted.
+  task_completed:
+    review_gate:
+
+      # Whether to run a review gate on completed tasks.
+      enabled: true
+
+      # Automatically reopen the task if review fails.
+      # When true, the teammate receives review findings and iterates.
+      auto_reopen_on_fail: true
+
+      # Reviewers by task category.
+      # Each category maps to a list of reviewer agents.
+      reviewers:
+        code: [code-reviewer, security-reviewer]
+        frontend: [code-reviewer, security-reviewer, design-system-agent]
+        infrastructure: [code-reviewer, terraform-plan-reviewer]
+
+  # Fires when a teammate has no assigned tasks and is idle.
+  teammate_idle:
+    work_assignment:
+
+      # Whether to automatically assign new work to idle teammates.
+      enabled: true
+
+      # Whether idle teammates can pick up tasks outside their role.
+      # When false, a frontend teammate will only pick up frontend tasks.
+      allow_cross_functional: false
+
+# -------------------------------------------------------------------
+# Cost Estimation Constants
+# Used by all team commands for pre-creation cost estimates.
+# See docs/output-formats.md for the display format.
+# -------------------------------------------------------------------
+cost_guidance:
+
+  # Approximate tokens per teammate for spawn + context + CLAUDE.md loading.
+  # This is the fixed overhead per teammate regardless of task count.
+  base_tokens_per_teammate: 50000
+
+  # Approximate tokens per task per teammate for execution + tool use.
+  # Multiply by task count for total estimated execution tokens.
+  tokens_per_task_per_teammate: 20000
+
+  # Show a cost comparison table before creating a team.
+  # Compares estimated cost of team execution vs. sequential execution.
+  show_cost_comparison: true
+
+# -------------------------------------------------------------------
+# Review Loops (Teams-Specific)
+# Teams use persistent teammates for review cycles, not fresh subagents.
+# Higher default than Synthex because teams can iterate more efficiently.
+# Resolution order: per-command override > global > hardcoded default.
+# -------------------------------------------------------------------
+review_loops:
+
+  # Maximum review loop iterations before forcing completion.
+  # Each cycle: reviewers provide findings -> teammate fixes -> re-review.
+  # If unresolved findings remain after max cycles, they are documented
+  # in the output (e.g., Open Questions, Summary).
+  max_cycles: 3
+
+  # Minimum severity level that must be addressed before exiting the loop.
+  # Options: critical, high, medium, low
+  # Default "high" means all CRITICAL and HIGH findings must be resolved.
+  # WARN-only results (MEDIUM and below) do NOT trigger the loop.
+  min_severity_to_address: high
+
+# -------------------------------------------------------------------
+# Shared Task List Settings
+# Controls how tasks are represented in the team's shared task list.
+# -------------------------------------------------------------------
+task_list:
+
+  # How much context to include in task descriptions.
+  # "references" = task descriptions contain pointers to files/specs
+  # "full" = task descriptions contain full inline context
+  # References mode is cheaper (fewer tokens) but requires teammates
+  # to read files themselves. Full mode is more expensive but faster.
+  context_mode: references
+
+  # Maximum number of tasks that can be in progress simultaneously.
+  # This is a soft limit — the team lead will warn but not block.
+  max_concurrent_tasks: 5
+
+# -------------------------------------------------------------------
+# Team Lifecycle Settings
+# Controls team behavior during execution and shutdown.
+# -------------------------------------------------------------------
+lifecycle:
+
+  # Timeout (minutes) for tasks showing no progress before the team lead
+  # intervenes. Progress is measured by tool calls and file modifications.
+  stuck_task_timeout_minutes: 30
+
+  # Maximum tasks per team invocation (soft limit, warned in guidance).
+  # Beyond this, consider splitting into multiple team invocations.
+  max_tasks_per_invocation: 15
+
+# -------------------------------------------------------------------
+# Document Paths
+# Default locations for key project documents.
+# These match Synthex's defaults for interoperability (FR-CX2).
+# -------------------------------------------------------------------
+documents:
+  requirements: docs/reqs/main.md
+  implementation_plan: docs/plans/main.md
+  specs: docs/specs
