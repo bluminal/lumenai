@@ -578,3 +578,19 @@ Do NOT retry cleanup automatically. Manual intervention is safer than automated 
 ### Stuck task detection
 
 If a task shows no progress for longer than `lifecycle.stuck_task_timeout_minutes` (default 30 minutes), the lead messages the assigned teammate via `SendMessage` to check status. If the teammate responds, allow them to continue working. If the teammate is unresponsive, recover using the same procedure as teammate failure: unclaim the task and reassign it to a capable teammate or handle it directly. Log the stuck task incident for inclusion in the next progress summary.
+
+## Orphan Prevention
+
+A lightweight tracking file mechanism detects teams that were not cleaned up from previous sessions. This is a cross-cutting concern that ties together multiple workflow steps.
+
+**Tracking file:** `.synthex-plus/.active-team` — contains the team name (e.g., `impl-milestone-2.1`). This file is NOT committed to git (already handled by `team-init`'s `.gitignore` entries).
+
+**Lifecycle:**
+
+- **Step 5 (team creation):** After the team is created successfully, write the team name to `.synthex-plus/.active-team`. This records the active team for the current session.
+- **Step 10e (shutdown):** Delete `.synthex-plus/.active-team`. This signals that no team is currently active and prevents false orphan detection on the next invocation.
+
+**Detection during pre-flight (Step 3a, 3c):**
+
+- If `.synthex-plus/.active-team` exists AND `~/.claude/teams/{recorded-team-name}/config.json` also exists — the previous session's team was not cleaned up. Report it as an orphan (handled by Step 3c's orphan detection).
+- If `.synthex-plus/.active-team` exists but the team metadata directory is gone — the team was cleaned up externally but the tracking file was not removed. Silently delete the stale tracking file and continue.
