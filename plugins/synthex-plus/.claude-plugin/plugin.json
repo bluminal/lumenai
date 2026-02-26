@@ -7,5 +7,5 @@
   },
   "keywords": ["agents", "teams", "orchestration", "collaboration", "parallel"],
   "hooks": "./hooks/hooks.json",
-  "commands": ["commands/team-init.md", "commands/team-implement.md"]
+  "commands": ["commands/team-init.md", "commands/team-implement.md", "commands/team-review.md"]
 }
