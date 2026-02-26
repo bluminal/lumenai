@@ -305,6 +305,12 @@ Same sequence as `team-implement` Step 10c:
 
 Same as `team-implement` Steps 10d and 10e. Clean up team resources and remove the `.synthex-plus/.active-team` tracking file.
 
+## When to Use Teams
+
+Use `team-plan` instead of `write-implementation-plan` when the PRD contains 10+ requirements, the plan spans multiple phases, or significant architectural decisions require concurrent evaluation from architecture, design, and implementation perspectives. The key advantage is that reviewers persist across review cycles -- they maintain context about what they flagged previously and how the PM addressed it, producing higher-quality feedback in later cycles. For single-feature planning, incremental plan updates, or straightforward PRDs with fewer than 10 requirements, use `write-implementation-plan` instead.
+
+See `plugins/synthex-plus/docs/decision-guide.md` for the full teams vs. subagents comparison.
+
 ## Graceful Degradation
 
 Agent Teams requires the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` environment variable. This check runs **before Step 6 (Pre-Flight Checks)** -- if the flag is missing, none of the team creation steps are reached.
