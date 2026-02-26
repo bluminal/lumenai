@@ -108,9 +108,9 @@ All implementation work for Synthex+ is committed to the **`plus`** long-lived f
 ### Milestone 2.3: team-implement -- Task Mapping & Execution
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 20 | Write team-implement workflow step 7: plan-to-task mapping instructions -- lead maps plan tasks to shared task list items, preserving dependency chains (blockedBy), enriching descriptions with context (CLAUDE.md reference, spec links, inter-task integration points, acceptance criteria, context budget guidance). Reference FR-TL1 and FR-TL3 | L | Task 19 | FR-TL1, FR-TL3 | pending |
-| 21 | Write team-implement workflow step 8: execution coordination -- lead assigns tasks respecting dependencies, teammates execute independently, lead monitors progress. Include progressive summarization instructions (summarize every 3-5 completed tasks per FR-CW2) | M | Task 20 | FR-CW2 | pending |
-| 22 | Write team-implement workflow step 9: progress synchronization -- only the lead writes to the implementation plan, teammates report via shared task list, lead consolidates at milestone boundaries. Discovered work captured in both systems. Reference FR-TL2 | M | Task 21 | FR-TL2 | pending |
+| 20 | Write team-implement workflow step 7: plan-to-task mapping instructions -- lead maps plan tasks to shared task list items, preserving dependency chains (blockedBy), enriching descriptions with context (CLAUDE.md reference, spec links, inter-task integration points, acceptance criteria, context budget guidance). Reference FR-TL1 and FR-TL3 | L | Task 19 | FR-TL1, FR-TL3 | done |
+| 21 | Write team-implement workflow step 8: execution coordination -- lead assigns tasks respecting dependencies, teammates execute independently, lead monitors progress. Include progressive summarization instructions (summarize every 3-5 completed tasks per FR-CW2) | M | Task 20 | FR-CW2 | done |
+| 22 | Write team-implement workflow step 9: progress synchronization -- only the lead writes to the implementation plan, teammates report via shared task list, lead consolidates at milestone boundaries. Discovered work captured in both systems. Reference FR-TL2 | M | Task 21 | FR-TL2 | done |
 
 **Parallelizable:** Sequential -- each step builds on the previous.
 **Milestone Value:** team-implement can map a plan to tasks, coordinate execution, and sync progress.
@@ -118,11 +118,11 @@ All implementation work for Synthex+ is committed to the **`plus`** long-lived f
 ### Milestone 2.4: team-implement -- Lifecycle Management
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 23 | Write team-implement workflow step 10: graceful shutdown -- lead summarizes completed work, non-lead teammates shut down first then lead, verify resource cleanup. Reference FR-LM2 | M | Task 22 | FR-LM2 | pending |
-| 24 | Write team-implement error handling section: teammate failure detection and reassignment (FR-LM3 case 1), lead failure with best-effort cleanup (case 2), cleanup failure reporting (case 3), stuck task timeout intervention (case 4, configurable via `lifecycle.stuck_task_timeout_minutes`) | M | Task 23 | FR-LM3 | pending |
-| 25 | Write team-implement graceful degradation: detect missing experimental flag, explain what's needed, offer fallback to `next-priority` command. Reference FR-GD1 | S | Task 24 | FR-GD1 | pending |
-| 26 | Write team-implement orphan prevention: record team name at creation, remove at cleanup, detect orphans on next invocation (using verification strategy from spike Q2). Reference FR-LM4 | S | Task 24 | FR-LM4 | pending |
-| 27 | Add `team-implement` to plugin.json commands array | S | Task 26 | FR-SP3 | pending |
+| 23 | Write team-implement workflow step 10: graceful shutdown -- lead summarizes completed work, non-lead teammates shut down first then lead, verify resource cleanup. Reference FR-LM2 | M | Task 22 | FR-LM2 | done |
+| 24 | Write team-implement error handling section: teammate failure detection and reassignment (FR-LM3 case 1), lead failure with best-effort cleanup (case 2), cleanup failure reporting (case 3), stuck task timeout intervention (case 4, configurable via `lifecycle.stuck_task_timeout_minutes`) | M | Task 23 | FR-LM3 | done |
+| 25 | Write team-implement graceful degradation: detect missing experimental flag, explain what's needed, offer fallback to `next-priority` command. Reference FR-GD1 | S | Task 24 | FR-GD1 | done |
+| 26 | Write team-implement orphan prevention: record team name at creation, remove at cleanup, detect orphans on next invocation (using verification strategy from spike Q2). Reference FR-LM4 | S | Task 24 | FR-LM4 | done |
+| 27 | Add `team-implement` to plugin.json commands array | S | Task 26 | FR-SP3 | done |
 
 **Parallelizable:** Tasks 25-26 can run concurrently after Task 24.
 **Milestone Value:** team-implement is feature-complete with full lifecycle management. First Synthex+ command operational end-to-end.
