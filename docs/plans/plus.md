@@ -182,10 +182,10 @@ All implementation work for Synthex+ is committed to the **`plus`** long-lived f
 ### Milestone 5.1: Decision Guide, Documentation & README
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 40 | Write teams vs. subagents decision guide at `plugins/synthex-plus/docs/decision-guide.md` covering: factor table from FR-CG1 (task duration, communication needs, context continuity, parallelism, review depth, cost sensitivity) with concrete thresholds | M | M2.4 | FR-CG1 | pending |
-| 41 | Embed decision guide summary in each team command's help text (brief version with pointer to full guide) | S | Task 40 | FR-CG1 | pending |
-| 42 | Write context window management guide at `plugins/synthex-plus/docs/context-management.md`: milestone scope limits, progressive summarization, auto-compaction behavior, task description as durable record | S | M2.3 | FR-CW1-3 | pending |
-| 43 | Write `plugins/synthex-plus/README.md`: prerequisites (Synthex installed, experimental flag), quick start (team-init, first team-implement), three commands with parameters and example invocations, cost model summary with pointer to decision guide, link to context management guide | M | M4.2 | -- | pending |
+| 40 | Write teams vs. subagents decision guide at `plugins/synthex-plus/docs/decision-guide.md` covering: factor table from FR-CG1 (task duration, communication needs, context continuity, parallelism, review depth, cost sensitivity) with concrete thresholds | M | M2.4 | FR-CG1 | done |
+| 41 | Embed decision guide summary in each team command's help text (brief version with pointer to full guide) | S | Task 40 | FR-CG1 | done |
+| 42 | Write context window management guide at `plugins/synthex-plus/docs/context-management.md`: milestone scope limits, progressive summarization, auto-compaction behavior, task description as durable record | S | M2.3 | FR-CW1-3 | done |
+| 43 | Write `plugins/synthex-plus/README.md`: prerequisites (Synthex installed, experimental flag), quick start (team-init, first team-implement), three commands with parameters and example invocations, cost model summary with pointer to decision guide, link to context management guide | M | M4.2 | -- | done |
 
 **Parallelizable:** Tasks 40-43 are independent.
 **Milestone Value:** Users have clear guidance on when to use teams vs. subagents, how to manage context, and a comprehensive README for getting started.
@@ -193,11 +193,11 @@ All implementation work for Synthex+ is committed to the **`plus`** long-lived f
 ### Milestone 5.2: Testing -- Schema Validators (Layer 1)
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 44 | Write schema validator `tests/schemas/synthex-plus/template.ts`: validate template structure (required sections per _skeleton.md: team name, purpose, agent references table, communication patterns, task decomposition guidance, quality gates, when to use / when NOT to use). Validate that agent references contain valid Synthex agent file paths (paths must match files in `plugins/synthex/agents/`), validate each role has a behavioral overlay section. **Study existing test patterns in `tests/schemas/` before writing** | M | M2.1, M4.1, M4.2 | FR-TS1 | pending |
-| 45 | Write schema validator `tests/schemas/synthex-plus/hooks.ts`: validate hooks.json structure (event names, command paths, descriptions), verify script files exist and are executable (validate mode 100755 on script files) | S | M3.1 | FR-TS1 | pending |
-| 46 | Write schema validator `tests/schemas/synthex-plus/command-output.ts`: validate team creation summaries (roles, team name, task count), progress reports, and completion reports against canonical formats in output-formats.md | M | M2.4, Task 6 | FR-TS1 | pending |
-| 47 | Write Vitest test suites for all 3 validators with inline sample outputs. **Study existing test patterns in `tests/schemas/*.test.ts` first** | M | Tasks 44-46 | FR-TS1 | pending |
-| 48 | Create test fixtures at `tests/fixtures/synthex-plus/`: sample templates, hooks.json, command output samples | M | Tasks 44-46 | FR-TS1 | pending |
+| 44 | Write schema validator `tests/schemas/synthex-plus/template.ts`: validate template structure (required sections per _skeleton.md: team name, purpose, agent references table, communication patterns, task decomposition guidance, quality gates, when to use / when NOT to use). Validate that agent references contain valid Synthex agent file paths (paths must match files in `plugins/synthex/agents/`), validate each role has a behavioral overlay section. **Study existing test patterns in `tests/schemas/` before writing** | M | M2.1, M4.1, M4.2 | FR-TS1 | done |
+| 45 | Write schema validator `tests/schemas/synthex-plus/hooks.ts`: validate hooks.json structure (event names, command paths, descriptions), verify script files exist and are executable (validate mode 100755 on script files) | S | M3.1 | FR-TS1 | done |
+| 46 | Write schema validator `tests/schemas/synthex-plus/command-output.ts`: validate team creation summaries (roles, team name, task count), progress reports, and completion reports against canonical formats in output-formats.md | M | M2.4, Task 6 | FR-TS1 | done |
+| 47 | Write Vitest test suites for all 3 validators with inline sample outputs. **Study existing test patterns in `tests/schemas/*.test.ts` first** | M | Tasks 44-46 | FR-TS1 | done |
+| 48 | Create test fixtures at `tests/fixtures/synthex-plus/`: sample templates, hooks.json, command output samples | M | Tasks 44-46 | FR-TS1 | done |
 
 **Parallelizable:** Tasks 44-46 are independent. Tasks 47-48 depend on all validators.
 **Milestone Value:** Layer 1 tests run on every PR at zero LLM cost. Template, hook, and output format structure validated automatically.
@@ -205,11 +205,11 @@ All implementation work for Synthex+ is committed to the **`plus`** long-lived f
 ### Milestone 5.3: Testing -- Behavioral & Integration (Layers 2-3)
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 49 | Write Layer 2 behavioral assertions for team-implement: team creation spawn prompt contains agent file path references and read-on-spawn instructions, cost estimate uses correct formula, pre-flight checks detect orphans and missing dependencies, lifecycle management instructions present. **Study existing Layer 2 patterns in `tests/promptfoo.config.yaml` first** | M | M5.2 | FR-TS2 | pending |
-| 50 | Write Layer 2 behavioral assertions for team-review: cross-domain messaging pattern instructed, consolidated report format matches Synthex conventions, re-review cycles reuse existing team with changed-files-only scope | M | M5.2 | FR-TS2 | pending |
-| 51 | Write Layer 2 behavioral assertions for team-plan: concurrent review instructed, PM retains authority, reviewer persistence across cycles, user interview step present | S | M5.2 | FR-TS2 | pending |
-| 52 | Write Layer 3 integration scenarios: team-implement executes small milestone with correct task coordination, team-review produces cross-domain findings, team-plan maintains reviewer context across cycles | L | M5.2 | FR-TS3 | pending |
-| 53 | Add Synthex+ test entries to `tests/promptfoo.config.yaml` for Layers 2-3 | S | Tasks 49-52 | FR-TS2-3 | pending |
+| 49 | Write Layer 2 behavioral assertions for team-implement: team creation spawn prompt contains agent file path references and read-on-spawn instructions, cost estimate uses correct formula, pre-flight checks detect orphans and missing dependencies, lifecycle management instructions present. **Study existing Layer 2 patterns in `tests/promptfoo.config.yaml` first** | M | M5.2 | FR-TS2 | done |
+| 50 | Write Layer 2 behavioral assertions for team-review: cross-domain messaging pattern instructed, consolidated report format matches Synthex conventions, re-review cycles reuse existing team with changed-files-only scope | M | M5.2 | FR-TS2 | done |
+| 51 | Write Layer 2 behavioral assertions for team-plan: concurrent review instructed, PM retains authority, reviewer persistence across cycles, user interview step present | S | M5.2 | FR-TS2 | done |
+| 52 | Write Layer 3 integration scenarios: team-implement executes small milestone with correct task coordination, team-review produces cross-domain findings, team-plan maintains reviewer context across cycles | L | M5.2 | FR-TS3 | done |
+| 53 | Add Synthex+ test entries to `tests/promptfoo.config.yaml` for Layers 2-3 | S | Tasks 49-52 | FR-TS2-3 | done |
 
 **Parallelizable:** Tasks 49-51 are independent. Task 52 depends on Layer 2 completion. Task 53 depends on all.
 **Milestone Value:** Full 3-layer testing pyramid for Synthex+. Behavioral correctness validated.
@@ -217,11 +217,11 @@ All implementation work for Synthex+ is committed to the **`plus`** long-lived f
 ### Milestone 5.4: Final Polish
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 54 | Final review of plugin.json commands array -- verify all user-facing commands registered: team-init, team-implement, team-review, team-plan. Confirm api-spike is NOT registered (D11) | S | M4.2 | FR-SP3 | pending |
-| 55 | Verify marketplace.json entry is complete and keywords differentiate from Synthex | S | Task 54 | FR-CX3 | pending |
-| 56 | Verify defaults.yaml covers all configurable settings documented across all commands and hooks | S | Task 54 | FR-CF1 | pending |
-| 57 | Verify no Synthex files were modified (FR-CX1 compliance check) | S | Task 54 | FR-CX1 | pending |
-| 58 | Verify shared document paths in Synthex+ defaults match Synthex defaults (FR-CX2) | S | Task 54 | FR-CX2 | pending |
+| 54 | Final review of plugin.json commands array -- verify all user-facing commands registered: team-init, team-implement, team-review, team-plan. Confirm api-spike is NOT registered (D11) | S | M4.2 | FR-SP3 | done |
+| 55 | Verify marketplace.json entry is complete and keywords differentiate from Synthex | S | Task 54 | FR-CX3 | done |
+| 56 | Verify defaults.yaml covers all configurable settings documented across all commands and hooks | S | Task 54 | FR-CF1 | done |
+| 57 | Verify no Synthex files were modified (FR-CX1 compliance check) | S | Task 54 | FR-CX1 | done |
+| 58 | Verify shared document paths in Synthex+ defaults match Synthex defaults (FR-CX2) | S | Task 54 | FR-CX2 | done |
 
 **Parallelizable:** All tasks 54-58 are independent.
 **Milestone Value:** Synthex+ v0.1 complete. All PRD requirements addressed, all success metrics verifiable.
