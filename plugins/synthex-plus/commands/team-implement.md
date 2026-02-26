@@ -293,3 +293,90 @@ Roles: {role_count}/{expected_count} spawned
 ```
 
 **Verification outcome:** If required roles are missing, abort (6b). If metadata is inaccessible, attempt prompt-based fallback (6c). If all roles are confirmed, proceed to task mapping and execution.
+
+### 7. Plan-to-Task Mapping (FR-TL1, FR-TL3)
+
+After the team is created and verified, the lead maps implementation plan tasks to the shared task list. This bridges the plan (a static document) to the team's executable work queue.
+
+#### 7a. Create shared task list items
+
+The lead creates one shared task list item per actionable plan task using `TaskCreate`:
+
+- **Subject:** Brief task title from the plan (e.g., "Implement login form with email/password fields")
+- **Description:** Enriched with context pointers and acceptance criteria (see 7b)
+- **Dependencies:** Map plan dependency references to `addBlockedBy` relationships
+  - Plan says "Depends on: Task 3" becomes `addBlockedBy: [task-3-id]`
+  - No circular dependencies allowed — if detected, break the cycle and flag it in the task description
+  - Dependencies only reference tasks within the current milestone scope — cross-milestone dependencies are noted in the description as informational context, not as `addBlockedBy` links
+
+#### 7b. Enrich task descriptions
+
+Teammates operate in independent context windows. Unlike subagents that share the parent's context, teammates must be given enough information in the task description itself to work autonomously.
+
+Every task description includes these elements:
+
+- **CLAUDE.md reference:** "Refer to CLAUDE.md for project conventions and patterns"
+- **Spec links:** Relevant specification documents from the `documents.specs` config path (e.g., "See docs/specs/design-system.md for form component patterns")
+- **Acceptance criteria:** Copied verbatim from the implementation plan task
+- **Inter-task integration points:** Explicitly name which other concurrent tasks this task interacts with (e.g., "This task creates the API endpoint that Task 5's frontend component will consume")
+- **Context budget guidance:** "Keep tool invocations focused. Summarize findings rather than dumping raw output."
+
+Task descriptions follow the `task_list.context_mode` config setting:
+
+| Mode | Behavior | Trade-off |
+|------|----------|-----------|
+| `references` (default) | Descriptions contain pointers to files and specs — teammates read referenced files when they claim the task | Lower token cost, slightly slower task start |
+| `full` | Descriptions contain full inline context — spec contents, acceptance criteria detail, and relevant code snippets embedded directly | Higher token cost, faster execution |
+
+#### 7c. Preserve complexity metadata
+
+Complexity grades (S/M/L) from the implementation plan are preserved in the task description so the lead can use them for:
+
+- **Assignment decisions:** Balance workload across teammates (avoid assigning all L tasks to one teammate)
+- **Progress estimation:** S tasks are expected to complete faster than L tasks — stale L tasks may not be stuck
+- **Reporting:** Progress summaries can report completion by complexity weight, not just task count
+
+Include the complexity grade in the task description as a labeled field: `Complexity: M`
+
+#### 7d. Assignment guidance
+
+After creating all shared task list items, the lead assigns them to teammates based on role match:
+
+- **Frontend tasks** (UI components, styling, client-side logic) — assign to Frontend teammate
+- **Test tasks** (unit tests, integration tests, coverage) — assign to Quality teammate
+- **General implementation** (API endpoints, business logic, data layer, configuration) — Lead handles directly
+- **Review tasks** — NOT created here; the TaskCompleted hook system creates review tasks automatically when implementation tasks are completed
+
+The lead assigns tasks via `TaskUpdate` with `owner` set to the teammate's role name. Only assign tasks whose dependencies are already satisfied (all `blockedBy` tasks are completed). Tasks with unsatisfied dependencies remain unassigned until their blockers resolve — the lead reassigns them as dependencies complete.
+
+#### 7e. Illustrative task mapping
+
+**Plan task (from implementation plan table):**
+```
+| 5 | Implement login form with email/password fields | M | Task 3 | FR-AUTH1 | pending |
+```
+
+**Shared task list item created by the lead:**
+```
+TaskCreate:
+  subject: "Implement login form with email/password fields"
+  description: |
+    Implement the login form component per FR-AUTH1.
+    Complexity: M
+
+    - Refer to CLAUDE.md for project conventions
+    - See docs/specs/design-system.md for form component patterns
+    - Acceptance: email + password fields, client-side validation, submit handler wired to auth API
+    - Integration: Task 3 (auth API endpoint) must complete first; Task 6 (login page layout) consumes this component
+    - Context budget: keep tool invocations focused, summarize findings
+  addBlockedBy: [task-3-id]
+```
+
+After creation, the lead assigns the task:
+```
+TaskUpdate:
+  taskId: task-5-id
+  owner: "Frontend"
+```
+
+This task is only assigned once Task 3 (its dependency) has been completed. Until then, it remains unassigned and pending.
