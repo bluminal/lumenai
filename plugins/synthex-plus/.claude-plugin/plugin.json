@@ -1,0 +1,11 @@
+{
+  "name": "synthex-plus",
+  "version": "0.1.0",
+  "description": "Teams-optimized orchestration for Synthex — sustained multi-agent collaboration via Claude Code Agent Teams.",
+  "author": {
+    "name": "Bluminal Labs"
+  },
+  "keywords": ["agents", "teams", "orchestration", "collaboration", "parallel"],
+  "hooks": "./hooks/hooks.json",
+  "commands": []
+}
