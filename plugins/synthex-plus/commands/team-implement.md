@@ -380,3 +380,65 @@ TaskUpdate:
 ```
 
 This task is only assigned once Task 3 (its dependency) has been completed. Until then, it remains unassigned and pending.
+
+### 8. Execution Coordination (FR-CW2)
+
+After task mapping (Step 7), the team enters the execution phase. The lead coordinates while teammates work concurrently and autonomously.
+
+#### 8a. Execution model
+
+- Teammates execute tasks independently and concurrently within their assigned roles
+- The lead monitors progress by periodically checking `TaskList` for status updates
+- The lead does NOT micromanage -- teammates are autonomous within their domain
+- The lead intervenes only when:
+  - A teammate reports a blocker via mailbox
+  - A task is stuck (see `lifecycle.stuck_task_timeout_minutes` and 8c below)
+  - A cross-cutting concern emerges that affects multiple teammates
+
+#### 8b. Task lifecycle
+
+Each task follows this lifecycle, managed by the teammate who owns it:
+
+1. **Claim:** Teammate uses `TaskUpdate` to set `status` to `in_progress` and `owner` to their role name
+2. **Execute:** Teammate implements the task, using tools as needed
+3. **Complete:** Teammate uses `TaskUpdate` to set `status` to `completed` with a brief completion note in the description (files modified, decisions made)
+4. **Quality gate:** The `TaskCompleted` hook fires, routing the completed work to reviewers (see Phase 3 hooks). If review returns FAIL, the task is reopened and the teammate iterates.
+
+Teammates only claim tasks that meet **all three** conditions:
+- `pending` status (not already claimed by another teammate)
+- Unblocked (all `blockedBy` dependencies are `completed`)
+- Matching their role (Frontend claims frontend tasks, Quality claims test tasks, Lead handles general implementation)
+
+#### 8c. Lead monitoring cadence
+
+The lead checks progress at regular intervals throughout execution:
+
+- Check `TaskList` for newly completed tasks, blocked tasks, and stuck tasks
+- A task is "stuck" if it has been `in_progress` for longer than `lifecycle.stuck_task_timeout_minutes` (default 30) without tool activity
+- For stuck tasks:
+  - Message the teammate via mailbox to check status
+  - If the teammate is unresponsive, reassign the task to another capable teammate
+  - If the task is blocked on an external dependency, update `blockedBy` and flag it
+
+#### 8d. Progressive summarization
+
+To manage context window capacity during long-running sessions, the lead produces periodic progress summaries:
+
+- **Frequency:** After every 3-5 completed tasks, the lead produces a summary
+- **Content:** Each summary captures:
+  - What was completed (task subjects and key outcomes)
+  - Key decisions made during execution
+  - Files created or modified
+  - Remaining work count and any active blockers
+- **Authority:** The summary is the authoritative record of team progress. Detailed task output can be dropped from context after summarization.
+- **Convention:** This mirrors the existing Synthex pattern of summarizing when plans exceed 1500 lines
+
+Display each progress summary using the **Progress Report Format** defined in `plugins/synthex-plus/docs/output-formats.md`.
+
+#### 8e. Dependency unblocking
+
+As tasks complete, the lead proactively unblocks downstream work:
+
+- When a task completes, check `TaskList` for tasks whose `blockedBy` list referenced the completed task
+- If a newly-unblocked task matches an idle teammate's role, assign it immediately via `TaskUpdate` with `owner` set to the teammate's role name
+- The `TeammateIdle` hook also handles automatic assignment (see Phase 3), but the lead proactively assigns to minimize idle time between tasks
