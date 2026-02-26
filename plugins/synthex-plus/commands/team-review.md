@@ -394,6 +394,12 @@ Unlike team-implement where tasks can be reassigned, review tasks are role-speci
 
 These follow the same patterns as team-implement's error handling (lead failure triggers best-effort cleanup; cleanup failure reports resource locations for manual intervention).
 
+## When to Use Teams
+
+Use `team-review` instead of `review-code` when the diff exceeds 500 lines of changed code, changes are security-critical (auth, crypto, API surface), or the changeset spans 5+ files across multiple modules. The key advantage is cross-domain discovery -- reviewers can alert each other to findings in overlapping areas (e.g., code reviewer spots a potential injection and messages the security reviewer directly). For diffs under 200 lines with a single concern, routine bug fixes, or documentation changes, use `review-code` instead.
+
+See `plugins/synthex-plus/docs/decision-guide.md` for the full teams vs. subagents comparison.
+
 ## Graceful Degradation
 
 Agent Teams requires the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` environment variable. This check runs **before Step 3 (Pre-Flight Checks)** -- if the flag is missing, none of the team creation steps are reached.
