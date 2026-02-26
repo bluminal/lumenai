@@ -246,3 +246,50 @@ After composing the prompt:
 - Each role from the template becomes a named teammate in the spawn call
 - Wait for confirmation that the team was created successfully before proceeding
 - If team creation fails, display the error and abort — do not retry automatically
+
+### 6. Post-Creation Verification (FR-TCM2)
+
+After team creation (Step 5), verify the team was formed correctly before proceeding to task mapping and execution.
+
+#### 6a. Inspect team metadata
+
+Check `~/.claude/teams/{team-name}/config.json` (where `{team-name}` is the name from Step 5d, e.g., `impl-milestone-2.1`):
+
+- Verify the config file exists (confirms team was created)
+- Verify the teammate count matches the template's roles table count
+- Verify all roles marked "Required" in the template are present
+
+#### 6b. Handle missing roles
+
+- **Required role missing** — Abort with cleanup. Remove partially-created resources at `~/.claude/teams/{team-name}/`, `~/.claude/tasks/{team-name}/`, and `~/.claude/teams/{team-name}/inboxes/`. Display:
+  ```
+  Error: Team creation incomplete. Missing required roles: {role_list}
+  Cleaning up partial team resources...
+  ```
+
+- **Optional role missing** — Warn and continue. The team operates with reduced capability:
+  ```
+  Warning: Optional role "{role_name}" did not spawn. The team will operate without this capability.
+  ```
+
+#### 6c. Prompt-based fallback (FR-GD2)
+
+If team metadata at `~/.claude/teams/{team-name}/config.json` is not accessible (path doesn't exist, permissions issue, or unreadable), fall back to prompt-based verification:
+
+- Send a message to each teammate asking them to confirm their identity and role
+- Verify responses match the expected roles from the template
+- This fallback is less reliable but provides a degraded path forward when metadata inspection is unavailable
+
+#### 6d. Display verification summary
+
+```
+Team "{team_name}" created successfully.
+Roles: {role_count}/{expected_count} spawned
+  - Lead (tech-lead): ready
+  - Frontend (lead-frontend-engineer): ready
+  - Quality (quality-engineer): ready
+  - Reviewer (code-reviewer): ready
+  - Security (security-reviewer): ready
+```
+
+**Verification outcome:** If required roles are missing, abort (6b). If metadata is inaccessible, attempt prompt-based fallback (6c). If all roles are confirmed, proceed to task mapping and execution.
