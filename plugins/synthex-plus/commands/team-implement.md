@@ -21,4 +21,49 @@ A single `team-implement` invocation should target one milestone. Milestones wit
 
 ## Workflow
 
-<!-- Workflow steps are added incrementally by Tasks 15-26 -->
+### 1. Load Configuration
+
+Load the Synthex+ configuration using the resolution chain:
+
+1. **Command parameter:** If `config_path` was provided, use that file
+2. **Project config:** Read `.synthex-plus/config.yaml` from the project root
+3. **Plugin defaults:** Read `plugins/synthex-plus/config/defaults.yaml` (relative: `../config/defaults.yaml`)
+4. **Hardcoded fallback:** Use embedded defaults for critical values
+
+Merge settings from each level — project config overrides plugin defaults, command parameters override both.
+
+Extract the following values for use in subsequent steps:
+- `teams.default_implementation_template` → template name (unless overridden by `template` parameter)
+- `cost_guidance.*` → cost estimation constants
+- `lifecycle.max_tasks_per_invocation` → task count soft limit
+- `lifecycle.stuck_task_timeout_minutes` → stuck task intervention threshold
+- `review_loops.*` → review cycle limits
+- `documents.*` → default document paths
+
+### 2. Read Implementation Plan and Identify Target Milestone
+
+Read the implementation plan at `@{implementation_plan_path}`.
+
+**Identify the target milestone:**
+- If the `milestone` parameter was provided, locate that specific milestone (e.g., "2.1" matches "Milestone 2.1")
+- If no milestone was specified, find the **current incomplete milestone** — the first milestone that has at least one task with status `pending` or `in progress`
+- If all milestones are complete, inform the user: "All milestones in the implementation plan are complete. No work to execute."
+
+**Extract milestone tasks:**
+- Parse all tasks in the target milestone, capturing: task number, description, complexity, dependencies, status
+- Filter to actionable tasks: `pending` and `in progress` tasks (skip `done` tasks)
+- Map dependency references to task IDs (e.g., "Task 13" → task #13)
+
+**Task count check (FR-CW1):**
+- Count the actionable tasks in the target milestone
+- If the count exceeds `lifecycle.max_tasks_per_invocation` (default 15):
+  - Display a warning: "Warning: Milestone {milestone} has {count} actionable tasks, exceeding the recommended limit of {max_tasks_per_invocation}. Consider splitting this milestone into sub-milestones for better context management."
+  - Proceed anyway (this is a soft limit, not a hard stop)
+
+**Display milestone summary:**
+```
+Target: Milestone {milestone_id} — {milestone_title}
+Tasks: {actionable_count} actionable ({pending_count} pending, {in_progress_count} in progress)
+Complexity: {S_count}S / {M_count}M / {L_count}L
+Dependencies: {dep_count} inter-task dependencies
+```
