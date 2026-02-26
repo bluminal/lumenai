@@ -495,3 +495,54 @@ When all milestone tasks are complete, the lead performs a final sync pass:
    - Discovered work and its disposition (completed, deferred, or filed as follow-up)
    - Files created or modified across all teammates
    - Quality gate results (code review, security review verdicts)
+
+### 10. Graceful Shutdown (FR-LM2)
+
+When all milestone tasks are complete, the lead orchestrates an ordered shutdown to ensure consistency and clean up team resources.
+
+#### 10a. Completion check
+
+The lead determines that work is complete when all three conditions are met:
+
+- All tasks on the shared task list are in `completed` status (quality gates passed)
+- No `pending` or `in_progress` tasks remain
+- All discovered work has been either completed or explicitly deferred
+
+If any tasks remain incomplete, the lead does not initiate shutdown — execution continues under Step 8.
+
+#### 10b. Completion report
+
+Before initiating shutdown, the lead:
+
+1. Performs the final synchronization (Step 9e) — updating the implementation plan with all task statuses, discovered work, and scope deviations
+2. Produces the **Completion Report** using the canonical format from `plugins/synthex-plus/docs/output-formats.md` (Completion Report section)
+
+The completion report is the final output of the entire `team-implement` invocation. It is displayed to the user before any shutdown actions begin.
+
+#### 10c. Ordered shutdown sequence
+
+Teammates shut down in a specific order to maintain consistency:
+
+1. **Non-lead teammates first:** Send shutdown signal to all non-lead teammates (Frontend, Quality, Reviewer, Security). Wait for acknowledgment from each before proceeding.
+2. **Lead shuts down last:** After all non-lead teammates have stopped, the lead shuts down.
+
+This ordering ensures the lead can handle any last-minute issues that arise during teammate shutdown — such as a teammate failing to acknowledge, a final mailbox message requiring action, or a resource cleanup problem.
+
+#### 10d. Resource cleanup
+
+After all teammates have shut down, verify that team resources are cleaned up:
+
+- `~/.claude/teams/{team-name}/` — should be removed or empty
+- `~/.claude/tasks/{team-name}/` — should be removed or empty
+- `~/.claude/teams/{team-name}/inboxes/` — should be removed or empty
+
+If resources remain, report them to the user:
+```
+Warning: Team resources not fully cleaned up. Remaining:
+  - ~/.claude/teams/{team-name}/
+Run `team-init --cleanup` to remove stale resources.
+```
+
+#### 10e. Remove team name record
+
+Remove the team name from the recorded active team list. This supports the orphan prevention system (FR-LM4) — the team name was recorded during Step 5 (team creation) and must be removed so that future `team-implement` invocations do not flag this team as an orphan during pre-flight checks (Step 3c).
