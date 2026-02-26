@@ -55,6 +55,7 @@ const CLAUDE_BIN = findClaudeBin();
 // ---------------------------------------------------------------------------
 
 const AGENTS_DIR = join(__dirname, '..', '..', 'plugins', 'synthex', 'agents');
+const COMMANDS_DIR = join(__dirname, '..', '..', 'plugins', 'synthex-plus', 'commands');
 const FIXTURES_DIR = join(__dirname, '..', 'fixtures');
 const CACHE_DIR = join(__dirname, '..', '.cache');
 
@@ -140,10 +141,13 @@ async function main() {
     process.exit(1);
   }
 
-  // Resolve agent path
-  const agentPath = join(AGENTS_DIR, `${agentName}.md`);
+  // Resolve agent/command path — check agents first, then commands
+  let agentPath = join(AGENTS_DIR, `${agentName}.md`);
   if (!existsSync(agentPath)) {
-    process.stderr.write(`Error: Agent file not found: ${agentPath}\n`);
+    agentPath = join(COMMANDS_DIR, `${agentName}.md`);
+  }
+  if (!existsSync(agentPath)) {
+    process.stderr.write(`Error: Agent/command file not found: ${agentName}.md (searched agents/ and commands/)\n`);
     process.exit(1);
   }
 

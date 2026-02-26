@@ -384,6 +384,236 @@ tests:
           Score 1.0 if all criteria met. Score 0.0 if missed.
         threshold: 0.75
 
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # SYNTHEX+ TEAM-IMPLEMENT (Layer 2)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "SP-IMP-B1: Spawn prompt references agent file paths (read-on-spawn)"
+    vars:
+      agent: team-implement
+      input_file: tests/fixtures/synthex-plus/commands/implement-small-milestone.md
+    assert:
+      - type: icontains
+        value: "read"
+      - type: javascript
+        value: |
+          // Spawn prompts must reference Synthex agent file paths
+          const hasAgentPath = /plugins\/synthex\/agents\/[\w-]+\.md/i.test(output);
+          return { pass: hasAgentPath, reason: hasAgentPath ? '' : 'No agent file path reference found in spawn prompt' };
+
+  - description: "SP-IMP-B2: Cost estimate uses formula with token counts"
+    vars:
+      agent: team-implement
+      input_file: tests/fixtures/synthex-plus/commands/implement-small-milestone.md
+    assert:
+      - type: javascript
+        value: |
+          // Cost estimate should mention tokens and show approximate numbers
+          const hasTokens = /token/i.test(output);
+          const hasApprox = /approximate|~|\bapprox/i.test(output);
+          return { pass: hasTokens && hasApprox, reason: `tokens=${hasTokens}, approx=${hasApprox}` };
+
+  - description: "SP-IMP-B3: Pre-flight checks detect orphans and dependencies"
+    vars:
+      agent: team-implement
+      input_file: tests/fixtures/synthex-plus/commands/implement-small-milestone.md
+    assert:
+      - type: javascript
+        value: |
+          // Pre-flight should check for orphan teams and Synthex dependency
+          const hasOrphan = /orphan|active.team|existing.team/i.test(output);
+          const hasSynthex = /synthex/i.test(output);
+          return { pass: hasOrphan || hasSynthex };
+
+  - description: "SP-IMP-B4: Lifecycle management instructions present"
+    vars:
+      agent: team-implement
+      input_file: tests/fixtures/synthex-plus/commands/implement-small-milestone.md
+    assert:
+      - type: javascript
+        value: |
+          // Should include shutdown/cleanup lifecycle management
+          const hasShutdown = /shutdown|cleanup|wind.down|teardown/i.test(output);
+          const hasProgress = /progress|monitor|status/i.test(output);
+          return { pass: hasShutdown && hasProgress };
+
+  - description: "SP-IMP-B5: Task dependencies preserved in task creation"
+    vars:
+      agent: team-implement
+      input_file: tests/fixtures/synthex-plus/commands/implement-small-milestone.md
+    assert:
+      - type: javascript
+        value: |
+          // Should respect task dependencies (blockedBy, dependencies)
+          const hasDeps = /block|depend|prerequisite|sequential/i.test(output);
+          return { pass: hasDeps };
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # SYNTHEX+ TEAM-REVIEW (Layer 2)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "SP-REV-B1: Cross-domain messaging pattern instructed"
+    vars:
+      agent: team-review
+      input_file: tests/fixtures/synthex-plus/commands/review-large-diff.md
+    assert:
+      - type: javascript
+        value: |
+          // Reviewers should be instructed to message other reviewers when finding cross-domain issues
+          const hasCrossDomain = /cross.domain|message.*reviewer|notify.*security|send.*finding/i.test(output);
+          return { pass: hasCrossDomain };
+
+  - description: "SP-REV-B2: Consolidated report format with verdict precedence"
+    vars:
+      agent: team-review
+      input_file: tests/fixtures/synthex-plus/commands/review-large-diff.md
+    assert:
+      - type: javascript
+        value: |
+          // Report should follow FAIL > WARN > PASS precedence
+          const hasVerdict = /PASS|WARN|FAIL/i.test(output);
+          const hasPrecedence = /precedence|FAIL.*overrid|consolidat/i.test(output);
+          return { pass: hasVerdict };
+
+  - description: "SP-REV-B3: Re-review cycles with changed-files-only scope"
+    vars:
+      agent: team-review
+      input_file: tests/fixtures/synthex-plus/commands/review-large-diff.md
+    assert:
+      - type: javascript
+        value: |
+          // Re-review should scope to changed files, not full re-review
+          const hasReReview = /re.review|fix.*review|cycle|iteration/i.test(output);
+          return { pass: hasReReview };
+
+  - description: "SP-REV-B4: Team persists across review cycles"
+    vars:
+      agent: team-review
+      input_file: tests/fixtures/synthex-plus/commands/review-large-diff.md
+    assert:
+      - type: javascript
+        value: |
+          // Team should persist (not be torn down and recreated each cycle)
+          const hasPersist = /persist|retain|same.team|context.*prior|previous.*cycle/i.test(output);
+          return { pass: hasPersist };
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # SYNTHEX+ TEAM-PLAN (Layer 2)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "SP-PLAN-B1: Concurrent review instructed"
+    vars:
+      agent: team-plan
+      input_file: tests/fixtures/synthex-plus/commands/plan-new-feature.md
+    assert:
+      - type: javascript
+        value: |
+          // Reviewers should review concurrently, not sequentially
+          const hasConcurrent = /concurrent|parallel|simultaneous|independent/i.test(output);
+          return { pass: hasConcurrent };
+
+  - description: "SP-PLAN-B2: PM retains authority over requirements"
+    vars:
+      agent: team-plan
+      input_file: tests/fixtures/synthex-plus/commands/plan-new-feature.md
+    assert:
+      - type: javascript
+        value: |
+          // PM should have final say on requirements decisions
+          const hasPMAuthority = /product.manager|PM.*authority|PM.*final|PM.*decision|lead.*retains/i.test(output);
+          return { pass: hasPMAuthority };
+
+  - description: "SP-PLAN-B3: User interview step present"
+    vars:
+      agent: team-plan
+      input_file: tests/fixtures/synthex-plus/commands/plan-new-feature.md
+    assert:
+      - type: javascript
+        value: |
+          // Should include a user interview/Q&A step before drafting
+          const hasInterview = /interview|clarif|question|ask.*user|Q&A|gather.*requirement/i.test(output);
+          return { pass: hasInterview };
+
+  - description: "SP-PLAN-B4: Reviewer persistence across cycles"
+    vars:
+      agent: team-plan
+      input_file: tests/fixtures/synthex-plus/commands/plan-new-feature.md
+    assert:
+      - type: javascript
+        value: |
+          // Reviewers persist across review cycles (retain context from prior feedback)
+          const hasPersist = /persist|retain|context.*prior|same.*reviewer|previous.*cycle/i.test(output);
+          return { pass: hasPersist };
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # SYNTHEX+ INTEGRATION (Layer 3)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "SP-IMP-S1: Team-implement produces correct task coordination (semantic)"
+    vars:
+      agent: team-implement
+      input_file: tests/fixtures/synthex-plus/commands/implement-small-milestone.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The command was given a milestone with 5 tasks, some parallelizable (1+2), some
+          sequential (3 depends on 1, 4 depends on 2, 5 depends on 1-4).
+
+          Evaluate whether the response:
+          1. Correctly identifies which tasks can run in parallel (Tasks 1 and 2)
+          2. Respects dependencies (Task 3 after 1, Task 4 after 2, Task 5 after all)
+          3. Creates a team with appropriate roles from the implementation template
+          4. References read-on-spawn pattern (teammates read agent definitions)
+          5. Includes cost estimate before team creation
+          6. Mentions lifecycle management (shutdown, cleanup)
+
+          Score 1.0 if all criteria met. 0.75 if 4-5/6. 0.5 if 3/6. 0.0 if fewer.
+        threshold: 0.6
+
+  - description: "SP-REV-S1: Team-review produces cross-domain findings (semantic)"
+    vars:
+      agent: team-review
+      input_file: tests/fixtures/synthex-plus/commands/review-large-diff.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The command was given a security-sensitive 742-line auth changeset for review.
+
+          Evaluate whether the response:
+          1. Creates a review team with multiple reviewer roles (code + security at minimum)
+          2. Instructs reviewers to work concurrently
+          3. Mentions cross-domain messaging (e.g., code reviewer notifying security reviewer)
+          4. Produces or describes a consolidated report with verdict (FAIL/WARN/PASS)
+          5. Addresses re-review loop if findings require fixes
+          6. Mentions the auth-specific security concerns (JWT, cookies, CSRF)
+
+          Score 1.0 if all criteria met. 0.75 if 4-5/6. 0.5 if 3/6. 0.0 if fewer.
+        threshold: 0.6
+
+  - description: "SP-PLAN-S1: Team-plan maintains reviewer context across cycles (semantic)"
+    vars:
+      agent: team-plan
+      input_file: tests/fixtures/synthex-plus/commands/plan-new-feature.md
+    assert:
+      - type: llm-rubric
+        value: |
+          The command was given a notification service PRD with 6 core requirements.
+
+          Evaluate whether the response:
+          1. Conducts or proposes a user interview before drafting
+          2. Creates a planning team with PM as lead plus reviewer roles
+          3. Produces or describes a phased implementation plan with milestones
+          4. Mentions concurrent review by architect/designer/tech-lead
+          5. Describes how reviewers persist across review cycles
+          6. Includes a compactness pass or plan refinement step
+
+          Score 1.0 if all criteria met. 0.75 if 4-5/6. 0.5 if 3/6. 0.0 if fewer.
+        threshold: 0.6
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # Layer 3: SEMANTIC EVALUATION (LLM-as-Judge) — Existing
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
   - description: "PM-S1: PM asks insightful questions (semantic quality)"
     vars:
       agent: product-manager
