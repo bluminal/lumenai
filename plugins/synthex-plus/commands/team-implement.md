@@ -142,3 +142,107 @@ multiplier        = team_estimate / subagent_estimate   (rounded to 1 decimal pl
 Include this caveat after the canonical display: the formula assumes all teammates interact with all tasks, which is a conservative upper bound. For implementation teams specifically, actual cost is typically lower because specialists only work on tasks relevant to their role.
 
 **User confirmation:** After displaying the estimate, prompt "Proceed with team creation? [Y/n]". If the user declines, abort the command gracefully with no side effects.
+
+### 5. Create Team (FR-TCM1)
+
+Compose and issue a team creation prompt using the **read-on-spawn pattern** (ADR-plus-001). Each teammate receives a three-layer prompt: identity from the canonical Synthex agent file, team-specific behavioral overlay from the template, and milestone/project context.
+
+#### 5a. Read the implementation template
+
+Read the team template file determined in Step 1 (default: `plugins/synthex-plus/templates/implementation.md`). Extract:
+
+- **Roles table** — Role name, Synthex agent file path, required flag, and team-specific behavioral overlay for each teammate
+- **Communication patterns section** — Mailbox conventions, escalation rules, hook-based routing
+- **Task decomposition guidance section** — How the lead maps plan tasks to shared task list items, dependency conventions, context mode
+
+#### 5b. Compose the team creation prompt
+
+For each role in the template's roles table, compose a spawn prompt with three layers:
+
+1. **Identity (read-on-spawn):**
+   ```
+   Read your agent definition at {agent_file_path} and adopt it as your identity.
+   ```
+   - The teammate reads the complete Synthex agent markdown file as its first action
+   - No condensed summaries — the canonical agent file IS the identity
+   - This gives the teammate full behavioral fidelity: expertise, output format, severity frameworks, behavioral rules
+
+2. **Team-specific behavioral overlay:**
+   - Mailbox usage conventions — when to send messages, to whom, expected format
+   - Task list conventions — how to claim tasks, report completion, flag blockers
+   - Communication patterns — who this role coordinates with directly, reporting cadence
+   - These overlay instructions supplement the base agent identity — they do not replace it
+   - Overlay text is sourced directly from the template's roles table "Team-Specific Behavioral Overlay" column
+
+3. **Context:**
+   - Reference to `CLAUDE.md` for project conventions
+   - Reference to relevant specs (from config `documents.specs`)
+   - Implementation plan scope: milestone ID, task list, dependency chains, acceptance criteria
+   - Any project-specific context from the resolved config
+
+#### 5c. Include auto-compaction guidance (FR-CW3)
+
+The team creation prompt must include guidance about Claude Code's auto-compaction behavior so teammates can operate effectively when context is compacted:
+
+- Teammates may lose detailed memory of earlier work when context compaction occurs
+- Task descriptions on the shared task list serve as the durable record of work
+- The lead's periodic summaries serve as the authoritative history
+- Teammates should rely on the task list as their primary memory, not their conversation context
+- When in doubt about prior state, check the task list and mailbox before re-doing work
+
+#### 5d. Team naming convention
+
+The team name follows the pattern: `impl-milestone-{milestone_id}` (e.g., `impl-milestone-2.1`).
+
+Use the milestone ID extracted in Step 2 to construct the team name.
+
+#### 5e. Illustrative spawn prompt
+
+The following example shows what a fully composed team creation prompt looks like. The actual prompt is assembled dynamically from the template's roles table, overlay column, and the milestone context from Step 2.
+
+```
+Create a team named "impl-milestone-1.2" with the following teammates:
+
+Lead (Tech Lead):
+  Read your agent definition at plugins/synthex/agents/tech-lead.md and adopt
+  it as your identity. Additionally:
+  - You are the team lead for this implementation milestone.
+  - Decompose the milestone into tasks and assign work via the shared task list.
+  - Only you write to the implementation plan file.
+  - Coordinate the team via the shared task list and mailbox.
+  - Resolve conflicts between teammates and review completed output.
+
+Frontend (Lead Frontend Engineer):
+  Read your agent definition at plugins/synthex/agents/lead-frontend-engineer.md
+  and adopt it as your identity. Additionally:
+  - You implement UI components and own frontend quality for this team.
+  - Coordinate with the design system spec at docs/specs/design-system.md.
+  - Message the Lead via mailbox when blocked or when you discover cross-cutting concerns.
+  - Report status via the shared task list, not by editing the plan directly.
+
+Quality (Quality Engineer):
+  Read your agent definition at plugins/synthex/agents/quality-engineer.md and
+  adopt it as your identity. Additionally:
+  - You write tests in parallel with implementation for this team.
+  - Monitor coverage gaps and report them on the shared task list.
+  - Target: 80% line, 70% branch coverage.
+  - Message the Lead when you identify untested integration points.
+
+The milestone to execute is 1.2 from docs/plans/main.md. The Lead should
+create shared task list items for each plan task, preserving dependency chains.
+
+Note on context compaction: Your conversation context may be compacted during
+long-running sessions. The shared task list is your durable memory — always
+check it for current state before starting new work. The Lead's periodic
+summaries are the authoritative history of team progress.
+```
+
+#### 5f. Issue the team creation prompt
+
+After composing the prompt:
+
+- Issue the team creation prompt to Claude Code using the `Teammate` tool with the `spawnTeam` operation
+- The team name is `impl-milestone-{milestone_id}` as defined in 5d
+- Each role from the template becomes a named teammate in the spawn call
+- Wait for confirmation that the team was created successfully before proceeding
+- If team creation fails, display the error and abort — do not retry automatically
