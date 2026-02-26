@@ -113,3 +113,32 @@ Consider running `team-init --cleanup` to remove stale resources.
 Read the `created` date from the `config.json` file in each orphaned team directory. If `config.json` is missing or unreadable, display "unknown date" instead.
 
 **Pre-flight outcome:** If the one-team-per-session check fails, abort. All other checks are warnings only — the workflow continues to Step 4.
+
+### 4. Cost Estimate
+
+Display an approximate token cost comparison so the user can make an informed decision before committing to team creation.
+
+**Skip check:** If `cost_guidance.show_cost_comparison` is `false` in the resolved config, skip this step entirely (no estimate display, no confirmation prompt) and proceed directly to team creation.
+
+**Calculate the following variables:**
+
+- `num_tasks` = count of actionable tasks identified in Step 2
+- `num_teammates` = count of roles in the resolved team template (from the `template` parameter or config default)
+- `base_tokens_per_teammate` = from config `cost_guidance.base_tokens_per_teammate` (default 50,000)
+- `tokens_per_task_per_teammate` = from config `cost_guidance.tokens_per_task_per_teammate` (default 20,000)
+
+**Apply the cost formulas:**
+
+```
+subagent_estimate = num_tasks * tokens_per_task_per_teammate
+team_estimate     = (num_teammates * base_tokens_per_teammate) + (num_tasks * num_teammates * tokens_per_task_per_teammate)
+multiplier        = team_estimate / subagent_estimate   (rounded to 1 decimal place)
+```
+
+**Display the cost estimate** following the canonical template defined in the **Cost Estimate Display** section of `plugins/synthex-plus/docs/output-formats.md`. For `team-implement`, use:
+- `{fallback_command}` = `next-priority`
+- `{team_command}` = `team-implement`
+
+Include this caveat after the canonical display: the formula assumes all teammates interact with all tasks, which is a conservative upper bound. For implementation teams specifically, actual cost is typically lower because specialists only work on tasks relevant to their role.
+
+**User confirmation:** After displaying the estimate, prompt "Proceed with team creation? [Y/n]". If the user declines, abort the command gracefully with no side effects.
