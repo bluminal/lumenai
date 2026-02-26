@@ -442,3 +442,56 @@ As tasks complete, the lead proactively unblocks downstream work:
 - When a task completes, check `TaskList` for tasks whose `blockedBy` list referenced the completed task
 - If a newly-unblocked task matches an idle teammate's role, assign it immediately via `TaskUpdate` with `owner` set to the teammate's role name
 - The `TeammateIdle` hook also handles automatic assignment (see Phase 3), but the lead proactively assigns to minimize idle time between tasks
+
+### 9. Progress Synchronization (FR-TL2)
+
+Task completions on the shared task list must be synchronized back to the implementation plan file. The critical constraint is **D7: only the lead writes to the implementation plan** to prevent concurrent write conflicts when multiple teammates are active.
+
+#### 9a. Single-writer rule (D7)
+
+**Only the lead writes to the implementation plan file.** No other teammate may edit the plan directly.
+
+Teammates report their status exclusively through the shared task list and mailbox:
+
+- **Task status:** Teammates update task status via `TaskUpdate`, including a completion note (files modified, decisions made)
+- **Complex findings:** Teammates use `SendMessage` to communicate discoveries, architectural concerns, or decisions that need the lead's attention
+- **Never by file edit:** Teammates do NOT open, read-to-edit, or write to the implementation plan file — this prevents concurrent write conflicts that arise when multiple agents modify the same file
+
+#### 9b. Synchronization cadence
+
+The lead synchronizes plan status at designated checkpoints, NOT after every individual task:
+
+- **After milestone completion:** Once all tasks in the target milestone are done, the lead updates the implementation plan marking each task as `done` with completion notes
+- **At natural breakpoints:** If the milestone is large, the lead may sync after completing a sub-group of related tasks (e.g., all tasks in a sub-section or all tasks assigned to a particular role)
+- **NOT in real-time:** Synchronizing after every individual task would create excessive file I/O and version churn with no material benefit
+
+#### 9c. What the lead writes to the plan
+
+For each completed task, the lead updates the implementation plan with:
+
+- **Status change:** `pending` → `done`
+- **Completion note:** Brief note if significant decisions were made during execution (e.g., "Used existing `useAuth` hook instead of new implementation per teammate recommendation")
+- **Scope deviations:** Any changes from the original task description — added scope, reduced scope, or alternative approach taken
+
+The lead reads completion details from the shared task list (`TaskGet` for each completed task) and consolidates them into the plan update.
+
+#### 9d. Discovered work
+
+New tasks discovered during execution that were not in the original plan are handled in both systems:
+
+1. **Shared task list:** The lead creates a new task via `TaskCreate` with the discovery details, assigns it to the appropriate teammate if within the current milestone's scope
+2. **Implementation plan:** The lead adds the discovered task to the appropriate milestone section, marking it as `pending` (if still to be done) or `done` (if it was already addressed during execution)
+
+Teammates report discovered work to the lead via `SendMessage` — they do NOT add tasks to the plan directly. The lead decides whether the discovered work is in-scope for the current milestone or should be deferred.
+
+#### 9e. Final synchronization
+
+When all milestone tasks are complete, the lead performs a final sync pass:
+
+1. **Reconcile task list with plan:** Verify every shared task list item has a corresponding status update in the implementation plan — no task left behind
+2. **Reconcile discovered work:** Ensure all discovered tasks added to the shared task list during execution are reflected in the plan
+3. **Produce the Completion Report:** Generate the final report using the canonical **Completion Report Format** defined in `plugins/synthex-plus/docs/output-formats.md`, capturing:
+   - Summary of work completed by each role
+   - Discovered work and its disposition (completed, deferred, or filed as follow-up)
+   - Files created or modified across all teammates
+   - Quality gate results (code review, security review verdicts)
