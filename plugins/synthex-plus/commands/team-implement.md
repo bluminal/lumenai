@@ -67,3 +67,49 @@ Tasks: {actionable_count} actionable ({pending_count} pending, {in_progress_coun
 Complexity: {S_count}S / {M_count}M / {L_count}L
 Dependencies: {dep_count} inter-task dependencies
 ```
+
+### 3. Pre-Flight Checks (FR-LM1)
+
+Run three validation checks before creating the team. These checks catch misconfigurations and stale resources early, before any agents are spawned.
+
+#### 3a. One-team-per-session check
+
+Verify no existing team is active in the current session. Check `~/.claude/teams/` for directories containing a `config.json` file — a team is considered active if `~/.claude/teams/{team-name}/config.json` exists.
+
+- If an active team is found, **abort immediately** with:
+  ```
+  Error: An active team "{team_name}" already exists in this session.
+  Complete or clean up the existing team before creating a new one.
+  To clean up: check ~/.claude/teams/ for stale resources.
+  ```
+- If no active team is found, proceed to the next check.
+
+#### 3b. Dependency check (Synthex plugin)
+
+Verify that agent files referenced by the selected team template are accessible. For each role in the template's roles table, check that the agent file path exists (e.g., `plugins/synthex/agents/tech-lead.md`).
+
+- For each missing agent file, emit a **warning** (not a hard failure):
+  ```
+  Warning: Synthex agent file not found at {path}. The teammate referencing this agent may not function correctly.
+  ```
+- Continue regardless — missing agents degrade gracefully rather than blocking the entire team.
+
+#### 3c. Orphan detection
+
+Scan `~/.claude/teams/` for leftover team resources from previous sessions. Compare found team directories against the team about to be created.
+
+- Team metadata lives at `~/.claude/teams/{team-name}/config.json`
+- Tasks live at `~/.claude/tasks/{team-name}/`
+- Inboxes live at `~/.claude/teams/{team-name}/inboxes/`
+
+If orphaned directories are found, emit a **warning**:
+```
+Warning: Found orphaned team resources from a previous session:
+  - {team_name_1} (created {date})
+  - {team_name_2} (created {date})
+Consider running `team-init --cleanup` to remove stale resources.
+```
+
+Read the `created` date from the `config.json` file in each orphaned team directory. If `config.json` is missing or unreadable, display "unknown date" instead.
+
+**Pre-flight outcome:** If the one-team-per-session check fails, abort. All other checks are warnings only — the workflow continues to Step 4.
