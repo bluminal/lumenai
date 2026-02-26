@@ -1,0 +1,14 @@
+{
+  "hooks": [
+    {
+      "event": "TaskCompleted",
+      "command": "./scripts/task-completed-gate.sh",
+      "description": "Review gate: triggers quality review on completed tasks. Exit 2 blocks completion (FAIL verdict), exit 0 allows (PASS/WARN)."
+    },
+    {
+      "event": "TeammateIdle",
+      "command": "./scripts/teammate-idle-gate.sh",
+      "description": "Work assignment: assigns pending tasks to idle teammates. Exit 2 keeps teammate working (task assigned), exit 0 allows idle."
+    }
+  ]
+}
