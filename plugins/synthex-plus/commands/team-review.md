@@ -349,10 +349,13 @@ This loop runs up to `review_loops.max_cycles` iterations (default: 3):
 
 2. **Caller fixes:** The caller (user or orchestrating agent) applies fixes to the code. This command does NOT apply fixes -- it waits for the caller to make changes and signal readiness for re-review.
 
-3. **Re-review (team persists):** Unlike Synthex's `review-code` which spawns fresh subagent instances per cycle, the team persists between review cycles. The lead creates **new** review tasks on the shared task list for each reviewer, scoped to the updated diff. Each new task includes:
-   - The updated diff (post-fix changeset)
+3. **Re-review (team persists):** Unlike Synthex's `review-code` which spawns fresh subagent instances per cycle, the team persists between review cycles. The lead creates **new** review tasks on the shared task list for each reviewer, scoped to domain-specific changed files. Each new task includes:
+   - The changed files relevant to that reviewer's domain (e.g., Security gets files with security-relevant changes, Craftsmanship gets files with code quality changes, Design gets modified frontend files). The lead determines domain relevance based on the reviewer's focus area defined in the review template
+   - The diff for those specific files only (not the full changeset) — this keeps re-review focused and avoids re-examining unchanged code
    - A compact summary of unresolved findings from the prior cycle: one line per finding with severity, title, and reviewer
    - Instruction to verify whether prior findings have been addressed
+
+   After creating the tasks, the lead also sends a `SendMessage` (type: `message`) to each reviewer with a brief notification: which files changed, which of their prior findings are expected to be addressed, and a pointer to the new review task on the shared task list. This direct message ensures reviewers are promptly aware of the re-review scope without needing to poll the task list.
 
    Reviewers claim and execute these new tasks following the same pattern as Step 8. The key advantage is that reviewers retain context from the prior cycle -- they know what they flagged previously and can verify fixes more efficiently.
 
