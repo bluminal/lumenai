@@ -191,11 +191,115 @@ The read-on-spawn architecture (`docs/specs/decisions/ADR-plus-001-read-on-spawn
 
 ## Findings
 
-_This section is populated after spike execution (Task 9 in `docs/plans/plus.md`)._
+_Resolved via documentation research (Claude Code docs, community guides, API references) rather than hands-on experimental execution. The api-spike command (`plugins/synthex-plus/commands/api-spike.md`) remains available for experimental validation if desired._
+
+### H1: Hook Events — Validated
+
+`TaskCompleted` and `TeammateIdle` exist with those exact names.
+
+- **Configuration:** Hooks are defined in `~/.claude/settings.json`, `.claude/settings.json`, or `.claude/settings.local.json` under a `hooks` key. Plugin `hooks/hooks.json` is also supported.
+- **TaskCompleted:** Fires when a teammate marks a task as completed. Exit code 0 allows completion. Exit code 2 blocks completion and feeds stderr back to the agent as feedback (triggering re-work).
+- **TeammateIdle:** Fires when a teammate has no assigned tasks and is about to go idle. Exit code 0 allows idle. Exit code 2 sends feedback to keep the teammate working (e.g., assign new work).
+- **Hook input:** Both events receive context JSON on stdin with event details.
+- **No matcher support:** Hooks fire on every occurrence of the event (no filtering by task type or teammate role). Filtering logic must live in the shell shim.
+- **Deviation from assumptions:** None. Event names and semantics match the implementation plan's assumptions exactly.
+
+### H2: Team Metadata — Validated
+
+Team metadata is inspectable at known filesystem paths.
+
+- **Team config:** `~/.claude/teams/{team-name}/config.json` — contains team name and members array (name, agentId, agentType per member). Members are added on spawn and removed on shutdown.
+- **Mailbox inboxes:** `~/.claude/teams/{team-name}/inboxes/{teammate-name}` — message inbox files per teammate.
+- **Task list:** `~/.claude/tasks/{team-name}/` — individual tasks as numbered JSON files (1.json, 2.json, etc.) with `.lock` files for concurrency control.
+- **Orphan detection strategy:** Check for directories under `~/.claude/teams/` that persist after a session ends. A non-empty team directory with no active Claude Code process indicates orphaned resources.
+- **Deviation from assumptions:** Tasks are stored under `~/.claude/tasks/` (separate from teams directory), not nested within the team directory. This is a minor path difference that does not affect functionality.
+
+### H3: plan_approval — Validated
+
+`plan_approval` permission works for teammates.
+
+- **Mechanism:** Lead can spawn teammates with plan approval requirement. Teammates work in read-only plan mode (can read files, analyze, propose changes but cannot execute modifications). Teammate sends `plan_approval_request` to lead when plan is ready. Lead reviews and either approves (teammate exits plan mode, begins implementation) or rejects with feedback (teammate revises).
+- **Lead approval criteria:** Controllable via spawn prompt (e.g., "only approve plans that include test coverage").
+- **Deviation from assumptions:** None. Works as expected.
+
+### H4: Team Creation — Validated
+
+Teams are created via natural language prompt to Claude Code.
+
+- **Primary mechanism:** Natural language instruction (e.g., "Create a team named 'implementation' with the following roles: ..."). Claude Code interprets the instruction and spawns the team.
+- **Structured API:** The `Teammate` tool provides programmatic operations: `spawnTeam`, `requestShutdown`, `approveShutdown`, `approvePlan`, `rejectPlan`, `discoverTeams`, `requestJoin`, `approveJoin`, `rejectJoin`.
+- **Auto-creation:** Claude may also propose a team if it determines the task would benefit from parallel work (requires user confirmation).
+- **Enable flag:** `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` must be set in environment or settings.
+- **Deviation from assumptions:** The `Teammate` tool provides more structure than pure natural language. Commands can compose instructions that result in `Teammate({ operation: "spawnTeam", ... })` calls, which is more reliable than relying solely on natural language interpretation.
+
+### H5: Task Dependencies — Validated
+
+The shared task list supports `blockedBy` dependency relationships.
+
+- **API:** `TaskCreate` creates tasks. `TaskUpdate` manages state transitions and dependencies via `addBlockedBy` (array of task IDs) and `addBlocks` (array of task IDs).
+- **Lifecycle:** Tasks progress through `pending` → `in_progress` → `completed`.
+- **Enforcement:** When a blocking task completes, blocked tasks automatically unblock. Teammates can only claim unblocked, pending tasks.
+- **Self-claiming:** Teammates call `TaskList()` to discover available work, then `TaskUpdate({ taskId, status: "in_progress", owner: "name" })` to claim.
+- **Deviation from assumptions:** Dependencies are enforced (not just advisory). This is stronger than the minimum we needed.
+
+### H6: Mailbox Messaging — Validated
+
+Direct teammate-to-teammate messaging is supported via `SendMessage`.
+
+- **Message types:**
+  - `type: "message"` — direct message to a specific teammate (most cost-efficient)
+  - `type: "broadcast"` — sends to ALL teammates simultaneously (expensive: N messages for N teammates)
+  - `type: "shutdown_request"` / `type: "shutdown_response"` — graceful shutdown protocol
+  - `type: "plan_approval_response"` — approve/reject teammate plans
+- **Parameters:** `recipient` (teammate name), `content` (message text), `summary` (5-10 word preview)
+- **Delivery:** Automatic — no polling required. Messages delivered to inbox files. Idle teammates automatically notified.
+- **Deviation from assumptions:** Richer than expected. Multiple message types support the full lifecycle (messaging, shutdown, plan approval). Broadcast should be used sparingly due to cost.
+
+### Summary
+
+| Hypothesis | Result | Deviations |
+|------------|--------|------------|
+| H1 (Hook events) | **Validated** | No matcher support — filtering in shell shim |
+| H2 (Team metadata) | **Validated** | Tasks at `~/.claude/tasks/` not under team dir |
+| H3 (plan_approval) | **Validated** | None |
+| H4 (Team creation) | **Validated** | `Teammate` tool provides structured API beyond natural language |
+| H5 (Task dependencies) | **Validated** | Dependencies enforced, not just advisory |
+| H6 (Mailbox messaging) | **Validated** | Multiple message types (direct, broadcast, shutdown, plan approval) |
+
+### Open Questions Resolution
+
+| # | Question | Answer |
+|---|----------|--------|
+| Q1 | Hook event names | `TaskCompleted` and `TeammateIdle` — exact names confirmed. Exit code 2 blocks, 0 allows. |
+| Q2 | Team metadata path | `~/.claude/teams/{team-name}/config.json` for team config. Tasks at `~/.claude/tasks/{team-name}/`. |
+| Q3 | plan_approval for teammates | Yes — read-only plan mode, approval/rejection flow via lead. |
+| Q4 | Team creation mechanism | Natural language + `Teammate` tool `spawnTeam` operation. Both work. |
 
 ## Decision
 
-_This section is populated after findings analysis (Task 10 in `docs/plans/plus.md`) with a go/conditional-go/no-go determination and any required implementation plan updates._
+**Go.** All six hypotheses validated. The implementation plan's assumptions are confirmed.
+
+### Rationale
+
+Per the go/no-go thresholds defined in the Success Criteria section:
+- H1 (hook events): **Validated** — `TaskCompleted` and `TeammateIdle` exist with assumed names and semantics
+- H4 (team creation): **Validated** — natural language works, plus structured `Teammate` tool
+- H5 (task dependencies): **Validated** — `blockedBy` enforced, auto-unblock on completion
+- H6 (mailbox messaging): **Validated** — `SendMessage` with multiple types, automatic delivery
+
+All four required hypotheses for "Go" are validated. H2 and H3 are also fully validated (exceeding the "at least partially validated" threshold).
+
+### Implementation Plan Impact
+
+- **No changes required.** The current Phase 2 and Phase 3 designs are valid as-is.
+- **defaults.yaml:** No updates needed — hook event names match assumptions (`TaskCompleted`, `TeammateIdle`).
+- **Minor insight:** The `Teammate` tool's `spawnTeam` operation provides a more structured creation mechanism than pure natural language. Commands can leverage this for more reliable team formation. This is additive, not a change.
+- **Minor insight:** Hook events have no matcher support. The shell shims in Phase 3 (Tasks 29-30) need to include filtering logic to determine task type/teammate role from the stdin JSON context. This was already the plan (shell shims handle detection logic), so no change needed.
+- **Minor insight:** `SendMessage` supports `type: "broadcast"` for team-wide announcements but this is expensive. Commands should default to direct messages and reserve broadcast for critical blockers. Template communication patterns should note this.
+
+### Recommendation for Experimental Validation
+
+While documentation research has resolved all open questions with high confidence, the api-spike command (`plugins/synthex-plus/commands/api-spike.md`) can be executed for hands-on validation at any time. This is recommended before Phase 3 hook implementation to confirm the hook stdin JSON format and exit code behavior match documentation.
 
 ## References
 
