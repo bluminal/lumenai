@@ -134,9 +134,9 @@ All implementation work for Synthex+ is committed to the **`plus`** long-lived f
 ### Milestone 3.1: Hook Infrastructure
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 28 | Write `plugins/synthex-plus/hooks/hooks.json` with TaskCompleted and TeammateIdle event definitions. Use event names validated by the Phase 1 spike (Task 9). Reference shell shims in `scripts/` | S | Task 10 (spike gate) | FR-HK1 | pending |
-| 29 | Write `plugins/synthex-plus/scripts/task-completed-gate.sh`: thin shim (<20 lines), detect completed task type, exit 0 for pass, exit 2 for block. Include inline comments explaining the hook's purpose. After writing, run `chmod +x`. Verify git tracks as mode 100755 | S | Task 28 | FR-HK1, FR-HK2 | pending |
-| 30 | Write `plugins/synthex-plus/scripts/teammate-idle-gate.sh`: thin shim (<20 lines), check for pending tasks matching idle teammate's role, exit 0 to allow idle, exit 2 to assign work. After writing, run `chmod +x`. Verify git tracks as mode 100755 | S | Task 28 | FR-HK1, FR-HK3 | pending |
+| 28 | Write `plugins/synthex-plus/hooks/hooks.json` with TaskCompleted and TeammateIdle event definitions. Use event names validated by the Phase 1 spike (Task 9). Reference shell shims in `scripts/` | S | Task 10 (spike gate) | FR-HK1 | done |
+| 29 | Write `plugins/synthex-plus/scripts/task-completed-gate.sh`: thin shim (<20 lines), detect completed task type, exit 0 for pass, exit 2 for block. Include inline comments explaining the hook's purpose. After writing, run `chmod +x`. Verify git tracks as mode 100755 | S | Task 28 | FR-HK1, FR-HK2 | done |
+| 30 | Write `plugins/synthex-plus/scripts/teammate-idle-gate.sh`: thin shim (<20 lines), check for pending tasks matching idle teammate's role, exit 0 to allow idle, exit 2 to assign work. After writing, run `chmod +x`. Verify git tracks as mode 100755 | S | Task 28 | FR-HK1, FR-HK3 | done |
 
 **Parallelizable:** Tasks 29-30 are independent after Task 28. All blocked on spike decision gate (Task 10).
 **Milestone Value:** Hook infrastructure in place. Shell shims ready for integration.
@@ -144,8 +144,8 @@ All implementation work for Synthex+ is committed to the **`plus`** long-lived f
 ### Milestone 3.2: Hook Behavioral Documentation
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 31 | Write companion markdown `plugins/synthex-plus/hooks/task-completed-gate.md` documenting FR-HK2 behavior: work type detection logic, reviewer routing rules (code/frontend/infrastructure), FAIL verdict reopening with findings, PASS/WARN notification to lead. This is the behavioral reference that the prompt-mediated system uses | M | Task 29 | FR-HK2 | pending |
-| 32 | Write companion markdown `plugins/synthex-plus/hooks/teammate-idle-gate.md` documenting FR-HK3 behavior: pending task matching by role, dependency chain respect, cross-functional help suggestion, dismissal notification to lead | M | Task 30 | FR-HK3 | pending |
+| 31 | Write companion markdown `plugins/synthex-plus/hooks/task-completed-gate.md` documenting FR-HK2 behavior: work type detection logic, reviewer routing rules (code/frontend/infrastructure), FAIL verdict reopening with findings, PASS/WARN notification to lead. This is the behavioral reference that the prompt-mediated system uses | M | Task 29 | FR-HK2 | done |
+| 32 | Write companion markdown `plugins/synthex-plus/hooks/teammate-idle-gate.md` documenting FR-HK3 behavior: pending task matching by role, dependency chain respect, cross-functional help suggestion, dismissal notification to lead | M | Task 30 | FR-HK3 | done |
 
 **Parallelizable:** Tasks 31-32 are independent.
 **Milestone Value:** Hooks are fully documented with behavioral logic in markdown (maintainable, testable) and thin shell entry points.
