@@ -605,3 +605,19 @@ This uses sequential subagent execution instead of persistent teams.
 ```
 
 Present both options and let the user decide how to proceed.
+
+## Orphan Prevention
+
+A lightweight tracking file mechanism detects teams that were not cleaned up from previous sessions. This is a cross-cutting concern that ties together multiple workflow steps.
+
+**Tracking file:** `.synthex-plus/.active-team` — contains the team name (e.g., `impl-milestone-2.1`). This file is NOT committed to git (already handled by `team-init`'s `.gitignore` entries).
+
+**Lifecycle:**
+
+- **Step 5 (team creation):** After the team is created successfully, write the team name to `.synthex-plus/.active-team`. This records the active team for the current session.
+- **Step 10e (shutdown):** Delete `.synthex-plus/.active-team`. This signals that no team is currently active and prevents false orphan detection on the next invocation.
+
+**Detection during pre-flight (Step 3a, 3c):**
+
+- If `.synthex-plus/.active-team` exists AND `~/.claude/teams/{recorded-team-name}/config.json` also exists — the previous session's team was not cleaned up. Report it as an orphan (handled by Step 3c's orphan detection).
+- If `.synthex-plus/.active-team` exists but the team metadata directory is gone — the team was cleaned up externally but the tracking file was not removed. Silently delete the stale tracking file and continue.
