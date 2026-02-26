@@ -4,6 +4,20 @@
 
 Synthex+ extends Synthex with teams-optimized orchestration for sustained multi-agent collaboration via Claude Code's experimental Agent Teams API. This plan implements the PRD at `docs/reqs/plus.md`. Priority order: team-implement first (highest value, validates all core mechanisms), then team-review, then team-plan.
 
+## Git Workflow
+
+All implementation work for Synthex+ is committed to the **`plus`** long-lived feature branch. No changes merge into `main` until the full implementation is reviewed and explicitly approved by the user.
+
+| Rule | Detail |
+|------|--------|
+| Working branch | `plus` (branched from `main`) |
+| Commit cadence | At least once per completed milestone; more frequently is fine |
+| Merge to `main` | Blocked until user explicitly approves a final PR |
+| Synthex files | Must remain unmodified on `main` — verified by Task 57 (FR-CX1) |
+| Rebase strategy | Rebase `plus` onto `main` periodically to stay current; never force-push without user approval |
+
+---
+
 ## Decisions
 
 | # | Decision | Context | Rationale |
@@ -36,12 +50,12 @@ Synthex+ extends Synthex with teams-optimized orchestration for sustained multi-
 ### Milestone 1.1: Plugin Scaffolding & Structural Anchors
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 1 | Create plugin directory structure: `plugins/synthex-plus/{.claude-plugin/,commands/,hooks/,scripts/,templates/,docs/,config/}` | S | None | FR-SP1 | pending |
-| 2 | Write `plugins/synthex-plus/.claude-plugin/plugin.json` manifest with name, version, description, author, hooks field. Leave commands array empty (populated as commands are built). Do NOT register api-spike (D11) | S | None | FR-SP3 | pending |
-| 3 | Write `plugins/synthex-plus/config/defaults.yaml` with all config sections from FR-CF1: teams, hooks, cost_guidance, review_loops, task_list, lifecycle, documents | M | None | FR-CF1 | pending |
-| 4 | Register synthex-plus in `.claude-plugin/marketplace.json` as a second plugin entry with appropriate keywords | S | None | FR-CX3 | pending |
-| 5 | Author template skeleton at `plugins/synthex-plus/templates/_skeleton.md` defining: exact heading levels (H2 for sections, H3 for subsections), section ordering (Purpose > Agent References > Communication Patterns > Task Decomposition Guidance > Quality Gates > When to Use / When NOT to Use), prose density expectations (bullets over paragraphs, max 3 sentences per guidance block). Agent References section defines roles table format: role name, Synthex agent file path (e.g., `plugins/synthex/agents/tech-lead.md`), optional/required flag, team-specific behavioral overlay notes (mailbox usage, task list conventions, communication patterns) | S | None | FR-TC1, D2 | pending |
-| 6 | Define canonical output formats at `plugins/synthex-plus/docs/output-formats.md`: cost estimate display (both formulas using config values, labeled as approximate, user confirmation prompt, `show_cost_comparison: false` skip behavior), progress report format, completion report format. All commands reference this file instead of defining formats independently | M | None | FR-CG2, D10 | pending |
+| 1 | Create plugin directory structure: `plugins/synthex-plus/{.claude-plugin/,commands/,hooks/,scripts/,templates/,docs/,config/}` | S | None | FR-SP1 | done |
+| 2 | Write `plugins/synthex-plus/.claude-plugin/plugin.json` manifest with name, version, description, author, hooks field. Leave commands array empty (populated as commands are built). Do NOT register api-spike (D11) | S | None | FR-SP3 | done |
+| 3 | Write `plugins/synthex-plus/config/defaults.yaml` with all config sections from FR-CF1: teams, hooks, cost_guidance, review_loops, task_list, lifecycle, documents | M | None | FR-CF1 | done |
+| 4 | Register synthex-plus in `.claude-plugin/marketplace.json` as a second plugin entry with appropriate keywords | S | None | FR-CX3 | done |
+| 5 | Author template skeleton at `plugins/synthex-plus/templates/_skeleton.md` defining: exact heading levels (H2 for sections, H3 for subsections), section ordering (Purpose > Agent References > Communication Patterns > Task Decomposition Guidance > Quality Gates > When to Use / When NOT to Use), prose density expectations (bullets over paragraphs, max 3 sentences per guidance block). Agent References section defines roles table format: role name, Synthex agent file path (e.g., `plugins/synthex/agents/tech-lead.md`), optional/required flag, team-specific behavioral overlay notes (mailbox usage, task list conventions, communication patterns) | S | None | FR-TC1, D2 | done |
+| 6 | Define canonical output formats at `plugins/synthex-plus/docs/output-formats.md`: cost estimate display (both formulas using config values, labeled as approximate, user confirmation prompt, `show_cost_comparison: false` skip behavior), progress report format, completion report format. All commands reference this file instead of defining formats independently | M | None | FR-CG2, D10 | done |
 
 **Parallelizable:** All 6 tasks are independent.
 **Milestone Value:** Plugin exists in the marketplace, installable alongside Synthex. Structural anchors ensure consistency across all subsequent template and command authoring.
