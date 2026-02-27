@@ -70,6 +70,37 @@ The organization spans the full software lifecycle: **discover, build, ship, ope
 | **reliability-review** | Operational readiness assessment | SRE Agent + Terraform Plan Reviewer (opt.) |
 | **performance-audit** | Full-stack performance analysis | Performance Engineer |
 
+### Synthex+ (Beta)
+
+A **companion plugin** to Synthex that adds persistent team orchestration via Claude Code's beta Agent Teams API. Synthex+ reuses Synthex agent definitions — it does not duplicate or modify them.
+
+> **BETA** — Requires the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` feature flag. Both the Agent Teams API and this plugin are under active development.
+
+```bash
+/plugin install synthex-plus
+```
+
+Where standard Synthex spawns ephemeral subagents (each unaware of the others), Synthex+ creates persistent teams where agents share a task list, exchange messages via mailboxes, and coordinate autonomously.
+
+| Synthex Command | Synthex+ Equivalent | What Changes |
+|----------------|--------------------|----|
+| `next-priority` | `team-implement` | Persistent team with real-time coordination instead of sequential subagent invocations |
+| `review-code` | `team-review` | Cross-domain messaging between reviewers (e.g., code reviewer alerts security reviewer) |
+| `write-implementation-plan` | `team-plan` | Reviewers persist across review cycles, retaining full context |
+
+#### Commands (4)
+
+| Command | Purpose | Synthex Agents Used |
+|---------|---------|-------------------|
+| **team-init** | Initialize Synthex+ configuration | -- |
+| **team-implement** | Sustained multi-agent implementation | Tech Lead + Frontend Engineer + Quality Engineer + Code Reviewer + Security Reviewer |
+| **team-review** | Multi-perspective code review with cross-domain communication | Code Reviewer + Security Reviewer + Performance Engineer (opt.) + Design System Agent (opt.) |
+| **team-plan** | Collaborative implementation planning with persistent reviewers | Product Manager + Architect + Design System Agent + Tech Lead |
+
+**When to use Synthex+ over Synthex:** Multi-component work spanning 3+ files across 2+ system layers, large code reviews (500+ LOC), security-sensitive changes, or planning for 10+ requirements. For quick, focused tasks, standard Synthex is lighter and more cost-effective.
+
+See the [Synthex+ README](./plugins/synthex-plus/README.md) for full documentation.
+
 ## Automated Testing
 
 All agents are tested using a three-layer testing pyramid. Since agents are pure markdown (no runtime code), testing works by invoking agents with synthetic fixtures and validating their outputs.
@@ -80,7 +111,7 @@ All agents are tested using a three-layer testing pyramid. Since agents are pure
 | 2 - Behavioral | Regex/JS assertions against cached agent outputs | ~$3/run (cached) | Manual trigger |
 | 3 - Semantic | LLM-as-judge evaluates accuracy and quality | ~$8/run | Manual trigger |
 
-**Current coverage:** 206 tests across 13 test suites covering all 15 agents, with schema validators and inline sample outputs for each. See [CLAUDE.md](./CLAUDE.md) for full details.
+**Current coverage:** 404 tests across 18 test suites — 206 for Synthex agents + 131 for Synthex+ templates, hooks, and command outputs + 67 for shared infrastructure. See [CLAUDE.md](./CLAUDE.md) for full details.
 
 ```bash
 cd tests && npx vitest run schemas/   # Layer 1: instant, free
@@ -91,15 +122,26 @@ cd tests && npx vitest run schemas/   # Layer 1: instant, free
 ```
 lumenai/
 ├── .claude-plugin/marketplace.json     # Marketplace registry
-├── plugins/synthex/                    # Synthex plugin
-│   ├── .claude-plugin/plugin.json      # Plugin manifest (15 agents, 11 commands)
-│   ├── agents/                         # Agent definitions (.md files)
-│   ├── commands/                       # Command definitions (.md files)
-│   └── config/defaults.yaml            # Default project configuration
+├── plugins/
+│   ├── synthex/                        # Synthex plugin
+│   │   ├── .claude-plugin/plugin.json  # Plugin manifest (15 agents, 11 commands)
+│   │   ├── agents/                     # Agent definitions (.md files)
+│   │   ├── commands/                   # Command definitions (.md files)
+│   │   └── config/defaults.yaml        # Default project configuration
+│   └── synthex-plus/                   # Synthex+ plugin (BETA)
+│       ├── .claude-plugin/plugin.json  # Plugin manifest (4 commands)
+│       ├── commands/                   # Team command definitions (.md files)
+│       ├── templates/                  # Team composition templates
+│       ├── hooks/                      # Hook behavioral specs + hooks.json
+│       ├── scripts/                    # Thin shell shims for hook events
+│       ├── config/defaults.yaml        # Default configuration
+│       └── docs/                       # Decision guide, context management, output formats
 ├── tests/                              # Automated agent testing framework
 │   ├── schemas/                        # Layer 1: Schema validators + Vitest tests
+│   │   └── synthex-plus/               # Synthex+ validators (templates, hooks, outputs)
 │   ├── helpers/                        # Invocation wrapper, cache, parser, snapshots
 │   ├── fixtures/                       # Synthetic test inputs with planted issues
+│   │   └── synthex-plus/               # Synthex+ fixtures
 │   └── promptfoo.config.yaml           # Layer 2+3: Behavioral + semantic tests
 ├── docs/
 │   ├── reqs/main.md                    # Product requirements

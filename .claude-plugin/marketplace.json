@@ -22,7 +22,7 @@
       "version": "0.1.0",
       "category": "productivity",
       "keywords": ["agents", "teams", "orchestration", "collaboration", "parallel"],
-      "description": "Teams-optimized orchestration for Synthex — sustained multi-agent collaboration via Claude Code Agent Teams."
+      "description": "[BETA] Teams-optimized orchestration for Synthex — sustained multi-agent collaboration via Claude Code Agent Teams. Requires the beta Agent Teams feature flag. Depends on the Synthex plugin."
     }
   ]
 }

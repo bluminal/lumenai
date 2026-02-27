@@ -1,20 +1,37 @@
 # Synthex+
 
-Teams-optimized orchestration for Synthex. Sustained multi-agent collaboration via Claude Code Agent Teams.
+> **BETA** — Synthex+ depends on Claude Code's **beta Agent Teams API**, which requires the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` feature flag. Both the Agent Teams API and this plugin are under active development. Expect breaking changes, evolving behavior, and rough edges. Use in production workflows at your own risk.
 
-Synthex+ extends the [Synthex](../synthex/) plugin with persistent team commands where agents share a task list, exchange messages via mailboxes, and coordinate autonomously. Unlike standard Synthex commands that spawn ephemeral subagents (each unaware of the others), Synthex+ creates persistent teams with cross-agent communication, shared context, and coordinated execution.
+Teams-optimized orchestration for [Synthex](../synthex/). Sustained multi-agent collaboration via Claude Code Agent Teams.
+
+## Relationship to Synthex
+
+Synthex+ is a **companion plugin** to [Synthex](../synthex/), not a replacement. It builds on top of Synthex by reusing its agent definitions and extending its commands with persistent team orchestration.
+
+| | Synthex | Synthex+ |
+|---|---------|----------|
+| **How agents run** | Ephemeral subagents — each spawned independently, unaware of other agents | Persistent teams — agents share a task list, exchange messages, and coordinate in real time |
+| **Agent definitions** | Defines all 15 agents (`.md` files in `agents/`) | Reuses Synthex agent definitions via read-on-spawn pattern — no duplicate agents |
+| **Commands** | 11 commands (`next-priority`, `review-code`, `write-implementation-plan`, etc.) | 4 team commands (`team-init`, `team-implement`, `team-review`, `team-plan`) that parallel 3 core Synthex commands |
+| **When to use** | Single-domain tasks, quick reviews (<500 LOC), focused work under ~4 hours | Multi-domain work spanning 3+ files, large reviews (500+ LOC), complex planning with 10+ requirements |
+| **Dependency** | Standalone | Requires Synthex to be installed |
+| **API requirement** | Standard Claude Code | Beta Agent Teams API (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) |
+
+Synthex+ does **not** modify any Synthex files. Both plugins can be installed simultaneously and used interchangeably — Synthex for quick, focused tasks and Synthex+ for sustained multi-agent collaboration.
+
+For a detailed comparison with concrete thresholds, see [`docs/decision-guide.md`](docs/decision-guide.md).
 
 ## Prerequisites
 
-1. **Synthex plugin installed.** Synthex+ uses Synthex agent definitions for teammate identities. Install and initialize Synthex first (`/init`).
+1. **Synthex plugin installed.** Synthex+ reuses Synthex agent definitions for teammate identities. Install and initialize Synthex first (`/init`).
 
-2. **Agent Teams feature flag.** Set the experimental flag in your environment:
+2. **Agent Teams feature flag (beta).** Enable the beta Agent Teams API:
 
    ```bash
    export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
    ```
 
-   Or add it to `~/.claude/settings.json` under `env`. All Synthex+ commands check for this flag and will abort with guidance if it is missing.
+   Or add it to `~/.claude/settings.json` under `env`. All Synthex+ commands check for this flag and will abort with guidance if it is missing. If the flag is not set, commands suggest the equivalent standard Synthex command as a fallback.
 
 ## Quick Start
 
@@ -174,7 +191,15 @@ For detailed guidance, see [`docs/context-management.md`](docs/context-managemen
 
 ## Graceful Degradation
 
-If the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` flag is not set, all team commands abort before creating any resources and suggest the equivalent standard Synthex command as a fallback. No team resources are created, no tokens are consumed, and the user can choose how to proceed.
+If the beta `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` flag is not set, all team commands abort before creating any resources and suggest the equivalent standard Synthex command as a fallback:
+
+| Synthex+ Command | Synthex Fallback |
+|------------------|-----------------|
+| `team-implement` | `next-priority` |
+| `team-review` | `review-code` |
+| `team-plan` | `write-implementation-plan` |
+
+No team resources are created, no tokens are consumed, and the user can choose how to proceed.
 
 ## Further Reading
 
