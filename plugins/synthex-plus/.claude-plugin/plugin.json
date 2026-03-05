@@ -6,7 +6,6 @@
     "name": "Bluminal Labs"
   },
   "keywords": ["agents", "teams", "orchestration", "collaboration", "parallel"],
-  "hooks": "./hooks/hooks.json",
   "commands": [
     "./commands/team-init.md",
     "./commands/team-implement.md",
