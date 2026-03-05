@@ -3,5 +3,19 @@
   "description": "AI agents modeled after a software startup org chart — specialized roles that synthesize to discover, build, ship, operate, and learn from complete, production-quality software.",
   "author": {
     "name": "Bluminal Labs"
-  }
+  },
+  "commands": [
+    "commands/init.md",
+    "commands/next-priority.md",
+    "commands/refine-requirements.md",
+    "commands/write-implementation-plan.md",
+    "commands/review-code.md",
+    "commands/write-adr.md",
+    "commands/write-rfc.md",
+    "commands/test-coverage-analysis.md",
+    "commands/design-system-audit.md",
+    "commands/retrospective.md",
+    "commands/reliability-review.md",
+    "commands/performance-audit.md"
+  ]
 }
