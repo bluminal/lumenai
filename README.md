@@ -88,8 +88,9 @@ Where standard Synthex spawns ephemeral subagents (each unaware of the others), 
 | `next-priority` | `team-implement` | Persistent team with real-time coordination instead of sequential subagent invocations |
 | `review-code` | `team-review` | Cross-domain messaging between reviewers (e.g., code reviewer alerts security reviewer) |
 | `write-implementation-plan` | `team-plan` | Reviewers persist across review cycles, retaining full context |
+| `refine-requirements` | `team-refine` | Persistent reviewers with cross-perspective messaging during PRD refinement |
 
-#### Commands (4)
+#### Commands (5)
 
 | Command | Purpose | Synthex Agents Used |
 |---------|---------|-------------------|
@@ -97,8 +98,9 @@ Where standard Synthex spawns ephemeral subagents (each unaware of the others), 
 | **team-implement** | Sustained multi-agent implementation | Tech Lead + Frontend Engineer + Quality Engineer + Code Reviewer + Security Reviewer |
 | **team-review** | Multi-perspective code review with cross-domain communication | Code Reviewer + Security Reviewer + Performance Engineer (opt.) + Design System Agent (opt.) |
 | **team-plan** | Collaborative implementation planning with persistent reviewers | Product Manager + Architect + Design System Agent + Tech Lead |
+| **team-refine** | Collaborative PRD refinement with persistent reviewers | Product Manager + Tech Lead + Lead Frontend Engineer |
 
-**When to use Synthex+ over Synthex:** Multi-component work spanning 3+ files across 2+ system layers, large code reviews (500+ LOC), security-sensitive changes, or planning for 10+ requirements. For quick, focused tasks, standard Synthex is lighter and more cost-effective.
+**When to use Synthex+ over Synthex:** Multi-component work spanning 3+ files across 2+ system layers, large code reviews (500+ LOC), security-sensitive changes, planning for 10+ requirements, or refining large PRDs (20+ requirements). For quick, focused tasks, standard Synthex is lighter and more cost-effective.
 
 See the [Synthex+ README](./plugins/synthex-plus/README.md) for full documentation.
 
@@ -130,7 +132,7 @@ lumenai/
 │   │   ├── commands/                   # Command definitions (.md files)
 │   │   └── config/defaults.yaml        # Default project configuration
 │   └── synthex-plus/                   # Synthex+ plugin (BETA)
-│       ├── .claude-plugin/plugin.json  # Plugin manifest (4 commands)
+│       ├── .claude-plugin/plugin.json  # Plugin manifest (5 commands)
 │       ├── commands/                   # Team command definitions (.md files)
 │       ├── templates/                  # Team composition templates
 │       ├── hooks/                      # Hook behavioral specs + hooks.json

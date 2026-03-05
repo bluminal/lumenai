@@ -26,6 +26,9 @@ teams:
   # Default team template for planning tasks.
   default_planning_template: planning
 
+  # Default team template for PRD refinement tasks.
+  default_refine_template: refine
+
 # -------------------------------------------------------------------
 # Hook Configuration
 # Quality gate hooks for team task completion and idle detection.

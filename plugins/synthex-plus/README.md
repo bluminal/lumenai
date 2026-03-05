@@ -12,7 +12,7 @@ Synthex+ is a **companion plugin** to [Synthex](../synthex/), not a replacement.
 |---|---------|----------|
 | **How agents run** | Ephemeral subagents — each spawned independently, unaware of other agents | Persistent teams — agents share a task list, exchange messages, and coordinate in real time |
 | **Agent definitions** | Defines all 15 agents (`.md` files in `agents/`) | Reuses Synthex agent definitions via read-on-spawn pattern — no duplicate agents |
-| **Commands** | 12 commands (`next-priority`, `refine-requirements`, `review-code`, `write-implementation-plan`, etc.) | 4 team commands (`team-init`, `team-implement`, `team-review`, `team-plan`) that parallel 3 core Synthex commands |
+| **Commands** | 12 commands (`next-priority`, `refine-requirements`, `review-code`, `write-implementation-plan`, etc.) | 5 team commands (`team-init`, `team-implement`, `team-review`, `team-plan`, `team-refine`) that parallel 4 core Synthex commands |
 | **When to use** | Single-domain tasks, quick reviews (<500 LOC), focused work under ~4 hours | Multi-domain work spanning 3+ files, large reviews (500+ LOC), complex planning with 10+ requirements |
 | **Dependency** | Standalone | Requires Synthex to be installed |
 | **API requirement** | Standard Claude Code | Beta Agent Teams API (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) |
@@ -100,6 +100,28 @@ Creates a persistent review team where reviewers (Code Reviewer, Security Review
 
 The Design reviewer is automatically included when the changeset contains frontend files (`.tsx`, `.jsx`, `.css`, `.scss`). The Performance reviewer can be enabled via project config (`review.include_performance: true`) or explicit request.
 
+### team-refine
+
+Collaborative PRD refinement with persistent reviewers. The teams-optimized equivalent of Synthex's `refine-requirements` command.
+
+Creates a refine team (Product Manager, Tech Lead, Lead Frontend Engineer) where reviewers evaluate the PRD concurrently for clarity, completeness, and communicability. Findings answerable from existing context are applied directly; questions requiring user judgment are escalated via AskUserQuestion. Reviewers persist across review cycles, maintaining full context of the PRD's evolution.
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `requirements_path` | Path to the PRD | `docs/reqs/main.md` |
+| `template` | Team composition template | `refine` |
+| `config_path` | Path to Synthex+ configuration | `.synthex-plus/config.yaml` |
+
+**Example invocations:**
+
+```bash
+# Refine the default PRD
+/team-refine
+
+# Refine a specific PRD
+/team-refine requirements_path="docs/reqs/mobile-v2.md"
+```
+
 ### team-plan
 
 Collaborative implementation planning with persistent reviewers. The teams-optimized equivalent of Synthex's `write-implementation-plan` command.
@@ -132,8 +154,9 @@ Each command uses a team template that defines roles, communication patterns, an
 | **implementation** | Tech Lead (lead), Frontend Engineer, Quality Engineer, Code Reviewer, Security Reviewer | Multi-component features spanning 3+ files across 2+ system layers; estimated work exceeds 4 hours |
 | **review** | Orchestrator (lead), Code Reviewer, Security Reviewer, Performance Engineer (optional), Design System Agent (optional) | Diffs exceeding 500 lines, security-sensitive changes, or pre-release review requiring multi-perspective sign-off |
 | **planning** | Product Manager (lead), Architect, Design System Agent, Tech Lead | PRDs with 10+ requirements, multi-phase plans, or projects with significant architectural decisions |
+| **refine** | Product Manager (lead), Tech Lead, Lead Frontend Engineer | Large PRDs (20+ requirements), cross-perspective feedback needed between engineering and design |
 
-For smaller or single-domain tasks, use the standard Synthex commands (`next-priority`, `review-code`, `write-implementation-plan`) instead.
+For smaller or single-domain tasks, use the standard Synthex commands (`next-priority`, `refine-requirements`, `review-code`, `write-implementation-plan`) instead.
 
 Templates are defined in `plugins/synthex-plus/templates/` and can be customized or extended. Each template uses the **read-on-spawn** pattern: teammates read their full Synthex agent definition file at spawn time, ensuring complete behavioral fidelity without condensed summaries.
 
@@ -198,6 +221,7 @@ If the beta `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` flag is not set, all team c
 | `team-implement` | `next-priority` |
 | `team-review` | `review-code` |
 | `team-plan` | `write-implementation-plan` |
+| `team-refine` | `refine-requirements` |
 
 No team resources are created, no tokens are consumed, and the user can choose how to proceed.
 

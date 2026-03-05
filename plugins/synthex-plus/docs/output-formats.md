@@ -4,9 +4,9 @@
 
 <!--
   This file is the SINGLE SOURCE OF TRUTH for output formats used across
-  Synthex+ commands (team-implement, team-review, team-plan). When a command
-  needs to display a cost estimate, progress report, or completion report,
-  it references the format defined here.
+  Synthex+ commands (team-implement, team-review, team-plan, team-refine).
+  When a command needs to display a cost estimate, progress report, or
+  completion report, it references the format defined here.
 
   Why: Defining the same format in 3+ commands creates drift risk. A single
   canonical definition ensures consistency and makes updates a one-file change.

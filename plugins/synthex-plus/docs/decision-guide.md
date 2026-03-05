@@ -36,6 +36,7 @@ Count how many factors fall in the "Teams" column for your specific task:
 | **Implementation** | `next-priority` | `team-implement` | Work spans 3+ files across 2+ system layers AND exceeds 4 hours of estimated effort AND specialists need real-time coordination |
 | **Code review** | `review-code` | `team-review` | Diff exceeds 500 lines OR changes are security-critical OR changes span 5+ files across multiple modules |
 | **Planning** | `write-implementation-plan` | `team-plan` | PRD contains 10+ requirements OR plan spans multiple phases OR significant architectural decisions require concurrent evaluation from multiple perspectives |
+| **PRD refinement** | `refine-requirements` | `team-refine` | PRD contains 20+ requirements OR cross-perspective feedback needed where engineering constraints and design decisions interact |
 
 ### Implementation: `next-priority` vs. `team-implement`
 
@@ -75,6 +76,19 @@ Count how many factors fall in the "Teams" column for your specific task:
 - Cross-domain feedback is expected (architecture decisions affecting design patterns, sequencing affecting task breakdown)
 - You need reviewers to maintain context across multiple review cycles rather than starting fresh each time
 
+### PRD Refinement: `refine-requirements` vs. `team-refine`
+
+**Use subagents when:**
+- PRD has fewer than 10 requirements
+- Quick spot-check of a single section
+- PRD is well-understood and only needs minor polish
+
+**Use teams when:**
+- PRD contains 20+ requirements spanning multiple product areas
+- Engineering constraints and design decisions are deeply intertwined in the requirements
+- Multiple review cycles are expected and reviewer context persistence across cycles is valuable
+- Cross-perspective feedback is needed (e.g., tech lead flagging implicit assumptions that the designer needs to address in UX flows)
+
 ---
 
 ## Cost Model
@@ -96,6 +110,7 @@ multiplier    = team_cost / subagent_cost
 | `team-implement` | 5 (Lead, Frontend, Quality, Reviewer, Security) | 8-15 | ~5.6-5.8x | Specialists only work on role-relevant tasks, so actual cost is lower than the formula suggests |
 | `team-review` | 2-4 (Lead, Craftsmanship, Security, +optional Performance/Design) | 2-4 | ~6.0-8.0x | Each reviewer examines the full scope, so estimate is closer to actual |
 | `team-plan` | 4 (PM, Architect, Designer, Implementer) | 3 per cycle | ~7.3x | All reviewers examine the full plan; multiple cycles increase total cost |
+| `team-refine` | 3 (PM, Engineer, Designer) | 2 per cycle | ~6.0x | Both reviewers examine the full PRD; finding triage adds PM overhead |
 
 ### When the cost is worth it
 
@@ -156,4 +171,5 @@ Which command?
   |--- Implementation (multi-step, multi-layer) --> team-implement
   |--- Code review (large diff, high-risk)      --> team-review
   |--- Planning (complex PRD, multi-phase)      --> team-plan
+  |--- PRD refinement (large PRD, cross-domain) --> team-refine
 ```
