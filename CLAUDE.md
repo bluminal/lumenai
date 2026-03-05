@@ -109,6 +109,7 @@ lumenai/
 |---------|---------|-------------------|
 | `init` | Initialize project configuration and directories | — |
 | `next-priority` | Execute next highest-priority tasks | Tech Lead |
+| `refine-requirements` | Improve PRD clarity through multi-agent review | PM + Tech Lead + Lead Frontend Engineer |
 | `write-implementation-plan` | Transform PRD into implementation plan | PM + Architect + Design System Agent + Tech Lead |
 | `review-code` | Multi-perspective code review | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
 | `write-adr` | Create Architecture Decision Record | Architect (interactive) |
@@ -173,6 +174,7 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 |---------|---------|-------------|
 | `review_loops.max_cycles` | 2 | Global max review loop iterations for all commands |
 | `review_loops.min_severity_to_address` | high | Global minimum severity that must be resolved |
+| `refine_requirements.reviewers` | product-manager, tech-lead, designer | Sub-agents that review PRD for clarity |
 | `implementation_plan.reviewers` | architect, designer, tech-lead | Sub-agents that review draft implementation plans |
 | `implementation_plan.review_loops.max_cycles` | 3 | Per-command override (higher for high-stakes plans) |
 | `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `review-code` command |

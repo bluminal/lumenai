@@ -30,3 +30,7 @@ credentials.*
 
 # Test cache (LLM output cache for agent testing)
 tests/.cache/
+
+# MCP server build output
+packages/synthex-mcp/server/
+packages/synthex-mcp/*.mcpb

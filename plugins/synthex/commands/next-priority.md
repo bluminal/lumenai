@@ -7,7 +7,7 @@ Automatically identify and execute the next highest-priority tasks from the impl
 | Parameter | Description | Default | Required |
 |-----------|-------------|---------|----------|
 | `implementation_plan_path` | Path to the implementation plan markdown file | `docs/plans/main.md` | No |
-| `concurrent_tasks` | Number of parallel tasks to work on simultaneously | `3` | No |
+| `concurrent_tasks` | Number of parallel tasks to work on simultaneously | Value from `next_priority.concurrent_tasks` config, or `3` | No |
 
 ## Core Responsibilities
 

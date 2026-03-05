@@ -1,0 +1,29 @@
+{
+  "name": "synthex",
+  "version": "0.1.0",
+  "display_name": "Synthex",
+  "description": "AI agents modeled after a software startup org chart — specialized roles that synthesize to discover, build, ship, operate, and learn from production-quality software.",
+  "author": {
+    "name": "Bluminal Labs"
+  },
+  "license": "Apache-2.0",
+  "icon": "icon.png",
+  "server": {
+    "command": "node",
+    "args": ["server/index.js"]
+  },
+  "tools": [
+    {
+      "name": "synthex_init",
+      "description": "Initialize Synthex project configuration and document directories"
+    },
+    {
+      "name": "synthex_read_config",
+      "description": "Read and merge project configuration with Synthex defaults"
+    },
+    {
+      "name": "synthex_list_agents",
+      "description": "List all available Synthex agents with their roles and types"
+    }
+  ]
+}

@@ -63,6 +63,32 @@ implementation_plan:
     max_cycles: 3
 
 # -------------------------------------------------------------------
+# Refine Requirements Settings
+# Used by the `refine-requirements` command
+# -------------------------------------------------------------------
+refine_requirements:
+
+  # Sub-agents that review the PRD for clarity and completeness.
+  # Each reviewer identifies ambiguities, gaps, and unclear areas
+  # from their professional perspective.
+  reviewers:
+    - agent: product-manager
+      enabled: true
+      focus: "Requirement clarity, acceptance criteria, scope boundaries, success metrics"
+
+    - agent: tech-lead
+      enabled: true
+      focus: "Technical clarity, implicit assumptions, NFR targets, missing requirements"
+
+    - agent: designer
+      enabled: true
+      focus: "UX clarity, interaction patterns, accessibility, user flow completeness"
+
+  # Per-command review loop overrides (inherits global review_loops defaults).
+  # review_loops:
+  #   max_cycles: 2
+
+# -------------------------------------------------------------------
 # Code Review Settings
 # Used by the `review-code` command
 # -------------------------------------------------------------------

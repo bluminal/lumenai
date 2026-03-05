@@ -1,0 +1,30 @@
+{
+  "name": "@synthex/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server exposing Synthex agents, commands, and tools to Claude Desktop",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "build": "tsup && node scripts/copy-assets.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pack": "npm run build && mcpb pack . synthex.mcpb"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "yaml": "^2.8.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.19.4",
+    "typescript": "^5.9.3",
+    "vitest": "^3.1.4"
+  },
+  "license": "Apache-2.0",
+  "author": {
+    "name": "Bluminal Labs"
+  }
+}
