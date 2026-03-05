@@ -12,7 +12,7 @@ Synthex+ is a **companion plugin** to [Synthex](../synthex/), not a replacement.
 |---|---------|----------|
 | **How agents run** | Ephemeral subagents — each spawned independently, unaware of other agents | Persistent teams — agents share a task list, exchange messages, and coordinate in real time |
 | **Agent definitions** | Defines all 15 agents (`.md` files in `agents/`) | Reuses Synthex agent definitions via read-on-spawn pattern — no duplicate agents |
-| **Commands** | 11 commands (`next-priority`, `review-code`, `write-implementation-plan`, etc.) | 4 team commands (`team-init`, `team-implement`, `team-review`, `team-plan`) that parallel 3 core Synthex commands |
+| **Commands** | 12 commands (`next-priority`, `refine-requirements`, `review-code`, `write-implementation-plan`, etc.) | 4 team commands (`team-init`, `team-implement`, `team-review`, `team-plan`) that parallel 3 core Synthex commands |
 | **When to use** | Single-domain tasks, quick reviews (<500 LOC), focused work under ~4 hours | Multi-domain work spanning 3+ files, large reviews (500+ LOC), complex planning with 10+ requirements |
 | **Dependency** | Standalone | Requires Synthex to be installed |
 | **API requirement** | Standard Claude Code | Beta Agent Teams API (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`) |

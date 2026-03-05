@@ -54,12 +54,13 @@ The organization spans the full software lifecycle: **discover, build, ship, ope
 | **Metrics Analyst** | DORA metrics, HEART/AARRR frameworks, OKR tracking | Advisory |
 | **Retrospective Facilitator** | Structured retrospectives, improvement item tracking | Planning + Advisory |
 
-#### Commands (11)
+#### Commands (12)
 
 | Command | Purpose | Agents Orchestrated |
 |---------|---------|-------------------|
 | **init** | Initialize project configuration and directories | -- |
 | **next-priority** | Execute next highest-priority tasks | Tech Lead |
+| **refine-requirements** | Improve PRD clarity through multi-agent review | PM + Tech Lead + Lead Frontend Engineer |
 | **write-implementation-plan** | Transform PRD into implementation plan | PM + Architect + Design System Agent + Tech Lead |
 | **review-code** | Multi-perspective code review | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
 | **write-adr** | Create Architecture Decision Record | Architect (interactive) |
@@ -124,7 +125,7 @@ lumenai/
 ├── .claude-plugin/marketplace.json     # Marketplace registry
 ├── plugins/
 │   ├── synthex/                        # Synthex plugin
-│   │   ├── .claude-plugin/plugin.json  # Plugin manifest (15 agents, 11 commands)
+│   │   ├── .claude-plugin/plugin.json  # Plugin manifest (15 agents, 12 commands)
 │   │   ├── agents/                     # Agent definitions (.md files)
 │   │   ├── commands/                   # Command definitions (.md files)
 │   │   └── config/defaults.yaml        # Default project configuration
