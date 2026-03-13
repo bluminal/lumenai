@@ -103,6 +103,7 @@ See [`config/defaults.yaml`](config/defaults.yaml) for the full reference. Key s
 | `review_loops.max_cycles` | 2 | Global max review loop iterations for all commands |
 | `review_loops.min_severity_to_address` | high | Global minimum severity that must be resolved |
 | `implementation_plan.reviewers` | architect, designer, tech-lead | Sub-agents that review draft implementation plans |
+| `implementation_plan.concurrent_tasks` | 3 | Max parallelizable tasks per milestone in the plan |
 | `implementation_plan.review_loops.max_cycles` | 3 | Per-command override (higher for high-stakes plans) |
 | `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `/review-code` |
 | `code_review.max_diff_lines` | 300 | Warn when diff exceeds this size |
@@ -117,6 +118,7 @@ See [`config/defaults.yaml`](config/defaults.yaml) for the full reference. Key s
 | `reliability.runbooks_path` | `docs/runbooks` | Operational runbooks |
 | `retrospective.format` | start-stop-continue | Retrospective format |
 | `retrospective.max_improvement_items` | 3 | Max items per cycle |
+| `next_priority.concurrent_tasks` | 3 | Max parallel tasks for `/next-priority` |
 | `documents.requirements` | `docs/reqs/main.md` | Default PRD path |
 | `documents.implementation_plan` | `docs/plans/main.md` | Default plan path |
 | `documents.specs` | `docs/specs` | Specs directory |

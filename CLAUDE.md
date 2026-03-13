@@ -176,6 +176,7 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 | `review_loops.min_severity_to_address` | high | Global minimum severity that must be resolved |
 | `refine_requirements.reviewers` | product-manager, tech-lead, designer | Sub-agents that review PRD for clarity |
 | `implementation_plan.reviewers` | architect, designer, tech-lead | Sub-agents that review draft implementation plans |
+| `implementation_plan.concurrent_tasks` | 3 | Max parallelizable tasks per milestone in the plan |
 | `implementation_plan.review_loops.max_cycles` | 3 | Per-command override (higher for high-stakes plans) |
 | `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `review-code` command |
 | `code_review.max_diff_lines` | 300 | Warn when diff exceeds this size |

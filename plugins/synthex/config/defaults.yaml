@@ -57,6 +57,11 @@ implementation_plan:
       enabled: true
       focus: "Task clarity, acceptance criteria, parallelizability, dependency accuracy"
 
+  # Maximum number of tasks to recommend for parallel execution per milestone.
+  # The PM uses this to size parallelizable work batches in the plan output.
+  # Can be overridden per-invocation via the `concurrent_tasks` parameter.
+  concurrent_tasks: 3
+
   # Override: higher max_cycles for high-stakes implementation plans.
   # (Global default is 2; plans get 3 because they affect many downstream tasks.)
   review_loops:

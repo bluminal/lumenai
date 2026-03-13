@@ -10,6 +10,7 @@ Transform a Product Requirements Document (PRD) into a prioritized, value-driven
 | `plan_path` | Path where the implementation plan will be written | `docs/plans/main.md` | No |
 | `specs_path` | Path to technical specifications directory | `docs/specs` | No |
 | `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
+| `concurrent_tasks` | Max tasks to recommend for parallel execution per milestone | `3` (from config) | No |
 
 ## Core Responsibilities
 
@@ -42,6 +43,7 @@ Check for a project configuration file at `@{config_path}`. If it exists, load t
 | `documents.requirements` | `docs/reqs/main.md` |
 | `documents.implementation_plan` | `docs/plans/main.md` |
 | `documents.specs` | `docs/specs` |
+| `concurrent_tasks` | 3 (max parallelizable tasks per milestone) |
 
 **Review loop config resolution order:** `implementation_plan.review_loops` > global `review_loops` > hardcoded default (max_cycles: 2, min_severity_to_address: high).
 
@@ -82,7 +84,7 @@ The Product Manager produces an initial implementation plan draft following the 
 - Phased milestones delivering incremental value
 - Specific, executable tasks with complexity grades (S/M/L)
 - Dependencies and critical path identified
-- Parallelizable work explicitly called out
+- Parallelizable work explicitly called out (limit to `@{concurrent_tasks}` concurrent tasks per milestone, per config)
 - A **Decisions** section documenting major planning decisions and rationale
 - An **Open Questions** section tracking items needing further discovery
 
@@ -252,7 +254,7 @@ Items requiring further discovery that could lead to future decisions and plan c
 | 2 | [Task description] | M | Task 1 | pending |
 | 3 | [Task description] | S | None | pending |
 
-**Parallelizable:** Tasks 1 and 3 can run concurrently.
+**Parallelizable:** Tasks 1 and 3 can run concurrently. _(max @{concurrent_tasks} concurrent per config)_
 **Milestone Value:** [What the user gets when this milestone is complete]
 
 ### Milestone 1.2: [Name]
