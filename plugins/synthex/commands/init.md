@@ -11,9 +11,10 @@ Set up the Synthex plugin configuration for a project. This command scaffolds th
 ## What This Command Does
 
 1. **Creates the project configuration file** at `.synthex/config.yaml` (or custom path)
-2. **Updates `.gitignore`** to exclude the worktrees directory (`.claude/worktrees/`) if not already present
-3. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`, `docs/specs/decisions/`, `docs/specs/rfcs/`, `docs/runbooks/`, `docs/retros/`) if they don't exist
-4. **Provides guidance** on customizing the configuration for your project
+2. **Prompts for concurrent task parallelism** — detects CPU count and asks the user to choose a concurrency level (Yolo, Aggressive, Default, or custom)
+3. **Updates `.gitignore`** to exclude the worktrees directory (`.claude/worktrees/`) if not already present
+4. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`, `docs/specs/decisions/`, `docs/specs/rfcs/`, `docs/runbooks/`, `docs/retros/`) if they don't exist
+5. **Provides guidance** on customizing the configuration for your project
 
 ## Workflow
 
@@ -30,7 +31,69 @@ Read the default configuration template from the plugin's `config/defaults.yaml`
 
 Create the directory `.synthex/` in the project root if it doesn't exist, then write the defaults template to `@{config_path}`.
 
-### 3. Update .gitignore
+### 3. Configure Concurrent Tasks
+
+Prompt the user to choose how many parallel tasks Synthex should run. This value controls `implementation_plan.concurrent_tasks` and `next_priority.concurrent_tasks` in the config file.
+
+#### 3a. Detect CPU Count
+
+Detect the number of logical CPUs on the machine using the appropriate system command:
+
+| Platform | Command |
+|----------|---------|
+| macOS | `sysctl -n hw.ncpu` |
+| Linux | `nproc` |
+| Windows (PowerShell) | `$env:NUMBER_OF_PROCESSORS` |
+
+**Fallback:** If CPU detection fails for any reason, default to `12`.
+
+Store the detected CPU count as `cpus`.
+
+#### 3b. Calculate Options
+
+Compute the following preset values:
+
+| Option | Value | Description |
+|--------|-------|-------------|
+| Yolo | `cpus` | Use all available CPUs — maximum parallelism |
+| Aggressive | `max(floor(cpus * 0.75), 8)` | High parallelism with headroom for system processes. If CPU detection failed, use `8`. |
+| Default | `3` | Conservative — works well on any machine |
+
+#### 3c. Ask the User
+
+Use the `AskUserQuestion` tool to present the options. The question should be formatted as:
+
+> **How many parallel tasks should Synthex run?**
+>
+> This controls how many tasks execute concurrently during planning and execution (e.g., `next-priority`, `write-implementation-plan`). Higher values speed up work but use more system resources.
+>
+> 1. **Yolo ({cpus})** — All CPUs, maximum parallelism
+> 2. **Aggressive ({aggressive_value})** — 75% of CPUs, leaves headroom
+> 3. **Default (3)** — Conservative, works on any machine
+>
+> Or type a custom number.
+
+Where `{cpus}` and `{aggressive_value}` are the computed values from step 3b.
+
+#### 3d. Validate the Response
+
+The response **must** resolve to a positive integer. Apply these rules:
+
+1. If the user picks an option by number (e.g., "1", "2", "3") or name (e.g., "yolo", "aggressive", "default"), resolve it to the corresponding integer value.
+2. If the user types a plain integer (e.g., "6"), use that value directly.
+3. If the response is NOT a valid positive integer and cannot be resolved to one, re-ask using `AskUserQuestion`:
+
+   > That doesn't look like a valid number. `concurrent_tasks` must be a positive integer (e.g., 3, 8, 16). Please enter a number or pick one of the options above.
+
+4. Repeat validation until a valid positive integer is obtained. Do NOT proceed until you have a valid integer.
+
+#### 3e. Update the Config File
+
+Replace **both** `concurrent_tasks` values in the config file at `@{config_path}`:
+- `implementation_plan.concurrent_tasks` — set to the chosen value
+- `next_priority.concurrent_tasks` — set to the chosen value
+
+### 4. Update .gitignore
 
 Check if `.gitignore` exists in the project root. If it does, check whether it already contains an entry for the worktrees base path (`.claude/worktrees` by default, or the value from the config file).
 
@@ -44,7 +107,7 @@ Check if `.gitignore` exists in the project root. If it does, check whether it a
 - **If `.gitignore` exists and already contains the path:** Do nothing.
 - **If `.gitignore` does not exist:** Create it with the worktrees entry above.
 
-### 4. Create Document Directories
+### 5. Create Document Directories
 
 Create the following directories if they don't already exist:
 - `docs/reqs/` — Product requirements documents
@@ -57,7 +120,7 @@ Create the following directories if they don't already exist:
 
 Do NOT create any files inside these directories — just the directories.
 
-### 5. Confirm and Guide
+### 6. Confirm and Guide
 
 Inform the user what was created and provide guidance:
 
@@ -65,7 +128,7 @@ Inform the user what was created and provide guidance:
 Synthex initialized for this project.
 
 Created:
-  .synthex/config.yaml           — Project configuration
+  .synthex/config.yaml           — Project configuration (concurrent_tasks: {chosen_value})
   .gitignore                     — Added worktrees path (if not present)
   docs/reqs/                     — Product requirements (PRDs)
   docs/plans/                    — Implementation plans

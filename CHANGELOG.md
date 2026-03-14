@@ -5,6 +5,19 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.4] - 2026-03-14
+
+### Added
+
+- **Interactive `concurrent_tasks` prompt during `/init`.** The init command now detects the machine's CPU count and presents three presets (Yolo = all CPUs, Aggressive = 75% of CPUs, Default = 3) via `AskUserQuestion`, with the option to enter a custom number. Validates that the response is a positive integer and re-asks on invalid input. Updates both `implementation_plan.concurrent_tasks` and `next_priority.concurrent_tasks` in the generated config file.
+- **CPU detection** for macOS (`sysctl -n hw.ncpu`), Linux (`nproc`), and Windows (`$env:NUMBER_OF_PROCESSORS`) with a fallback default of 12.
+- Schema validation tests for the init command concurrent tasks workflow (46 tests) covering CPU detection, preset options, AskUserQuestion usage, integer validation loop, config update targets, and workflow step ordering.
+- Total test count: 496 (up from 450), 16 test suites (up from 15).
+
+### Changed
+
+- `init` command workflow expanded from 5 steps to 6 — new Step 3 ("Configure Concurrent Tasks") inserted between config file creation and `.gitignore` update.
+
 ## [0.3.3] - 2026-03-13
 
 ### Added
@@ -118,6 +131,7 @@ First public release of the LumenAI marketplace and the Synthex plugin.
 - Golden snapshot infrastructure for regression testing
 - Promptfoo integration for behavioral and semantic evaluation
 
+[0.3.4]: https://github.com/bluminal/lumenai/releases/tag/v0.3.4
 [0.3.3]: https://github.com/bluminal/lumenai/releases/tag/v0.3.3
 [0.3.0]: https://github.com/bluminal/lumenai/releases/tag/v0.3.0
 [0.2.0]: https://github.com/bluminal/lumenai/releases/tag/v0.2.0
