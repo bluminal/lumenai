@@ -317,7 +317,10 @@ Every task description includes these elements:
 
 - **CLAUDE.md reference:** "Refer to CLAUDE.md for project conventions and patterns"
 - **Spec links:** Relevant specification documents from the `documents.specs` config path (e.g., "See docs/specs/design-system.md for form component patterns")
-- **Acceptance criteria:** Copied verbatim from the implementation plan task
+- **Typed acceptance criteria:** Copied verbatim from the implementation plan task, preserving `[T]`, `[H]`, and `[O]` type tags. Include handling instructions per type:
+  - `[T]` criteria: "Write an automated test that proves this criterion. Report the test file path and test name when marking the task complete."
+  - `[H]` criteria: "This criterion requires user approval. Flag it in your completion note — the lead will coordinate the user interview before merge."
+  - `[O]` criteria: "Post-deployment metric — no action required during implementation."
 - **Inter-task integration points:** Explicitly name which other concurrent tasks this task interacts with (e.g., "This task creates the API endpoint that Task 5's frontend component will consume")
 - **Context budget guidance:** "Keep tool invocations focused. Summarize findings rather than dumping raw output."
 
@@ -349,11 +352,20 @@ After creating all shared task list items, the lead assigns them to teammates ba
 
 The lead assigns tasks via `TaskUpdate` with `owner` set to the teammate's role name. Only assign tasks whose dependencies are already satisfied (all `blockedBy` tasks are completed). Tasks with unsatisfied dependencies remain unassigned until their blockers resolve — the lead reassigns them as dependencies complete.
 
+**Scheduling tasks with `[H]` criteria:** Tasks containing `[H]` (human-validated) acceptance criteria will pause for user input before they can be merged. To minimize idle time, the lead should assign `[H]`-criteria tasks early in each batch — start them before `[T]`-only tasks so that by the time autonomous work completes, the user review may already be in progress or done. Never hold back all `[T]`-only tasks waiting for an `[H]` review to complete; run them in parallel.
+
 #### 7e. Illustrative task mapping
 
 **Plan task (from implementation plan table):**
 ```
-| 5 | Implement login form with email/password fields | M | Task 3 | FR-AUTH1 | pending |
+| 5 | Implement login form with email/password fields | M | Task 3 | pending |
+```
+**Plan acceptance criteria:**
+```
+- [T] Email field validates format (rejects "foo", accepts "user@example.com")
+- [T] Password field enforces minimum 8 characters
+- [T] Submit handler calls auth API with correct payload
+- [H] Form layout and field ordering approved by stakeholder
 ```
 
 **Shared task list item created by the lead:**
@@ -364,9 +376,18 @@ TaskCreate:
     Implement the login form component per FR-AUTH1.
     Complexity: M
 
+    Acceptance Criteria:
+    - [T] Email field validates format (rejects "foo", accepts "user@example.com")
+      → Write a test that proves this. Report test file + test name on completion.
+    - [T] Password field enforces minimum 8 characters
+      → Write a test that proves this. Report test file + test name on completion.
+    - [T] Submit handler calls auth API with correct payload
+      → Write a test that proves this. Report test file + test name on completion.
+    - [H] Form layout and field ordering approved by stakeholder
+      → Flag in completion note. The lead will coordinate user interview before merge.
+
     - Refer to CLAUDE.md for project conventions
     - See docs/specs/design-system.md for form component patterns
-    - Acceptance: email + password fields, client-side validation, submit handler wired to auth API
     - Integration: Task 3 (auth API endpoint) must complete first; Task 6 (login page layout) consumes this component
     - Context budget: keep tool invocations focused, summarize findings
   addBlockedBy: [task-3-id]
@@ -401,8 +422,10 @@ Each task follows this lifecycle, managed by the teammate who owns it:
 
 1. **Claim:** Teammate uses `TaskUpdate` to set `status` to `in_progress` and `owner` to their role name
 2. **Execute:** Teammate implements the task, using tools as needed
-3. **Complete:** Teammate uses `TaskUpdate` to set `status` to `completed` with a brief completion note in the description (files modified, decisions made)
-4. **Quality gate:** The `TaskCompleted` hook fires, routing the completed work to reviewers (see Phase 3 hooks). If review returns FAIL, the task is reopened and the teammate iterates.
+3. **Test linkage (`[T]` criteria):** Before marking complete, the teammate must verify that every `[T]` acceptance criterion has a corresponding automated test that passes. The completion note must include the test linkage — test file path and test name for each `[T]` criterion (e.g., `[T] Email validation → src/auth/__tests__/login.test.ts: "validates email format"`)
+4. **Complete:** Teammate uses `TaskUpdate` to set `status` to `completed` with a completion note including: files modified, decisions made, and test linkage for all `[T]` criteria
+5. **Human validation (`[H]` criteria):** If the task has `[H]` criteria, the lead uses `AskUserQuestion` to present the work to the user and obtain explicit approval for each `[H]` criterion. If the user rejects, the lead reopens the task with the user's feedback and reassigns it. This step happens before the quality gate — the task stays in a pre-merge hold until the user approves.
+6. **Quality gate:** The `TaskCompleted` hook fires, routing the completed work to reviewers (see Phase 3 hooks). If review returns FAIL, the task is reopened and the teammate iterates.
 
 Teammates only claim tasks that meet **all three** conditions:
 - `pending` status (not already claimed by another teammate)
@@ -470,6 +493,8 @@ The lead synchronizes plan status at designated checkpoints, NOT after every ind
 For each completed task, the lead updates the implementation plan with:
 
 - **Status change:** `pending` → `done`
+- **Test linkage:** For each `[T]` criterion, record the test file and test name that proves it (e.g., `[T] Email validation → src/auth/__tests__/login.test.ts: "validates email format"`). This creates a durable link between acceptance criteria and their proof.
+- **`[H]` approval record:** Note that human approval was obtained for `[H]` criteria (e.g., `[H] Form layout — approved by user`)
 - **Completion note:** Brief note if significant decisions were made during execution (e.g., "Used existing `useAuth` hook instead of new implementation per teammate recommendation")
 - **Scope deviations:** Any changes from the original task description — added scope, reduced scope, or alternative approach taken
 

@@ -62,6 +62,15 @@ lumenai/
 2. Add `.claude-plugin/plugin.json` with agent and command registrations
 3. Add the plugin to the `plugins` array in `.claude-plugin/marketplace.json`
 
+## Releasing
+
+When creating a release (tagging a version, updating `CHANGELOG.md`), you **must** also bump the version in these manifests:
+
+- `.claude-plugin/marketplace.json` — top-level `"version"` **and** each entry in the `"plugins"` array that changed
+- `CHANGELOG.md` — new entry with the version number and link reference at the bottom
+
+The plugin system uses the `"version"` field in `marketplace.json` to detect upgrades. If you forget to bump it, users will see "already at the latest version" even after new changes are pushed.
+
 ## Conventions
 
 - Agent filenames: `kebab-case.md` (e.g., `tech-lead.md`, `security-reviewer.md`)

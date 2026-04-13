@@ -54,9 +54,13 @@ git worktree add {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short
 
 **This is the key orchestration step.** For each task, launch a **Tech Lead sub-agent** instance with:
 
-- The specific task description and acceptance criteria
+- The specific task description and acceptance criteria (with their type tags: `[T]`, `[H]`, `[O]`)
 - The worktree path as the working directory
 - Context about the project (link to specs, PRD, design system docs)
+- Acceptance criteria instructions:
+  - For each `[T]` criterion: write an automated test that proves it, ensure the test passes, and report the test file path and test name in the completion summary
+  - For `[H]` criteria: flag them in the completion summary as requiring user approval — do NOT consider the task complete until the user has been interviewed
+  - For `[O]` criteria: note them as post-deployment metrics — no action required during implementation
 - Git workflow instructions:
   - Work in the assigned worktree
   - Commit changes with descriptive messages using `git commit --no-gpg-sign`
@@ -66,8 +70,9 @@ git worktree add {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short
 The Tech Lead will:
 - Analyze the task and determine which sub-agents are needed
 - Orchestrate implementation (coding, frontend work, security review, testing)
+- Write tests that prove each `[T]` acceptance criterion before marking the task complete
 - Provide incremental progress updates
-- Report completion with a summary of what was done
+- Report completion with a summary including test linkage (which test proves which `[T]` criterion)
 
 ### 6. Monitor Progress
 
@@ -78,14 +83,34 @@ Monitor the Tech Lead instances for:
 
 ### 7. Validate Completion
 
-For each completed task:
-- Verify all acceptance criteria are met
-- Confirm tests pass
+For each completed task, validate acceptance criteria by type:
+
+**`[T]` criteria (testable):**
+- Verify that a test exists for each `[T]` criterion — the Tech Lead's summary must include the test file path and test name for each one
+- Run the test suite and confirm all tests pass
+- If any `[T]` criterion lacks a linked test, send the task back to the Tech Lead to write the missing test
+
+**`[H]` criteria (human-validated):**
+- Present the implemented work to the user using `AskUserQuestion`
+- Show what was built, how it addresses the criterion, and any alternatives considered
+- The user must explicitly approve each `[H]` criterion before the task can proceed to merge
+- If the user rejects, send specific feedback back to the Tech Lead for iteration
+
+**`[O]` criteria (observational):**
+- No validation at this stage — note them as post-deployment metrics in the completion record
+
+**General validation:**
+- Confirm all tests pass (not just acceptance-linked tests)
 - Review the Tech Lead's summary of changes and decisions
 
 ### 8. Merge Results
 
-After successful completion and validation:
+**Pre-merge gate:** A task may only be merged when:
+- All `[T]` criteria have linked, passing tests
+- All `[H]` criteria have been approved by the user
+- General validation (Step 7) has passed
+
+After the gate is satisfied:
 
 ```bash
 git merge --ff-only {worktrees.branch_prefix}[task-id]-[short-description]
@@ -103,6 +128,8 @@ git worktree remove {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[sh
 
 Mark completed tasks as "done" in the implementation plan with:
 - Completion notes
+- **Test linkage:** For each `[T]` criterion, record the test file and test name that proves it (e.g., `[T] Email validation → src/auth/__tests__/login.test.ts: "validates email format"`)
+- **`[H]` approval record:** Note that human approval was obtained for `[H]` criteria
 - Any learnings or discoveries
 - Follow-up tasks identified during implementation
 
@@ -111,6 +138,10 @@ Update `@CLAUDE.md` with any build/test optimization insights discovered.
 ## Critical Requirements
 
 - **Validate ALL acceptance criteria** before marking a task complete
+- **Every `[T]` criterion must have a linked, passing test** — no exceptions. Record the test file and test name in the plan upon completion
+- **Every `[H]` criterion must be approved by the user** before merge — use `AskUserQuestion` to present the work and obtain explicit approval
+- **Schedule `[H]`-criteria tasks early in parallel batches** so user review can overlap with autonomous `[T]`-only task execution
+- **`[O]` criteria are not validated during execution** — they are post-deployment metrics tracked at the milestone/phase level
 - **Keep the implementation plan continuously updated** with progress and learnings
 - **Respect pre-commit hooks** — address all failures, never skip them
 - **Never cross phase boundaries** in a single session

@@ -5,6 +5,25 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5] - 2026-04-13
+
+### Added
+
+- **Typed acceptance criteria framework (`[T]`, `[H]`, `[O]`).** Every task in the implementation plan now requires acceptance criteria tagged by validation type:
+  - `[T]` (Testable) — proven by an automated test; the test must exist and pass before the task is marked complete, and the test file/name is linked back to the criterion in the plan.
+  - `[H]` (Human-validated) — requires user approval via `AskUserQuestion` before merge; used for design decisions, stakeholder sign-off, UX judgment calls.
+  - `[O]` (Observational) — post-deployment metrics tracked at the milestone/phase level, not individual tasks (e.g., adoption rates, error reduction).
+- **Test linkage in plan completion records.** When a task is marked done, each `[T]` criterion records which test file and test name proves it (e.g., `[T] Email validation → src/auth/__tests__/login.test.ts: "validates email format"`).
+- **Pre-merge gate in `next-priority`.** Tasks may only be merged when all `[T]` criteria have linked passing tests and all `[H]` criteria have been approved by the user.
+- **`[H]`-criteria scheduling guidance.** Tasks with human-validated criteria are scheduled early in parallel batches so user review can overlap with autonomous `[T]`-only task execution.
+
+### Changed
+
+- `write-implementation-plan` output template updated with per-task acceptance criteria blocks, `[H]` scheduling notes in parallelization guidance, and milestone-level Observational Outcomes.
+- `next-priority` Step 7 (Validate Completion) rewritten with type-specific validation paths; Step 8 (Merge Results) now includes an explicit pre-merge gate; Step 9 (Update the Plan) records test linkage and `[H]` approval.
+- `team-implement` task enrichment (Step 7b) includes typed criteria with per-type handling instructions; task lifecycle (Step 8b) expanded from 4 to 6 steps with test linkage verification and human validation gates; plan synchronization (Step 9c) records test linkage and `[H]` approval; assignment guidance (Step 7d) includes `[H]`-criteria scheduling.
+- `team-implement` illustrative task mapping example updated to show typed criteria in both plan source and `TaskCreate` description.
+
 ## [0.3.4] - 2026-03-14
 
 ### Added
@@ -131,6 +150,7 @@ First public release of the LumenAI marketplace and the Synthex plugin.
 - Golden snapshot infrastructure for regression testing
 - Promptfoo integration for behavioral and semantic evaluation
 
+[0.3.5]: https://github.com/bluminal/lumenai/releases/tag/v0.3.5
 [0.3.4]: https://github.com/bluminal/lumenai/releases/tag/v0.3.4
 [0.3.3]: https://github.com/bluminal/lumenai/releases/tag/v0.3.3
 [0.3.0]: https://github.com/bluminal/lumenai/releases/tag/v0.3.0

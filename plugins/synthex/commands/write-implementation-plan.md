@@ -21,6 +21,25 @@ You orchestrate the creation of a high-quality implementation plan through:
 
 ---
 
+## Acceptance Criteria Types
+
+Every task in the implementation plan must have acceptance criteria. Each criterion is tagged with one of three types that determine how it is validated during execution:
+
+| Type | Tag | Validation | Scope |
+|------|-----|-----------|-------|
+| **Testable** | `[T]` | Proven by an automated test (unit, integration, e2e). The test must exist and pass before the task is marked complete. The test file and test name are linked back to the criterion in the plan upon completion. | Task-level |
+| **Human-validated** | `[H]` | Requires human-in-the-loop approval — the user is interviewed and confirms the criterion is met before the task is merged. Used for design decisions, stakeholder sign-off, UX judgment calls. | Task-level |
+| **Observational** | `[O]` | Requires deployment and elapsed time to measure (e.g., user adoption rates, error rate reduction, performance trends). Cannot be validated at task completion time. | Phase or Milestone-level |
+
+### Guidance for the Product Manager
+
+- **Prefer `[T]` criteria.** Every task should have at least one testable criterion whenever the task produces functional behavior. If a task's acceptance criteria are all `[H]` or `[O]`, question whether the task is well-scoped.
+- **`[O]` criteria belong at the milestone or phase level**, not individual tasks. They represent outcomes that emerge from the combined work of multiple tasks and can only be measured after deployment. List them under the milestone's **Observational Outcomes** line.
+- **`[H]` criteria create scheduling constraints.** Tasks with `[H]` criteria require a user interview before merge, which means they cannot complete autonomously. When identifying parallelizable work, note that `[H]` tasks will pause for user input — schedule them early in a batch so the user review can happen while other tasks continue executing.
+- **Be specific.** `[T] Login form validates email format` is actionable. `[T] Works correctly` is not.
+
+---
+
 ## Workflow
 
 ### 1. Load Configuration
@@ -83,8 +102,9 @@ The PM asks questions in small batches (3-5 at a time) using `AskUserQuestion`, 
 The Product Manager produces an initial implementation plan draft following the standard template (see Output section below). The draft must include:
 - Phased milestones delivering incremental value
 - Specific, executable tasks with complexity grades (S/M/L)
+- Typed acceptance criteria for every task — each criterion tagged `[T]`, `[H]`, or `[O]` per the Acceptance Criteria Types section above
 - Dependencies and critical path identified
-- Parallelizable work explicitly called out (limit to `@{concurrent_tasks}` concurrent tasks per milestone, per config)
+- Parallelizable work explicitly called out (limit to `@{concurrent_tasks}` concurrent tasks per milestone, per config), with scheduling notes when a batch includes `[H]`-criteria tasks (start them early so user review overlaps with autonomous work)
 - A **Decisions** section documenting major planning decisions and rationale
 - An **Open Questions** section tracking items needing further discovery
 
@@ -254,8 +274,21 @@ Items requiring further discovery that could lead to future decisions and plan c
 | 2 | [Task description] | M | Task 1 | pending |
 | 3 | [Task description] | S | None | pending |
 
-**Parallelizable:** Tasks 1 and 3 can run concurrently. _(max @{concurrent_tasks} concurrent per config)_
+**Task 1 Acceptance Criteria:**
+- `[T]` [Testable criterion — specific, verifiable by automated test]
+- `[T]` [Another testable criterion]
+- `[H]` [Human-validated criterion — requires user approval before merge]
+
+**Task 2 Acceptance Criteria:**
+- `[T]` [Testable criterion]
+
+**Task 3 Acceptance Criteria:**
+- `[T]` [Testable criterion]
+- `[T]` [Another testable criterion]
+
+**Parallelizable:** Tasks 1 and 3 can run concurrently. Task 1 has `[H]` criteria — start it first so user review can overlap with Task 3 execution. _(max @{concurrent_tasks} concurrent per config)_
 **Milestone Value:** [What the user gets when this milestone is complete]
+**Observational Outcomes:** `[O]` [Outcomes measurable only after deployment — e.g., adoption rates, error reduction. Tracked at milestone/phase level, not task level.]
 
 ### Milestone 1.2: [Name]
 ...
@@ -350,3 +383,7 @@ implementation_plan:
 - The final plan must be as compact as possible without losing information
 - The Product Manager must address all CRITICAL and HIGH reviewer findings
 - The Product Manager may ask the user for help when unsure about feedback
+- Every task must have typed acceptance criteria — each criterion tagged `[T]`, `[H]`, or `[O]`
+- Every task that produces functional behavior must have at least one `[T]` criterion
+- `[O]` criteria must live at the milestone or phase level, not individual tasks
+- Tasks with `[H]` criteria must be flagged in the parallelization notes so execution commands can schedule user reviews efficiently
