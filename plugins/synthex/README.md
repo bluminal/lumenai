@@ -123,6 +123,42 @@ See [`config/defaults.yaml`](config/defaults.yaml) for the full reference. Key s
 | `documents.implementation_plan` | `docs/plans/main.md` | Default plan path |
 | `documents.specs` | `docs/specs` | Specs directory |
 
+## Ralph Loop Integration
+
+The `next-priority` command supports running inside a [Ralph Loop](https://github.com/anthropics/claude-plugins-official/tree/main/ralph-loop) for fully autonomous plan execution. Each loop iteration completes a batch of tasks within the current milestone, and the next iteration picks up where it left off — advancing through milestones until the entire plan is done.
+
+### Basic Usage
+
+```bash
+# Execute the full plan autonomously — loop stops when every task is done
+/ralph-loop:ralph-loop "/synthex:next-priority" --completion-promise "PLAN COMPLETE"
+
+# Target a specific plan
+/ralph-loop:ralph-loop "/synthex:next-priority implementation_plan_path='docs/plans/mobile-v2.md'" \
+  --completion-promise "PLAN COMPLETE"
+```
+
+### Milestone Checkpoints
+
+By default, the loop continues across milestone boundaries. To stop at each milestone for review:
+
+```bash
+/ralph-loop:ralph-loop "/synthex:next-priority exit_on_milestone_complete=true" \
+  --completion-promise "MILESTONE DONE"
+```
+
+### How It Works
+
+- The command checks `.claude/ralph-loop.local.md` to detect whether it's running inside a loop and reads the configured `completion_promise`.
+- The completion signal (`<promise>...</promise>`) is output **only** when every task in the plan has status `done` — or at milestone boundaries when `exit_on_milestone_complete` is `true`.
+- Tasks with any non-done status (pending, in-progress, blocked, awaiting `[H]` user approval) prevent the signal. This means the loop keeps running while you complete manual `[H]` tasks in a separate thread — the next iteration will pick up newly-unblocked work.
+
+### Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `exit_on_milestone_complete` | Output the completion signal after finishing a milestone, even if later milestones remain | `false` |
+
 ## License
 
 Apache 2.0 — See [LICENSE](../../LICENSE) for details.

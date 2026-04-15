@@ -5,6 +5,16 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.6] - 2026-04-15
+
+### Added
+
+- **Ralph Loop integration for `next-priority` and `team-implement`.** Both commands now detect when they are running inside a [Ralph Loop](https://github.com/anthropics/claude-plugins-official/tree/main/ralph-loop) and output a `<promise>` completion signal to auto-terminate the loop when all work is done.
+  - The command reads `.claude/ralph-loop.local.md` to detect an active loop and its configured `completion_promise`.
+  - The completion signal fires **only** when every task in the plan has status `done`. Tasks with any non-done status — pending, in-progress, blocked, or awaiting `[H]` user approval — prevent the signal, allowing the loop to continue while the user completes manual tasks in a separate thread.
+  - New `exit_on_milestone_complete` parameter (default `false`) for both commands: when `true`, outputs the completion signal at milestone boundaries even if later milestones have remaining work. Useful for inserting review checkpoints between milestones.
+- Ralph Loop Integration sections added to both plugin READMEs with usage examples.
+
 ## [0.3.5] - 2026-04-13
 
 ### Added
@@ -150,6 +160,7 @@ First public release of the LumenAI marketplace and the Synthex plugin.
 - Golden snapshot infrastructure for regression testing
 - Promptfoo integration for behavioral and semantic evaluation
 
+[0.3.6]: https://github.com/bluminal/lumenai/releases/tag/v0.3.6
 [0.3.5]: https://github.com/bluminal/lumenai/releases/tag/v0.3.5
 [0.3.4]: https://github.com/bluminal/lumenai/releases/tag/v0.3.4
 [0.3.3]: https://github.com/bluminal/lumenai/releases/tag/v0.3.3

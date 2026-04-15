@@ -12,6 +12,7 @@ Teams provide sustained multi-agent collaboration where teammates share a task l
 | `template` | Team composition template to use | Value from config `teams.default_implementation_template`, falling back to `implementation` | No |
 | `milestone` | Specific milestone to execute (e.g., "2.1") | Current incomplete milestone (first milestone with pending tasks) | No |
 | `config_path` | Path to Synthex+ configuration | `.synthex-plus/config.yaml` | No |
+| `exit_on_milestone_complete` | When running in a Ralph Loop, output the completion signal after finishing the target milestone even if later milestones remain. Useful for inserting a checkpoint between milestones. | `false` | No |
 
 **Config resolution order:** command parameter > project config (`{config_path}`) > plugin defaults (`config/defaults.yaml`) > hardcoded fallback.
 
@@ -47,7 +48,8 @@ Read the implementation plan at `@{implementation_plan_path}`.
 **Identify the target milestone:**
 - If the `milestone` parameter was provided, locate that specific milestone (e.g., "2.1" matches "Milestone 2.1")
 - If no milestone was specified, find the **current incomplete milestone** — the first milestone that has at least one task with status `pending` or `in progress`
-- If all milestones are complete, inform the user: "All milestones in the implementation plan are complete. No work to execute."
+- If every task across all milestones has status `done`, output the **Ralph Loop completion signal** (see Ralph Loop Integration below) and then inform the user: "All milestones in the implementation plan are complete. No work to execute."
+  - **Important:** If non-`done` tasks exist in any milestone (including tasks awaiting `[H]` user approval, blocked tasks, or tasks the command chose not to pick up), do **NOT** output the completion signal. The Ralph Loop will re-invoke the command on the next iteration — the user may be completing manual tasks or `[H]` reviews in a separate thread.
 
 **Extract milestone tasks:**
 - Parse all tasks in the target milestone, capturing: task number, description, complexity, dependencies, status
@@ -544,6 +546,13 @@ Before initiating shutdown, the lead:
 
 The completion report is the final output of the entire `team-implement` invocation. It is displayed to the user before any shutdown actions begin.
 
+After producing the completion report, check the Ralph Loop exit conditions (see Ralph Loop Integration below):
+
+1. If every task across all milestones now has status `done`, output the **Ralph Loop completion signal**.
+2. Otherwise, if `exit_on_milestone_complete` is `true` and all tasks in the **target milestone** are now `done`, output the **Ralph Loop completion signal**.
+
+If neither condition is met, the loop continues — the next iteration will pick up the next incomplete milestone.
+
 #### 10c. Ordered shutdown sequence
 
 Teammates shut down in a specific order to maintain consistency:
@@ -652,3 +661,40 @@ A lightweight tracking file mechanism detects teams that were not cleaned up fro
 
 - If `.synthex-plus/.active-team` exists AND `~/.claude/teams/{recorded-team-name}/config.json` also exists — the previous session's team was not cleaned up. Report it as an orphan (handled by Step 3c's orphan detection).
 - If `.synthex-plus/.active-team` exists but the team metadata directory is gone — the team was cleaned up externally but the tracking file was not removed. Silently delete the stale tracking file and continue.
+
+## Ralph Loop Integration
+
+This command can run inside a [Ralph Loop](https://github.com/anthropics/claude-plugins-official/tree/main/ralph-loop) — an iterative execution loop that re-invokes the same prompt until work is done. Each iteration, the command sees the updated implementation plan from the previous iteration and picks up where it left off. This is the primary way to execute an entire multi-milestone plan autonomously — each iteration completes one milestone, the loop advances to the next.
+
+### Detection
+
+Check whether the file `.claude/ralph-loop.local.md` exists in the project root. If it exists, read its YAML frontmatter to extract:
+
+- `active` — whether a loop is currently running
+- `completion_promise` — the text to echo back when work is complete (may be `null`)
+
+The command is inside an active Ralph Loop when the file exists **and** `active` is `true`.
+
+### Completion Signal
+
+When running inside an active Ralph Loop with a non-null `completion_promise`, output the promise tag to terminate the loop:
+
+```
+<promise>{completion_promise}</promise>
+```
+
+This tag must appear in the assistant's output text. The Ralph Loop's stop hook scans for this tag and terminates the loop when the promise text matches. Output the tag **before** the human-readable completion message so the hook detects it even if the response is truncated.
+
+### When to Signal
+
+The completion signal is output **only** under these conditions:
+
+1. **Entire plan complete:** Every task across all milestones has status `done`. This is the primary exit condition. Tasks with **any** non-done status — `pending`, `in progress`, `blocked`, or awaiting `[H]` user approval — prevent the signal. The loop continues so the user can finish manual tasks or `[H]` reviews in a separate thread; the next iteration will pick up the next incomplete milestone or newly-unblocked work.
+
+2. **Milestone boundary exit (opt-in):** If `exit_on_milestone_complete` is `true` and all tasks in the **target milestone** are `done`, the signal fires even if later milestones have remaining work. Use this when you want a checkpoint between milestones (e.g., to review progress, adjust the plan, or switch contexts).
+
+**Important:** The signal must never fire simply because the command found no actionable tasks or no incomplete milestones to target this iteration. A plan with pending `[H]` tasks, blocked tasks, or tasks the command chose not to pick up is **not complete** — it is waiting for external progress.
+
+### When NOT inside a Ralph Loop
+
+If `.claude/ralph-loop.local.md` does not exist, or `active` is `false`, or `completion_promise` is `null`, skip the promise tag entirely. The command behaves identically to its non-loop behavior.

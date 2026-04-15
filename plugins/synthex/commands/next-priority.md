@@ -8,6 +8,7 @@ Automatically identify and execute the next highest-priority tasks from the impl
 |-----------|-------------|---------|----------|
 | `implementation_plan_path` | Path to the implementation plan markdown file | `docs/plans/main.md` | No |
 | `concurrent_tasks` | Number of parallel tasks to work on simultaneously | Value from `next_priority.concurrent_tasks` config, or `3` | No |
+| `exit_on_milestone_complete` | When running in a Ralph Loop, output the completion signal after finishing a milestone even if later milestones remain. Useful for inserting a checkpoint between milestones. | `false` | No |
 
 ## Core Responsibilities
 
@@ -27,6 +28,10 @@ Read `@{implementation_plan_path}` and identify the top `{concurrent_tasks}` mos
 - **Dependency chains** — prerequisites must be complete before dependent tasks can start
 - **Business value** — tasks that deliver the most user-facing value
 - **Current milestone** — stay within the current phase and milestone boundaries
+
+**Plan complete:** If every task in the plan has status `done`, output the **Ralph Loop completion signal** (see Ralph Loop Integration below) and inform the user: "All tasks in the implementation plan are complete. No work to execute."
+
+**No actionable tasks this iteration:** If non-`done` tasks exist but none are actionable right now (e.g., all remaining tasks are blocked, awaiting `[H]` user approval, or have unsatisfied dependencies), do **NOT** output the Ralph Loop completion signal. Instead, inform the user which tasks remain and why they are not actionable. The Ralph Loop will re-invoke the command on the next iteration — the user may be completing manual tasks or `[H]` reviews in a separate thread, which will unblock work for the next pass.
 
 **Critical Rule:** Only select tasks that are truly independent for parallel execution. Tasks with dependencies on each other MUST be sequenced — they cannot run in parallel.
 
@@ -134,6 +139,50 @@ Mark completed tasks as "done" in the implementation plan with:
 - Follow-up tasks identified during implementation
 
 Update `@CLAUDE.md` with any build/test optimization insights discovered.
+
+After updating the plan, check the Ralph Loop exit conditions (see Ralph Loop Integration below):
+
+1. If every task across all milestones and phases now has status `done`, output the **Ralph Loop completion signal**.
+2. Otherwise, if `exit_on_milestone_complete` is `true` and all tasks in the **current milestone** are now `done`, output the **Ralph Loop completion signal**.
+
+If neither condition is met, the loop continues on the next iteration.
+
+## Ralph Loop Integration
+
+This command can run inside a [Ralph Loop](https://github.com/anthropics/claude-plugins-official/tree/main/ralph-loop) — an iterative execution loop that re-invokes the same prompt until work is done. Each iteration, the command sees the updated implementation plan from the previous iteration and picks up where it left off.
+
+### Detection
+
+Check whether the file `.claude/ralph-loop.local.md` exists in the project root. If it exists, read its YAML frontmatter to extract:
+
+- `active` — whether a loop is currently running
+- `completion_promise` — the text to echo back when work is complete (may be `null`)
+
+The command is inside an active Ralph Loop when the file exists **and** `active` is `true`.
+
+### Completion Signal
+
+When running inside an active Ralph Loop with a non-null `completion_promise`, output the promise tag to terminate the loop:
+
+```
+<promise>{completion_promise}</promise>
+```
+
+This tag must appear in the assistant's output text. The Ralph Loop's stop hook scans for this tag and terminates the loop when the promise text matches. Output the tag **before** the human-readable completion message so the hook detects it even if the response is truncated.
+
+### When to Signal
+
+The completion signal is output **only** under these conditions:
+
+1. **Entire plan complete:** Every task across all milestones has status `done`. This is the primary exit condition. Tasks with **any** non-done status — `pending`, `in progress`, `blocked`, or awaiting `[H]` user approval — prevent the signal. The loop continues so the user can finish manual tasks or `[H]` reviews in a separate thread; the next iteration will pick up newly-unblocked work.
+
+2. **Milestone boundary exit (opt-in):** If `exit_on_milestone_complete` is `true` and all tasks in the **current milestone** are `done`, the signal fires even if later milestones have remaining work. Use this when you want a checkpoint between milestones (e.g., to review progress, adjust the plan, or switch contexts).
+
+**Important:** The signal must never fire simply because the command found no actionable tasks this iteration. A plan with pending `[H]` tasks, blocked tasks, or tasks the command chose not to pick up is **not complete** — it is waiting for external progress.
+
+### When NOT inside a Ralph Loop
+
+If `.claude/ralph-loop.local.md` does not exist, or `active` is `false`, or `completion_promise` is `null`, skip the promise tag entirely. The command behaves identically to its non-loop behavior.
 
 ## Critical Requirements
 

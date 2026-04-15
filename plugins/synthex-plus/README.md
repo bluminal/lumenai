@@ -59,6 +59,7 @@ Creates a persistent team (Tech Lead, Frontend Engineer, Quality Engineer, Code 
 | `template` | Team composition template | `implementation` |
 | `milestone` | Specific milestone to execute (e.g., "2.1") | First incomplete milestone |
 | `config_path` | Path to Synthex+ configuration | `.synthex-plus/config.yaml` |
+| `exit_on_milestone_complete` | When in a Ralph Loop, signal completion after finishing the target milestone even if later milestones remain | `false` |
 
 **Example invocations:**
 
@@ -224,6 +225,47 @@ If the beta `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` flag is not set, all team c
 | `team-refine` | `refine-requirements` |
 
 No team resources are created, no tokens are consumed, and the user can choose how to proceed.
+
+## Ralph Loop Integration
+
+The `team-implement` command supports running inside a [Ralph Loop](https://github.com/anthropics/claude-plugins-official/tree/main/ralph-loop) for fully autonomous multi-milestone plan execution. Each loop iteration creates a team, completes one milestone, shuts down the team, and the next iteration picks up the next incomplete milestone — advancing through the plan until every task is done.
+
+### Basic Usage
+
+```bash
+# Execute the full plan autonomously — loop stops when every task is done
+/ralph-loop:ralph-loop "/synthex-plus:team-implement" --completion-promise "PLAN COMPLETE"
+
+# Target a specific plan
+/ralph-loop:ralph-loop "/synthex-plus:team-implement implementation_plan_path='docs/plans/mobile-v2.md'" \
+  --completion-promise "PLAN COMPLETE"
+```
+
+### Milestone Checkpoints
+
+By default, the loop continues across milestone boundaries (one milestone per iteration). To stop after each milestone for review:
+
+```bash
+/ralph-loop:ralph-loop "/synthex-plus:team-implement exit_on_milestone_complete=true" \
+  --completion-promise "MILESTONE DONE"
+```
+
+### How It Works
+
+- The command checks `.claude/ralph-loop.local.md` to detect whether it's running inside a loop and reads the configured `completion_promise`.
+- The completion signal (`<promise>...</promise>`) is output **only** when every task across all milestones has status `done` — or at milestone boundaries when `exit_on_milestone_complete` is `true`.
+- Tasks with any non-done status (pending, in-progress, blocked, awaiting `[H]` user approval) prevent the signal. This means the loop keeps running while you complete manual `[H]` tasks in a separate thread — the next iteration will pick up the next incomplete milestone or newly-unblocked work.
+- Each iteration creates and shuts down a fresh team, so context doesn't accumulate across milestones. The implementation plan file is the durable state that carries progress between iterations.
+
+### Synthex vs. Synthex+ in a Ralph Loop
+
+Both `next-priority` and `team-implement` support ralph loops with identical completion signal behavior. Choose based on the same criteria as non-loop usage:
+
+| | `next-priority` | `team-implement` |
+|---|-----------------|------------------|
+| **Loop iteration** | Picks up a batch of tasks within the current milestone | Creates a full team, completes one milestone, shuts down |
+| **Best for** | Plans with many small milestones, single-domain work | Multi-domain milestones requiring specialist coordination |
+| **Token cost per iteration** | Lower (sequential subagents) | Higher (persistent team with concurrent agents) |
 
 ## Further Reading
 
