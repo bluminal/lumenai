@@ -29,7 +29,7 @@ Read `@{implementation_plan_path}` and identify the top `{concurrent_tasks}` mos
 - **Business value** — tasks that deliver the most user-facing value
 - **Current milestone** — stay within the current phase and milestone boundaries
 
-**Plan complete:** If every task in the plan has status `done`, output the **Ralph Loop completion signal** (see Ralph Loop Integration below) and inform the user: "All tasks in the implementation plan are complete. No work to execute."
+**Plan complete:** If every task in the plan has status `done`, check for an active Ralph Loop (see Ralph Loop Integration below). If inside a loop with a `completion_promise`, output `<promise>{completion_promise}</promise>` (literal XML tags — the stop hook requires them). Then inform the user: "All tasks in the implementation plan are complete. No work to execute."
 
 **No actionable tasks this iteration:** If non-`done` tasks exist but none are actionable right now (e.g., all remaining tasks are blocked, awaiting `[H]` user approval, or have unsatisfied dependencies), do **NOT** output the Ralph Loop completion signal. Instead, inform the user which tasks remain and why they are not actionable. The Ralph Loop will re-invoke the command on the next iteration — the user may be completing manual tasks or `[H]` reviews in a separate thread, which will unblock work for the next pass.
 
@@ -140,10 +140,10 @@ Mark completed tasks as "done" in the implementation plan with:
 
 Update `@CLAUDE.md` with any build/test optimization insights discovered.
 
-After updating the plan, check the Ralph Loop exit conditions (see Ralph Loop Integration below):
+After updating the plan, check the Ralph Loop exit conditions (see Ralph Loop Integration below). If inside an active loop with a `completion_promise`:
 
-1. If every task across all milestones and phases now has status `done`, output the **Ralph Loop completion signal**.
-2. Otherwise, if `exit_on_milestone_complete` is `true` and all tasks in the **current milestone** are now `done`, output the **Ralph Loop completion signal**.
+1. If every task across all milestones and phases now has status `done`, output `<promise>{completion_promise}</promise>` (literal XML tags required).
+2. Otherwise, if `exit_on_milestone_complete` is `true` and all tasks in the **current milestone** are now `done`, output `<promise>{completion_promise}</promise>`.
 
 If neither condition is met, the loop continues on the next iteration.
 
@@ -162,13 +162,28 @@ The command is inside an active Ralph Loop when the file exists **and** `active`
 
 ### Completion Signal
 
-When running inside an active Ralph Loop with a non-null `completion_promise`, output the promise tag to terminate the loop:
+When running inside an active Ralph Loop with a non-null `completion_promise`, you **must** output the completion promise wrapped in literal `<promise>` and `</promise>` XML tags. The stop hook uses regex to detect these exact tags — outputting the promise text without the tags will NOT stop the loop.
 
-```
+**Format — you must output this exactly:**
+
+```xml
 <promise>{completion_promise}</promise>
 ```
 
-This tag must appear in the assistant's output text. The Ralph Loop's stop hook scans for this tag and terminates the loop when the promise text matches. Output the tag **before** the human-readable completion message so the hook detects it even if the response is truncated.
+Where `{completion_promise}` is replaced with the value read from the state file.
+
+**Example:** If `completion_promise` is `PLAN COMPLETE`, you must output:
+
+```
+<promise>PLAN COMPLETE</promise>
+```
+
+**Wrong** (will not stop the loop):
+```
+PLAN COMPLETE
+```
+
+The `<promise>` tag must appear in your response text. Output it **before** the human-readable completion message so the hook detects it even if the response is truncated.
 
 ### When to Signal
 

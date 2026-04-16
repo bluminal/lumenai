@@ -48,8 +48,8 @@ Read the implementation plan at `@{implementation_plan_path}`.
 **Identify the target milestone:**
 - If the `milestone` parameter was provided, locate that specific milestone (e.g., "2.1" matches "Milestone 2.1")
 - If no milestone was specified, find the **current incomplete milestone** — the first milestone that has at least one task with status `pending` or `in progress`
-- If every task across all milestones has status `done`, output the **Ralph Loop completion signal** (see Ralph Loop Integration below) and then inform the user: "All milestones in the implementation plan are complete. No work to execute."
-  - **Important:** If non-`done` tasks exist in any milestone (including tasks awaiting `[H]` user approval, blocked tasks, or tasks the command chose not to pick up), do **NOT** output the completion signal. The Ralph Loop will re-invoke the command on the next iteration — the user may be completing manual tasks or `[H]` reviews in a separate thread.
+- If every task across all milestones has status `done`, check for an active Ralph Loop (see Ralph Loop Integration below). If inside a loop with a `completion_promise`, output `<promise>{completion_promise}</promise>` (literal XML tags — the stop hook requires them). Then inform the user: "All milestones in the implementation plan are complete. No work to execute."
+  - **Important:** If non-`done` tasks exist in any milestone (including tasks awaiting `[H]` user approval, blocked tasks, or tasks the command chose not to pick up), do **NOT** output the `<promise>` tag. The Ralph Loop will re-invoke the command on the next iteration — the user may be completing manual tasks or `[H]` reviews in a separate thread.
 
 **Extract milestone tasks:**
 - Parse all tasks in the target milestone, capturing: task number, description, complexity, dependencies, status
@@ -546,10 +546,10 @@ Before initiating shutdown, the lead:
 
 The completion report is the final output of the entire `team-implement` invocation. It is displayed to the user before any shutdown actions begin.
 
-After producing the completion report, check the Ralph Loop exit conditions (see Ralph Loop Integration below):
+After producing the completion report, check the Ralph Loop exit conditions (see Ralph Loop Integration below). If inside an active loop with a `completion_promise`:
 
-1. If every task across all milestones now has status `done`, output the **Ralph Loop completion signal**.
-2. Otherwise, if `exit_on_milestone_complete` is `true` and all tasks in the **target milestone** are now `done`, output the **Ralph Loop completion signal**.
+1. If every task across all milestones now has status `done`, output `<promise>{completion_promise}</promise>` (literal XML tags required).
+2. Otherwise, if `exit_on_milestone_complete` is `true` and all tasks in the **target milestone** are now `done`, output `<promise>{completion_promise}</promise>`.
 
 If neither condition is met, the loop continues — the next iteration will pick up the next incomplete milestone.
 
@@ -677,13 +677,28 @@ The command is inside an active Ralph Loop when the file exists **and** `active`
 
 ### Completion Signal
 
-When running inside an active Ralph Loop with a non-null `completion_promise`, output the promise tag to terminate the loop:
+When running inside an active Ralph Loop with a non-null `completion_promise`, you **must** output the completion promise wrapped in literal `<promise>` and `</promise>` XML tags. The stop hook uses regex to detect these exact tags — outputting the promise text without the tags will NOT stop the loop.
 
-```
+**Format — you must output this exactly:**
+
+```xml
 <promise>{completion_promise}</promise>
 ```
 
-This tag must appear in the assistant's output text. The Ralph Loop's stop hook scans for this tag and terminates the loop when the promise text matches. Output the tag **before** the human-readable completion message so the hook detects it even if the response is truncated.
+Where `{completion_promise}` is replaced with the value read from the state file.
+
+**Example:** If `completion_promise` is `PLAN COMPLETE`, you must output:
+
+```
+<promise>PLAN COMPLETE</promise>
+```
+
+**Wrong** (will not stop the loop):
+```
+PLAN COMPLETE
+```
+
+The `<promise>` tag must appear in your response text. Output it **before** the human-readable completion message so the hook detects it even if the response is truncated.
 
 ### When to Signal
 
