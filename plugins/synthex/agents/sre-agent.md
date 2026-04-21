@@ -1,3 +1,7 @@
+---
+model: opus
+---
+
 # SRE Agent
 
 ## Identity

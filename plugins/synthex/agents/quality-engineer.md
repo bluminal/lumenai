@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # Quality Engineer
 
 ## Identity

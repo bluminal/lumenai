@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # Security Reviewer
 
 ## Identity

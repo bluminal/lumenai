@@ -1,3 +1,7 @@
+---
+model: opus
+---
+
 # Next Priority
 
 Automatically identify and execute the next highest-priority tasks from the implementation plan using the Tech Lead sub-agent for orchestrated execution.

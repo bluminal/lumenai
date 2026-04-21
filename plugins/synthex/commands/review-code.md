@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # Review Code
 
 Comprehensive, multi-perspective code review combining craftsmanship review, security analysis, and optional performance assessment — all run in parallel for fast, thorough feedback.

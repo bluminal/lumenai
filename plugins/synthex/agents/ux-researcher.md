@@ -1,3 +1,7 @@
+---
+model: opus
+---
+
 # UX Researcher
 
 ## Identity

@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # Write RFC
 
 Create a Request for Comments (RFC) document for a significant technical proposal — combining product context with technical design and structured multi-agent review.

@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # Retrospective Facilitator
 
 ## Identity

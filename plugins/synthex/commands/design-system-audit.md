@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # Design System Audit
 
 Audit the frontend codebase for design system compliance — identifying hardcoded values, incorrect component usage, accessibility violations, and opportunities to improve visual consistency.

@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # Refine Requirements
 
 Improve a Product Requirements Document (PRD) by running it through a multi-agent review loop focused on clarity, completeness, and communicability — then updating the PRD directly with the improvements.

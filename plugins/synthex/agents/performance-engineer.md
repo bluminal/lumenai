@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # Performance Engineer
 
 ## Identity

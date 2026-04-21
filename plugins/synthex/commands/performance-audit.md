@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # Performance Audit
 
 Conduct a full-stack performance analysis — quantifying bottlenecks, measuring against budgets, and producing prioritized optimization recommendations with estimated impact.
