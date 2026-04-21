@@ -1,3 +1,7 @@
+---
+model: opus
+---
+
 # Write Implementation Plan
 
 Transform a Product Requirements Document (PRD) into a prioritized, value-driven implementation plan optimized for parallel execution and incremental delivery — refined through multi-agent peer review.

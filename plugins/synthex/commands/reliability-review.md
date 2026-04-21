@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # Reliability Review
 
 Assess the operational readiness of a service or feature before deployment — covering SLOs, observability, runbooks, deployment risk, and incident response preparedness.

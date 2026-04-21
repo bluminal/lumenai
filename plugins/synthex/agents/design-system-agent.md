@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # Design System Agent
 
 ## Identity

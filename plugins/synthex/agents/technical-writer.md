@@ -1,3 +1,7 @@
+---
+model: haiku
+---
+
 # Technical Writer
 
 ## Identity

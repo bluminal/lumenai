@@ -1,3 +1,7 @@
+---
+model: haiku
+---
+
 # Initialize Synthex
 
 Set up the Synthex plugin configuration for a project. This command scaffolds the configuration file and document directories needed for the plugin to operate.

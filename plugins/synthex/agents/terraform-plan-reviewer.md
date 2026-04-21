@@ -1,3 +1,7 @@
+---
+model: sonnet
+---
+
 # Terraform Plan Reviewer
 
 ## Identity

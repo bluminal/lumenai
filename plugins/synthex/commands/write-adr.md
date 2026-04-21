@@ -1,3 +1,7 @@
+---
+model: haiku
+---
+
 # Write ADR
 
 Create an Architecture Decision Record (ADR) through an interactive process with the Architect sub-agent. ADRs capture important technical decisions with their context, alternatives considered, and consequences — ensuring institutional memory persists beyond any individual's involvement.

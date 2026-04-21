@@ -1,3 +1,7 @@
+---
+model: haiku
+---
+
 # Test Coverage Analysis
 
 Analyze the project's test suite for coverage gaps, test quality, and strategy alignment — then optionally write missing tests for the highest-priority gaps.

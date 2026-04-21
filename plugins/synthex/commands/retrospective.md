@@ -1,3 +1,7 @@
+---
+model: haiku
+---
+
 # Retrospective
 
 Facilitate a structured retrospective at the end of a delivery cycle, phase, or milestone — combining quantitative metrics with qualitative analysis to produce actionable improvement items.
