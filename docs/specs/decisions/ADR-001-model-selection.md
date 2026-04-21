@@ -55,17 +55,19 @@ Commands only orchestrate sub-agents, parse user input, manage review loops, and
 | Command | Model | Primary Justification |
 |---------|-------|----------------------|
 | `next-priority` | **opus** | Leading execution command; task selection, dependency analysis, worktree/merge orchestration at scale |
-| `refine-requirements` | **sonnet** | Multi-reviewer loop with triage decisions on when to escalate to the user |
-| `write-implementation-plan` | **sonnet** | PM + Architect + Tech Lead review cycle; cross-cycle finding tracking |
-| `write-rfc` | **sonnet** | Multi-agent review loop with findings carryover |
+| `write-implementation-plan` | **opus** | Authors the project's implementation plan -- a foundational artifact; PM + Architect + Tech Lead review cycle |
+| `refine-requirements` | **opus** | Primary PRD-evolution command; PRDs define product scope and direction -- highest-leverage document we produce |
+| `write-adr` | **opus** | Architecture decisions persist for years and shape every downstream choice; interactive session with Architect |
+| `write-rfc` | **opus** | Technical research and design for significant proposals; multi-agent review loop over novel technical direction |
 | `review-code` | **sonnet** | Parallel reviewer launch, severity consolidation, fix-and-re-review loop |
 | `design-system-audit` | **sonnet** | Audit + compliance loop management |
 | `reliability-review` | **sonnet** | SRE review + optional Terraform review + remediation loop |
 | `performance-audit` | **sonnet** | Performance Engineer invocation + optimization loop |
 | `init` | **haiku** | Scaffolds files, asks one question, updates `.gitignore` -- purely mechanical |
-| `write-adr` | **haiku** | Finds next ADR number, delegates to Architect, writes file |
 | `test-coverage-analysis` | **haiku** | Loads config, invokes Quality Engineer -- sub-agent does the work |
 | `retrospective` | **haiku** | Chains Metrics Analyst to Retrospective Facilitator |
+
+**Note on Opus-tier commands.** Five commands run on Opus. Four of them (`write-implementation-plan`, `refine-requirements`, `write-adr`, `write-rfc`) produce the project's foundational strategic and architectural artifacts -- plans, PRDs, ADRs, and RFCs. These documents shape every downstream decision, so we pay for the strongest reasoning at the top level even though each command also invokes Opus sub-agents (Product Manager, Architect). The top-level command is not just glue: it drives the interactive flow, interprets ambiguous user input, synthesizes reviewer feedback across cycles, and writes the final document. Using Sonnet or Haiku here would bottleneck the foundational artifacts on a weaker model than the sub-agents producing their content. The fifth, `next-priority`, is the leading execution command and does non-trivial dependency reasoning itself.
 
 ### Guiding Heuristics
 
@@ -77,13 +79,14 @@ For future additions and revisions, apply these heuristics in order:
 4. **Everything in the middle → Sonnet.** Most engineering execution (code review that requires contextual judgment, test writing, code generation following a plan, multi-agent review loops) lives here.
 5. **When in doubt, match the *hardest thing the agent must do* rather than the modal task.** A code reviewer that occasionally needs to catch subtle threading bugs still benefits more from being cheap and fast on the 95% simple case -- if the 5% case matters, invoke a more expensive agent explicitly.
 6. **Security and reliability deserve upgrades, not downgrades.** When uncertain between Haiku and Sonnet for the Security Reviewer or SRE Agent, pick the larger model. The cost of a missed finding is asymmetric.
+7. **Foundational artifacts deserve the strongest model at every layer.** When a command produces a PRD, implementation plan, ADR, RFC, or vision statement -- artifacts that shape many downstream decisions -- run Opus at both the command level and the sub-agent level, even if the command's literal job looks like orchestration. The command still drives the interactive flow and synthesizes the final output; a weaker model at the top bottlenecks the whole pipeline.
 
 ## Consequences
 
 ### Positive
 
 - **Lower cost.** Cheaper models for routine work reduce per-invocation cost significantly. For repeated commands like `review-code` and `next-priority`, this compounds quickly.
-- **Faster responses.** Haiku and Sonnet return tokens faster than Opus. Low-stakes commands (`init`, `write-adr`, `retrospective`) feel snappier.
+- **Faster responses.** Haiku and Sonnet return tokens faster than Opus. Low-stakes commands (`init`, `test-coverage-analysis`, `retrospective`) feel snappier.
 - **Capacity is now a signal.** When a user sees that `architect` or `product-manager` runs on Opus while `code-reviewer` runs on Haiku, the model assignment communicates the cognitive weight of the role. The system becomes more legible.
 - **Opus stays available for the work that needs it.** Strategic planning, architecture review, and reliability design still get the most capable model.
 
