@@ -112,6 +112,16 @@ The plugin system uses the `"version"` field in `marketplace.json` to detect upg
 | `metrics-analyst` | DORA metrics, HEART/AARRR frameworks, OKR tracking | Advisory |
 | `retrospective-facilitator` | Structured retrospectives, improvement item tracking | Planning + Advisory |
 
+### Utility Layer (Haiku-backed helpers)
+
+Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical work. Not invoked directly by users.
+
+| Agent | Role | Type |
+|-------|------|------|
+| `findings-consolidator` | Dedup, group, and sort findings from multiple reviewers (preserves attribution) | Utility |
+| `plan-linter` | Structural audit of implementation plan drafts against the template rubric | Utility |
+| `plan-scribe` | Applies Product Manager's decided edits to the plan document mechanically | Utility |
+
 ## Commands
 
 | Command | Purpose | Agents Orchestrated |

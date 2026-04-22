@@ -80,7 +80,17 @@ For each enabled reviewer in the configuration, launch a sub-agent IN PARALLEL:
 
 ### 5. Consolidate Results
 
-Merge all reviewer outputs into a unified report:
+Invoke the **findings-consolidator** sub-agent (Haiku-backed) with all reviewer outputs from Step 4. The consolidator:
+
+- Deduplicates findings that multiple reviewers raised (e.g., both Code Reviewer and Security Reviewer flag the same missing input validation)
+- Groups findings by file/location
+- Sorts by severity within each group
+- Preserves reviewer attribution on every finding
+- Flags severity disagreements (e.g., Code Reviewer: MEDIUM, Security Reviewer: HIGH)
+
+Use the consolidator's output as the source for the unified report below. The consolidator never drops CRITICAL/HIGH findings regardless of severity floor, so the report remains complete.
+
+Merge the consolidated findings into the unified report format:
 
 ```markdown
 ## Code Review Report

@@ -20,8 +20,9 @@ Transform a Product Requirements Document (PRD) into a prioritized, value-driven
 
 You orchestrate the creation of a high-quality implementation plan through:
 1. Invoking the **Product Manager sub-agent** to gather requirements and draft the plan
-2. Running a **peer review loop** where specialist sub-agents provide structured feedback
-3. Iterating until the plan is clear, complete, and compact enough for efficient agent consumption
+2. Running a cheap **structural audit** via the Plan Linter sub-agent (Haiku) to catch template violations before invoking expensive reviewers
+3. Running a **peer review loop** where specialist sub-agents provide structured feedback, with findings deduplicated and grouped by the Findings Consolidator sub-agent (Haiku) before the PM consumes them
+4. Iterating until the plan is clear, complete, and compact enough for efficient agent consumption
 
 ---
 
@@ -112,6 +113,20 @@ The Product Manager produces an initial implementation plan draft following the 
 - A **Decisions** section documenting major planning decisions and rationale
 - An **Open Questions** section tracking items needing further discovery
 
+### 5.5. Structural Lint Pass
+
+Before sending the draft to expensive peer reviewers, run a fast structural audit with the **Plan Linter** sub-agent (Haiku-backed). This catches template violations, missing typed acceptance criteria, malformed task tables, and broken dependency references cheaply -- so the expensive reviewers (Architect, Tech Lead, Design System Agent) can spend their tokens on substantive concerns instead of structural nits.
+
+**Process:**
+
+1. Invoke the **plan-linter** sub-agent with the draft plan.
+2. Plan Linter returns a structured report of structural findings, each tagged CRITICAL / HIGH / MEDIUM.
+3. Hand the linter report back to the Product Manager.
+4. PM addresses all CRITICAL and HIGH findings from the linter. MEDIUM findings are addressed at PM's discretion.
+5. Proceed to Step 6 with the linter-clean draft.
+
+Plan Linter runs exactly once per draft cycle. It is not re-invoked between review cycles -- by that point the structural issues are resolved and further linting adds no value.
+
 ### 6. Peer Review Loop
 
 This is the core quality mechanism. The draft plan is reviewed by specialist sub-agents who provide structured feedback.
@@ -124,9 +139,21 @@ This is the core quality mechanism. The draft plan is reviewed by specialist sub
 └────────┬────────┘
          │
          ▼
+┌─────────────────┐     Haiku-backed structural audit
+│  Plan Linter     │──── Runs ONCE per draft (Step 5.5)
+│  (pre-review)    │     PM addresses structural findings
+└────────┬────────┘
+         │
+         ▼
 ┌─────────────────┐     Spawn FRESH reviewers IN PARALLEL
 │  Peer Review     │──── Each reviewer is a new sub-agent
 │  (all reviewers) │     (never resumed from prior cycle)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐     Haiku-backed dedup/group/sort
+│  Findings        │──── Consolidates N reviewer outputs
+│  Consolidator    │     into a single attributed list
 └────────┬────────┘
          │
          ▼
@@ -205,16 +232,28 @@ Each reviewer must produce feedback in this structure:
 - **MEDIUM** — Improvement opportunities. Could be clearer, minor dependency concerns, optimization suggestions, nice-to-have tasks missing.
 - **LOW** — Polish. Formatting, naming, minor wording improvements.
 
-**Step 6c: Product Manager Addresses Feedback**
+**Step 6c: Consolidate Findings**
 
-The Product Manager receives all reviewer feedback and:
+Before the Product Manager reads the raw reviewer outputs, invoke the **findings-consolidator** sub-agent (Haiku-backed) with all reviewer outputs from Step 6a. The consolidator:
+
+- Deduplicates findings that multiple reviewers raised about the same issue
+- Groups findings by plan section
+- Sorts by severity
+- Preserves attribution (so PM knows which reviewer raised each finding)
+- Flags severity disagreements between reviewers
+
+Pass the consolidated findings list to the Product Manager instead of the raw reviewer outputs. This reduces PM's reading load substantially (typically 3-5x fewer tokens) without losing any information. If the consolidator flags a finding as a "potential duplicate" rather than merging, the PM resolves the ambiguity.
+
+**Step 6d: Product Manager Addresses Feedback**
+
+The Product Manager receives the consolidated findings and:
 1. **Must address** all CRITICAL and HIGH findings (per `review_loops.min_severity_to_address` config)
 2. **May address** MEDIUM and LOW findings at its discretion
 3. **Has final say** on requirements content — if a reviewer suggests changing *what* to build, the PM decides. But feedback on *clarity* (is this task clear enough to execute?) carries high weight.
 4. **Asks the user** for guidance when unsure how to handle feedback — especially architectural trade-offs, scope questions, or conflicting reviewer opinions
 5. Documents how each CRITICAL/HIGH finding was addressed (accepted, modified, or rejected with reasoning)
 
-**Step 6d: Re-review if Needed**
+**Step 6e: Re-review if Needed**
 
 If the PM made significant changes, submit the revised plan for another review cycle by returning to Step 6a (spawning fresh reviewer sub-agents). Continue until:
 - All CRITICAL and HIGH findings are addressed, OR

@@ -80,6 +80,12 @@ This is the core quality mechanism. The PRD is reviewed by specialist sub-agents
 └────────┬────────┘
          │
          ▼
+┌─────────────────┐     Haiku-backed dedup/group/sort
+│  Findings        │──── Consolidates N reviewer outputs
+│  Consolidator    │     into a single attributed list
+└────────┬────────┘
+         │
+         ▼
 ┌─────────────────┐     Triage findings:
 │  Address         │──── - Answerable from context → update PRD directly
 │  Findings        │     - Needs user input → AskUserQuestion
@@ -149,7 +155,18 @@ Each reviewer must produce feedback in this structure:
 - **MEDIUM** — Improvement opportunities. Could be clearer, minor gaps, nice-to-have clarifications, edge cases for secondary flows.
 - **LOW** — Polish. Formatting, wording, structural improvements.
 
-**Step 4c: Triage and Address Findings**
+**Step 4c: Consolidate Findings**
+
+Before triaging raw reviewer outputs, invoke the **findings-consolidator** sub-agent (Haiku-backed) with all reviewer outputs from Step 4a. The consolidator:
+
+- Deduplicates findings that multiple reviewers raised about the same PRD section
+- Groups findings by PRD section
+- Sorts by severity, preserves reviewer attribution
+- Flags severity disagreements between reviewers
+
+Work from the consolidated list in the next step rather than reading each reviewer's raw output. This substantially reduces reading load without losing information.
+
+**Step 4d: Triage and Address Findings**
 
 For each finding across all reviewers:
 
@@ -163,7 +180,7 @@ For each finding across all reviewers:
 
 5. **May address** MEDIUM and LOW findings at your discretion.
 
-**Step 4d: Re-review if Needed**
+**Step 4e: Re-review if Needed**
 
 If significant changes were made to the PRD, submit the revised version for another review cycle by returning to Step 4a (spawning fresh reviewer sub-agents). Continue until:
 - All CRITICAL and HIGH findings are addressed, OR
