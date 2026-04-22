@@ -96,11 +96,17 @@ Launch **fresh** reviewer sub-agents IN PARALLEL (new instances each cycle — n
 
 Each reviewer receives the current RFC draft and provides structured feedback in the standard format (CRITICAL/HIGH/MEDIUM/LOW findings). On cycles 2+, reviewers also receive a compact summary of unresolved findings from the prior cycle (see Context Management below).
 
-**Step 5b: Address Findings**
+**Step 5b: Consolidate Findings**
+
+Before the Architect reads the raw reviewer outputs, invoke the **findings-consolidator** sub-agent (Haiku-backed) with all four reviewer outputs from Step 5a. Because RFC review runs four reviewers in parallel, consolidation has high leverage here: overlapping findings (e.g., Architect and Security Reviewer both flag the same threat model gap) get merged with attribution preserved, and the Architect sees a single ranked list instead of four reports.
+
+The consolidator preserves CRITICAL/HIGH findings regardless of severity floor and flags severity disagreements for the Architect to resolve.
+
+**Step 5c: Address Findings**
 
 The Architect addresses all CRITICAL and HIGH findings (per `review_loops.min_severity_to_address`), revising the RFC as needed. MEDIUM and LOW findings may be addressed at the Architect's discretion.
 
-**Step 5c: Check Exit Conditions**
+**Step 5d: Check Exit Conditions**
 
 Exit the loop when:
 - All CRITICAL and HIGH findings are addressed, OR

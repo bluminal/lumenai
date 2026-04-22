@@ -235,9 +235,45 @@ If the maximum review cycle limit is reached with unresolved findings, document 
 
 ---
 
+## Delegating Mechanical Edits to Plan Scribe
+
+The **plan-scribe sub-agent** (Haiku-backed) exists to apply your decided edits to the plan document mechanically. Your job is to *decide* what changes; plan-scribe's job is to *execute* them on the document.
+
+**When to delegate to plan-scribe:**
+
+- After you have decided which reviewer findings to address and *what specifically* to change in response -- delegate the plan rewrite to plan-scribe rather than rewriting the plan yourself.
+- For the compactness pass (see below) -- decide which sections to tighten and by how much, then hand off to plan-scribe with specific tightening targets per section.
+- For the final write to disk -- once all reviewer cycles are complete, plan-scribe writes the finalized plan to the target file path.
+
+**When NOT to delegate to plan-scribe:**
+
+- Strategic decisions (which findings to accept, reject, or modify) -- these stay with you.
+- Initial drafting (converting PRD to first-draft plan) -- the strategic synthesis is yours.
+- Ambiguous or open-ended transformations ("make this better") -- plan-scribe requires explicit, specific instructions.
+- Scope changes, re-sequencing milestones, adding or removing tasks based on reviewer judgment -- these are strategic.
+
+**How to delegate:**
+
+Send plan-scribe the current plan plus a structured edit list. The edit list should be one of:
+
+1. **Explicit edits** -- "In Milestone 2.1, add task: [exact task row]. With acceptance criteria: [exact criteria]." Plan-scribe applies verbatim.
+2. **Findings-driven edits** -- "FINDING: [HIGH] Task 7 lacks [T] criteria. MY DECISION: Accept. Add two specific [T] criteria: [criteria]." Plan-scribe applies the decision.
+3. **Pattern edits** (for compactness) -- "Tighten the Overview section to 3 sentences. Preserve: product name, primary users, key value proposition." Plan-scribe rewrites the targeted section and returns.
+
+After plan-scribe returns, review the diff. Plan-scribe is mechanical -- it may flag ambiguities in its "Could not apply" section; resolve those and re-invoke if needed.
+
+**Why this split exists:** Opus is the right model for strategic decisions; Haiku is the right model for text rewriting. Delegating the mechanical rewrite reduces the run cost of `write-implementation-plan` substantially (typically 30-40%) without affecting quality, because plan-scribe follows your decisions literally rather than making its own.
+
+---
+
 ## Compactness Principle
 
-Implementation plans are loaded into agent context windows during execution. Every unnecessary line costs context capacity. After the peer review loop, perform a compactness pass:
+Implementation plans are loaded into agent context windows during execution. Every unnecessary line costs context capacity. After the peer review loop, perform a compactness pass by:
+
+1. **Deciding** which sections are redundant, bloated, or filler -- this is your strategic call.
+2. **Delegating** the actual text rewriting to plan-scribe with specific targets (e.g., "tighten Milestone 3.2 by 30%; preserve all task meaning and acceptance criteria").
+
+Your compactness heuristics (for deciding what to tighten):
 
 1. **Remove redundancy** — If information appears in multiple places, consolidate it.
 2. **Tighten language** — Say more with fewer words. Replace paragraphs with bullet points where appropriate.
@@ -245,7 +281,7 @@ Implementation plans are loaded into agent context windows during execution. Eve
 4. **Preserve information** — Never sacrifice clarity or completeness for brevity. The goal is *efficient* communication, not minimal communication.
 5. **Summarize completed work** — When the plan exceeds 1500 lines, summarize completed phases into a brief "Completed" section rather than keeping full task details.
 
-**Rule of thumb:** If a section can be 30% shorter without losing meaning, make it shorter.
+**Rule of thumb:** If a section can be 30% shorter without losing meaning, instruct plan-scribe to shorten it.
 
 ---
 

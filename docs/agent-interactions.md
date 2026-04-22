@@ -1,6 +1,8 @@
 # Agent Interaction Map
 
-This document describes how the 15 agents in the Synthex interact with each other, the commands that orchestrate them, and the user. It serves as a reference for understanding delegation patterns, quality gates, and information flow across the organization.
+This document describes how the 18 agents in the Synthex interact with each other, the commands that orchestrate them, and the user. It serves as a reference for understanding delegation patterns, quality gates, and information flow across the organization.
+
+Agents are organized into four layers: **Orchestration** (drive commands and delegate), **Specialist** (produce domain-specific analysis and work), **Research & Analysis** (inform strategy with evidence), and **Utility** (narrow-scope Haiku-backed helpers that let expensive agents delegate mechanical work).
 
 ---
 
@@ -37,6 +39,13 @@ This document describes how the 15 agents in the Synthex interact with each othe
    | UX Researcher | | Metrics       | | Retrospective    |
    |               | | Analyst       | | Facilitator      |
    +---------------+ +---------------+ +------------------+
+
+   UTILITY LAYER (Haiku-backed helpers)
+   +------------------+ +------------------+ +------------------+
+   | Findings         | | Plan Linter      | | Plan Scribe      |
+   | Consolidator     | | (structural      | | (applies PM's    |
+   | (dedup N reviews)| |  pre-review)     | |  edits to plan)  |
+   +------------------+ +------------------+ +------------------+
 ```
 
 ---
@@ -61,6 +70,12 @@ This document describes how the 15 agents in the Synthex interact with each othe
 | **Lead Frontend Engineer** | Design System Agent | Design system consultation, compliance questions |
 | **Product Manager** | UX Researcher | User research to inform product decisions |
 | **Product Manager** | Metrics Analyst | Product metrics to inform roadmap decisions |
+| **Product Manager** | Plan Scribe | Mechanical application of PM's decided edits to the plan document |
+| **`write-implementation-plan` command** | Plan Linter | Pre-review structural audit (once per draft cycle) |
+| **`write-implementation-plan` command** | Findings Consolidator | Dedup/group/sort reviewer findings before PM reads them |
+| **`review-code` command** | Findings Consolidator | Dedup/group/sort findings from Code Reviewer, Security Reviewer, Performance Engineer, Design System Agent |
+| **`refine-requirements` command** | Findings Consolidator | Dedup/group/sort PRD reviewer findings before PM triages them |
+| **`write-rfc` command** | Findings Consolidator | Dedup/group/sort findings from Architect, PM, Tech Lead, Security Reviewer |
 
 ### Who Reviews Whose Work
 
@@ -89,11 +104,15 @@ This document describes how the 15 agents in the Synthex interact with each othe
 ### `write-implementation-plan`
 
 ```
-User → PM drafts plan → Reviewers (in parallel):
+User → PM drafts plan → Plan Linter (structural audit, Haiku)
+                       → PM addresses structural findings
+                       → Reviewers (in parallel):
                           ├── Architect (feasibility, NFRs, architecture)
                           ├── Design System Agent (design tasks, UX impact)
                           └── Tech Lead (task clarity, parallelizability)
-                       → PM addresses feedback → Re-review if needed → Final plan
+                       → Findings Consolidator (dedup/group/sort, Haiku)
+                       → PM addresses consolidated findings (delegates writes to Plan Scribe)
+                       → Re-review if needed → Plan Scribe writes final plan
 ```
 
 ### `next-priority`
@@ -116,7 +135,8 @@ User → Determine scope → Launch reviewers (in parallel):
                           ├── Security Reviewer (vulnerabilities)
                           ├── Performance Engineer (optional)
                           └── Design System Agent (if UI changes)
-                       → Consolidate → Unified PASS/WARN/FAIL verdict
+                       → Findings Consolidator (dedup/group/sort, Haiku)
+                       → Unified PASS/WARN/FAIL verdict
                        → If FAIL: Review Loop (up to review_loops.max_cycles):
                            Caller fixes → Re-review all → Re-consolidate → Check exit
                        → Present final results
@@ -143,6 +163,7 @@ User → PM provides product context
          ├── PM (product alignment)
          ├── Tech Lead (implementation feasibility)
          └── Security Reviewer (security implications)
+     → Findings Consolidator (dedup/group/sort across 4 reviewers, Haiku)
      → Architect addresses CRITICAL/HIGH → Re-review if needed → Write RFC document
 ```
 
@@ -289,3 +310,4 @@ All advisory agents follow the same quality gate pattern:
 | **Advisory** | Metrics Analyst, Design System Agent (compliance mode), SRE Agent | Provides analysis and recommendations |
 | **Planning + Strategy** | Product Manager | Gathers requirements, creates plans |
 | **Planning + Advisory** | Architect, UX Researcher, Retrospective Facilitator, Design System Agent (plan review mode) | Designs approaches, provides structured guidance |
+| **Utility (Haiku-backed)** | Findings Consolidator, Plan Linter, Plan Scribe | Narrow-scope helpers that let expensive agents delegate mechanical work (deduplication, structural audit, document rewriting) |
