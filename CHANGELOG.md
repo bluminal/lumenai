@@ -5,6 +5,32 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-04-22
+
+### Added
+
+- **Explicit per-agent and per-command model assignments ([ADR-001](docs/specs/decisions/ADR-001-model-selection.md)).** Every Synthex agent and command now declares a `model:` in its YAML frontmatter, calibrated to the cognitive demand of its role. Previously all agents and commands inherited the session's default model (typically Opus), which overpaid for mechanical and rubric-based work.
+  - **Opus** (4 agents + 5 commands): `product-manager`, `architect`, `ux-researcher`, `sre-agent`; `next-priority`, `write-implementation-plan`, `refine-requirements`, `write-adr`, `write-rfc` — strategic planning, creative synthesis, foundational-artifact authoring.
+  - **Sonnet** (8 agents + 4 commands): `tech-lead`, `lead-frontend-engineer`, `security-reviewer`, `terraform-plan-reviewer`, `performance-engineer`, `quality-engineer`, `design-system-agent`, `retrospective-facilitator`; `review-code`, `design-system-audit`, `reliability-review`, `performance-audit` — engineering execution, orchestration, contextual rubric reasoning.
+  - **Haiku** (3 existing + 3 new agents + 3 commands): `code-reviewer`, `technical-writer`, `metrics-analyst`; `init`, `test-coverage-analysis`, `retrospective` — rubric and template application.
+- **Haiku utility sub-agents for decomposing expensive Opus workloads ([ADR-002](docs/specs/decisions/ADR-002-haiku-subagent-decomposition.md)).** Three new narrow-scope sub-agents let Opus agents and commands delegate mechanical work, reducing per-run cost on `write-implementation-plan` by an estimated 35–40% without quality impact:
+  - **`findings-consolidator`** — Dedupes, groups, and sorts findings from multiple reviewers; preserves attribution; flags severity disagreements. Invoked by `write-implementation-plan`, `review-code`, `write-rfc`, and `refine-requirements`.
+  - **`plan-linter`** — Structural audit of implementation plan drafts against a deterministic rubric (required sections, typed acceptance criteria, task table structure, dependency validity). Runs between PM draft and peer review in `write-implementation-plan`.
+  - **`plan-scribe`** — Applies the Product Manager's decided edits to the plan document mechanically; handles renumbering; validates template compliance. Invoked by `product-manager` after strategic decisions are made.
+- **New Utility Layer** in the agent topology (`docs/agent-interactions.md`, `CLAUDE.md`) documenting the decomposition pattern and interaction map for the new sub-agents.
+
+### Changed
+
+- `write-implementation-plan` gains a **Plan Linter pass** (Step 5.5) between the PM's initial draft and the peer review loop, so expensive reviewers (Architect, Tech Lead, Design System Agent) spend their tokens on substantive concerns rather than structural nits.
+- `write-implementation-plan`, `review-code`, `write-rfc`, and `refine-requirements` now invoke the **Findings Consolidator** between parallel reviewers returning and the consuming agent reading findings. Flow diagrams updated.
+- `product-manager` agent gains a "Delegating Mechanical Edits to Plan Scribe" section; the compactness pass now delegates text rewriting to `plan-scribe` while retaining the strategic "what to tighten" call on the PM.
+- **Foundational-artifact commands now run on Opus at the top level, not just in their sub-agents.** `write-adr` (previously Haiku), `write-rfc` (previously Sonnet), `refine-requirements` (previously Sonnet), and `write-implementation-plan` (previously Sonnet) all escalated to Opus. Rationale: these commands drive interactive flows and synthesize the final document, so a weaker model at the top bottlenecks the whole pipeline.
+
+### Fixed
+
+- `tests/schemas/synthex-plus/hooks.test.ts` — Updated Real Plugin Validation tests to parse the Claude Code record-keyed hooks.json format introduced in 0.3.6. Four previously-failing tests now pass; the legacy `validateHooks()` helper and its synthetic tests remain unchanged pending a larger `synthex-plus` refactor.
+- `plugins/synthex-plus/.claude-plugin/plugin.json` — Synced `version` field (0.1.1 → 0.1.2) with `marketplace.json`, which had drifted during the 0.3.6 release.
+
 ## [0.3.6] - 2026-04-15
 
 ### Added
@@ -160,6 +186,7 @@ First public release of the LumenAI marketplace and the Synthex plugin.
 - Golden snapshot infrastructure for regression testing
 - Promptfoo integration for behavioral and semantic evaluation
 
+[0.4.0]: https://github.com/bluminal/lumenai/releases/tag/v0.4.0
 [0.3.6]: https://github.com/bluminal/lumenai/releases/tag/v0.3.6
 [0.3.5]: https://github.com/bluminal/lumenai/releases/tag/v0.3.5
 [0.3.4]: https://github.com/bluminal/lumenai/releases/tag/v0.3.4
