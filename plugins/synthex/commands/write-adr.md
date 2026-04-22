@@ -1,5 +1,5 @@
 ---
-model: haiku
+model: opus
 ---
 
 # Write ADR
