@@ -37,6 +37,9 @@
 | **Consensus badge** | Metadata on each consolidated finding indicating how many reviewers (and which families) flagged it (e.g., "3/4 · Claude+GPT+Gemini"). |
 | **Strict mode** | A configuration option (off by default) that makes any proposer failure abort the entire review instead of degrading gracefully. |
 | **Fallback** | Behavior when all configured proposers fail: the orchestrator returns control to the native single-model review path (existing Synthex reviewers on the host Claude), surfacing the fallback to the user. |
+| **Capability tier** | An adapter's declared ability to access files beyond the pre-assembled context bundle. Two values: `agentic` (CLI supports tool-use — can read additional files in the sandboxed workspace) or `text-only` (prompt-in/text-out — works strictly from the bundle). Declared in each adapter's markdown definition, used by the orchestrator to decide what context to deliver. |
+| **Context bundle** | The orchestrator-assembled package of review context (diff + touched files + relevant specs + CLAUDE.md + optional overview) passed to every reviewer regardless of tier. Size-limited via Haiku summarization when it exceeds the configured byte cap. |
+| **Complexity gate** | A pre-orchestration check (currently only in `review-code`) that decides whether a change is complex enough to warrant multi-model review. Below the gate: fall through to native single-model review. Above the gate: invoke the orchestrator. Overridable per-invocation with `--multi-model` / `--no-multi-model`. |
 
 ---
 
@@ -128,13 +131,39 @@ multi_model_review:
     review_code:
       enabled: true                 # Per-command override of the master switch
       strict_mode: false
+      # Complexity gate — only spend multi-model cost when the change warrants it.
+      # Below the threshold, review-code falls through to native single-model review.
+      # Users can still force multi-model with --multi-model (or skip with --no-multi-model).
+      complexity_gate:
+        mode: auto                  # auto | always | never
+        threshold_lines: 50         # combined added + removed lines across the diff
+        threshold_files: 3          # distinct files touched by the diff
+        always_escalate_paths:      # glob patterns — any match forces multi-model regardless of size
+          - "**/auth/**"
+          - "**/authn/**"
+          - "**/authz/**"
+          - "**/payment*/**"
+          - "**/payments/**"
+          - "**/billing/**"
+          - "**/migrations/**"
+          - "**/security/**"
+          - "**/secrets/**"
+          - "**/crypto/**"
     write_implementation_plan:
-      enabled: true
+      enabled: true                 # No complexity gate — plans are always high-stakes.
     refine_requirements:
       enabled: false                # Opt out per-command even when master is on
+  context:
+    # Context bundle delivered to every reviewer. See FR-MR28.
+    max_bundle_bytes: 204800        # 200 KB cap; bundle is compressed by Haiku summaries above this
+    max_file_bytes: 65536           # 64 KB per-file cap; larger files are summarized, not verbatim
+    include_touched_files: true     # full file contents for every file in the diff
+    include_specs: true             # files under documents.specs matching touched paths
+    include_overview: true          # README.md or docs/overview.md (bounded)
+    include_convention_sources: true  # CLAUDE.md and code_review.convention_sources
   audit:
     enabled: true
-    output_path: docs/reviews        # Where to write the audit artifact (FR-MR24)
+    output_path: docs/reviews       # Where to write the audit artifact (FR-MR24)
 ```
 
 **Resolution order:** `per_command.<cmd>.<setting>` > `multi_model_review.<setting>` > hardcoded default.
@@ -237,14 +266,16 @@ Every adapter must:
 
 The initial adapter set ships with the plugin and covers the providers users are most likely to already have installed:
 
-| Adapter | Wraps | Covers | Default Family |
-|---------|-------|--------|----------------|
-| `claude-review-prompter` | `claude -p --output-format json` | Anthropic (Sonnet/Opus/Haiku), including Bedrock/Vertex routing via env vars | `anthropic` |
-| `codex-review-prompter` | `codex exec --json --sandbox read-only` | OpenAI (GPT-5, o-series); also any OpenAI-compatible base URL the user has configured in Codex | `openai` |
-| `gemini-review-prompter` | `gemini -p --output-format json` | Google (Gemini 2.5/3) | `google` |
-| `ollama-review-prompter` | `ollama run` + HTTP API with `format: <schema>` | Any local Ollama model (Llama, Qwen, DeepSeek, Gemma, Mistral) | `local-<model>` |
-| `llm-review-prompter` | `llm -m <model> --schema <file>` | Universal adapter — 50+ providers via `llm` plugins (OpenRouter, Groq, Mistral, Cohere, Bedrock) | Inferred from the `llm` model ID prefix |
-| `bedrock-review-prompter` | `aws bedrock-runtime invoke-model` | AWS Bedrock (Claude, Llama, Nova, Titan, Mistral) — for users with AWS creds but no per-vendor CLI | Inferred from Bedrock model ID |
+| Adapter | Wraps | Covers | Default Family | Capability Tier |
+|---------|-------|--------|----------------|-----------------|
+| `claude-review-prompter` | `claude -p --output-format json` | Anthropic (Sonnet/Opus/Haiku), including Bedrock/Vertex routing via env vars | `anthropic` | `agentic` |
+| `codex-review-prompter` | `codex exec --json --sandbox read-only` | OpenAI (GPT-5, o-series); also any OpenAI-compatible base URL the user has configured in Codex | `openai` | `agentic` |
+| `gemini-review-prompter` | `gemini -p --output-format json` | Google (Gemini 2.5/3) | `google` | `agentic` |
+| `ollama-review-prompter` | `ollama run` + HTTP API with `format: <schema>` | Any local Ollama model (Llama, Qwen, DeepSeek, Gemma, Mistral) | `local-<model>` | `text-only` |
+| `llm-review-prompter` | `llm -m <model> --schema <file>` | Universal adapter — 50+ providers via `llm` plugins (OpenRouter, Groq, Mistral, Cohere, Bedrock) | Inferred from the `llm` model ID prefix | `text-only` |
+| `bedrock-review-prompter` | `aws bedrock-runtime invoke-model` | AWS Bedrock (Claude, Llama, Nova, Titan, Mistral) — for users with AWS creds but no per-vendor CLI | Inferred from Bedrock model ID | `text-only` |
+
+**Capability tier matters** because it controls how the orchestrator delivers context (FR-MR28). Agentic-tier reviewers receive the context bundle AND read-only access to the sandboxed workspace (they can follow imports, check sibling files, read additional specs). Text-only-tier reviewers receive the context bundle alone — no file access — so bundle completeness and summarization quality directly determine the upper bound of their review quality.
 
 **Acceptance Criteria:**
 - Each adapter has its own `.md` definition in `plugins/synthex/agents/`
@@ -339,6 +370,61 @@ The aggregator is configurable (`multi_model_review.aggregator.command`). Defaul
 - `aggregator.command: auto` resolves deterministically given a configured reviewer list
 - Every aggregator invocation includes the randomization and system prompt above
 - Self-preference bias is detectable and warned about in config validation
+
+**FR-MR28: Context provisioning**
+
+Reviewers produce findings against a review artifact (diff, plan, PRD), but **quality of review is bounded by quality of context**. A reviewer that only sees a 50-line diff hunk cannot flag "this duplicates a utility in `src/utils/helpers.ts`" or "this violates the auth pattern in `docs/specs/auth.md`." Worse, the CLIs we shell out to have **different file-access capabilities**:
+
+- **Agentic-tier CLIs** (`claude -p`, `codex exec`, `gemini -p`, `opencode run`) can read additional files in their sandboxed working directory via native tool-use.
+- **Text-only-tier CLIs** (`ollama`, `llm`, `aws bedrock-runtime`, `mods`) cannot read files at all — they are pure prompt-in/text-out.
+
+If the orchestrator did nothing to level this, text-only reviewers would systematically under-review context-sensitive issues. The orchestrator therefore pre-assembles a **context bundle** delivered to *every* reviewer regardless of tier, and additionally permits agentic reviewers to explore beyond the bundle when they need to. This ensures text-only reviewers have meaningful context without forcing every reviewer into a lowest-common-denominator prompt shape.
+
+**Context bundle contents (assembled by the orchestrator once per invocation):**
+
+1. **The review artifact itself** — always verbatim. Diff for `review-code`, draft plan for `write-implementation-plan`, etc.
+2. **Touched-file expansion** — for each file in the diff, the full current file contents (not just the hunk). Subject to `context.max_file_bytes` (default 64 KB). Files larger than the cap are replaced by a Haiku-produced summary that preserves: the file's exports, its top-level structure, and any regions neighboring the diff hunks.
+3. **Matching specs** — files under `documents.specs` (default `docs/specs/`) whose filename or path relates to any touched path. A simple heuristic: include `docs/specs/auth.md` when `src/auth/**` is in the diff. Up to `context.max_bundle_bytes / 4` total spec content.
+4. **Convention sources** — `CLAUDE.md` and any paths in `code_review.convention_sources` (e.g., `.eslintrc`, `.prettierrc`).
+5. **Project overview (optional)** — `README.md` or `docs/overview.md`, bounded to a small excerpt.
+6. **Capability-tier note** — for agentic reviewers only, an appendix: "You are operating in a read-only sandbox rooted at the project root. You MAY read additional files if you need them to complete the review. You MUST NOT modify any file." Text-only reviewers do not see this appendix.
+
+**Bundle size management:**
+
+The bundle has a hard cap at `context.max_bundle_bytes` (default 200 KB). The orchestrator's assembly process is:
+
+1. Add the artifact (always, uncompressed).
+2. Add convention sources (always, uncompressed — small).
+3. Add touched-file contents; summarize any file over `max_file_bytes` via Haiku.
+4. Add matching specs until spec budget is hit.
+5. Add overview excerpt.
+6. If total exceeds `max_bundle_bytes`, compress iteratively: summarize the largest still-verbatim file, re-measure, repeat until under the cap. Never summarize the artifact itself; if the artifact alone exceeds the cap, emit an error asking the user to narrow scope (consistent with `max_diff_lines` behavior in `review-code`).
+
+**What gets sent to each reviewer:**
+
+| Reviewer tier | Sends | Additional capability |
+|---------------|-------|------------------------|
+| `agentic` | Full context bundle + capability-tier note | MAY read additional files in the sandbox (read-only) |
+| `text-only` | Full context bundle (no capability-tier note) | Cannot read any additional files — bundle is final |
+
+The orchestrator tells reviewers in their system prompt which tier they are operating at, so they do not hallucinate exploration they cannot actually do.
+
+**Audit trail:**
+
+The context bundle (or a manifest of what it contained: file list, which files were summarized, total bytes) is written to the audit artifact (FR-MR24) for reproducibility. Secrets / credentials: the bundle is assembled from files the orchestrator can already read — Synthex does not introduce new access paths.
+
+**Trade-off statement (documentation):**
+
+Text-only reviewers inherently produce lower-quality reviews on "this code elsewhere does X" types of findings because they cannot pull in files the bundle didn't anticipate. The v1 bundle heuristics (touched files + matching specs + conventions) cover the vast majority of review-relevant context. Users who need the strongest possible review quality should configure at least one agentic-tier reviewer; users who prefer local/privacy-sensitive reviewers (Ollama, llamafile) accept this trade-off knowingly.
+
+**Acceptance Criteria:**
+- Every adapter declares its `capability_tier` in its markdown definition; the orchestrator reads this to decide what to send
+- The context bundle is assembled once per invocation and passed identically to every reviewer; there is no per-reviewer bundle divergence
+- Bundle size never exceeds `context.max_bundle_bytes` in practice (verified via Layer 2 behavioral test with large fixture)
+- When a file is summarized due to size, the summary is generated by the Haiku-backed `findings-consolidator` or a similar utility agent — never by the proposer CLIs themselves
+- Agentic reviewers receive the capability-tier note; text-only reviewers do not
+- The audit artifact records, at minimum: bundle size, file count, list of files that were summarized vs. sent verbatim
+- If the review artifact alone exceeds `max_bundle_bytes`, the orchestrator emits a clear error with remediation (e.g., "Diff is 320 KB; narrow scope with `target=<file>` or split into smaller reviews"), not a silent truncation
 
 ---
 
@@ -462,23 +548,56 @@ Preflight failures (not warnings) block the invocation with a clear remediation 
 
 ### 4.7 Command Integration
 
-**FR-MR21: `review-code` integration (v1 scope)**
+**FR-MR21: `review-code` integration (v1 scope) — with complexity gating**
 
-`review-code` is updated to detect and use multi-model review when enabled:
+`review-code` is updated to detect and use multi-model review *selectively*. Multi-model review is expensive (N provider invocations + 1 aggregator) and adds latency; running it on every tiny diff slows hands-off development with no quality gain, because small changes rarely surface cross-reviewer disagreement. The command therefore applies a **complexity gate** after loading configuration: only diffs above the threshold trigger the orchestrator; smaller diffs fall through to the existing native single-model path.
 
-1. After Step 1 (Load Configuration), the command checks `multi_model_review.per_command.review_code.enabled` (or the `--multi-model` / `--no-multi-model` override).
-2. If multi-model is active:
-   - The command invokes `multi-model-review-orchestrator` with the diff and context as the artifact.
+**Decision order (applied in sequence after Step 1 Load Configuration):**
+
+1. **Explicit override wins.**
+   - `--no-multi-model` → always use native single-model review, skip all multi-model logic below.
+   - `--multi-model` → always use multi-model review, skip the gate below.
+
+2. **Master switch.** If `multi_model_review.enabled: false` OR `multi_model_review.per_command.review_code.enabled: false`, use native single-model review.
+
+3. **Complexity gate (FR-MR21a).** The command reads `multi_model_review.per_command.review_code.complexity_gate`:
+
+   - `mode: never` → always use native single-model review
+   - `mode: always` → always use multi-model (skip the gate; same behavior as `--multi-model`)
+   - `mode: auto` (default) → apply the heuristic:
+     - Compute diff metrics: `lines_changed = added + removed`, `files_touched = distinct files in diff`
+     - If `lines_changed > threshold_lines`, trigger multi-model
+     - Else if `files_touched > threshold_files`, trigger multi-model
+     - Else if any file matches any glob in `always_escalate_paths`, trigger multi-model
+     - Else fall through to native single-model review
+
+4. **Multi-model path (gate triggered or overridden on):**
+   - Invoke `multi-model-review-orchestrator` with the diff plus the context bundle assembled per FR-MR28.
    - The orchestrator's consolidated findings replace the native Code Reviewer + Security Reviewer (+ optional Performance Engineer) output in the unified report.
    - The unified report format (`## Code Review Report`) is preserved; the reviewer table shows one row per multi-model reviewer plus a synthetic "Aggregator" row.
-3. If multi-model is inactive (or falls back per FR-MR17): behavior is unchanged from today.
-4. The review loop (Step 6) continues to work: on FAIL verdict, the command re-invokes the orchestrator with the updated diff on the next cycle.
+
+5. **Native path (gate not triggered or forced off):**
+   - Behavior is byte-identical to today's `review-code` — Code Reviewer + Security Reviewer (+ optional Performance Engineer).
+
+6. **Always transparent.** The unified report's header states which path ran and why, in one line:
+   - `Review path: multi-model (complexity gate triggered: 127 lines changed > 50)`
+   - `Review path: multi-model (forced by --multi-model flag)`
+   - `Review path: multi-model (always_escalate match: src/auth/session.ts)`
+   - `Review path: native single-model (diff below complexity threshold: 12 lines across 1 file)`
+   - `Review path: native single-model (multi-model disabled in config)`
+
+7. **Fallback interaction.** If the orchestrator fires and then all proposers fail (FR-MR17), the fallback path is the same native single-model path the command would have used if the gate had sent it there.
+
+8. **Review loop (Step 6) continues to work:** on FAIL verdict, the command re-invokes whichever path was chosen. Note that the gate decision is made once per `review-code` invocation, not per loop cycle — if a fix pushes a diff from 48 lines to 52 lines mid-loop, the loop still uses the path chosen at the start. This prevents oscillation.
 
 **Acceptance Criteria:**
-- `review-code --multi-model` runs multi-model mode even if disabled in config
-- `review-code --no-multi-model` runs native mode even if enabled in config
-- The unified report shows per-reviewer verdicts (PASS/WARN/FAIL) and counts for each multi-model reviewer
-- Design-system compliance for UI changes (today's automatic behavior) continues to run even in multi-model mode, as a separate Synthex-native review (design-system is a specialized advisory role, not a generic review)
+- `review-code --multi-model` runs multi-model mode even if disabled in config or below the complexity gate
+- `review-code --no-multi-model` runs native mode even if enabled and above the gate
+- `mode: auto` produces multi-model on diffs > threshold_lines, diffs touching > threshold_files files, or diffs matching any always_escalate_paths glob — verified with planted fixtures for each trigger
+- `mode: never` disables multi-model entirely for `review-code` without unsetting the master switch (useful for cost-sensitive CI)
+- The unified report header always states which path ran and why, in the documented format
+- Design-system compliance for UI changes (today's automatic behavior) continues to run regardless of path — the design-system agent is a specialized advisory role, not a generic reviewer, and is always invoked on UI diffs
+- The complexity gate decision is cached for the duration of the review loop to prevent oscillation between paths mid-loop
 
 **FR-MR22: `write-implementation-plan` integration (v1 scope)**
 
@@ -635,6 +754,13 @@ Deferred to future work:
 | Disabling multi-model via config OR `--no-multi-model` produces today's behavior | Verified via regression fixture |
 | Audit artifact is written for every invocation | Verified via file-system check after fixture runs |
 | No provider credentials appear in audit artifacts, logs, or config | Verified via test asserting no secret-like tokens appear in sample audits |
+| Complexity gate triggers multi-model on diffs > threshold_lines | Verified via Layer 2 fixture |
+| Complexity gate triggers multi-model on diffs matching always_escalate_paths | Verified via Layer 2 fixture (trivial diff to src/auth/**) |
+| Complexity gate falls through to native review on trivial diffs | Verified via Layer 2 fixture (< threshold_lines, no escalate match) |
+| Unified report header declares the chosen review path and reason | Verified via Layer 1 schema test against fixture outputs |
+| Context bundle stays under max_bundle_bytes for oversized fixture | Verified via Layer 2 fixture with 500+ KB of touched-file content |
+| Text-only reviewer receives context bundle without capability-tier note | Verified via Layer 2 behavioral test inspecting rendered prompt |
+| Agentic reviewer receives capability-tier note | Verified via Layer 2 behavioral test inspecting rendered prompt |
 
 ---
 
@@ -687,3 +813,12 @@ Some models respond better to specific prompting patterns (Gemini prefers XML-ta
 
 **OQ-6: Aggregator failure.**
 What if the aggregator CLI itself fails? Options: (a) fall back to `findings-consolidator` (the existing Haiku-backed utility) for mechanical dedup without judgement, (b) fall back to the host Claude session as emergency aggregator, (c) abort with a clear error. Recommend (b) as the most resilient; document as part of FR-MR17 in the implementation plan.
+
+**OQ-7: Complexity gate threshold tuning.**
+The v1 defaults (`threshold_lines: 50`, `threshold_files: 3`, plus escalate-paths for auth/payments/migrations/security) are informed guesses, not measured values. After v1 ships, instrument the audit artifact to capture (a) chosen path, (b) whether multi-model found issues native review would have missed, (c) whether native review missed issues that a separately-run multi-model review would have caught. Re-tune the defaults based on this evidence. Consider exposing a `complexity_gate.mode: auto-ml` in v2 that uses a Haiku classifier rather than a hand-coded heuristic — deferred until we have enough data to train/evaluate it.
+
+**OQ-8: Spec-file matching heuristic.**
+FR-MR28 says the bundle includes "specs files matching touched paths" but does not define the matching rule. Options: (a) simple filename-substring match (`src/auth/**` touches include `docs/specs/auth.md`), (b) embedding similarity between touched-file path and spec content, (c) explicit mapping in config (`context.spec_map`). Recommend (a) for v1 with (c) as an override, because (b) adds an embedding call before every review which is cost-sensitive. Re-evaluate if users complain about irrelevant specs being included or relevant specs being missed.
+
+**OQ-9: Context bundle caching.**
+For a review loop that runs multiple cycles (FR-MR21 step 8), the context bundle from cycle 1 is mostly the same as cycle 2 — only the diff and touched files have changed. Should we cache the non-diff parts (specs, conventions, overview) across loop cycles to save Haiku summarization cost? Recommend cache-by-hash-of-content for v2; v1 reassembles each cycle (simpler, consistent, correct).
