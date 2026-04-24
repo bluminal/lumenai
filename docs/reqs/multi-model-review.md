@@ -1,14 +1,14 @@
-# Product Requirements Document: Multimodal Review Orchestration
+# Product Requirements Document: Multi-Model Review Orchestration
 
 ## 1. Vision & Purpose
 
 **Why this exists:** Synthex's review commands (`review-code`, `write-implementation-plan`, `refine-requirements`, `write-rfc`, `reliability-review`, `performance-audit`) currently run all reviewers on a single model family — the Claude model that hosts the session. This is a known failure mode: same-family models share blind spots (correlated errors, [arXiv:2506.07962](https://arxiv.org/html/2506.07962v1)), so a single-family review ensemble has a ceiling that no amount of additional Claude reviewers can raise.
 
-**Multimodal review** breaks that ceiling by fanning review prompts out to multiple LLM families (Claude, GPT, Gemini, local open-source models) and consolidating the results into one deduplicated, severity-reconciled, attributed findings list. The pattern is modeled on Cloudflare's production "Review Coordinator" architecture and Mixture-of-Agents ([arXiv:2406.04692](https://arxiv.org/abs/2406.04692)), which show measurable lift over single-model review when model family diversity is enforced.
+**Multi-model review** breaks that ceiling by fanning review prompts out to multiple LLM families (Claude, GPT, Gemini, local open-source models) and consolidating the results into one deduplicated, severity-reconciled, attributed findings list. The pattern is modeled on Cloudflare's production "Review Coordinator" architecture and Mixture-of-Agents ([arXiv:2406.04692](https://arxiv.org/abs/2406.04692)), which show measurable lift over single-model review when model family diversity is enforced.
 
 **Design commitment:** the feature ships **off by default** and is **CLI-only** — Synthex never touches provider API keys, and each external reviewer runs through the developer's existing CLI (`codex`, `gemini`, `ollama`, `llm`, `aws bedrock-runtime`, etc.). This inherits the developer's configured auth, MCP servers, approval modes, and model routing for free, and keeps Synthex's credential surface area at zero.
 
-**The Multimodal Review Orchestrator** is the new agent introduced by this PRD. It accepts a review artifact (diff, plan, PRD, RFC, etc.) from a calling agent or command, invokes N configured **provider adapter agents** in parallel, consolidates their findings, and returns a single unified review with per-finding attribution and consensus metadata.
+**The Multi-Model Review Orchestrator** is the new agent introduced by this PRD. It accepts a review artifact (diff, plan, PRD, RFC, etc.) from a calling agent or command, invokes N configured **provider adapter agents** in parallel, consolidates their findings, and returns a single unified review with per-finding attribution and consensus metadata.
 
 ---
 
@@ -28,11 +28,11 @@
 
 | Term | Definition |
 |------|------------|
-| **Multimodal review** | Review orchestrated across multiple LLM families. ("Multi-model" is the more technically precise term; "multimodal" is used throughout Synthex for consistency with the branch and user terminology, and does not refer to vision/audio modalities.) |
+| **Multi-model review** | Review orchestrated across multiple LLM families (Claude, GPT, Gemini, local open-source models, etc.) — one review per configured model, then consolidated. Not related to multimodal input (vision/audio); "multi-model" here means multiple language models. |
 | **Proposer** | An external LLM invoked via a CLI adapter that produces a set of review findings. Cheap/fast models (Sonnet, GPT-5-mini, Gemini Flash, local Qwen). |
 | **Aggregator** | The LLM that consolidates all proposers' findings into a single output — handles dedup, severity reconciliation, contradiction resolution, and attribution. A stronger model (Opus, GPT-5, Gemini Ultra) or, by default, the host Claude session. |
 | **Adapter agent** | A Haiku-backed Synthex utility agent that wraps a specific provider CLI (`codex-review-prompter`, `gemini-review-prompter`, etc.). Handles invocation, output parsing, and normalization to the canonical finding schema. |
-| **Orchestrator agent** | `multimodal-review-orchestrator` — the new Synthex agent that drives the full flow: fan-out to adapters, consolidation, return to caller. |
+| **Orchestrator agent** | `multi-model-review-orchestrator` — the new Synthex agent that drives the full flow: fan-out to adapters, consolidation, return to caller. |
 | **Canonical finding** | A normalized finding record produced by any adapter, conforming to the shared JSON schema (see FR-MR13). |
 | **Consensus badge** | Metadata on each consolidated finding indicating how many reviewers (and which families) flagged it (e.g., "3/4 · Claude+GPT+Gemini"). |
 | **Strict mode** | A configuration option (off by default) that makes any proposer failure abort the entire review instead of degrading gracefully. |
@@ -70,15 +70,15 @@ All proposer invocations shell out to CLI tools installed on the user's host. Sy
 
 **FR-MR3: Off by default**
 
-Multimodal review is disabled unless the user explicitly enables it in `.synthex/config.yaml`. The zero-config experience is unchanged from today: single-model review using the host Claude session.
+Multi-model review is disabled unless the user explicitly enables it in `.synthex/config.yaml`. The zero-config experience is unchanged from today: single-model review using the host Claude session.
 
 **Acceptance Criteria:**
-- With no `multimodal_review` section in the user's config, all review commands behave identically to their pre-feature behavior
+- With no `multi_model_review` section in the user's config, all review commands behave identically to their pre-feature behavior
 - Enabling the feature requires both a config entry AND at least one configured reviewer passing preflight validation
 
 **FR-MR4: Model family diversity**
 
-The orchestrator enforces a minimum of **two distinct model families** in the proposer pool when multimodal mode is active. Configurations with only one family produce a warning at preflight and a repeated warning on the first invocation. This mitigates the correlated-errors failure mode ([arXiv:2506.07962](https://arxiv.org/html/2506.07962v1)).
+The orchestrator enforces a minimum of **two distinct model families** in the proposer pool when multi-model mode is active. Configurations with only one family produce a warning at preflight and a repeated warning on the first invocation. This mitigates the correlated-errors failure mode ([arXiv:2506.07962](https://arxiv.org/html/2506.07962v1)).
 
 **Acceptance Criteria:**
 - Preflight detects family diversity from adapter metadata (each adapter declares its family)
@@ -94,7 +94,7 @@ The orchestrator enforces a minimum of **two distinct model families** in the pr
 A new top-level section in `.synthex/config.yaml`:
 
 ```yaml
-multimodal_review:
+multi_model_review:
   enabled: false                    # Master switch. Default: false.
   strict_mode: false                # See FR-MR17. Default: false.
   min_family_diversity: 2           # See FR-MR4. Default: 2.
@@ -137,20 +137,20 @@ multimodal_review:
     output_path: docs/reviews        # Where to write the audit artifact (FR-MR24)
 ```
 
-**Resolution order:** `per_command.<cmd>.<setting>` > `multimodal_review.<setting>` > hardcoded default.
+**Resolution order:** `per_command.<cmd>.<setting>` > `multi_model_review.<setting>` > hardcoded default.
 
 **FR-MR6: Per-command invocation override**
 
-Each multimodal-capable command accepts an explicit flag/parameter to override config at invocation time:
+Each multi-model-capable command accepts an explicit flag/parameter to override config at invocation time:
 
-- `--multimodal` / `multimodal: true` — force multimodal review on for this invocation
-- `--no-multimodal` / `multimodal: false` — force single-model review for this invocation
+- `--multi-model` / `multi-model: true` — force multi-model review on for this invocation
+- `--no-multi-model` / `multi-model: false` — force single-model review for this invocation
 - Default (no flag): use the resolved config value
 
 **Acceptance Criteria:**
 - The flag overrides both the master switch and any `per_command` entry
-- A user with multimodal disabled can run a one-off multimodal review with `--multimodal`
-- A user with multimodal enabled can run a one-off single-model review with `--no-multimodal`
+- A user with multi-model disabled can run a one-off multi-model review with `--multi-model`
+- A user with multi-model enabled can run a one-off single-model review with `--no-multi-model`
 
 ---
 
@@ -158,7 +158,7 @@ Each multimodal-capable command accepts an explicit flag/parameter to override c
 
 **FR-MR7: Adapter layer**
 
-A new row in the Synthex agent hierarchy: the **Review Adapter Layer**. Each adapter is a Haiku-backed utility agent (consistent with `findings-consolidator`, `plan-linter`, `plan-scribe`). Adapters are not invoked directly by users; they are invoked only by the multimodal-review-orchestrator.
+A new row in the Synthex agent hierarchy: the **Review Adapter Layer**. Each adapter is a Haiku-backed utility agent (consistent with `findings-consolidator`, `plan-linter`, `plan-scribe`). Adapters are not invoked directly by users; they are invoked only by the multi-model-review-orchestrator.
 
 **FR-MR8: Adapter responsibilities**
 
@@ -180,7 +180,7 @@ Every adapter must:
 ```json
 {
   "role": "security-reviewer",
-  "artifact_path": "/tmp/multimodal-review-<uuid>.md",
+  "artifact_path": "/tmp/multi-model-review-<uuid>.md",
   "context": {
     "project_root": "/path/to/repo",
     "specs_paths": ["docs/specs/"],
@@ -224,7 +224,7 @@ Every adapter must:
     "output_tokens": 1420,
     "reported_cost_usd": null
   },
-  "raw_output_path": "/tmp/multimodal-raw-<uuid>-<reviewer>.txt"
+  "raw_output_path": "/tmp/multi-model-raw-<uuid>-<reviewer>.txt"
 }
 ```
 
@@ -255,9 +255,9 @@ The initial adapter set ships with the plugin and covers the providers users are
 
 ### 4.4 Orchestrator Agent
 
-**FR-MR11: Multimodal Review Orchestrator**
+**FR-MR11: Multi-Model Review Orchestrator**
 
-A new agent — `multimodal-review-orchestrator` — is introduced. It is invoked by review commands (or by calling agents directly) whenever multimodal mode is active. It is a **Sonnet-backed** agent (not Haiku) because its consolidation work involves non-trivial reasoning: severity judgement, contradiction detection, CoVe verification.
+A new agent — `multi-model-review-orchestrator` — is introduced. It is invoked by review commands (or by calling agents directly) whenever multi-model mode is active. It is a **Sonnet-backed** agent (not Haiku) because its consolidation work involves non-trivial reasoning: severity judgement, contradiction detection, CoVe verification.
 
 **FR-MR12: Parallel fan-out**
 
@@ -325,7 +325,7 @@ A finding flagged by only one reviewer is **never dropped** on the basis of low 
 
 **FR-MR15: Aggregator identity and bias mitigation**
 
-The aggregator is configurable (`multimodal_review.aggregator.command`). Default behavior:
+The aggregator is configurable (`multi_model_review.aggregator.command`). Default behavior:
 
 - **`auto`:** select the strongest proposer in the configured list by a hardcoded tier table (Opus > GPT-5 > Gemini Ultra > Sonnet > GPT-5-mini > ...). If the strongest proposer is also a reviewer, the aggregator invocation uses a separate, freshly-spawned CLI call with a judge-mode system prompt.
 - **Explicit:** the user names a specific adapter (e.g., `claude-review-prompter` with `model: claude-opus-4-7`).
@@ -357,7 +357,7 @@ When `strict_mode: false` (default), the orchestrator handles proposer failures 
    - `parse_failed` — adapter could not parse CLI output into the canonical schema even after one retry. Skip reviewer, record `error_code: parse_failed`.
    - `cli_error` — CLI exited non-zero for any other reason. Skip reviewer, record `error_code: cli_error` with stderr excerpt.
 
-2. **Degradation threshold:** the review proceeds as long as **at least `min_proposers_to_proceed`** (default: 1) reviewers succeed. The default of 1 is deliberately permissive — a review with even one successful multimodal reviewer is still more useful than nothing, and multimodal mode is opt-in in the first place.
+2. **Degradation threshold:** the review proceeds as long as **at least `min_proposers_to_proceed`** (default: 1) reviewers succeed. The default of 1 is deliberately permissive — a review with even one successful multi-model reviewer is still more useful than nothing, and multi-model mode is opt-in in the first place.
 
 3. **If ALL proposers fail:** the orchestrator falls back to the **native single-model review path** (FR-MR17) and surfaces the fallback prominently in the output.
 
@@ -372,18 +372,18 @@ When `strict_mode: false` (default), the orchestrator handles proposer failures 
 
 When all configured proposers fail AND `strict_mode: false`, the orchestrator does NOT abort. Instead it:
 
-1. Emits a prominent warning to the user: "All multimodal reviewers failed. Falling back to single-model review using the host Claude session."
+1. Emits a prominent warning to the user: "All multi-model reviewers failed. Falling back to single-model review using the host Claude session."
 2. Lists each failed reviewer with its error code and remediation hint.
 3. Hands control to the command's pre-existing native review path (e.g., `review-code` invokes Code Reviewer + Security Reviewer on Claude, exactly as today).
 4. The audit artifact (FR-MR24) records the failure, the fallback decision, and which single-model reviewers ran.
 
-This fallback ensures that enabling multimodal review never makes a command less reliable than single-model review. The worst-case outcome is "same quality as before, with a warning."
+This fallback ensures that enabling multi-model review never makes a command less reliable than single-model review. The worst-case outcome is "same quality as before, with a warning."
 
 **Acceptance Criteria:**
 - Fallback triggers only when all proposers fail AND strict mode is off
 - The user sees a visible warning, not a silent fallback
 - The audit artifact records both the failure and the fallback
-- Fallback uses the exact same native reviewer set that would have been used if multimodal were disabled
+- Fallback uses the exact same native reviewer set that would have been used if multi-model were disabled
 
 **FR-MR18: Strict mode**
 
@@ -421,15 +421,15 @@ Strict mode is off by default because it can **break hands-off automation loops*
 
 **FR-MR19: `init` command advertises the feature**
 
-The `init` command is updated to introduce multimodal review during project setup. Because the feature is off by default and requires external CLI configuration, discoverability depends on the user learning about it at init time.
+The `init` command is updated to introduce multi-model review during project setup. Because the feature is off by default and requires external CLI configuration, discoverability depends on the user learning about it at init time.
 
 **Changes to `init`:**
 
-1. After the existing concurrent-tasks prompt, add a new section: **"Multimodal review (optional)"**.
+1. After the existing concurrent-tasks prompt, add a new section: **"Multi-model review (optional)"**.
 2. Briefly describe the feature: "Synthex can run reviews across multiple LLM families (Claude, GPT, Gemini, local models) via CLIs you already have installed. Off by default."
 3. Detect locally-available CLIs via `which` for each first-class adapter (FR-MR10) and report which are installed.
-4. Use `AskUserQuestion` to ask whether to enable multimodal review with the detected CLIs as defaults. Options:
-   - "Enable with detected CLIs" — writes `multimodal_review.enabled: true` and reviewers matching detected CLIs
+4. Use `AskUserQuestion` to ask whether to enable multi-model review with the detected CLIs as defaults. Options:
+   - "Enable with detected CLIs" — writes `multi_model_review.enabled: true` and reviewers matching detected CLIs
    - "Enable later (show config snippet)" — leaves `enabled: false` and prints a commented-out config snippet with setup instructions
    - "Skip" — no changes, no snippet
 5. If the user enables it, run the preflight validation once (FR-MR20) and show the result.
@@ -438,11 +438,11 @@ The `init` command is updated to introduce multimodal review during project setu
 - `init` detects installed CLIs without asking the user to enumerate them
 - Users who skip the prompt get no configuration changes and no surprises
 - Users who enable the feature get a config that works, including sensible defaults for `aggregator` and `strict_mode`
-- The init output includes a link/reference to the full docs for multimodal review
+- The init output includes a link/reference to the full docs for multi-model review
 
 **FR-MR20: Preflight validation**
 
-A preflight check runs on every multimodal-review invocation AND at the end of `init` if the feature was enabled. Preflight:
+A preflight check runs on every multi-model-review invocation AND at the end of `init` if the feature was enabled. Preflight:
 
 1. Confirms every configured reviewer's adapter has its CLI available (`which`).
 2. For CLIs that support a lightweight auth check (e.g., `codex whoami`, `gcloud auth list`, `aws sts get-caller-identity`), attempts that check and records the result.
@@ -464,43 +464,43 @@ Preflight failures (not warnings) block the invocation with a clear remediation 
 
 **FR-MR21: `review-code` integration (v1 scope)**
 
-`review-code` is updated to detect and use multimodal review when enabled:
+`review-code` is updated to detect and use multi-model review when enabled:
 
-1. After Step 1 (Load Configuration), the command checks `multimodal_review.per_command.review_code.enabled` (or the `--multimodal` / `--no-multimodal` override).
-2. If multimodal is active:
-   - The command invokes `multimodal-review-orchestrator` with the diff and context as the artifact.
+1. After Step 1 (Load Configuration), the command checks `multi_model_review.per_command.review_code.enabled` (or the `--multi-model` / `--no-multi-model` override).
+2. If multi-model is active:
+   - The command invokes `multi-model-review-orchestrator` with the diff and context as the artifact.
    - The orchestrator's consolidated findings replace the native Code Reviewer + Security Reviewer (+ optional Performance Engineer) output in the unified report.
-   - The unified report format (`## Code Review Report`) is preserved; the reviewer table shows one row per multimodal reviewer plus a synthetic "Aggregator" row.
-3. If multimodal is inactive (or falls back per FR-MR17): behavior is unchanged from today.
+   - The unified report format (`## Code Review Report`) is preserved; the reviewer table shows one row per multi-model reviewer plus a synthetic "Aggregator" row.
+3. If multi-model is inactive (or falls back per FR-MR17): behavior is unchanged from today.
 4. The review loop (Step 6) continues to work: on FAIL verdict, the command re-invokes the orchestrator with the updated diff on the next cycle.
 
 **Acceptance Criteria:**
-- `review-code --multimodal` runs multimodal mode even if disabled in config
-- `review-code --no-multimodal` runs native mode even if enabled in config
-- The unified report shows per-reviewer verdicts (PASS/WARN/FAIL) and counts for each multimodal reviewer
-- Design-system compliance for UI changes (today's automatic behavior) continues to run even in multimodal mode, as a separate Synthex-native review (design-system is a specialized advisory role, not a generic review)
+- `review-code --multi-model` runs multi-model mode even if disabled in config
+- `review-code --no-multi-model` runs native mode even if enabled in config
+- The unified report shows per-reviewer verdicts (PASS/WARN/FAIL) and counts for each multi-model reviewer
+- Design-system compliance for UI changes (today's automatic behavior) continues to run even in multi-model mode, as a separate Synthex-native review (design-system is a specialized advisory role, not a generic review)
 
 **FR-MR22: `write-implementation-plan` integration (v1 scope)**
 
 `write-implementation-plan` is updated similarly:
 
-1. The plan review step (currently runs Architect, Designer, Tech Lead as reviewers) becomes multimodal-aware.
-2. When multimodal is active, the orchestrator is invoked with the draft plan as the artifact. The reviewer **role** remains "plan reviewer" — but the orchestrator fans out to the configured external LLM reviewers rather than spawning Synthex's Architect/Designer/Tech Lead sub-agents.
+1. The plan review step (currently runs Architect, Designer, Tech Lead as reviewers) becomes multi-model-aware.
+2. When multi-model is active, the orchestrator is invoked with the draft plan as the artifact. The reviewer **role** remains "plan reviewer" — but the orchestrator fans out to the configured external LLM reviewers rather than spawning Synthex's Architect/Designer/Tech Lead sub-agents.
 3. **Important role-mapping question (Open Question OQ-1):** should each external model play the "plan reviewer" generalist role, or should each external model receive a different Synthex reviewer prompt (one plays Architect, one plays Designer, etc.)? The PRD defers this to implementation with a preference for the first option (every external model reviews as a generalist) because (a) it keeps the orchestrator simple, (b) it preserves the canonical comparison "did model X see issue Y that model Z missed", and (c) role-specific prompting can be added later without breaking this pattern.
 4. The Product Manager's decision-and-revision flow (invoking `plan-scribe` to apply decided edits) is unchanged.
 
 **Acceptance Criteria:**
-- Multimodal plan review produces findings in the same structure Architect/Designer/Tech Lead would
+- Multi-Model plan review produces findings in the same structure Architect/Designer/Tech Lead would
 - The PM agent receives consolidated findings identical in shape to today's output
 - `plan-linter` (pre-review structural check) is unaffected — it runs before the orchestrator, as today
 
-**FR-MR23: Command behavior when multimodal is inactive**
+**FR-MR23: Command behavior when multi-model is inactive**
 
-Every command touched by this PRD must preserve its current behavior when `multimodal_review.enabled: false` OR when `--no-multimodal` is passed. Test coverage must include a regression test that asserts identical output for a representative fixture with multimodal disabled.
+Every command touched by this PRD must preserve its current behavior when `multi_model_review.enabled: false` OR when `--no-multi-model` is passed. Test coverage must include a regression test that asserts identical output for a representative fixture with multi-model disabled.
 
 **Acceptance Criteria:**
-- Disabling multimodal produces byte-identical command behavior to today (modulo non-deterministic LLM outputs)
-- Enabling multimodal then disabling it returns to pre-enablement behavior
+- Disabling multi-model produces byte-identical command behavior to today (modulo non-deterministic LLM outputs)
+- Enabling multi-model then disabling it returns to pre-enablement behavior
 
 ---
 
@@ -508,12 +508,12 @@ Every command touched by this PRD must preserve its current behavior when `multi
 
 **FR-MR24: Review audit file**
 
-Every multimodal review invocation writes an audit file to `docs/reviews/` (configurable). File naming: `<YYYY-MM-DD>-<command>-<short-hash>.md`.
+Every multi-model review invocation writes an audit file to `docs/reviews/` (configurable). File naming: `<YYYY-MM-DD>-<command>-<short-hash>.md`.
 
 Contents:
 
 1. **Invocation metadata** — command, target/artifact, timestamp, git commit, Synthex version
-2. **Configuration snapshot** — the resolved `multimodal_review` config used for this invocation (strict mode, reviewers, aggregator)
+2. **Configuration snapshot** — the resolved `multi_model_review` config used for this invocation (strict mode, reviewers, aggregator)
 3. **Preflight result** — which CLIs were available, family diversity, warnings
 4. **Per-reviewer results** — for each proposer: status, error code if any, finding count, token usage, raw output path (under `/tmp` or a per-run subdirectory)
 5. **Consolidated findings** — the final output, same format as returned to the caller
@@ -555,7 +555,7 @@ Adapter definitions document their exact sandbox flag set. Review prompts instru
 
 Because artifacts (diffs, plans) are sent to external providers, the PRD surfaces — but does not solve — the concern that sensitive code or requirements may be transmitted. The solution is documentation, not enforcement:
 
-- The `init` discoverability prompt (FR-MR19) includes a warning: "Multimodal review sends your code/plans/PRD to the configured external providers. Confirm this matches your organization's data-handling policy."
+- The `init` discoverability prompt (FR-MR19) includes a warning: "Multi-model review sends your code/plans/PRD to the configured external providers. Confirm this matches your organization's data-handling policy."
 - The audit artifact (FR-MR24) records which providers received the content.
 - The `reviewers` list in config supports an `enabled: false` pattern for quickly disabling a provider (e.g., if you want to exclude hosted providers from a sensitive review).
 
@@ -571,22 +571,22 @@ Organizations with hard data-residency requirements should configure only local 
 ## 5. Non-Functional Requirements
 
 **NFR-MR1: Zero-config compatibility**
-Users with no `multimodal_review` section in their config see exactly today's behavior across all review commands. Adding the section and setting `enabled: false` is also a no-op. No silent opt-ins, ever.
+Users with no `multi_model_review` section in their config see exactly today's behavior across all review commands. Adding the section and setting `enabled: false` is also a no-op. No silent opt-ins, ever.
 
 **NFR-MR2: Platform support**
 The feature works on all Claude Code surfaces that expose host bash: CLI, desktop app in local session, IDE extensions backed by either. It degrades gracefully — with a clear error — on cloud/web surfaces where host CLIs are not reachable unless the user has configured setup scripts to install them.
 
 **NFR-MR3: Parallel execution**
-Proposer invocations run in parallel. The end-to-end wall-clock time of a multimodal review should approximate `max(per-reviewer times) + aggregator time`, not the sum.
+Proposer invocations run in parallel. The end-to-end wall-clock time of a multi-model review should approximate `max(per-reviewer times) + aggregator time`, not the sum.
 
 **NFR-MR4: Cost transparency**
-The audit artifact reports token usage per reviewer when the CLI provides it. Synthex itself does not compute costs (rates vary by provider/plan); users consult their provider billing dashboards. The documentation must set expectations: multimodal review is strictly more expensive than single-model review, and the cost is borne by the user through their existing provider relationships.
+The audit artifact reports token usage per reviewer when the CLI provides it. Synthex itself does not compute costs (rates vary by provider/plan); users consult their provider billing dashboards. The documentation must set expectations: multi-model review is strictly more expensive than single-model review, and the cost is borne by the user through their existing provider relationships.
 
 **NFR-MR5: Extensibility**
 Adding a new adapter requires only: creating `<adapter>-review-prompter.md` in `plugins/synthex/agents/`, registering it in `plugin.json`, and documenting its CLI. No changes to the orchestrator are required provided the adapter conforms to FR-MR9.
 
 **NFR-MR6: Consistent output contract**
-The orchestrator's returned findings conform to the same canonical schema as native reviewer findings, so any downstream consumer (a command's consolidated report, `findings-consolidator`, the PM's plan-revision flow) works identically regardless of whether multimodal was used.
+The orchestrator's returned findings conform to the same canonical schema as native reviewer findings, so any downstream consumer (a command's consolidated report, `findings-consolidator`, the PM's plan-revision flow) works identically regardless of whether multi-model was used.
 
 **NFR-MR7: Testability**
 Every adapter and the orchestrator must be testable under the existing three-layer testing pyramid (schemas/behavioral/semantic per `CLAUDE.md`):
@@ -599,7 +599,7 @@ Adapter tests must NOT require the real CLI to be present in CI — they use rec
 The orchestrator logs every major decision (dedup merges, severity judge invocations, contradiction detections, fallback triggers) to the audit artifact. Log format is structured (markdown sections with finding IDs) so future tooling can diff audit files across runs.
 
 **NFR-MR9: Documentation**
-`README.md`, `CLAUDE.md`, and `config/defaults.yaml` must all be updated. The `init` command's configuration guide must include a dedicated multimodal review section. A dedicated `docs/specs/multimodal-review.md` design document covers the architecture for future contributors.
+`README.md`, `CLAUDE.md`, and `config/defaults.yaml` must all be updated. The `init` command's configuration guide must include a dedicated multi-model review section. A dedicated `docs/specs/multi-model-review.md` design document covers the architecture for future contributors.
 
 ---
 
@@ -625,14 +625,14 @@ Deferred to future work:
 |--------|--------|
 | All adapter agents in v1 adapter set have complete, unambiguous definitions | 100% |
 | Orchestrator produces canonical-schema output for every successful invocation | Verified via Layer 1 schema tests |
-| `review-code --multimodal` runs proposer CLIs in parallel | Verified via wall-clock timing on representative fixture |
+| `review-code --multi-model` runs proposer CLIs in parallel | Verified via wall-clock timing on representative fixture |
 | Dedup pipeline correctly merges duplicate findings across reviewers | Verified via Layer 2 behavioral fixtures with planted duplicates |
 | Severity reconciliation correctly takes max on 1-level disagreement, triggers judge on 2+ level disagreement | Verified via Layer 2 behavioral fixtures with planted disagreements |
 | Graceful degradation: review proceeds when 1 of N reviewers fails | Verified via Layer 2 fixture where one adapter is forced to `cli_missing` |
 | Fallback: review falls back to native single-model when all reviewers fail | Verified via Layer 2 fixture where all adapters are forced to fail |
 | Strict mode aborts on first proposer failure | Verified via Layer 2 fixture |
 | `init` detects installed CLIs and offers enable/skip options | Verified via interactive-mode manual test |
-| Disabling multimodal via config OR `--no-multimodal` produces today's behavior | Verified via regression fixture |
+| Disabling multi-model via config OR `--no-multi-model` produces today's behavior | Verified via regression fixture |
 | Audit artifact is written for every invocation | Verified via file-system check after fixture runs |
 | No provider credentials appear in audit artifacts, logs, or config | Verified via test asserting no secret-like tokens appear in sample audits |
 
@@ -656,7 +656,7 @@ Deferred to future work:
 
 ## 9. Future Work / Extension Points
 
-- **v2 commands:** extend multimodal review to `refine-requirements`, `write-rfc`, `reliability-review`, `performance-audit`
+- **v2 commands:** extend multi-model review to `refine-requirements`, `write-rfc`, `reliability-review`, `performance-audit`
 - **Role-specialized proposers:** allow per-reviewer role prompts (GPT plays security-reviewer, Gemini plays code-reviewer) as a configuration option
 - **Custom OpenAI-compatible endpoints:** optional first-class config item with clear OpenAI Chat Completions spec requirement, gated on user demand
 - **Cost budgets per invocation:** `max_cost_usd` with pre-invocation estimation
