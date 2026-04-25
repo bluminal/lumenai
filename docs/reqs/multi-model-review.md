@@ -29,17 +29,20 @@
 | Term | Definition |
 |------|------------|
 | **Multi-model review** | Review orchestrated across multiple LLM families (Claude, GPT, Gemini, local open-source models, etc.) — one review per configured model, then consolidated. Not related to multimodal input (vision/audio); "multi-model" here means multiple language models. |
-| **Proposer** | An external LLM invoked via a CLI adapter that produces a set of review findings. Should be a flagship reasoning-capable model (Claude Sonnet/Opus, GPT-5, Gemini 2.5 Pro, DeepSeek V3.x, Qwen 2.5 Coder 32B+, etc.) — not a small/fast tier. The aggregator cannot recover issues that no proposer flagged, so each proposer slot is high-value and should be filled by the best model the user's CLI gives access to. Most CLI defaults already select flagship models; Synthex does not override them. |
-| **Aggregator** | The LLM that consolidates all proposers' findings into a single output — handles dedup, severity reconciliation, contradiction resolution, and attribution. Its task is judging among findings, not producing them, so it does not need to be markedly stronger than the proposers — but it must be at least as strong as the weakest proposer to avoid information loss. By default the orchestrator picks the strongest configured proposer for this role; users can name an explicit aggregator. |
-| **Adapter agent** | A Haiku-backed Synthex utility agent that wraps a specific provider CLI (`codex-review-prompter`, `gemini-review-prompter`, etc.). Handles invocation, output parsing, and normalization to the canonical finding schema. |
-| **Orchestrator agent** | `multi-model-review-orchestrator` — the new Synthex agent that drives the full flow: fan-out to adapters, consolidation, return to caller. |
-| **Canonical finding** | A normalized finding record produced by any adapter, conforming to the shared JSON schema (see FR-MR13). |
-| **Consensus badge** | Metadata on each consolidated finding indicating how many reviewers (and which families) flagged it (e.g., "3/4 · Claude+GPT+Gemini"). |
-| **Strict mode** | A configuration option (off by default) that makes any proposer failure abort the entire review instead of degrading gracefully. |
-| **Fallback** | Behavior when all configured proposers fail: the orchestrator returns control to the native single-model review path (existing Synthex reviewers on the host Claude), surfacing the fallback to the user. |
-| **Capability tier** | An adapter's declared ability to access files beyond the pre-assembled context bundle. Two values: `agentic` (CLI supports tool-use — can read additional files in the sandboxed workspace) or `text-only` (prompt-in/text-out — works strictly from the bundle). Declared in each adapter's markdown definition, used by the orchestrator to decide what context to deliver. |
-| **Context bundle** | The orchestrator-assembled package of review context (diff + touched files + relevant specs + CLAUDE.md + optional overview) passed to every reviewer regardless of tier. Size-limited via Haiku summarization when it exceeds the configured byte cap. |
-| **Complexity gate** | A pre-orchestration check (currently only in `review-code`) that decides whether a change is complex enough to warrant multi-model review. Below the gate: fall through to native single-model review. Above the gate: invoke the orchestrator. Overridable per-invocation with `--multi-model` / `--no-multi-model`. |
+| **Proposer** | A reviewer in the multi-model ensemble that produces independent findings on the artifact. May be a **native reviewer** (Synthex sub-agent in the host Claude session) or an **external reviewer** (a non-Anthropic-CLI model reached via shelling out). All proposers — native and external — should be flagship reasoning-capable models (Claude Sonnet/Opus host, GPT-5 via Codex, Gemini 2.5 Pro via Gemini CLI, DeepSeek V3.x, Qwen 2.5 Coder 32B+, etc.). The aggregator cannot recover issues that no proposer flagged, so each proposer slot is high-value. |
+| **Native reviewer** | A Synthex sub-agent invoked via the Task tool in the host Claude session — `code-reviewer`, `security-reviewer`, `architect`, `designer`, `tech-lead`, `performance-engineer`, etc. These already run today as part of every review command; multi-model mode does not replace them — it adds external proposers alongside them. Native reviewers count as the `anthropic` family for diversity purposes. |
+| **External reviewer** | A non-host-session model reached via a CLI adapter (`codex-review-prompter`, `gemini-review-prompter`, `ollama-review-prompter`, `llm-review-prompter`, `bedrock-review-prompter`, etc.). These are added by enabling multi-model mode and configuring the `reviewers` list. The `claude-review-prompter` adapter exists for users who want a specific Claude model that differs from the host session (e.g., host is Sonnet but you want Opus as a second Anthropic voice), but is not part of the default-recommended set because the native reviewers already cover the Anthropic family. |
+| **Aggregator** | The LLM that consolidates all proposers' findings into a single output — handles dedup, severity reconciliation, contradiction resolution, and attribution. Its task is judging among findings, not producing them, so it does not need to be markedly stronger than the proposers — but it must be at least as strong as the weakest proposer to avoid information loss. By default the orchestrator (running in the host Claude session) is the aggregator; users can name an explicit external aggregator. |
+| **Adapter agent** | A Haiku-backed Synthex utility agent that wraps a specific provider CLI (`codex-review-prompter`, `gemini-review-prompter`, etc.). Handles invocation, output parsing, and normalization to the canonical finding schema. Only external reviewers go through adapters; native reviewers run directly via the Task tool. |
+| **Orchestrator agent** | `multi-model-review-orchestrator` — the new Synthex agent that drives the full flow: fan-out to both native sub-agents (via Task) and external adapters (via Task → Bash), consolidation, return to caller. |
+| **Canonical finding** | A normalized finding record produced by any reviewer (native or external), conforming to the shared JSON schema (see FR-MR13). Native reviewers already produce structured findings today; the orchestrator normalizes them into the canonical schema alongside external findings. |
+| **Consensus badge** | Metadata on each consolidated finding indicating how many reviewers (and which families) flagged it (e.g., "3/4 · Anthropic+OpenAI+Google"). Native reviewers contribute to the Anthropic family count. |
+| **Strict mode** | A configuration option (off by default) that makes any external reviewer failure abort the entire review instead of degrading gracefully. Native reviewer failures are not subject to strict mode — those are command-level failures handled the same way as today. |
+| **Fallback** | Behavior when all external reviewers fail: the orchestrator continues with the native reviewers' findings (which were collected in the same parallel cycle) and emits a warning. Because natives always run, the worst case of multi-model mode is "same as today's review, with a warning that the externals didn't contribute." |
+| **Capability tier** | An external adapter's declared ability to access files beyond the pre-assembled context bundle. Two values: `agentic` (CLI supports tool-use — can read additional files in the sandboxed workspace) or `text-only` (prompt-in/text-out — works strictly from the bundle). Declared in each adapter's markdown definition, used by the orchestrator to decide what context to deliver. Native reviewers always have full Synthex tool access in the host session and do not need a tier classification. |
+| **Context bundle** | The orchestrator-assembled package of review context (diff + touched files + relevant specs + CLAUDE.md + optional overview) passed to every external reviewer regardless of tier. Native reviewers receive context the same way they do today (full session access); the bundle is built specifically to level the playing field for external reviewers. Size-limited via Haiku summarization when it exceeds the configured byte cap. |
+| **Complexity gate** | A pre-orchestration check (currently only in `review-code`) that decides whether the diff is complex enough to add external reviewers on top of the always-running native reviewers. Below the gate: native-only path (today's behavior). Above the gate: native + external in parallel. Overridable per-invocation with `--multi-model` / `--no-multi-model`. |
+| **Native-only mode** | What runs when multi-model is disabled, the complexity gate doesn't fire, or `include_native_reviewers` is the only enabled source. Identical to today's review behavior — Synthex sub-agents only, no external CLI invocation. |
 
 ---
 
@@ -47,20 +50,24 @@
 
 ### 4.1 Core Architecture
 
-**FR-MR1: Two-tier orchestration**
+**FR-MR1: Two-tier orchestration with native + external proposers**
 
-The system uses a **proposers-plus-aggregator** architecture:
+The system uses a **proposers-plus-aggregator** architecture, where the proposer pool is **additive**: it consists of (a) the native Synthex sub-agents that already review for the calling command today, plus (b) any configured external CLI reviewers. Multi-model mode does not replace the natives — it adds external voices alongside them.
 
-1. **Proposer tier:** N external LLMs (one per configured reviewer) each produce independent review findings on the same artifact. Proposers run in parallel.
-   - Each proposer should be a **flagship reasoning-capable model** (Claude Sonnet/Opus, GPT-5, Gemini 2.5 Pro, DeepSeek V3.x, Qwen 2.5 Coder 32B+) — *not* a small/fast variant. Code review is a "find subtle issues" task; cheap models systematically under-detect, and the aggregator cannot recover findings no proposer flagged. Each proposer slot is high-value and should be the best the user's CLI gives them access to.
-   - **Extended-thinking / reasoning modes** (Claude extended thinking, GPT-5/o-series reasoning tokens, Gemini 2.5 thinking mode) should be enabled when the CLI supports them. The latency and token cost are well-spent on a review task. Most modern CLIs enable this by default; Synthex does not override the user's CLI configuration.
-   - The actual model choice is whatever the user's CLI invocation produces — Synthex never specifies a model behind the user's back. Documented adapter recipes recommend flagship-class invocations as defaults.
-2. **Aggregator tier:** A single model consolidates proposer outputs (dedup, severity reconciliation, contradiction resolution) and emits one consolidated findings list. The aggregator's job is *judgement among existing findings*, not original analysis, so it does not need to be markedly stronger than the proposers — but it must be at least as capable as the weakest proposer to avoid information loss when summarizing. By default it is the strongest configured proposer (FR-MR15); explicit aggregator selection is supported.
+1. **Proposer tier (additive: native + external):**
+   - **Native proposers** — Synthex sub-agents invoked via the Task tool in the host Claude session. Which sub-agents participate is determined by the calling command (e.g., `/review-code` invokes `code-reviewer` + `security-reviewer` + optional `performance-engineer`; `/write-implementation-plan` invokes `architect` + `designer` + `tech-lead`). These run today and continue to run with multi-model mode enabled — multi-model adds to them, never replaces them.
+   - **External proposers** — non-host-session models reached through CLI adapters (`codex-review-prompter`, `gemini-review-prompter`, `ollama-review-prompter`, `llm-review-prompter`, `bedrock-review-prompter`, etc.). Configured by the user in `multi_model_review.reviewers`.
+   - All proposers — native and external — run **in parallel** as a single fan-out batch. They never see each other's output; that independence is what makes the ensemble diagnostic.
+   - Every proposer should be a **flagship reasoning-capable model** (Claude Sonnet/Opus for natives via the host session, GPT-5 via Codex, Gemini 2.5 Pro via Gemini CLI, DeepSeek V3.x, Qwen 2.5 Coder 32B+ via Ollama, etc.). Code review is a "find subtle issues" task; cheap models systematically under-detect, and the aggregator cannot recover findings no proposer flagged. Each slot is high-value.
+   - **Extended-thinking / reasoning modes** (Claude extended thinking, GPT-5 / o-series reasoning tokens, Gemini 2.5 thinking mode) should be enabled where the CLI supports them. The host Claude session inherits whatever extended-thinking the user has configured at the Claude Code level; external CLIs inherit their own defaults.
+   - Synthex never overrides the user's CLI model selection or extended-thinking configuration. Documented adapter recipes recommend flagship-class invocations as defaults.
+2. **Aggregator tier:** A single model consolidates all proposer outputs (native + external) into one canonical findings list — handles dedup, severity reconciliation, contradiction resolution, attribution. The aggregator's job is *judgement among existing findings*, not original analysis, so it does not need to be markedly stronger than the proposers — but it must be at least as capable as the weakest proposer to avoid information loss when summarizing. **By default the aggregator is the host Claude session itself** (the orchestrator agent runs the consolidation pipeline directly, no extra CLI invocation); explicit external aggregator selection is supported via `multi_model_review.aggregator.command` (FR-MR15).
 
 **Acceptance Criteria:**
-- Proposer invocations are fan-out parallel, not sequential
+- Native sub-agents and external adapters are launched in a single parallel batch — not natives-then-externals or vice versa
+- The orchestrator collects findings from both sources and feeds them to a single consolidation pipeline
+- When multi-model mode is disabled, only the native sub-agents run (today's behavior, byte-identical)
 - Aggregator runs exactly once per review cycle, after all proposers have returned (or timed out)
-- The aggregator is a distinct step from any individual proposer, even when the aggregator model family overlaps with a proposer family
 - Adapter documentation recommends a flagship default model + extended-thinking flags where applicable; documentation explicitly warns against using small/cheap variants for the proposer role
 
 **FR-MR2: CLI-only provider integration**
@@ -85,11 +92,17 @@ Multi-model review is disabled unless the user explicitly enables it in `.synthe
 
 **FR-MR4: Model family diversity**
 
-The orchestrator enforces a minimum of **two distinct model families** in the proposer pool when multi-model mode is active. Configurations with only one family produce a warning at preflight and a repeated warning on the first invocation. This mitigates the correlated-errors failure mode ([arXiv:2506.07962](https://arxiv.org/html/2506.07962v1)).
+The orchestrator enforces a minimum of **two distinct model families** across the combined proposer pool (native + external) when multi-model mode is active. Configurations with only one family produce a warning at preflight and a repeated warning on the first invocation. This mitigates the correlated-errors failure mode ([arXiv:2506.07962](https://arxiv.org/html/2506.07962v1)).
+
+**Family attribution:**
+- **Native reviewers** count as the `anthropic` family (they all run on the host Claude session).
+- **External reviewers** declare their family in their adapter metadata (`openai` for Codex, `google` for Gemini, `local-<model>` for Ollama, etc.).
+- A default configuration of "native reviewers + Codex (GPT-5) + Gemini" already satisfies the 2-family minimum (Anthropic + OpenAI + Google = 3 families) without needing the optional `claude-review-prompter` adapter.
 
 **Acceptance Criteria:**
-- Preflight detects family diversity from adapter metadata (each adapter declares its family)
-- Single-family configurations are warned, not blocked — users retain the ability to opt into lower diversity
+- Preflight counts the host Claude session's family (`anthropic`) as one family member by virtue of native reviewers running there
+- Preflight detects external family diversity from adapter metadata (each adapter declares its family)
+- Single-family configurations (e.g., natives only, or natives + only `claude-review-prompter`) are warned, not blocked — users retain the ability to opt into lower diversity
 - The warning includes a one-sentence explanation of why diversity matters
 
 ---
@@ -105,17 +118,21 @@ multi_model_review:
   enabled: false                    # Master switch. Default: false.
   strict_mode: false                # See FR-MR17. Default: false.
   min_family_diversity: 2           # See FR-MR4. Default: 2.
-  min_proposers_to_proceed: 1       # See FR-MR16. Default: 1.
+  min_proposers_to_proceed: 1       # See FR-MR16. Default: 1 (NOT counting native reviewers).
+  include_native_reviewers: true    # Always include the command's native Synthex sub-agents
+                                    # in the multi-model ensemble alongside external CLIs.
+                                    # Default: true. Set to false ONLY when you want a
+                                    # pure-external "second opinion" review with no Anthropic
+                                    # voice from the host session — see FR-MR1.
   aggregator:
-    command: auto                   # "auto" picks the strongest available from the reviewer list.
-                                    # Or set to an explicit adapter name: claude, codex, gemini, etc.
+    command: auto                   # "auto" picks the host Claude session as aggregator
+                                    # (no extra CLI invocation). Set to an explicit adapter
+                                    # (e.g., codex-review-prompter) to use an external aggregator.
     model: auto                     # Optional: pin a specific model within the chosen CLI.
+  # External reviewers added to the ensemble alongside the always-running native sub-agents.
+  # The native reviewers (code-reviewer, security-reviewer, architect, designer, tech-lead, etc.)
+  # are NOT listed here — they are determined by the calling command and run automatically.
   reviewers:
-    - name: claude-opus             # User-facing label, must be unique
-      adapter: claude-review-prompter
-      model: claude-opus-4-7
-      family: anthropic
-      enabled: true
     - name: gpt-5
       adapter: codex-review-prompter
       model: gpt-5
@@ -130,6 +147,15 @@ multi_model_review:
     #   adapter: llm-review-prompter
     #   model: ollama/qwen2.5-coder:32b
     #   family: local-qwen
+    #   enabled: false
+    # The claude-review-prompter adapter exists but is NOT recommended in the default
+    # set — the native reviewers already cover the Anthropic family via the host
+    # Claude session. Use it only if you want a *different* Anthropic model (e.g.,
+    # host is Sonnet, you want Opus as a second Anthropic voice):
+    # - name: claude-opus-second-opinion
+    #   adapter: claude-review-prompter
+    #   model: claude-opus-4-7
+    #   family: anthropic
     #   enabled: false
   per_command:
     review_code:
@@ -268,18 +294,20 @@ Every adapter must:
 
 **FR-MR10: First-class adapter set (v1)**
 
-The initial adapter set ships with the plugin and covers the providers users are most likely to already have installed:
+The initial adapter set ships with the plugin and covers the external providers users are most likely to already have installed. **The Anthropic family is covered by the native Synthex sub-agents in the host Claude session** (FR-MR1) — the `claude-review-prompter` adapter is included for users who explicitly want a *different* Anthropic model than the one hosting the session, but it is not part of the default-recommended ensemble.
 
-| Adapter | Wraps | Covers | Default Family | Capability Tier |
-|---------|-------|--------|----------------|-----------------|
-| `claude-review-prompter` | `claude -p --output-format json` | Anthropic (Sonnet/Opus/Haiku), including Bedrock/Vertex routing via env vars | `anthropic` | `agentic` |
-| `codex-review-prompter` | `codex exec --json --sandbox read-only` | OpenAI (GPT-5, o-series); also any OpenAI-compatible base URL the user has configured in Codex | `openai` | `agentic` |
-| `gemini-review-prompter` | `gemini -p --output-format json` | Google (Gemini 2.5/3) | `google` | `agentic` |
-| `ollama-review-prompter` | `ollama run` + HTTP API with `format: <schema>` | Any local Ollama model (Llama, Qwen, DeepSeek, Gemma, Mistral) | `local-<model>` | `text-only` |
-| `llm-review-prompter` | `llm -m <model> --schema <file>` | Universal adapter — 50+ providers via `llm` plugins (OpenRouter, Groq, Mistral, Cohere, Bedrock) | Inferred from the `llm` model ID prefix | `text-only` |
-| `bedrock-review-prompter` | `aws bedrock-runtime invoke-model` | AWS Bedrock (Claude, Llama, Nova, Titan, Mistral) — for users with AWS creds but no per-vendor CLI | Inferred from Bedrock model ID | `text-only` |
+| Adapter | Default in ensemble? | Wraps | Covers | Default Family | Capability Tier |
+|---------|----------------------|-------|--------|----------------|-----------------|
+| `codex-review-prompter` | **Yes (recommended)** | `codex exec --json --sandbox read-only` | OpenAI (GPT-5, o-series); also any OpenAI-compatible base URL the user has configured in Codex | `openai` | `agentic` |
+| `gemini-review-prompter` | **Yes (recommended)** | `gemini -p --output-format json` | Google (Gemini 2.5/3) | `google` | `agentic` |
+| `ollama-review-prompter` | Yes (for local-only configs) | `ollama run` + HTTP API with `format: <schema>` | Any local Ollama model (Llama, Qwen, DeepSeek, Gemma, Mistral) | `local-<model>` | `text-only` |
+| `llm-review-prompter` | Optional (universal escape hatch) | `llm -m <model> --schema <file>` | Universal adapter — 50+ providers via `llm` plugins (OpenRouter, Groq, Mistral, Cohere, Bedrock) | Inferred from the `llm` model ID prefix | `text-only` |
+| `bedrock-review-prompter` | Optional (for users on AWS) | `aws bedrock-runtime invoke-model` | AWS Bedrock (Claude, Llama, Nova, Titan, Mistral) — for users with AWS creds but no per-vendor CLI | Inferred from Bedrock model ID | `text-only` |
+| `claude-review-prompter` | **No (specialty)** — see note below | `claude -p --output-format json` | Anthropic (Sonnet/Opus/Haiku), including Bedrock/Vertex routing via env vars | `anthropic` | `agentic` |
 
-**Capability tier matters** because it controls how the orchestrator delivers context (FR-MR28). Agentic-tier reviewers receive the context bundle AND read-only access to the sandboxed workspace (they can follow imports, check sibling files, read additional specs). Text-only-tier reviewers receive the context bundle alone — no file access — so bundle completeness and summarization quality directly determine the upper bound of their review quality.
+**On `claude-review-prompter`:** the native Synthex sub-agents already cover the Anthropic family by running in the host Claude session — they have role-specialized prompts, full Synthex context (CLAUDE.md, project specs, conventions), and direct Task-tool access. A generic `claude -p` subprocess does not have that specialization and would also pay for a fresh CLI invocation. Only configure `claude-review-prompter` if you want a *different* Anthropic model than the host session's model — e.g., the host is Sonnet and you want Opus as a second Anthropic voice for a high-stakes review. Otherwise, leave it out.
+
+**Capability tier matters** because it controls how the orchestrator delivers context (FR-MR28). Agentic-tier external reviewers receive the context bundle AND read-only access to the sandboxed workspace (they can follow imports, check sibling files, read additional specs). Text-only-tier external reviewers receive the context bundle alone — no file access — so bundle completeness and summarization quality directly determine the upper bound of their review quality. Native reviewers do not have a tier classification because they always have full Synthex tool access in the host session.
 
 **Acceptance Criteria:**
 - Each adapter has its own `.md` definition in `plugins/synthex/agents/`
@@ -294,14 +322,22 @@ The initial adapter set ships with the plugin and covers the providers users are
 
 A new agent — `multi-model-review-orchestrator` — is introduced. It is invoked by review commands (or by calling agents directly) whenever multi-model mode is active. It is a **Sonnet-backed** agent (not Haiku) because its consolidation work involves non-trivial reasoning: severity judgement, contradiction detection, CoVe verification.
 
-**FR-MR12: Parallel fan-out**
+**FR-MR12: Parallel fan-out (native + external in one batch)**
 
-The orchestrator invokes all enabled adapter agents in parallel via the Task tool. Each adapter runs independently and does not see other adapters' outputs.
+The orchestrator invokes both kinds of proposers in a single parallel fan-out batch via the Task tool:
+
+1. **Native sub-agents** for the calling command (e.g., `code-reviewer` + `security-reviewer` for `/review-code`; `architect` + `designer` + `tech-lead` for `/write-implementation-plan`). These are determined by the calling command and resolved at orchestrator entry — the orchestrator does not invent the native list, it accepts it from the caller.
+2. **External adapter agents** for every enabled entry in `multi_model_review.reviewers`. Each adapter is itself a Task-tool invocation that internally shells out to the external CLI via Bash.
+
+All proposers run in one batch and do not see each other's output. After the slowest proposer returns (or times out), the orchestrator runs consolidation against the combined finding set.
 
 **Acceptance Criteria:**
-- All adapter invocations are launched in a single batch (parallel Task calls)
-- The orchestrator waits for all adapters to complete (or timeout) before beginning consolidation
-- Adapter timeouts are enforced per-adapter, not globally — one slow adapter does not stall faster ones beyond their own timeout
+- Native sub-agent invocations and external adapter invocations are launched in the same parallel batch (a single set of Task tool calls), not in two sequential phases
+- The orchestrator waits for all proposers to complete (or timeout) before beginning consolidation
+- Per-proposer timeouts are enforced individually — one slow proposer does not stall faster ones beyond its own timeout
+- A native sub-agent failure (e.g., context-window error, output-parse failure) is reported in the unified output the same way an external failure would be — no hidden differences in how natives vs externals surface errors
+- When `include_native_reviewers: false`, only external proposers are launched (the orchestrator still runs but with a smaller pool)
+- When multi-model mode is disabled or the complexity gate doesn't fire, the orchestrator is not invoked at all — the calling command runs its native sub-agents directly as it does today
 
 **FR-MR13: Canonical finding schema**
 
@@ -447,33 +483,39 @@ When `strict_mode: false` (default), the orchestrator handles proposer failures 
    - `parse_failed` — adapter could not parse CLI output into the canonical schema even after one retry. Skip reviewer, record `error_code: parse_failed`.
    - `cli_error` — CLI exited non-zero for any other reason. Skip reviewer, record `error_code: cli_error` with stderr excerpt.
 
-2. **Degradation threshold:** the review proceeds as long as **at least `min_proposers_to_proceed`** (default: 1) reviewers succeed. The default of 1 is deliberately permissive — a review with even one successful multi-model reviewer is still more useful than nothing, and multi-model mode is opt-in in the first place.
+2. **External-reviewer degradation threshold:** the review proceeds with whatever external reviewers succeeded, as long as **at least `min_proposers_to_proceed`** external reviewers succeeded (default: 1). This setting counts external reviewers only — native reviewers are not subject to this threshold because they are not what's at risk of failing transiently.
 
-3. **If ALL proposers fail:** the orchestrator falls back to the **native single-model review path** (FR-MR17) and surfaces the fallback prominently in the output.
+3. **If ALL external reviewers fail (and strict_mode is off):** the orchestrator does NOT abort. Because native reviewers ran in the same parallel batch (FR-MR12), their findings are already in hand. The orchestrator continues with the native findings only — see FR-MR17.
 
-4. **Family-diversity warning on degradation:** if degradation drops the successful reviewer count below `min_family_diversity`, emit a warning on the output but continue. The warning is a soft nudge, not a block.
+4. **Family-diversity warning on degradation:** if external failures drop the surviving family count below `min_family_diversity`, emit a warning on the output but continue. The warning is a soft nudge, not a block.
+
+5. **Native reviewer failure handling:** native sub-agents can also fail (context-window error, output-parse failure, etc.). These are surfaced the same way external failures are — listed in the unified report with an error code. They do NOT trigger external-fallback logic; they are command-level errors and the surviving native + external set proceeds. If ALL native reviewers fail AND `include_native_reviewers: true`, that is a more serious condition and the orchestrator emits a critical warning that the Anthropic perspective is missing entirely from the consolidation.
 
 **Acceptance Criteria:**
 - Each failure category produces a distinct, machine-readable `error_code`
-- The user-facing output lists every failed reviewer with its error category and a remediation hint
+- The user-facing output lists every failed reviewer (native or external) with its error category and a remediation hint
 - The review never silently drops a failed reviewer — failures are always reported
+- `min_proposers_to_proceed` applies to external reviewers only; native reviewer count is reported separately in degradation logging
 
-**FR-MR17: Fallback to native single-model review**
+**FR-MR17: Continuation with natives only when externals all fail**
 
-When all configured proposers fail AND `strict_mode: false`, the orchestrator does NOT abort. Instead it:
+When all configured external reviewers fail AND `strict_mode: false`, the orchestrator does NOT abort and does NOT need to re-run anything. Because native reviewers ran in the same parallel fan-out batch (FR-MR12), their findings are already collected. The orchestrator simply:
 
-1. Emits a prominent warning to the user: "All multi-model reviewers failed. Falling back to single-model review using the host Claude session."
-2. Lists each failed reviewer with its error code and remediation hint.
-3. Hands control to the command's pre-existing native review path (e.g., `review-code` invokes Code Reviewer + Security Reviewer on Claude, exactly as today).
-4. The audit artifact (FR-MR24) records the failure, the fallback decision, and which single-model reviewers ran.
+1. Emits a prominent warning to the user: "All external multi-model reviewers failed. Continuing with native Synthex reviewers only — the consolidated review reflects only the Anthropic perspective."
+2. Lists each failed external reviewer with its error code and remediation hint.
+3. Runs the consolidation pipeline on the native findings alone (which is mostly a no-op — native reviewers already produce well-structured findings; consolidation just normalizes them and emits the standard report shape).
+4. The audit artifact (FR-MR24) records the failure of each external reviewer and the fact that the review completed on natives only.
 
-This fallback ensures that enabling multi-model review never makes a command less reliable than single-model review. The worst-case outcome is "same quality as before, with a warning."
+This fallback ensures that enabling multi-model mode **never makes a command less reliable than today's single-model behavior**. The worst case is "today's review behavior, plus a warning that you didn't get the multi-model lift you configured for." There is no separate fallback CLI path or re-run — the safety net is structural, baked into the parallel fan-out shape.
+
+If `include_native_reviewers: false` AND all external reviewers fail, the orchestrator has nothing to consolidate. In that case it reports the total failure to the user with all error codes, and the calling command decides how to handle (typically: report the failure as the review verdict and let the user retry).
 
 **Acceptance Criteria:**
-- Fallback triggers only when all proposers fail AND strict mode is off
-- The user sees a visible warning, not a silent fallback
-- The audit artifact records both the failure and the fallback
-- Fallback uses the exact same native reviewer set that would have been used if multi-model were disabled
+- Continuation triggers automatically when all externals fail AND strict mode is off AND at least one native reviewer succeeded — no new CLI invocations needed
+- The user sees a visible warning, not a silent continuation
+- The audit artifact records both the external failures and the native-only continuation
+- The continuation uses the native sub-agent results from the same review cycle — there is no second round of native invocations
+- When `include_native_reviewers: false` AND all externals fail, the command surfaces the total failure as a review error rather than producing an empty report
 
 **FR-MR18: Strict mode**
 
@@ -562,60 +604,68 @@ Preflight failures (not warnings) block the invocation with a clear remediation 
    - `--no-multi-model` → always use native single-model review, skip all multi-model logic below.
    - `--multi-model` → always use multi-model review, skip the gate below.
 
-2. **Master switch.** If `multi_model_review.enabled: false` OR `multi_model_review.per_command.review_code.enabled: false`, use native single-model review.
+2. **Master switch.** If `multi_model_review.enabled: false` OR `multi_model_review.per_command.review_code.enabled: false`, use native-only review (today's behavior — Code Reviewer + Security Reviewer + optional Performance Engineer; no externals).
 
 3. **Complexity gate (FR-MR21a).** The command reads `multi_model_review.per_command.review_code.complexity_gate`:
 
-   - `mode: never` → always use native single-model review
-   - `mode: always` → always use multi-model (skip the gate; same behavior as `--multi-model`)
+   - `mode: never` → always use native-only review (externals never added)
+   - `mode: always` → always run native + external (skip the gate; same as `--multi-model`)
    - `mode: auto` (default) → apply the heuristic:
      - Compute diff metrics: `lines_changed = added + removed`, `files_touched = distinct files in diff`
-     - If `lines_changed > threshold_lines`, trigger multi-model
-     - Else if `files_touched > threshold_files`, trigger multi-model
-     - Else if any file matches any glob in `always_escalate_paths`, trigger multi-model
-     - Else fall through to native single-model review
+     - If `lines_changed > threshold_lines`, add externals
+     - Else if `files_touched > threshold_files`, add externals
+     - Else if any file matches any glob in `always_escalate_paths`, add externals
+     - Else native-only (today's behavior)
 
-4. **Multi-model path (gate triggered or overridden on):**
-   - Invoke `multi-model-review-orchestrator` with the diff plus the context bundle assembled per FR-MR28.
-   - The orchestrator's consolidated findings replace the native Code Reviewer + Security Reviewer (+ optional Performance Engineer) output in the unified report.
-   - The unified report format (`## Code Review Report`) is preserved; the reviewer table shows one row per multi-model reviewer plus a synthetic "Aggregator" row.
+4. **Multi-model path (gate triggered or `--multi-model`):**
+   - Invoke `multi-model-review-orchestrator`, which fans out to **both** the native sub-agents (Code Reviewer + Security Reviewer + optional Performance Engineer) AND the external adapters configured in `multi_model_review.reviewers` (e.g., Codex, Gemini) — all in one parallel batch (FR-MR12).
+   - Native sub-agents run with their existing prompts and full Synthex context. External adapters run with the context bundle (FR-MR28).
+   - The orchestrator consolidates findings from all sources into a single unified report.
+   - The unified report format (`## Code Review Report`) is preserved; the reviewer table shows one row per native reviewer AND one row per external reviewer (e.g., "Code Reviewer", "Security Reviewer", "GPT-5 (Codex)", "Gemini 2.5 Pro").
 
-5. **Native path (gate not triggered or forced off):**
-   - Behavior is byte-identical to today's `review-code` — Code Reviewer + Security Reviewer (+ optional Performance Engineer).
+5. **Native-only path (gate not triggered or `--no-multi-model`):**
+   - Behavior is byte-identical to today's `review-code` — Code Reviewer + Security Reviewer + optional Performance Engineer run via the existing single-model path. The orchestrator is not invoked at all.
 
 6. **Always transparent.** The unified report's header states which path ran and why, in one line:
-   - `Review path: multi-model (complexity gate triggered: 127 lines changed > 50)`
-   - `Review path: multi-model (forced by --multi-model flag)`
-   - `Review path: multi-model (always_escalate match: src/auth/session.ts)`
-   - `Review path: native single-model (diff below complexity threshold: 12 lines across 1 file)`
-   - `Review path: native single-model (multi-model disabled in config)`
+   - `Review path: native + external multi-model (complexity gate triggered: 127 lines changed > 50; reviewers: 2 native + 2 external)`
+   - `Review path: native + external multi-model (forced by --multi-model flag; reviewers: 2 native + 3 external)`
+   - `Review path: native + external multi-model (always_escalate match: src/auth/session.ts; reviewers: 2 native + 2 external)`
+   - `Review path: native only (diff below complexity threshold: 12 lines across 1 file; reviewers: 2 native)`
+   - `Review path: native only (multi-model disabled in config; reviewers: 2 native)`
+   - `Review path: native only (all external reviewers failed — see error log; reviewers: 2 native, 0 external succeeded)`
 
-7. **Fallback interaction.** If the orchestrator fires and then all proposers fail (FR-MR17), the fallback path is the same native single-model path the command would have used if the gate had sent it there.
+7. **Continuation when externals fail.** If the orchestrator fires and all external reviewers fail (FR-MR17), the unified report still completes using the native sub-agents' findings (which were collected in the same parallel cycle) and emits a warning. This is *not* a separate fallback re-run — there is no extra cost or latency to the failure path.
 
-8. **Review loop (Step 6) continues to work:** on FAIL verdict, the command re-invokes whichever path was chosen. Note that the gate decision is made once per `review-code` invocation, not per loop cycle — if a fix pushes a diff from 48 lines to 52 lines mid-loop, the loop still uses the path chosen at the start. This prevents oscillation.
+8. **Review loop continues to work:** on FAIL verdict, the command re-invokes whichever path was chosen with the updated diff. Note that the gate decision is made once per `review-code` invocation, not per loop cycle — if a fix pushes a diff from 48 lines to 52 lines mid-loop, the loop still uses the path chosen at the start. This prevents oscillation.
 
 **Acceptance Criteria:**
-- `review-code --multi-model` runs multi-model mode even if disabled in config or below the complexity gate
-- `review-code --no-multi-model` runs native mode even if enabled and above the gate
-- `mode: auto` produces multi-model on diffs > threshold_lines, diffs touching > threshold_files files, or diffs matching any always_escalate_paths glob — verified with planted fixtures for each trigger
-- `mode: never` disables multi-model entirely for `review-code` without unsetting the master switch (useful for cost-sensitive CI)
+- `review-code --multi-model` adds external reviewers to the native ensemble even if disabled in config or below the complexity gate
+- `review-code --no-multi-model` runs native-only even if enabled and above the gate (no externals invoked)
+- `mode: auto` adds externals on diffs > threshold_lines, diffs touching > threshold_files files, or diffs matching any always_escalate_paths glob — verified with planted fixtures for each trigger
+- `mode: never` disables external reviewers entirely for `review-code` without unsetting the master switch (useful for cost-sensitive CI)
+- When externals are added, native sub-agents continue to run unchanged — verified by snapshot regression test that native findings are present in the unified report alongside external findings
 - The unified report header always states which path ran and why, in the documented format
 - Design-system compliance for UI changes (today's automatic behavior) continues to run regardless of path — the design-system agent is a specialized advisory role, not a generic reviewer, and is always invoked on UI diffs
 - The complexity gate decision is cached for the duration of the review loop to prevent oscillation between paths mid-loop
 
 **FR-MR22: `write-implementation-plan` integration (v1 scope)**
 
-`write-implementation-plan` is updated similarly:
+`write-implementation-plan` is updated similarly to `review-code`, with one key difference: there is no complexity gate. Plans are inherently high-stakes and a small plan is not a good reason to skip multi-model review.
 
-1. The plan review step (currently runs Architect, Designer, Tech Lead as reviewers) becomes multi-model-aware.
-2. When multi-model is active, the orchestrator is invoked with the draft plan as the artifact. The reviewer **role** remains "plan reviewer" — but the orchestrator fans out to the configured external LLM reviewers rather than spawning Synthex's Architect/Designer/Tech Lead sub-agents.
-3. **Important role-mapping question (Open Question OQ-1):** should each external model play the "plan reviewer" generalist role, or should each external model receive a different Synthex reviewer prompt (one plays Architect, one plays Designer, etc.)? The PRD defers this to implementation with a preference for the first option (every external model reviews as a generalist) because (a) it keeps the orchestrator simple, (b) it preserves the canonical comparison "did model X see issue Y that model Z missed", and (c) role-specific prompting can be added later without breaking this pattern.
-4. The Product Manager's decision-and-revision flow (invoking `plan-scribe` to apply decided edits) is unchanged.
+1. The plan review step (currently runs Architect + Designer + Tech Lead as native sub-agents) becomes multi-model-aware.
+2. **When multi-model is active**, the orchestrator is invoked with the draft plan as the artifact. The orchestrator fans out to **both** the native sub-agents (Architect + Designer + Tech Lead) AND the configured external adapters in one parallel batch.
+3. **Native sub-agents keep their role-specialized prompts.** Architect reviews architecture; Designer reviews design; Tech Lead reviews task clarity. Each emits findings in the canonical schema.
+4. **External reviewers play a generalist "plan reviewer" role.** This is per-Open-Question OQ-1 — for v1, every external model reviews as a generalist. Role-specialization for externals is deferred to v2.
+5. **Consolidation merges all findings** — the PM agent receives a single consolidated list as it does today, with attribution showing which native or external reviewer raised each finding.
+6. **When multi-model is inactive**, behavior is byte-identical to today's plan review — only the native sub-agents run.
+7. The Product Manager's decision-and-revision flow (invoking `plan-scribe` to apply decided edits) is unchanged.
 
 **Acceptance Criteria:**
-- Multi-Model plan review produces findings in the same structure Architect/Designer/Tech Lead would
-- The PM agent receives consolidated findings identical in shape to today's output
+- Native Architect + Designer + Tech Lead sub-agents run unchanged on every invocation, regardless of whether externals are added
+- When multi-model is active, external reviewers run in parallel alongside the natives in a single fan-out batch
+- The PM agent receives consolidated findings in the same shape it does today, with per-finding attribution distinguishing native and external sources
 - `plan-linter` (pre-review structural check) is unaffected — it runs before the orchestrator, as today
+- Disabling multi-model produces byte-identical behavior to today (native-only)
 
 **FR-MR23: Command behavior when multi-model is inactive**
 
@@ -636,15 +686,18 @@ Every multi-model review invocation writes an audit file to `docs/reviews/` (con
 Contents:
 
 1. **Invocation metadata** — command, target/artifact, timestamp, git commit, Synthex version
-2. **Configuration snapshot** — the resolved `multi_model_review` config used for this invocation (strict mode, reviewers, aggregator)
-3. **Preflight result** — which CLIs were available, family diversity, warnings
-4. **Per-reviewer results** — for each proposer: status, error code if any, finding count, token usage, raw output path (under `/tmp` or a per-run subdirectory)
-5. **Consolidated findings** — the final output, same format as returned to the caller
+2. **Configuration snapshot** — the resolved `multi_model_review` config used for this invocation (strict mode, `include_native_reviewers` setting, external reviewers list, aggregator)
+3. **Preflight result** — which external CLIs were available, family diversity (counting natives), warnings
+4. **Per-reviewer results** — separated into two sections:
+   - **Native reviewers** — for each Synthex sub-agent invoked: name, status, finding count
+   - **External reviewers** — for each external proposer: name, family, status, error code if any, finding count, token usage, raw output path (under `/tmp` or a per-run subdirectory)
+5. **Consolidated findings** — the final output, same format as returned to the caller, with each finding's attribution showing whether it came from a native or external reviewer (or both)
 6. **Aggregator trace** — which findings were merged, which were flagged as contradictions, which triggered the severity judge, which were demoted as minority-of-one
-7. **Fallback event** (if applicable) — failure trigger, fallback path taken
+7. **Continuation event** (if applicable) — list of failed external reviewers, the decision to continue with natives only, family-diversity warning if applicable
 
 **Acceptance Criteria:**
-- Audit files are written for every invocation, including failed ones
+- Audit files are written for every invocation, including ones where some or all externals failed
+- Native and external reviewer sections are clearly separated in the audit so a reader can quickly answer "which natives ran" vs "which externals ran"
 - Audit files are self-contained — a reader can reconstruct exactly what happened from the file alone
 - Audit files do NOT contain provider API keys, tokens, or any secret material (CLIs handle auth; Synthex never sees secrets, so this is a design-invariant guarantee rather than a filter)
 - The `audit.enabled: false` configuration disables audit file creation for users with privacy or disk-space concerns
