@@ -29,8 +29,8 @@
 | Term | Definition |
 |------|------------|
 | **Multi-model review** | Review orchestrated across multiple LLM families (Claude, GPT, Gemini, local open-source models, etc.) — one review per configured model, then consolidated. Not related to multimodal input (vision/audio); "multi-model" here means multiple language models. |
-| **Proposer** | An external LLM invoked via a CLI adapter that produces a set of review findings. Cheap/fast models (Sonnet, GPT-5-mini, Gemini Flash, local Qwen). |
-| **Aggregator** | The LLM that consolidates all proposers' findings into a single output — handles dedup, severity reconciliation, contradiction resolution, and attribution. A stronger model (Opus, GPT-5, Gemini Ultra) or, by default, the host Claude session. |
+| **Proposer** | An external LLM invoked via a CLI adapter that produces a set of review findings. Should be a flagship reasoning-capable model (Claude Sonnet/Opus, GPT-5, Gemini 2.5 Pro, DeepSeek V3.x, Qwen 2.5 Coder 32B+, etc.) — not a small/fast tier. The aggregator cannot recover issues that no proposer flagged, so each proposer slot is high-value and should be filled by the best model the user's CLI gives access to. Most CLI defaults already select flagship models; Synthex does not override them. |
+| **Aggregator** | The LLM that consolidates all proposers' findings into a single output — handles dedup, severity reconciliation, contradiction resolution, and attribution. Its task is judging among findings, not producing them, so it does not need to be markedly stronger than the proposers — but it must be at least as strong as the weakest proposer to avoid information loss. By default the orchestrator picks the strongest configured proposer for this role; users can name an explicit aggregator. |
 | **Adapter agent** | A Haiku-backed Synthex utility agent that wraps a specific provider CLI (`codex-review-prompter`, `gemini-review-prompter`, etc.). Handles invocation, output parsing, and normalization to the canonical finding schema. |
 | **Orchestrator agent** | `multi-model-review-orchestrator` — the new Synthex agent that drives the full flow: fan-out to adapters, consolidation, return to caller. |
 | **Canonical finding** | A normalized finding record produced by any adapter, conforming to the shared JSON schema (see FR-MR13). |
@@ -51,13 +51,17 @@
 
 The system uses a **proposers-plus-aggregator** architecture:
 
-1. **Proposer tier:** N external LLMs (one per configured reviewer) each produce independent review findings on the same artifact. Proposers run in parallel. The model per proposer should be fast/cheap-leaning (Sonnet-class, GPT-5-mini, Gemini Flash, local Qwen) — exact choice is governed by whatever the user's CLI config selects.
-2. **Aggregator tier:** A single stronger model consolidates proposer outputs (dedup, severity reconciliation, contradiction resolution) and emits one consolidated findings list.
+1. **Proposer tier:** N external LLMs (one per configured reviewer) each produce independent review findings on the same artifact. Proposers run in parallel.
+   - Each proposer should be a **flagship reasoning-capable model** (Claude Sonnet/Opus, GPT-5, Gemini 2.5 Pro, DeepSeek V3.x, Qwen 2.5 Coder 32B+) — *not* a small/fast variant. Code review is a "find subtle issues" task; cheap models systematically under-detect, and the aggregator cannot recover findings no proposer flagged. Each proposer slot is high-value and should be the best the user's CLI gives them access to.
+   - **Extended-thinking / reasoning modes** (Claude extended thinking, GPT-5/o-series reasoning tokens, Gemini 2.5 thinking mode) should be enabled when the CLI supports them. The latency and token cost are well-spent on a review task. Most modern CLIs enable this by default; Synthex does not override the user's CLI configuration.
+   - The actual model choice is whatever the user's CLI invocation produces — Synthex never specifies a model behind the user's back. Documented adapter recipes recommend flagship-class invocations as defaults.
+2. **Aggregator tier:** A single model consolidates proposer outputs (dedup, severity reconciliation, contradiction resolution) and emits one consolidated findings list. The aggregator's job is *judgement among existing findings*, not original analysis, so it does not need to be markedly stronger than the proposers — but it must be at least as capable as the weakest proposer to avoid information loss when summarizing. By default it is the strongest configured proposer (FR-MR15); explicit aggregator selection is supported.
 
 **Acceptance Criteria:**
 - Proposer invocations are fan-out parallel, not sequential
 - Aggregator runs exactly once per review cycle, after all proposers have returned (or timed out)
 - The aggregator is a distinct step from any individual proposer, even when the aggregator model family overlaps with a proposer family
+- Adapter documentation recommends a flagship default model + extended-thinking flags where applicable; documentation explicitly warns against using small/cheap variants for the proposer role
 
 **FR-MR2: CLI-only provider integration**
 
@@ -358,7 +362,7 @@ A finding flagged by only one reviewer is **never dropped** on the basis of low 
 
 The aggregator is configurable (`multi_model_review.aggregator.command`). Default behavior:
 
-- **`auto`:** select the strongest proposer in the configured list by a hardcoded tier table (Opus > GPT-5 > Gemini Ultra > Sonnet > GPT-5-mini > ...). If the strongest proposer is also a reviewer, the aggregator invocation uses a separate, freshly-spawned CLI call with a judge-mode system prompt.
+- **`auto`:** select the strongest proposer in the configured list by a hardcoded tier table (e.g., Claude Opus > GPT-5 > Gemini 2.5 Pro Ultra > Claude Sonnet > Gemini 2.5 Pro > DeepSeek V3 > ...). The table only ranks among flagship models — small/cheap variants (`gpt-5-mini`, `gemini-flash`, etc.) are not represented because they are not recommended as proposers (see FR-MR1) and therefore should not be selected as aggregators either. If the strongest proposer is also a reviewer, the aggregator invocation uses a separate, freshly-spawned CLI call with a judge-mode system prompt.
 - **Explicit:** the user names a specific adapter (e.g., `claude-review-prompter` with `model: claude-opus-4-7`).
 
 **Bias mitigation applied by the orchestrator regardless of choice:**
@@ -806,7 +810,7 @@ Stage 3 dedup needs an embedding model. Options: (a) call `llm embed` if present
 A 2000-line diff may exceed some CLI context windows. Should the orchestrator auto-chunk? Or error with guidance to reduce scope? Recommend error-with-guidance for v1 (matches today's `max_diff_lines: 300` warning pattern in `review-code`). Auto-chunking is future work because it interacts with dedup across chunks.
 
 **OQ-4: Aggregator model family overlap.**
-If the aggregator's family is the same as the only non-Claude proposer's family (e.g., GPT-5 aggregator over GPT-5-mini + Claude proposers), is that acceptable? Per FR-MR15 we warn but don't block. Should we block in `strict_mode`? Defer — revisit if users hit self-preference issues in practice.
+If the aggregator's family is the same as the only non-Claude proposer's family (e.g., a GPT-5 aggregator judging an ensemble of GPT-5 + Claude Sonnet proposers, where the only non-Claude voice is GPT-5), is that acceptable? Per FR-MR15 we warn but don't block. Should we block in `strict_mode`? Defer — revisit if users hit self-preference issues in practice.
 
 **OQ-5: Handling reviewer-specific quirks in prompts.**
 Some models respond better to specific prompting patterns (Gemini prefers XML-tagged structure; GPT-5 prefers concise instruction). Should adapter prompts be model-family-specific? Recommend a shared canonical prompt in v1 with per-adapter `prompt_style` config field reserved for v2.
