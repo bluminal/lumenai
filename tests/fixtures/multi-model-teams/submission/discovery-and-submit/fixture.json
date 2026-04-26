@@ -1,0 +1,56 @@
+{
+  "scenario": "discovery-and-submit",
+  "description": "Standard command (review-code) discovers matching pool and submits tasks via standing-pool-submitter. Pool Lead returns success envelope with review report.",
+  "setup": {
+    "pool_name": "review-pool-a",
+    "pool_roster": ["code-reviewer", "security-reviewer"],
+    "pool_state": "idle",
+    "multi_model": false,
+    "last_active_at": "2026-04-26T05:00:00Z",
+    "ttl_minutes": 60,
+    "routing_mode": "prefer-with-fallback",
+    "matching_mode": "covers",
+    "submission_timeout_seconds": 300,
+    "required_reviewer_set": ["code-reviewer", "security-reviewer"],
+    "submitted_tasks": [
+      {
+        "subject": "Code review: staged changes",
+        "description": "Review for craftsmanship, conventions, specification compliance"
+      },
+      {
+        "subject": "Security review: staged changes",
+        "description": "Review for vulnerabilities, secrets, injection, access control"
+      }
+    ]
+  },
+  "submitter_inputs": {
+    "pool_name": "review-pool-a",
+    "tasks": [
+      {"subject": "Code review: staged changes", "description": "..."},
+      {"subject": "Security review: staged changes", "description": "..."}
+    ],
+    "submission_timeout_seconds": 300
+  },
+  "submitter_outputs": {
+    "status": "success",
+    "report": "## Code Review Report\n\n### Overall Verdict: PASS\n\nAll reviewers returned PASS. No findings.",
+    "error": null,
+    "metadata": {
+      "pool_name": "review-pool-a",
+      "multi_model": false,
+      "task_uuids": ["uuid-1111", "uuid-2222"],
+      "completed_at": "2026-04-26T05:10:00Z"
+    }
+  },
+  "expected": {
+    "routing_decision": "routed-to-pool",
+    "pool_name": "review-pool-a",
+    "multi_model": false,
+    "submitter_invoked": true,
+    "tasks_submitted_count": 2,
+    "envelope_status": "success",
+    "report_surfaced": true,
+    "notification_contains": "Routing to standing pool 'review-pool-a' (multi-model: no).",
+    "provenance_line": "Review path: standing pool 'review-pool-a' (multi-model: no)."
+  }
+}
