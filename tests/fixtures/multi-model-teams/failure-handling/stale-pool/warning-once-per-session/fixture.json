@@ -1,0 +1,80 @@
+[
+  {
+    "frame": "first_discovery",
+    "description": "Router finds old-pool stale (metadata_dir missing). First encounter for this pool in this session.",
+    "state": {
+      "index_json_pools": [
+        {
+          "name": "old-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-24T00:00:00Z",
+          "metadata_dir": "~/.claude/teams/standing/old-pool"
+        }
+      ],
+      "metadata_dir_exists": false,
+      "session_warned_pools": []
+    },
+    "assertion": "old-pool discovered as stale; session_warned_pools is empty; no warning yet shown"
+  },
+  {
+    "frame": "first_cleanup",
+    "description": "old-pool cleaned up; warning shown for first time; session marker set for old-pool.",
+    "state": {
+      "cleanup_result": {
+        "result": "removed",
+        "pool_name": "old-pool",
+        "removed_index_entry": true,
+        "removed_metadata_dir": false
+      },
+      "warning_shown": true,
+      "pool_name": "old-pool",
+      "session_marker_set": true,
+      "session_warned_pools": ["old-pool"]
+    },
+    "assertion": "warning_shown is true; session_marker_set is true; old-pool added to session_warned_pools"
+  },
+  {
+    "frame": "second_discovery",
+    "description": "Old-pool no longer in index (already removed). A different pool 'other-pool' is found stale. Session marker for old-pool has no effect here.",
+    "state": {
+      "index_json_pools": [
+        {
+          "name": "other-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-23T00:00:00Z",
+          "metadata_dir": "~/.claude/teams/standing/other-pool"
+        }
+      ],
+      "metadata_dir_exists": false,
+      "session_warned_pools": ["old-pool"]
+    },
+    "assertion": "old-pool absent from index; other-pool is now found stale; old-pool session marker present but does not affect other-pool"
+  },
+  {
+    "frame": "second_cleanup",
+    "description": "other-pool cleaned up; warning shown for other-pool (separate pool = separate warning). Session marker set for other-pool.",
+    "state": {
+      "cleanup_result": {
+        "result": "removed",
+        "pool_name": "other-pool",
+        "removed_index_entry": true,
+        "removed_metadata_dir": false
+      },
+      "warning_shown": true,
+      "pool_name": "other-pool",
+      "session_warned_pools": ["old-pool", "other-pool"]
+    },
+    "assertion": "warning_shown is true for other-pool; other-pool added to session_warned_pools; both pools now in session_warned_pools"
+  },
+  {
+    "frame": "third_discovery",
+    "description": "Hypothetical re-encounter: old-pool appears again in index. Session marker for old-pool suppresses the duplicate warning.",
+    "state": {
+      "pool_name": "old-pool",
+      "session_warned_pools": ["old-pool", "other-pool"],
+      "warning_shown": false,
+      "suppressed_by_session_marker": true
+    },
+    "assertion": "warning_shown is false; suppressed_by_session_marker is true; session marker prevents duplicate warning for old-pool"
+  }
+]

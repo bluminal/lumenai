@@ -1,0 +1,49 @@
+[
+  {
+    "frame": "discovery_started",
+    "description": "Router scans index.json and finds review-pool listed as idle. The metadata_dir path does not exist on disk — FR-MMT22 Condition 1 will trigger.",
+    "state": {
+      "index_json_pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-25T00:00:00Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ],
+      "metadata_dir_exists": false
+    },
+    "assertion": "index.json lists review-pool as idle; metadata_dir_exists is false; discovery has started"
+  },
+  {
+    "frame": "stale_detected",
+    "description": "FR-MMT22 Condition 1 fires: metadata_dir referenced in index.json does not exist on disk. Pool is flagged as stale.",
+    "state": {
+      "detection_reason": "metadata-missing",
+      "pool_name": "review-pool"
+    },
+    "assertion": "detection_reason is metadata-missing; pool_name is review-pool; FR-MMT22 Condition 1 triggered"
+  },
+  {
+    "frame": "cleanup_invoked",
+    "description": "standing-pool-cleanup agent called to remove the stale entry. Index entry removed; metadata_dir removal skipped (dir does not exist).",
+    "state": {
+      "cleanup_result": {
+        "result": "removed",
+        "pool_name": "review-pool",
+        "removed_index_entry": true,
+        "removed_metadata_dir": false
+      }
+    },
+    "assertion": "cleanup result is removed; index entry removed; metadata_dir removal was skipped (false) because dir did not exist"
+  },
+  {
+    "frame": "warning_shown",
+    "description": "User-visible warning emitted once. Session marker set to suppress duplicate warnings for this pool.",
+    "state": {
+      "warning_text": "Standing pool 'review-pool' was stale and has been cleaned up. Falling back to fresh-spawn review.",
+      "warning_shown": true
+    },
+    "assertion": "warning_shown is true; warning_text contains verbatim FR-MMT22 fragments"
+  }
+]
