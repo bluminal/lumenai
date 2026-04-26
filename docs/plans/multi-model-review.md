@@ -49,8 +49,8 @@ Establishes the substrate every adapter and integration depends on. No user-visi
 ### Milestone 1.1: Canonical Schema, Configuration Schema, and Baseline Snapshots
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 0 | Capture golden-snapshot fixtures for pre-feature behavior of `review-code` and `write-implementation-plan` (no `multi_model_review` config). Store under `tests/__snapshots__/multi-model-review/baseline/`. **Snapshots capture only the deterministic envelope** — path-and-reason header (when present), per-reviewer table structure, decision-flow log lines, exit status, file-write paths and counts. **LLM-generated finding text is excluded via a redaction step that replaces finding bodies with `<<finding-body>>` placeholders before snapshot.** Used as the regression baseline for FR-MR23 byte-identical assertions in Tasks 38(a) and 45(b). | S | None | in progress |
-| 1 | Author canonical finding schema as a JSON Schema document at `plugins/synthex/agents/_shared/canonical-finding-schema.md` (markdown wrapper around JSON Schema). Covers all FR-MR13 fields and constrains `finding_id` to forbid line numbers. | S | None | in progress |
+| 0 | Capture golden-snapshot fixtures for pre-feature behavior of `review-code` and `write-implementation-plan` (no `multi_model_review` config). Store under `tests/__snapshots__/multi-model-review/baseline/`. **Snapshots capture only the deterministic envelope** — path-and-reason header (when present), per-reviewer table structure, decision-flow log lines, exit status, file-write paths and counts. **LLM-generated finding text is excluded via a redaction step that replaces finding bodies with `<<finding-body>>` placeholders before snapshot.** Used as the regression baseline for FR-MR23 byte-identical assertions in Tasks 38(a) and 45(b). | S | None | done |
+| 1 | Author canonical finding schema as a JSON Schema document at `plugins/synthex/agents/_shared/canonical-finding-schema.md` (markdown wrapper around JSON Schema). Covers all FR-MR13 fields and constrains `finding_id` to forbid line numbers. | S | None | done |
 | 2 | Extend `plugins/synthex/config/defaults.yaml` to add the entire `multi_model_review:` block per FR-MR5, plus `audit:` subsection from FR-MR24, plus the new `consolidation.stage4.max_calls_per_consolidation` key from D18. Include inline comments mirroring PRD commentary (especially `strict_mode`, `include_native_reviewers`, per-command patterns). Document each `always_escalate_paths` default (auth, payments, billing, migrations, security, secrets, crypto) with one-sentence justification. | S | None | in progress |
 | 3 | Author `docs/specs/multi-model-review/architecture.md` (initial skeleton): proposer-plus-aggregator architecture, native-vs-external distinction, parallel fan-out shape, context bundle role, pointers to forthcoming adapter-recipes and failure-modes docs. | M | Task 1 | pending |
 | 4 | Author the canonical adapter input/output envelope contract at `docs/specs/multi-model-review/adapter-contract.md` (FR-MR9). Includes envelope JSON Schema for the `Output` shape (status enum, error_code enum, findings array, usage object, raw_output_path). | S | Task 1 | pending |
@@ -61,9 +61,13 @@ Establishes the substrate every adapter and integration depends on. No user-visi
 - `[T]` Redaction step replaces all finding bodies with `<<finding-body>>` placeholder; verified by raw-string scan confirming no real finding text leaks
 - `[T]` Redaction strategy referenced from Tasks 38(a) and 45(b) byte-comparison criteria
 
+**Task 0 Completion Note:** Done. Baseline snapshots at `tests/__snapshots__/multi-model-review/baseline/` for `review-code` and `write-implementation-plan` + `redaction-strategy.md`. 8 tests in `baseline-snapshots.test.ts`. All 4 `[T]` criteria pass with linked tests. Commit `a1e0ee6`.
+
 **Task 1 Acceptance Criteria:**
 - `[T]` Schema file exists; validates a sample canonical finding
 - `[T]` A finding with a line number in `finding_id` fails validation
+
+**Task 1 Completion Note:** Done. Canonical finding schema at `plugins/synthex/agents/_shared/canonical-finding-schema.md` (FR-MR13, D17, D18 references). Validator at `tests/schemas/canonical-finding.ts`. 27 tests in `canonical-finding.test.ts`. Both `[T]` criteria pass: schema validates a sample finding; finding with line number in `finding_id` (`:42`, `L42`, `line_42` patterns) fails. Commit `0a9188d`.
 
 **Task 2 Acceptance Criteria:**
 - `[T]` `defaults.yaml` parses as valid YAML
