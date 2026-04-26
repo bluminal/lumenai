@@ -1,0 +1,31 @@
+{
+  "scenario": "concurrent-submitters",
+  "description": "Two independent sessions submit to the same pool concurrently. UUID-based report-to paths ensure each session gets the correct report envelope without collision.",
+  "setup": {
+    "pool_name": "shared-pool",
+    "pool_roster": ["code-reviewer", "security-reviewer"],
+    "pool_state": "idle"
+  },
+  "session_a": {
+    "report_uuid": "uuid-session-a-report",
+    "task_uuids": ["uuid-a-task-1", "uuid-a-task-2"],
+    "report_to": "~/.claude/tasks/standing/shared-pool/reports/uuid-session-a-report.json",
+    "submitted_at": "2026-04-26T05:00:00Z"
+  },
+  "session_b": {
+    "report_uuid": "uuid-session-b-report",
+    "task_uuids": ["uuid-b-task-1", "uuid-b-task-2"],
+    "report_to": "~/.claude/tasks/standing/shared-pool/reports/uuid-session-b-report.json",
+    "submitted_at": "2026-04-26T05:00:01Z"
+  },
+  "expected": {
+    "session_a_report_to_unique": true,
+    "session_b_report_to_unique": true,
+    "report_to_paths_differ": true,
+    "task_uuids_no_overlap": true,
+    "both_sessions_complete": true,
+    "no_report_collision": true,
+    "pool_serializes_work": true,
+    "fr_mmt18_documented_behavior": "Non-deterministic completion order; users needing guaranteed parallelism should use multiple pools."
+  }
+}
