@@ -1,0 +1,82 @@
+[
+  {
+    "frame": "pool_active",
+    "description": "Native-only standing pool is active with two tasks submitted to code-reviewer and security-reviewer.",
+    "pool_name": "review-pool",
+    "multi_model": false,
+    "reviewers": ["code-reviewer", "security-reviewer"],
+    "tasks_submitted": 2,
+    "assertion": "pool is active, multi_model is false, two reviewers, two tasks submitted"
+  },
+  {
+    "frame": "security_reviewer_completed",
+    "description": "security-reviewer finishes its task normally, returning 3 findings.",
+    "reviewer": "security-reviewer",
+    "status": "completed",
+    "findings_count": 3,
+    "assertion": "security-reviewer completed with 3 findings; no error"
+  },
+  {
+    "frame": "code_reviewer_crashed",
+    "description": "code-reviewer crashes mid-task. Its process terminated unexpectedly.",
+    "reviewer": "code-reviewer",
+    "status": "failed",
+    "error": "reviewer crashed",
+    "assertion": "code-reviewer status is failed with error indicating crash"
+  },
+  {
+    "frame": "submitter_returns_failed",
+    "description": "standing-pool-submitter returns a failed envelope to the host session. The envelope carries the reviewer_crashed error code and metadata. The submitter does NOT invoke recovery itself.",
+    "envelope": {
+      "status": "failed",
+      "report": null,
+      "error": {
+        "code": "reviewer_crashed",
+        "message": "Reviewer code-reviewer did not complete: process terminated"
+      },
+      "metadata": {
+        "pool_name": "review-pool",
+        "multi_model": false,
+        "task_uuids": ["uuid-1", "uuid-2"],
+        "completed_at": "2026-04-26T08:10:00Z"
+      }
+    },
+    "assertion": "envelope status is failed; error.code is reviewer_crashed; error.message names code-reviewer; submitter does not own recovery"
+  },
+  {
+    "frame": "recovery_invoked",
+    "description": "The submitting command's host session detects reviewer_crashed, extracts 'code-reviewer' from error.message, and spawns a fresh native code-reviewer via the Task tool. The submitter does not own this step.",
+    "invoked_by": "submitting_command_host_session",
+    "reviewer_name_extracted": "code-reviewer",
+    "spawn_method": "Task tool",
+    "submitter_owns_recovery": false,
+    "assertion": "recovery invoked by host session, not submitter; reviewer name extracted from error.message; Task tool used for spawn"
+  },
+  {
+    "frame": "fresh_reviewer_completed",
+    "description": "The freshly spawned native code-reviewer completes successfully, returning 2 findings attributed as native-recovery.",
+    "reviewer": "code-reviewer",
+    "status": "completed",
+    "findings_count": 2,
+    "source_type": "native-recovery",
+    "assertion": "fresh code-reviewer completed with 2 findings; source_type is native-recovery"
+  },
+  {
+    "frame": "lightweight_merge",
+    "description": "Surviving security-reviewer findings (3) are appended with recovered code-reviewer findings (2). Stages 3–6 of consolidation are NOT re-run. Full reconsolidation is NOT run. Total is 5.",
+    "surviving_findings": 3,
+    "recovered_findings": 2,
+    "total_findings": 5,
+    "stages_3_to_6_run": false,
+    "full_reconsolidation_run": false,
+    "assertion": "total = surviving + recovered = 5; no full reconsolidation; Stages 3–6 not run"
+  },
+  {
+    "frame": "unified_report_emitted",
+    "description": "A unified report is emitted. The report header contains the verbatim FR-MMT24 step-5 note naming the recovered reviewer. Recovered findings are attributed as native-recovery. Total findings in report is 5.",
+    "report_header_contains": "Note: reviewer code-reviewer was recovered from a pool failure.",
+    "recovered_findings_attribution": "native-recovery",
+    "report_total_findings": 5,
+    "assertion": "report header verbatim per FR-MMT24 step 5; recovered findings attributed native-recovery; total findings 5"
+  }
+]
