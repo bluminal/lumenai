@@ -121,7 +121,46 @@ Check if `.gitignore` exists in the project root. If it does, check whether it a
 - **If `.gitignore` exists and already contains `.synthex-plus/`:** Do nothing.
 - **If `.gitignore` does not exist:** Create it with the entry above.
 
-### 7. Confirm and Guide
+### 7. Standing Review Pools (optional)
+
+**Standing Review Pools (optional)**
+
+Standing review pools keep reviewers warm between reviews — useful when you run many code reviews per session and want to amortize the reviewer spawn cost.
+
+AskUserQuestion: "Would you like to enable standing review pools for this project? (Enable / Skip)"
+
+On Enable:
+- Write `standing_pools.enabled: true` to `.synthex-plus/config.yaml`
+- Add default standing-pool settings to the config:
+  - `standing_pools.routing_mode: prefer-with-fallback`  (silent fallback when no pool matches)
+  - `standing_pools.matching_mode: covers`  (pool roster must cover required reviewers)
+- Do NOT spawn any pool now — FR-MMT27 criterion 3: do not spawn a pool at init time (user runs /start-review-team separately when ready)
+
+On Skip:
+- Do not write `standing_pools` config keys; feature stays off by default
+
+Record the user's choice (Enabled or Skipped) for use in Step 9's guidance output.
+
+### 8. Multi-model review in /team-review (optional)
+
+**Multi-model review in /team-review (optional)**
+
+When enabled, /team-review routes reviewer findings through an external multi-model orchestrator for deeper consolidation — useful for large or high-risk diffs.
+
+Note: This requires `multi_model_review.enabled: true` in `.synthex/config.yaml` (the base Synthex plugin's config). If you haven't enabled multi-model review in Synthex yet, the Synthex /init command handles that setup.
+
+AskUserQuestion: "Would you like to enable multi-model review in /team-review? This requires multi_model_review.enabled: true in .synthex/config.yaml. (Enable / Skip)"
+
+On Enable:
+- Write `multi_model_review.per_command.team_review.enabled: true` to `.synthex-plus/config.yaml`
+- Note to user: "Enabled. Make sure multi_model_review.enabled: true is set in .synthex/config.yaml — run /synthex:init if you haven't already."
+
+On Skip:
+- Do not write the config key; feature stays off by default
+
+Record the user's choice (Enabled or Skipped) for use in Step 9's guidance output.
+
+### 9. Confirm and Guide
 
 Display a summary of what was created, any warnings collected from steps 2-4, and guidance on available commands and configuration.
 
@@ -160,6 +199,14 @@ Configuration guide:
   - Disable cost prompt:   Set cost_guidance.show_cost_comparison: false
   - Hook settings:         Edit hooks.task_completed and hooks.teammate_idle
   - Full reference:        See .synthex-plus/config.yaml for all settings
+```
+
+If `standing_pools.enabled: true` was chosen in Step 7, append the following to the "Available team commands" section in the guidance output:
+
+```
+  /synthex-plus:start-review-team  — Start a standing review pool (keeps reviewers warm between reviews)
+  /synthex-plus:stop-review-team   — Stop a running pool (graceful shutdown with drain)
+  /synthex-plus:list-teams         — View all active pools and their status
 ```
 
 ## Configuration Overview
