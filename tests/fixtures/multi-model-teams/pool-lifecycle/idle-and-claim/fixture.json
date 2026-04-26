@@ -1,0 +1,191 @@
+[
+  {
+    "frame": "spawn",
+    "description": "Pool created, no work submitted. Pool Lead writes initial config.json and index.json entry with pool_state: idle.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 60,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 12345,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:00:00Z",
+      "pool_state": "idle"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-25T10:00:00Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "assertion": "pool_state is idle; last_active_at is T0 (2026-04-25T10:00:00Z); config.json and index.json are in sync"
+  },
+  {
+    "frame": "idle-hook-fires-1",
+    "description": "First TeammateIdle event fires for code-reviewer. Hook proposes T1 > T0. Pool Lead reads T0, max(T0, T1) = T1, writes T1. Both files updated.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 60,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 12345,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:01:15Z",
+      "pool_state": "idle"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-25T10:01:15Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "assertion": "pool_state is still idle; last_active_at advanced to T1 (2026-04-25T10:01:15Z) > T0; max-semantics applied correctly"
+  },
+  {
+    "frame": "idle-hook-fires-2",
+    "description": "Second TeammateIdle event fires for security-reviewer 60 seconds later. Hook proposes T2 > T1. Pool Lead reads T1, max(T1, T2) = T2, writes T2. Monotonic advance confirmed.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 60,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 12345,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:02:20Z",
+      "pool_state": "idle"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-25T10:02:20Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "assertion": "pool_state is still idle; last_active_at advanced to T2 (2026-04-25T10:02:20Z) > T1; second idle hook fires correctly"
+  },
+  {
+    "frame": "debounce-skip",
+    "description": "Third TeammateIdle fires within 30 seconds of T2. Debounce guard detects the last write was too recent (delta < 30s) and skips the write entirely. last_active_at stays at T2.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 60,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 12345,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:02:20Z",
+      "pool_state": "idle"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-25T10:02:20Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "assertion": "pool_state is still idle; last_active_at is unchanged at T2 (2026-04-25T10:02:20Z) — debounce suppressed the write; value did NOT regress"
+  },
+  {
+    "frame": "task-claimed",
+    "description": "A task is submitted. Pool Lead claims it and transitions pool_state: idle → active. last_active_at updated to T3 >= T2 using max-semantics. Both config.json and index.json written.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 60,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 12345,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:05:42Z",
+      "pool_state": "active"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "active",
+          "last_active_at": "2026-04-25T10:05:42Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "assertion": "pool_state transitioned to active; last_active_at advanced to T3 (2026-04-25T10:05:42Z) >= T2; index.json denormalized correctly"
+  },
+  {
+    "frame": "task-complete",
+    "description": "Task completes. Task list empties. Pool Lead transitions pool_state: active → idle. last_active_at updated to T4 >= T3. Both config.json and index.json written.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 60,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 12345,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:08:11Z",
+      "pool_state": "idle"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-25T10:08:11Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "assertion": "pool_state transitioned back to idle; last_active_at advanced to T4 (2026-04-25T10:08:11Z) >= T3; pool persists after task completion"
+  },
+  {
+    "frame": "idle-after-empty",
+    "description": "Task list is empty. Pool remains alive in idle state — it does NOT enter draining or stopping. Standing pools only stop on TTL expiry or explicit /stop-review-team. No new writes; last_active_at stays at T4.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 60,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 12345,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:08:11Z",
+      "pool_state": "idle"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-25T10:08:11Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "assertion": "pool_state is idle (NOT draining or stopping); last_active_at unchanged at T4 (2026-04-25T10:08:11Z); pool does not self-destruct on empty task list"
+  }
+]
