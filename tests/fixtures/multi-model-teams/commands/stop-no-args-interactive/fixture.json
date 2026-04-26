@@ -1,0 +1,65 @@
+[
+  {
+    "frame": "command_invoked",
+    "description": "User invokes /stop-review-team with no arguments.",
+    "event": "command_invoked",
+    "state": {
+      "params": {}
+    },
+    "assertion": "params is empty object"
+  },
+  {
+    "frame": "table_displayed",
+    "description": "Standing-pools table shown to user BEFORE the interactive prompt. User can see available pools before deciding.",
+    "event": "table_displayed",
+    "state": {
+      "table_shown": true,
+      "table_data": [
+        {
+          "name": "review-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-26T08:00:00Z",
+          "ttl_remaining_minutes": 55
+        }
+      ],
+      "prompt_shown_yet": false
+    },
+    "assertion": "table_shown is true; prompt_shown_yet is false (table precedes prompt)"
+  },
+  {
+    "frame": "user_prompted",
+    "description": "After table, user is prompted with verbatim text. User responds 'review-pool'.",
+    "event": "user_prompted",
+    "state": {
+      "prompt_text": "Which pool would you like to stop? Enter pool name or 'cancel' to abort:",
+      "user_response": "review-pool",
+      "prompt_type": "AskUserQuestion"
+    },
+    "assertion": "prompt_text matches verbatim; user_response is 'review-pool'"
+  },
+  {
+    "frame": "shutdown_sent",
+    "description": "SendMessage type:shutdown dispatched to Pool Lead of 'review-pool'.",
+    "event": "shutdown_sent",
+    "state": {
+      "message_to": "Pool Lead of review-pool",
+      "message_type": "shutdown",
+      "payload": {
+        "reason": "user_requested",
+        "initiated_by": "stop-review-team command"
+      }
+    },
+    "assertion": "message_type is 'shutdown'; sent to Pool Lead of review-pool"
+  },
+  {
+    "frame": "confirmation_shown",
+    "description": "Stop confirmed. Pool stopped cleanly. pre_prompt_table_shown records that table was displayed before prompt.",
+    "event": "confirmation_shown",
+    "state": {
+      "pool_name": "review-pool",
+      "result": "stopped_cleanly",
+      "pre_prompt_table_shown": true
+    },
+    "assertion": "result is 'stopped_cleanly'; pre_prompt_table_shown is true"
+  }
+]

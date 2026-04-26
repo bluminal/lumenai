@@ -1,0 +1,29 @@
+[
+  {
+    "frame": "command_invoked",
+    "description": "User invokes /list-teams. No teams directory exists and index.json has no pools.",
+    "event": "command_invoked",
+    "state": {
+      "params": {},
+      "filesystem": {
+        "teams_dir_exists": false,
+        "index_json": {
+          "pools": []
+        }
+      }
+    },
+    "assertion": "no teams exist; index.json pools array is empty"
+  },
+  {
+    "frame": "output_shown",
+    "description": "Output rendered: empty lists for both standing pools and non-standing teams. Friendly empty_message shown with hint.",
+    "event": "output_shown",
+    "state": {
+      "standing_pools": [],
+      "non_standing_teams": [],
+      "empty_message": "No active teams found. Use /start-review-team to create a standing review pool or /next-priority to start a session.",
+      "table_shown": false
+    },
+    "assertion": "standing_pools is empty array; empty_message is non-empty string containing 'start' hint"
+  }
+]
