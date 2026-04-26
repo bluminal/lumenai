@@ -229,40 +229,41 @@ See `pool-lifecycle.md` for the producer-side draining semantics (Pool Lead stat
 
 ### 7.1 Detection Conditions
 
-A pool is detected as "stale" by either of two conditions during inline discovery:
+A pool is considered stale if either of the following conditions holds during the inline discovery filter step:
 
-1. **Metadata directory missing.** The index entry exists but `~/.claude/teams/standing/<name>/` is gone (e.g., user manually deleted it).
-2. **Process likely dead.** The metadata directory exists but `last_active_at` has not been updated for longer than `max(ttl_minutes, 24h)` — the pool's idle hook has not run, suggesting the host process tree owning the teammate processes has died (host reboot, OS-level kill, parent Claude Code process exit).
+1. **Condition 1 (metadata missing):** The pool's `metadata_dir` entry in `index.json` points to a directory that no longer exists — the pool's spawning session ended without clean teardown.
+2. **Condition 2 (last_active_at stale):** `last_active_at` is older than `max(ttl_minutes, 24h)` — meaning the pool's own TTL has expired AND it has been inactive for at least 24 hours. The 24-hour floor prevents cleanup from racing with a pool that is simply idle between tasks; a pool idle for 3 days with TTL=60 is definitively orphaned.
 
 ### 7.2 Cleanup Procedure (FR-MMT22 Normative)
 
-Single path for both detection conditions:
+When inline discovery encounters a stale pool during the filter step:
 
-1. Acquire `.index.lock` per FR-MMT9a.
-2. Remove the index entry (atomic `.tmp` + rename on `index.json`).
-3. If the metadata directory still exists, remove it (`rm -rf ~/.claude/teams/standing/<name>/`).
-4. Release the lock.
-5. Emit a one-time-per-session user-visible warning: `"Standing pool '{name}' appears to have died unexpectedly (no activity for {idle_minutes} min). Cleaned up its metadata. If this happens repeatedly, check host process state or use /list-teams to inspect remaining pools."` The "one-time-per-session" guarantee avoids spamming the warning on repeated commands within the same session.
-6. Continue with the routing decision per `routing_mode` (silent fallback in `prefer-with-fallback`; abort in `explicit-pool-required`).
+1. Invoke the `standing-pool-cleanup` agent (Task 32 agent at `plugins/synthex-plus/agents/standing-pool-cleanup.md`) with the pool name and detection reason.
+2. The cleanup agent acquires `.index.lock`, removes the index entry, removes the metadata directory (if present), releases the lock, and returns a cleanup result.
+3. Emit the verbatim one-time-per-session warning to the user (substituting pool name and fallback action): **`"Standing pool '{name}' was stale and has been cleaned up. {fallback_action}."`** — this is the FR-MMT22 step 5 verbatim warning.
+4. After cleanup, continue with routing: treat the cleaned-up pool as absent and apply `routing_mode` per §4 (silent fallback in `prefer-with-fallback`; abort with no-pool error in `explicit-pool-required`).
 
-### 7.3 Inline-Discovery Side-Effect and `standing-pool-cleanup` Agent
+### 7.3 One-Time-Per-Session Suppression
 
-Stale-pool cleanup is a **side-effect of inline discovery** in the submitting command. When inline discovery encounters a stale pool (step 2 of §1.3), it invokes the `standing-pool-cleanup` Haiku utility agent (Task 32) to perform the multi-step coordinated cleanup under index lock (steps 1–4 of §7.2). The cleanup agent's scope is limited to filesystem coordination — it does NOT perform the discovery filter step.
+To avoid showing the stale-pool warning repeatedly when a user runs multiple review commands in the same session:
 
-The user-visible warning text for TTL-expired pools (FR-MMT13 "probably dead" path — distinct from FR-MMT22 post-death orphan cleanup) is:
+- The first time a stale pool is cleaned up per session, the warning is shown.
+- Subsequent discoveries of the same pool (which will no longer appear in `index.json` after cleanup) will simply find no pool — no repeated warning.
+- If two different stale pools are cleaned up in the same session, each gets its own warning (suppression is per-pool, not global).
+- Implementation: **track a transient marker in the calling session's state** (e.g., a local variable in the command's workflow context; this is not persisted to disk and does not survive session boundaries).
 
-- **Alive-path (pool responded to idle hook recently enough):** `"Pool {name} expired after {idle_minutes} min idle (TTL was {ttl_minutes}); cleaned up."`
-- **Dead-path (stale — no idle hook activity):** `"Pool {name} appears stale (no activity for {idle_minutes} min); reaping orphan metadata."`
+### 7.4 Distinction from FR-MMT28 (Orphan Scan at Team-Init Time)
 
-The FR-MMT22 step-5 warning for general stale detection (not TTL-specific):
+FR-MMT22 (this section) covers in-session stale-pool detection during routing. FR-MMT28 (Task 49) covers orphan detection at `team-init` startup time. Both call the same cleanup agent, but emit **different verbatim warning strings**:
 
-`"Standing pool '{name}' was stale and has been cleaned up. {fallback_action}."` (Task 47 will embed this in command bodies; this document is the schema-of-record.)
+- FR-MMT22 (routing, this section): `"Standing pool '{name}' was stale and has been cleaned up. {fallback_action}."`
+- FR-MMT28 (orphan scan, Task 49): uses a distinct verbatim string — **do NOT reuse FR-MMT22's wording**.
 
-See `pool-lifecycle.md` for the producer-side TTL and draining semantics.
+The FR-MMT22 one-time-per-session suppression does NOT suppress FR-MMT28 orphan warnings at team-init time — the suppression marker is per-session-context and does not propagate to `team-init` invocations.
 
-### 7.4 FR-MMT22 Acceptance Criteria
+### 7.5 FR-MMT22 Acceptance Criteria
 
-- Stale index entries are detected and cleaned automatically when the metadata directory is missing OR `last_active_at` is older than `max(ttl_minutes, 24h)`.
-- Cleanup is atomic: index entry removed and (if present) metadata directory removed under the cross-session lock.
-- The user-visible warning fires at most once per session per stale pool detection.
-- The command continues without erroring (in `prefer-with-fallback` mode); aborts in `explicit-pool-required` mode if the cleanup leaves no matching pool.
+- Stale index entries are cleaned up atomically (delegated to cleanup agent under lock).
+- Discovery proceeds after cleanup with correct routing-mode semantics: `prefer-with-fallback` silently falls back; `explicit-pool-required` aborts with no-pool error.
+- One-time-per-session warning fires on first stale-pool encounter; no second warning for same pool.
+- FR-MMT22 verbatim warning string is distinct from FR-MMT28 orphan warning string.
