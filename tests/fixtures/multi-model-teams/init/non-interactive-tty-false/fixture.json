@@ -1,0 +1,14 @@
+{
+  "scenario": "non-interactive-tty-false",
+  "environment": {
+    "tty": false
+  },
+  "user_responses": {},
+  "expected": {
+    "standing_pools_enabled_written": false,
+    "multi_model_team_review_enabled_written": false,
+    "config_keys_added": [],
+    "auto_skip_applied": true,
+    "blocking": false
+  }
+}

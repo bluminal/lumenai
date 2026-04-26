@@ -1,0 +1,13 @@
+{
+  "scenario": "skip-both",
+  "user_responses": {
+    "standing_pools_prompt": "Skip",
+    "multi_model_prompt": "Skip"
+  },
+  "expected": {
+    "standing_pools_enabled_written": false,
+    "multi_model_team_review_enabled_written": false,
+    "config_keys_added": [],
+    "step9_pool_commands_shown": false
+  }
+}

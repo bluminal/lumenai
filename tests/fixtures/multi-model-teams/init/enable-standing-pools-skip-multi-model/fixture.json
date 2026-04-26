@@ -1,0 +1,20 @@
+{
+  "scenario": "enable-standing-pools-skip-multi-model",
+  "user_responses": {
+    "standing_pools_prompt": "Enable",
+    "multi_model_prompt": "Skip"
+  },
+  "expected": {
+    "standing_pools_enabled_written": true,
+    "routing_mode_written": "prefer-with-fallback",
+    "matching_mode_written": "covers",
+    "pool_spawned_at_init": false,
+    "multi_model_team_review_enabled_written": false,
+    "step9_pool_commands_shown": true,
+    "step9_commands": [
+      "/synthex-plus:start-review-team",
+      "/synthex-plus:stop-review-team",
+      "/synthex-plus:list-teams"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "scenario": "interactive-default-enter",
+  "description": "User presses Enter (empty input) at both prompts. Empty input is treated as Skip.",
+  "user_responses": {
+    "standing_pools_prompt": "",
+    "multi_model_prompt": ""
+  },
+  "expected": {
+    "standing_pools_enabled_written": false,
+    "multi_model_team_review_enabled_written": false,
+    "config_keys_added": [],
+    "step9_pool_commands_shown": false
+  }
+}
