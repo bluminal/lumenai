@@ -1,0 +1,47 @@
+[
+  {
+    "frame": "standing_pool_active",
+    "description": "A standing pool 'review-pool' is active in the session. No non-standing teams exist. The pool does not count toward the one-team-per-session limit (FR-MMT26).",
+    "pool_name": "review-pool",
+    "pool_type": "standing",
+    "session_id": "sess-abc123",
+    "session_team_count_non_standing": 0,
+    "assertion": "standing pool is active; session_team_count_non_standing is 0; pool does not consume the non-standing team slot"
+  },
+  {
+    "frame": "first_non_standing_spawned",
+    "description": "User runs /team-review. The standing pool is exempt under FR-MMT26. session_team_count_non_standing is 0, so the spawn is allowed. Non-standing team 'review-a3f7b2c1' is created.",
+    "team_name": "review-a3f7b2c1",
+    "team_type": "non-standing",
+    "session_id": "sess-abc123",
+    "session_team_count_non_standing": 1,
+    "spawn_allowed": true,
+    "assertion": "spawn_allowed is true; one standing pool + one non-standing team coexist; session_team_count_non_standing is now 1"
+  },
+  {
+    "frame": "second_non_standing_attempt",
+    "description": "User runs /team-review again. session_team_count_non_standing is already 1 (from 'review-a3f7b2c1'). A second non-standing team spawn is blocked by the one-team-per-session rule.",
+    "session_id": "sess-abc123",
+    "session_team_count_non_standing": 1,
+    "spawn_allowed": false,
+    "assertion": "spawn_allowed is false; second non-standing team spawn aborts; standing pool still exempt and unaffected"
+  },
+  {
+    "frame": "error_shown",
+    "description": "FR-MMT26 criterion 3: the original non-standing team conflict error message is surfaced unchanged. It starts with 'Error: An active team' and includes the name of the existing non-standing team.",
+    "session_id": "sess-abc123",
+    "error_message_prefix": "Error: An active team",
+    "error_contains_existing_team_name": true,
+    "existing_team_name": "review-a3f7b2c1",
+    "assertion": "error message starts with 'Error: An active team'; existing team name 'review-a3f7b2c1' is included in the error; original error text is unchanged per FR-MMT26 criterion 3"
+  },
+  {
+    "frame": "standing_pool_unaffected",
+    "description": "After the non-standing team conflict, the standing pool 'review-pool' remains in idle state. The conflict between non-standing teams does not affect the standing pool.",
+    "pool_name": "review-pool",
+    "pool_state": "idle",
+    "session_id": "sess-abc123",
+    "affected_by_conflict": false,
+    "assertion": "pool_state is idle; affected_by_conflict is false; standing pool continues operating normally after the non-standing conflict"
+  }
+]
