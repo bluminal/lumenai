@@ -1,0 +1,39 @@
+{
+  "scenario": "roster-mismatch-fallback",
+  "description": "A pool exists but has roster [performance-engineer] — missing code-reviewer and security-reviewer. Command falls back with routing_decision: fell-back-roster-mismatch.",
+  "setup": {
+    "index_json": {
+      "pools": [
+        {
+          "name": "perf-pool",
+          "roster": ["performance-engineer"],
+          "pool_state": "idle",
+          "multi_model": false,
+          "last_active_at": "2026-04-26T05:00:00Z",
+          "ttl_minutes": 60,
+          "metadata_dir": "~/.claude/teams/standing/perf-pool"
+        }
+      ]
+    },
+    "config": {
+      "standing_pools": {
+        "enabled": true,
+        "routing_mode": "prefer-with-fallback",
+        "matching_mode": "covers"
+      }
+    },
+    "command_args": {
+      "target": "staged"
+    }
+  },
+  "expected": {
+    "routing_decision": "fell-back-roster-mismatch",
+    "pool_name": null,
+    "multi_model": null,
+    "notification_contains": null,
+    "fallback_type": "fresh-spawn",
+    "audit_decision": "fell-back-roster-mismatch",
+    "error": null,
+    "error_shown": false
+  }
+}

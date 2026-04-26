@@ -1,0 +1,34 @@
+{
+  "scenario": "explicit-pool-required-abort",
+  "description": "No matching pool; routing_mode is explicit-pool-required. Command aborts with verbatim FR-MMT17 error. No fallback occurs.",
+  "setup": {
+    "index_json": {
+      "pools": []
+    },
+    "config": {
+      "standing_pools": {
+        "enabled": true,
+        "routing_mode": "explicit-pool-required",
+        "matching_mode": "covers"
+      }
+    },
+    "command_args": {
+      "target": "staged"
+    }
+  },
+  "expected": {
+    "routing_decision": "skipped-routing-mode-explicit",
+    "pool_name": null,
+    "multi_model": null,
+    "abort": true,
+    "error_shown": true,
+    "error_message": "No standing pool matches the required reviewers (code-reviewer, security-reviewer).\nRouting mode is 'explicit-pool-required', so this command will not fall back to\nfresh-spawn reviewers. To proceed, either:\n  1. Start a matching pool:\n       /synthex-plus:start-review-team --reviewers code-reviewer,security-reviewer\n  2. Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml",
+    "error_contains": [
+      "No standing pool matches the required reviewers (code-reviewer, security-reviewer).",
+      "Routing mode is 'explicit-pool-required', so this command will not fall back to",
+      "fresh-spawn reviewers. To proceed, either:",
+      "/synthex-plus:start-review-team --reviewers code-reviewer,security-reviewer",
+      "Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml"
+    ]
+  }
+}

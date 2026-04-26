@@ -1,0 +1,42 @@
+{
+  "scenario": "tty-suppressed-waiting-indicator",
+  "description": "Pool matches; stdout is NOT a TTY (CI simulation); expected wait > 60s. Waiting indicator must NOT be emitted. Submission completes normally.",
+  "setup": {
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool-ci",
+          "roster": ["code-reviewer", "security-reviewer"],
+          "pool_state": "idle",
+          "multi_model": false,
+          "last_active_at": "2026-04-26T05:00:00Z",
+          "ttl_minutes": 60,
+          "metadata_dir": "~/.claude/teams/standing/review-pool-ci"
+        }
+      ]
+    },
+    "config": {
+      "standing_pools": {
+        "enabled": true,
+        "routing_mode": "prefer-with-fallback",
+        "matching_mode": "covers"
+      }
+    },
+    "command_args": {
+      "target": "staged"
+    },
+    "runtime": {
+      "stdout_is_tty": false,
+      "expected_wait_seconds": 90
+    }
+  },
+  "expected": {
+    "routing_decision": "routed-to-pool",
+    "pool_name": "review-pool-ci",
+    "multi_model": false,
+    "waiting_indicator_emitted": false,
+    "waiting_indicator_text": null,
+    "submission_completed": true,
+    "error": null
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "scenario": "waiting-indicator-tty",
+  "description": "Pool matches; stdout IS a TTY; expected wait > 60s. Waiting indicator must be emitted every 30s with verbatim text: \"Pool '{pool_name}' working: {tasks_complete}/{tasks_total} tasks complete...\"",
+  "setup": {
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool-tty",
+          "roster": ["code-reviewer", "security-reviewer"],
+          "pool_state": "idle",
+          "multi_model": false,
+          "last_active_at": "2026-04-26T05:00:00Z",
+          "ttl_minutes": 60,
+          "metadata_dir": "~/.claude/teams/standing/review-pool-tty"
+        }
+      ]
+    },
+    "config": {
+      "standing_pools": {
+        "enabled": true,
+        "routing_mode": "prefer-with-fallback",
+        "matching_mode": "covers"
+      }
+    },
+    "command_args": {
+      "target": "staged"
+    },
+    "runtime": {
+      "stdout_is_tty": true,
+      "expected_wait_seconds": 90,
+      "indicator_interval_seconds": 30
+    }
+  },
+  "expected": {
+    "routing_decision": "routed-to-pool",
+    "pool_name": "review-pool-tty",
+    "multi_model": false,
+    "waiting_indicator_emitted": true,
+    "waiting_indicator_verbatim_template": "Pool '{pool_name}' working: {tasks_complete}/{tasks_total} tasks complete...",
+    "waiting_indicator_sample": "Pool 'review-pool-tty' working: 1/2 tasks complete...",
+    "indicator_interval_seconds": 30,
+    "submission_completed": true,
+    "error": null
+  }
+}

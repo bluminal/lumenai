@@ -1,0 +1,51 @@
+{
+  "scenario": "pool-draining-fallback",
+  "description": "Pool listed as idle in index.json, but config.json re-read shows pool_state: draining. Submitter detects drain on re-read and returns fell-back-pool-draining. Command falls back.",
+  "setup": {
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool-c",
+          "roster": ["code-reviewer", "security-reviewer"],
+          "pool_state": "idle",
+          "multi_model": false,
+          "last_active_at": "2026-04-26T05:00:00Z",
+          "ttl_minutes": 60,
+          "metadata_dir": "~/.claude/teams/standing/review-pool-c"
+        }
+      ]
+    },
+    "pool_config_json": {
+      "name": "review-pool-c",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 60,
+      "spawn_timestamp": "2026-04-26T04:00:00Z",
+      "host_pid": 55001,
+      "host_session_id": "sess-drain-001",
+      "last_active_at": "2026-04-26T05:00:00Z",
+      "pool_state": "draining"
+    },
+    "config": {
+      "standing_pools": {
+        "enabled": true,
+        "routing_mode": "prefer-with-fallback",
+        "matching_mode": "covers"
+      }
+    },
+    "command_args": {
+      "target": "staged"
+    }
+  },
+  "expected": {
+    "routing_decision": "fell-back-pool-draining",
+    "pool_name": "review-pool-c",
+    "multi_model": null,
+    "notification_contains": null,
+    "fallback_type": "fresh-spawn",
+    "audit_decision": "fell-back-pool-draining",
+    "error": null,
+    "error_shown": false
+  }
+}
