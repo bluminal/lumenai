@@ -1,0 +1,38 @@
+{
+  "scenario": "no-pool-fallback",
+  "description": "Pool exists but has wrong roster [code-reviewer] — does not cover required [performance-engineer]. Config is prefer-with-fallback. Command falls back silently with no error emitted.",
+  "setup": {
+    "index_json": {
+      "pools": [
+        {
+          "name": "code-review-pool",
+          "roster": ["code-reviewer"],
+          "pool_state": "idle",
+          "multi_model": false,
+          "last_active_at": "2026-04-26T05:00:00Z",
+          "ttl_minutes": 60,
+          "metadata_dir": "~/.claude/teams/standing/code-review-pool"
+        }
+      ]
+    },
+    "config": {
+      "standing_pools": {
+        "enabled": true,
+        "routing_mode": "prefer-with-fallback",
+        "matching_mode": "covers"
+      }
+    },
+    "command_args": {
+      "scope": "full-stack"
+    }
+  },
+  "expected": {
+    "routing_decision": "fell-back-roster-mismatch",
+    "pool_name": null,
+    "multi_model": null,
+    "notification_contains": null,
+    "fallback_type": "fresh-spawn",
+    "error": null,
+    "error_shown": false
+  }
+}
