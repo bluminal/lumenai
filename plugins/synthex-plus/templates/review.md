@@ -151,3 +151,105 @@ post-compaction state is not reliably introspectable.
 
 **Cost rationale (FR-MMT5b verbatim):** This is a single Read call; cost is negligible vs. a code
 review's typical token spend.
+
+---
+
+### Standing Pool Lifecycle Overlay (apply when standing=true)
+
+> **Composition note (D22):** There is no rendering engine. This overlay is a labeled prose section.
+> Commands compose Pool Lead spawn prompts by reading this file and including this overlay verbatim
+> (raw inclusion) when `standing=true` resolves for the pool. This overlay is composed into
+> Pool Lead prompts ONLY — not into reviewer prompts. Reviewers receive the Identity Confirm overlay
+> (above) and, when `multi_model=true`, the Multi-Model overlay (above). Commands MUST include the
+> entire subtree below verbatim — do not split or summarize.
+
+This overlay is included verbatim into the Pool Lead's spawn prompt when `standing: true`. It
+defines the Pool Lead's lifecycle responsibilities for the duration of the pool's lifetime,
+covering `last_active_at` maintenance, idle persistence, shutdown signal handling, draining, and
+clean exit.
+
+#### (a) `last_active_at` Dual-Write on TeammateIdle (FR-MMT12, FR-MMT9b)
+
+On each TeammateIdle event observed for any pool reviewer, the Pool Lead updates `last_active_at`
+using **`max(existing, new)` semantics**: read the current `last_active_at` from
+`~/.claude/teams/standing/<name>/config.json`, compare against the proposed new timestamp, and
+write the larger of the two. This keeps the timestamp monotonically non-decreasing regardless of
+write interleaving between the Pool Lead and the TeammateIdle hook.
+
+**Debounce:** Write `last_active_at` at most once per 30 seconds even if multiple TeammateIdle
+events fire within that window. This bounds pool-maintenance token spend to ≤ 200 tokens/min at
+steady idle (NFR-MMT2 compliance).
+
+**Dual-write protocol (FR-MMT9b):** Every `last_active_at` write touches both files atomically:
+
+1. **`config.json` (canonical):** Write to
+   `~/.claude/teams/standing/<name>/config.json.tmp`, then `rename` to
+   `~/.claude/teams/standing/<name>/config.json`.
+2. **`index.json` (cache):** Acquire `.index.lock` using the Task 25 locking primitive
+   (`mkdir ~/.claude/teams/standing/.index.lock`). Write the updated index entry to
+   `~/.claude/teams/standing/.index.json.tmp`, then `rename` to
+   `~/.claude/teams/standing/index.json`. Release the lock with
+   `rmdir ~/.claude/teams/standing/.index.lock`.
+
+Write config.json first, then index.json. If the Pool Lead crashes between the two writes,
+`config.json` holds the correct state and the next discovery operation reconciles the stale
+index entry.
+
+#### (b) Skip Natural Shutdown on Empty Task List (FR-MMT14)
+
+A standing pool Pool Lead does NOT exit when facing an empty task list. Continue polling the task
+list for new tasks indefinitely. The only exit paths are via shutdown signal (see (c)–(e) below) or
+TTL expiry. This is the key behavioral difference between a standing pool Pool Lead and a
+per-invocation review-team orchestrator.
+
+#### (c) Shutdown Signal Handling → Draining State (FR-MMT14)
+
+On receiving a shutdown signal — a message with `type: shutdown_request` in the Pool Lead's mailbox
+— transition `pool_state` to `draining` atomically:
+
+1. Write `pool_state: draining` to `config.json` using the `config.json.tmp` + `rename` pattern.
+2. Write the updated `pool_state` to `index.json` using the `.index.lock` acquire →
+   `.index.json.tmp` + `rename` → release pattern (Task 25 locking primitive).
+
+Once `pool_state` is `draining`, the Pool Lead stops accepting new tasks. Submitting commands that
+discover this pool will see `pool_state: draining` in `index.json` and fall back per FR-MMT17
+routing mode semantics.
+
+#### (d) Wait for In-Flight Tasks Before Stopping (FR-MMT14)
+
+While `pool_state: draining`, complete all in-flight tasks before exiting. Do not interrupt
+reviewers that have already claimed and begun working on tasks.
+
+**Stuck-task timeout:** If any in-flight task has not reached `completed` status within
+`lifecycle.stuck_task_timeout_minutes` (default: 30 minutes), mark that task `abandoned` via
+TaskUpdate and proceed as if it completed. This prevents the Pool Lead from hanging indefinitely
+on a reviewer that has become unresponsive.
+
+#### (e) Drain Completion → Stopping → Exit (FR-MMT14)
+
+When all in-flight tasks have completed (or been abandoned per the stuck-task timeout), transition
+`pool_state` to `stopping`:
+
+1. Write `pool_state: stopping` to `config.json` using the `config.json.tmp` + `rename` pattern.
+2. Write the updated `pool_state` to `index.json` using the `.index.lock` acquire →
+   `.index.json.tmp` + `rename` → release pattern.
+
+Then exit cleanly. The Pool Lead's exit removes the in-process pool instance; subsequent discovery
+operations will find `pool_state: stopping` (or a missing index entry if cleanup has run) and
+treat the pool as not routing-eligible.
+
+#### Per-Task Reviewer Re-Issuance (D26)
+
+Per D26 (Task 26 spike outcome): spawn-prompt overlays live in the teammate's conversation history,
+not the system prompt, and are subject to lossy summarization during Claude Code auto-compaction.
+For pool reviewers processing many sequential tasks over hours, compaction is an expected event —
+not an edge case. The Pool Lead MUST re-issue the FR-MMT5b identity-confirm instruction AND the
+FR-MMT20 JSON-envelope clause in each per-task `SendMessage` to pool reviewers, embedding the
+critical overlay content in post-compaction context for every task.
+
+**How to re-issue:** The Pool Lead reads the reviewer's spawn prompt from
+`~/.claude/teams/standing/<name>/config.json` (the `prompt` field) to retrieve the overlay
+instructions. Each `SendMessage` assigning a task to a reviewer must include the FR-MMT5b and
+FR-MMT20 overlay instructions verbatim as part of the task assignment message body. This renders
+spawn-prompt durability irrelevant for FR-MMT5b and FR-MMT20 compliance — the instructions are
+always fresh in post-compaction context.
