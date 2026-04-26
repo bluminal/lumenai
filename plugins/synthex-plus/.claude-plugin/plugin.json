@@ -11,6 +11,9 @@
     "./commands/team-implement.md",
     "./commands/team-review.md",
     "./commands/team-plan.md",
-    "./commands/team-refine.md"
+    "./commands/team-refine.md",
+    "./commands/start-review-team.md",
+    "./commands/stop-review-team.md",
+    "./commands/list-teams.md"
   ]
 }
