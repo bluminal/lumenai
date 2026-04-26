@@ -1,0 +1,51 @@
+[
+  {
+    "frame": "command_invoked",
+    "description": "User invokes /stop-review-team with no arguments.",
+    "event": "command_invoked",
+    "state": {
+      "params": {}
+    },
+    "assertion": "params is empty object"
+  },
+  {
+    "frame": "table_displayed",
+    "description": "Standing-pools table shown before interactive prompt.",
+    "event": "table_displayed",
+    "state": {
+      "table_shown": true,
+      "table_data": [
+        {
+          "name": "review-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-26T08:00:00Z",
+          "ttl_remaining_minutes": 55
+        }
+      ],
+      "prompt_shown_yet": false
+    },
+    "assertion": "table_shown is true; prompt_shown_yet is false"
+  },
+  {
+    "frame": "user_prompted",
+    "description": "User is prompted and responds 'cancel' to abort the operation.",
+    "event": "user_prompted",
+    "state": {
+      "prompt_text": "Which pool would you like to stop? Enter pool name or 'cancel' to abort:",
+      "user_response": "cancel",
+      "prompt_type": "AskUserQuestion"
+    },
+    "assertion": "user_response is 'cancel'"
+  },
+  {
+    "frame": "aborted_cleanly",
+    "description": "User cancelled. No changes: index.json unchanged, no shutdown signal sent, command exits cleanly.",
+    "event": "aborted_cleanly",
+    "state": {
+      "index_changed": false,
+      "shutdown_sent": false,
+      "result": "cancelled"
+    },
+    "assertion": "index_changed is false; shutdown_sent is false; result is 'cancelled'"
+  }
+]

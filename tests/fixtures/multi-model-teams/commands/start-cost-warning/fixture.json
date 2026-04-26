@@ -1,0 +1,49 @@
+[
+  {
+    "frame": "command_invoked",
+    "description": "User invokes /start-review-team with 4 reviewers: code-reviewer, security-reviewer, performance-engineer, design-system-agent.",
+    "event": "command_invoked",
+    "state": {
+      "params": {
+        "reviewers": ["code-reviewer", "security-reviewer", "performance-engineer", "design-system-agent"]
+      }
+    },
+    "assertion": "reviewers list has 4 entries — at or above D16 cost warning threshold"
+  },
+  {
+    "frame": "cost_warning_shown",
+    "description": "D16 threshold reached (4 reviewers). Cost advisory displayed before spawning. User prompted to continue.",
+    "event": "cost_warning_shown",
+    "state": {
+      "reviewer_count": 4,
+      "ttl_minutes": 60,
+      "advisory_text": "Heads up: this pool will keep 4 reviewers idle for up to 60 minutes. Estimated idle cost: ~{cost_estimate}. Continue?",
+      "threshold_triggered": true
+    },
+    "assertion": "advisory_text contains 'Heads up: this pool will keep' and 'idle for up to' and 'minutes' and 'Continue?'"
+  },
+  {
+    "frame": "user_accepted",
+    "description": "User responds Y to continue spawning the pool despite the cost advisory.",
+    "event": "user_accepted",
+    "state": {
+      "user_response": "Y",
+      "proceeding": true
+    },
+    "assertion": "user_response is Y; proceeding is true"
+  },
+  {
+    "frame": "confirmation_shown",
+    "description": "Pool spawned successfully. Confirmation includes cost_warning_shown: true to record that advisory was displayed.",
+    "event": "confirmation_shown",
+    "state": {
+      "pool_name": "review-pool",
+      "roster": ["code-reviewer", "security-reviewer", "performance-engineer", "design-system-agent"],
+      "ttl_minutes": 60,
+      "multi_model": false,
+      "cost_warning_shown": true,
+      "submission_timeout_seconds": 30
+    },
+    "assertion": "cost_warning_shown is true"
+  }
+]

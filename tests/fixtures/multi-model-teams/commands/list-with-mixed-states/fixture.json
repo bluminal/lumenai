@@ -1,0 +1,90 @@
+[
+  {
+    "frame": "command_invoked",
+    "description": "User invokes /list-teams. Index has 4 standing pools (one per state) plus 1 non-standing team.",
+    "event": "command_invoked",
+    "state": {
+      "params": {},
+      "filesystem": {
+        "index_json": {
+          "pools": [
+            {
+              "name": "review-pool-idle",
+              "pool_state": "idle",
+              "last_active_at": "2026-04-26T07:00:00Z",
+              "metadata_dir": "~/.claude/teams/standing/review-pool-idle"
+            },
+            {
+              "name": "review-pool-active",
+              "pool_state": "active",
+              "last_active_at": "2026-04-26T08:30:00Z",
+              "metadata_dir": "~/.claude/teams/standing/review-pool-active"
+            },
+            {
+              "name": "review-pool-draining",
+              "pool_state": "draining",
+              "last_active_at": "2026-04-26T06:45:00Z",
+              "metadata_dir": "~/.claude/teams/standing/review-pool-draining"
+            },
+            {
+              "name": "review-pool-stopping",
+              "pool_state": "stopping",
+              "last_active_at": "2026-04-26T06:00:00Z",
+              "metadata_dir": "~/.claude/teams/standing/review-pool-stopping"
+            }
+          ]
+        },
+        "non_standing_teams": [
+          {
+            "name": "feature-team-123",
+            "standing": false,
+            "created_at": "2026-04-26T08:00:00Z"
+          }
+        ]
+      }
+    },
+    "assertion": "index has 4 standing pools and 1 non-standing team"
+  },
+  {
+    "frame": "output_shown",
+    "description": "Output rendered: all 4 standing pools with states; draining and stopping pools show ttl_remaining_minutes: 0; 1 non-standing team.",
+    "event": "output_shown",
+    "state": {
+      "standing_pools": [
+        {
+          "name": "review-pool-idle",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-26T07:00:00Z",
+          "ttl_remaining_minutes": 42
+        },
+        {
+          "name": "review-pool-active",
+          "pool_state": "active",
+          "last_active_at": "2026-04-26T08:30:00Z",
+          "ttl_remaining_minutes": 20
+        },
+        {
+          "name": "review-pool-draining",
+          "pool_state": "draining",
+          "last_active_at": "2026-04-26T06:45:00Z",
+          "ttl_remaining_minutes": 0
+        },
+        {
+          "name": "review-pool-stopping",
+          "pool_state": "stopping",
+          "last_active_at": "2026-04-26T06:00:00Z",
+          "ttl_remaining_minutes": 0
+        }
+      ],
+      "non_standing_teams": [
+        {
+          "name": "feature-team-123",
+          "standing": false,
+          "created_at": "2026-04-26T08:00:00Z"
+        }
+      ],
+      "empty_message": null
+    },
+    "assertion": "standing_pools has 4 entries; all 4 states represented; draining and stopping have ttl_remaining_minutes: 0; non_standing_teams has 1 entry"
+  }
+]

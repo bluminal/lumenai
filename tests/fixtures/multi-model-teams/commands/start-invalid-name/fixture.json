@@ -1,0 +1,37 @@
+[
+  {
+    "frame": "command_invoked",
+    "description": "User invokes /start-review-team with name 'Review_Pool' (uppercase R, underscore — violates ^[a-z0-9][a-z0-9-]{0,47}$).",
+    "event": "command_invoked",
+    "state": {
+      "params": {
+        "name": "Review_Pool"
+      }
+    },
+    "assertion": "params.name is 'Review_Pool' — contains uppercase and underscore"
+  },
+  {
+    "frame": "validation_failed",
+    "description": "Name 'Review_Pool' fails regex ^[a-z0-9][a-z0-9-]{0,47}$. Verbatim error message emitted immediately. Command does not proceed.",
+    "event": "validation_failed",
+    "state": {
+      "input_name": "Review_Pool",
+      "error_message": "Pool name 'Review_Pool' is invalid. Names must be 1–48 characters, start with a lowercase letter or digit, and contain only lowercase letters, digits, and hyphens.",
+      "regex_tested": "^[a-z0-9][a-z0-9-]{0,47}$",
+      "regex_matched": false
+    },
+    "assertion": "error_message contains \"Pool name '\" and \"is invalid\" and \"Names must be 1–48\""
+  },
+  {
+    "frame": "aborted_no_fs_write",
+    "description": "Command aborted after validation failure. No filesystem writes occurred: config.json not created, index.json not modified, lock not acquired.",
+    "event": "aborted_no_fs_write",
+    "state": {
+      "config_json_written": false,
+      "index_updated": false,
+      "lock_acquired": false,
+      "exit_reason": "validation_failure"
+    },
+    "assertion": "config_json_written is false; index_updated is false; lock_acquired is false"
+  }
+]

@@ -1,0 +1,37 @@
+[
+  {
+    "frame": "command_invoked",
+    "description": "User invokes /start-review-team with name 'review-pool' which already exists.",
+    "event": "command_invoked",
+    "state": {
+      "params": {
+        "name": "review-pool"
+      }
+    },
+    "assertion": "params.name is 'review-pool'"
+  },
+  {
+    "frame": "pre_flight_failed",
+    "description": "Pre-flight check detects existing pool directory at ~/.claude/teams/standing/review-pool/. Conflict reported.",
+    "event": "pre_flight_failed",
+    "state": {
+      "requested_name": "review-pool",
+      "existing_pool_path": "~/.claude/teams/standing/review-pool",
+      "conflict_detected": true,
+      "existing_pool_state": "idle"
+    },
+    "assertion": "conflict_detected is true; existing_pool_path ends with 'review-pool'"
+  },
+  {
+    "frame": "aborted_duplicate",
+    "description": "Command aborted. Error message names the conflict and suggests /list-teams or /stop-review-team for remediation.",
+    "event": "aborted_duplicate",
+    "state": {
+      "error_message": "A standing pool named 'review-pool' already exists at ~/.claude/teams/standing/review-pool. Use /list-teams to see active pools or /stop-review-team --name review-pool to stop it first.",
+      "config_json_written": false,
+      "index_updated": false,
+      "lock_acquired": false
+    },
+    "assertion": "error_message references '/list-teams' or '/stop-review-team' as remediation hint"
+  }
+]

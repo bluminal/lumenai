@@ -1,0 +1,101 @@
+[
+  {
+    "frame": "command_invoked",
+    "description": "User invokes /start-review-team with --multi-model and explicit 3-reviewer roster.",
+    "event": "command_invoked",
+    "state": {
+      "params": {
+        "multi_model": true,
+        "reviewers": ["code-reviewer", "security-reviewer", "performance-engineer"]
+      },
+      "config": {
+        "standing_pools": {
+          "default_ttl_minutes": 60
+        }
+      }
+    },
+    "assertion": "multi_model is true; reviewers list has 3 entries"
+  },
+  {
+    "frame": "preflight_warning",
+    "description": "Multi-model preflight returned warning: only 1 external CLI configured. User prompted 'Continue spawning pool? [Y/n]' and responds Y.",
+    "event": "preflight_warning",
+    "state": {
+      "preflight_result": "warning",
+      "warning_message": "Only 1 external model CLI is configured. Multi-model review may be limited.",
+      "user_prompt": "Continue spawning pool? [Y/n]",
+      "user_response": "Y",
+      "user_continued": true
+    },
+    "assertion": "preflight_result is warning; user_continued is true"
+  },
+  {
+    "frame": "lock_acquired",
+    "description": "Cross-session lock acquired via mkdir .index.lock.",
+    "event": "lock_acquired",
+    "state": {
+      "lock_path": "~/.claude/teams/standing/.index.lock",
+      "lock_acquired": true,
+      "method": "mkdir"
+    },
+    "assertion": "lock_acquired is true; method is mkdir"
+  },
+  {
+    "frame": "metadata_written",
+    "description": "config.json written with multi_model: true. index.json updated atomically.",
+    "event": "metadata_written",
+    "state": {
+      "config_json": {
+        "name": "review-pool",
+        "standing": true,
+        "reviewers": ["code-reviewer", "security-reviewer", "performance-engineer"],
+        "multi_model": true,
+        "ttl_minutes": 60,
+        "spawn_timestamp": "2026-04-26T09:00:00Z",
+        "host_pid": 42200,
+        "host_session_id": "sess-multimodel-001",
+        "last_active_at": "2026-04-26T09:00:00Z",
+        "pool_state": "idle"
+      },
+      "index_json": {
+        "pools": [
+          {
+            "name": "review-pool",
+            "pool_state": "idle",
+            "last_active_at": "2026-04-26T09:00:00Z",
+            "metadata_dir": "~/.claude/teams/standing/review-pool"
+          }
+        ]
+      }
+    },
+    "assertion": "config_json.multi_model is true; pool_state is idle"
+  },
+  {
+    "frame": "spawn_prompts_composed",
+    "description": "Spawn prompts composed. Pool Lead receives all 3 overlays (Identity Confirm + Multi-Model + Lifecycle). Reviewer prompts receive Identity Confirm + Multi-Model but NOT Lifecycle overlay.",
+    "event": "spawn_prompts_composed",
+    "state": {
+      "pool_lead_prompt": "You are the Pool Lead for standing pool 'review-pool'.\n### Standing Pool Identity Confirm Overlay\nYou are a persistent standing-pool agent.\n### Multi-Model Conditional Overlay\nRoute tasks to external model CLIs when beneficial.\n### Standing Pool Lifecycle Overlay\nMonitor TTL and manage pool lifecycle.",
+      "reviewer_prompts": {
+        "code-reviewer": "You are code-reviewer in standing pool 'review-pool'.\n### Standing Pool Identity Confirm Overlay\nYou are a persistent standing-pool agent.\n### Multi-Model Conditional Overlay\nRoute tasks to external model CLIs when beneficial.",
+        "security-reviewer": "You are security-reviewer in standing pool 'review-pool'.\n### Standing Pool Identity Confirm Overlay\nYou are a persistent standing-pool agent.\n### Multi-Model Conditional Overlay\nRoute tasks to external model CLIs when beneficial.",
+        "performance-engineer": "You are performance-engineer in standing pool 'review-pool'.\n### Standing Pool Identity Confirm Overlay\nYou are a persistent standing-pool agent.\n### Multi-Model Conditional Overlay\nRoute tasks to external model CLIs when beneficial."
+      }
+    },
+    "assertion": "pool_lead_prompt contains all 3 overlay headings; reviewer prompts contain Identity Confirm and Multi-Model but NOT Lifecycle overlay"
+  },
+  {
+    "frame": "confirmation_shown",
+    "description": "Confirmation shown to user. multi_model: true reflected in output.",
+    "event": "confirmation_shown",
+    "state": {
+      "pool_name": "review-pool",
+      "roster": ["code-reviewer", "security-reviewer", "performance-engineer"],
+      "ttl_minutes": 60,
+      "multi_model": true,
+      "cost_warning_shown": false,
+      "submission_timeout_seconds": 30
+    },
+    "assertion": "multi_model is true; pool_name is review-pool"
+  }
+]

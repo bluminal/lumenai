@@ -1,0 +1,90 @@
+[
+  {
+    "frame": "command_invoked",
+    "description": "User invokes /start-review-team with no flags. Config provides default roster of code-reviewer + security-reviewer.",
+    "event": "command_invoked",
+    "state": {
+      "params": {},
+      "config": {
+        "standing_pools": {
+          "default_reviewers": ["code-reviewer", "security-reviewer"],
+          "default_ttl_minutes": 60
+        }
+      }
+    },
+    "assertion": "command received; params are empty; config provides default roster"
+  },
+  {
+    "frame": "validation_passed",
+    "description": "Name resolved to 'review-pool' (default); roster validated against known agents. Both checks pass.",
+    "event": "validation_passed",
+    "state": {
+      "resolved_name": "review-pool",
+      "resolved_reviewers": ["code-reviewer", "security-reviewer"],
+      "resolved_ttl_minutes": 60,
+      "name_valid": true,
+      "roster_valid": true
+    },
+    "assertion": "resolved_name is 'review-pool'; roster contains exactly code-reviewer and security-reviewer; both flags true"
+  },
+  {
+    "frame": "lock_acquired",
+    "description": "Cross-session lock acquired via mkdir .index.lock before any filesystem writes.",
+    "event": "lock_acquired",
+    "state": {
+      "lock_path": "~/.claude/teams/standing/.index.lock",
+      "lock_acquired": true,
+      "method": "mkdir"
+    },
+    "assertion": "lock_path ends with .index.lock; lock_acquired is true; method is mkdir"
+  },
+  {
+    "frame": "metadata_written",
+    "description": "config.json written with pool_state: idle and last_active_at equal to spawn timestamp. index.json updated atomically via .index.json.tmp rename. Spawn prompts embedded.",
+    "event": "metadata_written",
+    "state": {
+      "config_json": {
+        "name": "review-pool",
+        "standing": true,
+        "reviewers": ["code-reviewer", "security-reviewer"],
+        "multi_model": false,
+        "ttl_minutes": 60,
+        "spawn_timestamp": "2026-04-26T08:00:00Z",
+        "host_pid": 42100,
+        "host_session_id": "sess-default-001",
+        "last_active_at": "2026-04-26T08:00:00Z",
+        "pool_state": "idle"
+      },
+      "index_json": {
+        "pools": [
+          {
+            "name": "review-pool",
+            "pool_state": "idle",
+            "last_active_at": "2026-04-26T08:00:00Z",
+            "metadata_dir": "~/.claude/teams/standing/review-pool"
+          }
+        ]
+      },
+      "spawn_prompts": {
+        "pool_lead": "You are the Pool Lead for standing pool 'review-pool'.\n### Standing Pool Identity Confirm Overlay\nYou are a persistent standing-pool agent.\n### Standing Pool Lifecycle Overlay\nMonitor TTL and manage pool lifecycle.",
+        "reviewer_code_reviewer": "You are code-reviewer in standing pool 'review-pool'.\n### Standing Pool Identity Confirm Overlay\nYou are a persistent standing-pool agent.",
+        "reviewer_security_reviewer": "You are security-reviewer in standing pool 'review-pool'.\n### Standing Pool Identity Confirm Overlay\nYou are a persistent standing-pool agent."
+      }
+    },
+    "assertion": "config_json.pool_state is idle; spawn_prompts.pool_lead contains Standing Pool Identity Confirm Overlay verbatim; index_json in sync"
+  },
+  {
+    "frame": "confirmation_shown",
+    "description": "User sees confirmation: pool name, roster, TTL. No cost warning because roster has only 2 reviewers (below D16 threshold).",
+    "event": "confirmation_shown",
+    "state": {
+      "pool_name": "review-pool",
+      "roster": ["code-reviewer", "security-reviewer"],
+      "ttl_minutes": 60,
+      "multi_model": false,
+      "cost_warning_shown": false,
+      "submission_timeout_seconds": 30
+    },
+    "assertion": "cost_warning_shown is false (roster size 2, below threshold); pool_name is review-pool; ttl_minutes is 60"
+  }
+]

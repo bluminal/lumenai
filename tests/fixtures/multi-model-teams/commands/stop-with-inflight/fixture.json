@@ -1,0 +1,56 @@
+[
+  {
+    "frame": "command_invoked",
+    "description": "User invokes /stop-review-team --name review-pool --force. Pool has 1 in-progress task.",
+    "event": "command_invoked",
+    "state": {
+      "params": {
+        "name": "review-pool",
+        "force": true
+      },
+      "pool_state": {
+        "name": "review-pool",
+        "pool_state": "active",
+        "tasks_in_progress": 1
+      }
+    },
+    "assertion": "params.force is true; pool has 1 task in progress"
+  },
+  {
+    "frame": "inflight_check",
+    "description": "1 in-progress task found. Normally this triggers a warning, but force=true suppresses it. Proceeding without prompting.",
+    "event": "inflight_check",
+    "state": {
+      "tasks_in_progress": 1,
+      "force": true,
+      "warning_shown": false,
+      "reason": "force flag set — in-flight warning suppressed"
+    },
+    "assertion": "warning_shown is false (force=true suppresses in-flight warning)"
+  },
+  {
+    "frame": "shutdown_sent",
+    "description": "SendMessage type:shutdown dispatched to Pool Lead of 'review-pool'.",
+    "event": "shutdown_sent",
+    "state": {
+      "message_to": "Pool Lead of review-pool",
+      "message_type": "shutdown",
+      "payload": {
+        "reason": "force_stop",
+        "initiated_by": "stop-review-team command"
+      }
+    },
+    "assertion": "message_type is 'shutdown'; sent to Pool Lead"
+  },
+  {
+    "frame": "confirmation_shown",
+    "description": "Stop confirmed. Pool force-stopped despite in-flight task.",
+    "event": "confirmation_shown",
+    "state": {
+      "pool_name": "review-pool",
+      "result": "force_stopped",
+      "tasks_abandoned": 1
+    },
+    "assertion": "result is 'force_stopped'"
+  }
+]
