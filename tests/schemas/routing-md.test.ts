@@ -1,9 +1,9 @@
 /**
  * Layer 1: Structural validation tests for docs/specs/multi-model-teams/routing.md
  *
- * Validates that the routing normative skeleton satisfies all [T] acceptance criteria
- * from Task 31:
- *   - First line is exactly `## Status: Skeleton`
+ * Validates that the routing documentation satisfies all normative requirements and
+ * accessibility criteria (Task 67):
+ *   - Status: Skeleton marker is removed (document is production-ready)
  *   - All required FR codes are present (FR-MMT15, FR-MMT16, FR-MMT16a, FR-MMT17,
  *     FR-MMT13, FR-MMT14a, FR-MMT18, FR-MMT22)
  *   - No literal `TODO` strings (case-sensitive)
@@ -11,6 +11,9 @@
  *   - Verbatim FR-MMT16a timeout note substring present
  *   - Verbatim explicit-pool-required first-line present
  *   - Terminology: no standalone `Lead` / `team Lead` / `team-lead` outside `Pool Lead`
+ *   - Overview section present
+ *   - Quick reference table present
+ *   - Tutorial section (§8) present
  */
 
 import { describe, it, expect } from 'vitest';
@@ -25,11 +28,11 @@ const ROUTING_MD_PATH = join(
 const content = readFileSync(ROUTING_MD_PATH, 'utf-8');
 const lines = content.split('\n');
 
-describe('routing.md — Task 31 [T] acceptance criteria', () => {
+describe('routing.md — Task 67 production-ready validation', () => {
 
-  // ── [T] `## Status: Skeleton` header at top ──────────────────────────────
-  it('[T] first line is exactly "## Status: Skeleton"', () => {
-    expect(lines[0]).toBe('## Status: Skeleton');
+  // ── [T] Status: Skeleton marker removed ───────────────────────────────────
+  it('[T] document does not contain "## Status: Skeleton" (production-ready)', () => {
+    expect(content).not.toContain('## Status: Skeleton');
   });
 
   // ── [T] All FR-MMT references accurate ───────────────────────────────────
@@ -106,6 +109,29 @@ describe('routing.md — Task 31 [T] acceptance criteria', () => {
 
   it('[T] no "team-lead" (hyphenated form)', () => {
     expect(content).not.toMatch(/\bteam-lead\b/);
+  });
+
+  // ── [T] New sections added in Task 67 ─────────────────────────────────────
+  it('[T] Overview section present', () => {
+    expect(content).toContain('## Overview');
+  });
+
+  it('[T] Quick Reference table present with routing decision summary', () => {
+    expect(content).toContain('## Quick Reference: Routing Decisions');
+    expect(content).toContain('`routed-to-pool`');
+    expect(content).toContain('`fell-back-no-pool`');
+    expect(content).toContain('`fell-back-roster-mismatch`');
+    expect(content).toContain('`fell-back-pool-draining`');
+    expect(content).toContain('`fell-back-pool-stale`');
+    expect(content).toContain('`fell-back-timeout`');
+    expect(content).toContain('`skipped-routing-mode-explicit`');
+  });
+
+  it('[T] Tutorial section (§8) present with practical scenarios', () => {
+    expect(content).toContain('## 8. Tutorial: Routing in Practice');
+    expect(content).toContain('Scenario A');
+    expect(content).toContain('Scenario B');
+    expect(content).toContain('Scenario C');
   });
 
 });

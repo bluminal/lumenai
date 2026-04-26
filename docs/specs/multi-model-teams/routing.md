@@ -1,17 +1,36 @@
-## Status: Skeleton
-
 # Routing — Discovery, Submission, and Routing Mode Reference
 
-This document is the normative source of truth for how standard Synthex commands discover standing review pools, submit work to them, poll for reports, and resolve routing mode semantics. Phase 8 (Task 67) replaces this skeleton with narrative prose, tutorial examples, and extended cross-references. The normative procedures, schemas, and verbatim requirement text below are complete from the start.
+**Audience:** Developers building standing pool routing logic for Synthex commands.  
+**Last Updated:** April 2026
+
+## Overview
+
+This document is the normative source of truth for how standard Synthex commands discover standing review pools, submit work to them, poll for reports, and resolve routing mode semantics. It covers the complete lifecycle: from discovery (§1) through submission (§2) and polling (§3), routing mode decisions (§4), and edge cases like race conditions (§5), draining state (§6), and stale-pool cleanup (§7). A working tutorial (§8) shows routing in practice.
+
+The procedures, schemas, and verbatim requirement text in §1–§7 are normative and complete. New sections in this revision add narrative context and practical examples to make the routing system discoverable for implementers and operators.
+
+For users starting new standing pools, see [`standing-pools.md`](../../plugins/synthex-plus/docs/standing-pools.md) (forthcoming) for configuration and operational guidance.
+
+## Quick Reference: Routing Decisions
+
+| Decision | Meaning | Fallback Path |
+|----------|---------|---------------|
+| `routed-to-pool` | Work sent to a standing pool; pool will report back | N/A (pool handles) |
+| `fell-back-no-pool` | No matching pool found | Fresh-spawn review (§4) |
+| `fell-back-roster-mismatch` | Pool found but roster doesn't cover required reviewers | Fresh-spawn review (§4) |
+| `fell-back-pool-draining` | Pool is shutting down | Fresh-spawn review (§4) |
+| `fell-back-pool-stale` | Pool is orphaned/stale; cleaned up | Fresh-spawn review (§4) |
+| `fell-back-timeout` | Pool did not return report within timeout | Fresh-spawn review (§3.4) |
+| `skipped-routing-mode-explicit` | Routing disabled by config (`explicit-pool-required` with no match) | Error (§4.2) |
 
 ---
 
 ## Related Documentation
 
-- [`architecture.md`](./architecture.md) — Option B rationale, native-team-vs-orchestrator separation, cross-session lifetime model (forthcoming, Task 3 / Task 65)
+- [`architecture.md`](./architecture.md) — Option B rationale, native-team-vs-orchestrator separation, cross-session lifetime model (forthcoming, Task 65)
 - [`pool-lifecycle.md`](./pool-lifecycle.md) — Pool storage schemas, state machine, writer-ordering rules, locking primitive (Task 29)
 - [`recovery.md`](./recovery.md) — FR-MMT24 per-task fallback, stale-pool cleanup, partial-dedup entry point (forthcoming)
-- [`standing-pools.md`](../../plugins/synthex-plus/docs/standing-pools.md) — User-facing design doc (forthcoming, NFR-MMT8)
+- [`standing-pools.md`](../../plugins/synthex-plus/docs/standing-pools.md) — User-facing design doc for standing pools (forthcoming, Task 53)
 
 ---
 
@@ -267,3 +286,62 @@ The FR-MMT22 one-time-per-session suppression does NOT suppress FR-MMT28 orphan 
 - Discovery proceeds after cleanup with correct routing-mode semantics: `prefer-with-fallback` silently falls back; `explicit-pool-required` aborts with no-pool error.
 - One-time-per-session warning fires on first stale-pool encounter; no second warning for same pool.
 - FR-MMT22 verbatim warning string is distinct from FR-MMT28 orphan warning string.
+
+---
+
+## 8. Tutorial: Routing in Practice
+
+This section walks through two real-world routing scenarios to illustrate how discovery, submission, and fallback interact from the user's perspective.
+
+### Scenario A: Pool Match, Successful Route
+
+**Setup:** A team has started a standing review pool called `review-pool-a` with reviewers `code-reviewer, security-reviewer`. The team invokes `/synthex:review-code` with the default reviewer set.
+
+**What happens:**
+
+1. **Discovery (§1.3):** The command reads `~/.claude/teams/standing/index.json`, finds `review-pool-a`, checks that its roster `[code-reviewer, security-reviewer]` is a superset of the required reviewers `[code-reviewer, security-reviewer]` (exact match with `covers` mode), and selects the pool.
+
+2. **Submission (§2):** The command writes the code-review task to `~/.claude/tasks/standing/review-pool-a/` with a unique UUID filename, sends a notification to the Pool Lead's inbox, and records the report-to path as `~/.claude/tasks/standing/review-pool-a/reports/<uuid>.json`.
+
+3. **User-Visible Output:** User sees the note: `"Routing to standing pool 'review-pool-a' (multi-model: yes)."` — informing them that review is underway in the pool rather than spawning fresh sub-agents.
+
+4. **Polling (§2, §3.4):** The command polls the task list and the report path every 2–10 seconds until the report envelope appears. When the Pool Lead finishes consolidating reviews, it writes the report envelope to the report-to path.
+
+5. **Completion:** The command reads the report envelope, checks `status: "success"`, extracts the `report` markdown, and surfaces it to the user — indistinguishable from a fresh-spawn review output.
+
+### Scenario B: No Pool Match, Silent Fallback
+
+**Setup:** Same team, same `/synthex:review-code` invocation, but no standing pool is active (maybe `review-pool-a` was shut down, or `routing_mode: prefer-with-fallback`).
+
+**What happens:**
+
+1. **Discovery (§1.3):** The command reads `~/.claude/teams/standing/index.json`, finds no matching pool (either the index is empty, or pools present have non-overlapping rosters).
+
+2. **Routing Mode Decision (§4.1):** The config says `routing_mode: prefer-with-fallback` (default). With no match, the command silently falls back.
+
+3. **User-Visible Output:** No routing note appears. The command proceeds as it always has — spawning fresh `code-reviewer` and `security-reviewer` sub-agents natively.
+
+4. **Completion:** User sees standard review output, unaware that a pool lookup occurred. The audit artifact (FR-MMT30) records the routing decision for analytics.
+
+### Scenario C: Explicit-Pool-Required Mode with No Match
+
+**Setup:** Team configures `routing_mode: explicit-pool-required` and runs `/synthex:review-code` with no standing pool available.
+
+**What happens:**
+
+1. **Discovery (§1.3):** No matching pool found.
+
+2. **Routing Mode Decision (§4.2):** Config says `explicit-pool-required`. Instead of falling back silently, the command aborts with this error:
+
+   ```
+   No standing pool matches the required reviewers (code-reviewer, security-reviewer).
+   Routing mode is 'explicit-pool-required', so this command will not fall back to
+   fresh-spawn reviewers. To proceed, either:
+     1. Start a matching pool:
+          /synthex-plus:start-review-team --reviewers code-reviewer,security-reviewer
+     2. Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml
+   ```
+
+3. **User Action:** User either starts the pool or adjusts config, then retries.
+
+This design ensures that teams can enforce pool routing when desired (e.g., for cost control or audit requirements) while defaulting to graceful fallback for convenience.
