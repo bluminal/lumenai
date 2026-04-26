@@ -1,0 +1,51 @@
+[
+  {
+    "frame": "discovery_started",
+    "description": "Router scans index.json and finds old-pool listed as idle. last_active_at is 56 hours ago — exceeds max(ttl_minutes=60, 24h) floor. FR-MMT22 Condition 2 will trigger.",
+    "state": {
+      "index_json_pools": [
+        {
+          "name": "old-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-24T00:00:00Z",
+          "metadata_dir": "~/.claude/teams/standing/old-pool"
+        }
+      ],
+      "now": "2026-04-26T08:00:00Z",
+      "ttl_minutes": 60
+    },
+    "assertion": "index.json lists old-pool; last_active_at is 56h before now; ttl_minutes=60 so max(60min, 24h)=24h — threshold exceeded"
+  },
+  {
+    "frame": "stale_detected",
+    "description": "FR-MMT22 Condition 2 fires: last_active_at is older than max(ttl_minutes=60, 24h). Pool inactive for 56 hours.",
+    "state": {
+      "detection_reason": "last-active-stale",
+      "pool_name": "old-pool",
+      "hours_inactive": 56
+    },
+    "assertion": "detection_reason is last-active-stale; pool_name is old-pool; hours_inactive is 56"
+  },
+  {
+    "frame": "cleanup_invoked",
+    "description": "standing-pool-cleanup agent called. Both index entry and metadata_dir removed successfully.",
+    "state": {
+      "cleanup_result": {
+        "result": "removed",
+        "pool_name": "old-pool",
+        "removed_index_entry": true,
+        "removed_metadata_dir": true
+      }
+    },
+    "assertion": "cleanup result is removed; both index entry and metadata_dir removed (true)"
+  },
+  {
+    "frame": "warning_shown",
+    "description": "User-visible warning emitted. Session marker set to suppress duplicate warnings for old-pool.",
+    "state": {
+      "warning_text": "Standing pool 'old-pool' was stale and has been cleaned up. Falling back to fresh-spawn review.",
+      "warning_shown": true
+    },
+    "assertion": "warning_shown is true; warning_text contains verbatim FR-MMT22 fragments for old-pool"
+  }
+]

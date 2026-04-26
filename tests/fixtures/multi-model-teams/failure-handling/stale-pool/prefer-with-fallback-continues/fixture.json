@@ -1,0 +1,52 @@
+[
+  {
+    "frame": "discovery_started",
+    "description": "Router scans index.json with routing_mode=prefer-with-fallback. Finds stale-pool listed as idle but last_active_at is 25 days ago — stale.",
+    "state": {
+      "routing_mode": "prefer-with-fallback",
+      "index_json_pools": [
+        {
+          "name": "stale-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-01T00:00:00Z",
+          "metadata_dir": "~/.claude/teams/standing/stale-pool"
+        }
+      ]
+    },
+    "assertion": "routing_mode is prefer-with-fallback; stale-pool is the only pool; last_active_at is 25 days ago"
+  },
+  {
+    "frame": "stale_detected_and_cleaned",
+    "description": "FR-MMT22 Condition 2 fires and cleanup runs. stale-pool removed from index. Warning shown once.",
+    "state": {
+      "detection_reason": "last-active-stale",
+      "pool_name": "stale-pool",
+      "cleanup_result": {
+        "result": "removed",
+        "pool_name": "stale-pool",
+        "removed_index_entry": true,
+        "removed_metadata_dir": true
+      },
+      "warning_shown": true
+    },
+    "assertion": "stale-pool cleaned up; warning shown; index now empty"
+  },
+  {
+    "frame": "routing_fallback",
+    "description": "After cleanup, no matching pool remains. routing_mode=prefer-with-fallback: falls back silently with no error shown.",
+    "state": {
+      "routing_decision": "fell-back-no-pool",
+      "silent": true,
+      "error_shown": false
+    },
+    "assertion": "routing_decision is fell-back-no-pool; silent is true; error_shown is false (prefer-with-fallback does not abort)"
+  },
+  {
+    "frame": "fresh_review_spawned",
+    "description": "Command proceeds by spawning a fresh review team as the fallback path.",
+    "state": {
+      "result": "fresh_spawn_started"
+    },
+    "assertion": "result is fresh_spawn_started; command completed without error"
+  }
+]

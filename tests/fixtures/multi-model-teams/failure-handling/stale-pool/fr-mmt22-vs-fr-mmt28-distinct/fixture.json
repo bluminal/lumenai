@@ -1,0 +1,20 @@
+[
+  {
+    "frame": "fr_mmt22_warning",
+    "description": "FR-MMT22 stale-pool-cleanup-during-routing warning. Triggered when a pool is found stale at routing time.",
+    "state": {
+      "warning_source": "FR-MMT22",
+      "warning_text": "Standing pool 'test-pool' was stale and has been cleaned up. Falling back to fresh-spawn review."
+    },
+    "assertion": "warning_source is FR-MMT22; warning_text matches FR-MMT22 verbatim template"
+  },
+  {
+    "frame": "fr_mmt28_warning",
+    "description": "FR-MMT28 orphaned-pool background cleanup warning. Triggered when TTL elapsed and pool inactive for >24h (background sweep, not routing time).",
+    "state": {
+      "warning_source": "FR-MMT28",
+      "warning_text": "Standing pool 'test-pool' appears orphaned (TTL elapsed and inactive for >24h). It has been cleaned up automatically."
+    },
+    "assertion": "warning_source is FR-MMT28; warning_text matches FR-MMT28 verbatim template; distinct from FR-MMT22 text"
+  }
+]
