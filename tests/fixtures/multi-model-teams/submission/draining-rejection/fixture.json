@@ -1,0 +1,32 @@
+{
+  "scenario": "draining-rejection",
+  "description": "Pool transitions to draining between inline discovery and submitter invocation. Submitter re-reads config.json, detects pool_state: draining, and rejects submission with fell-back-pool-draining.",
+  "setup": {
+    "pool_name": "review-pool-b",
+    "pool_roster": ["code-reviewer", "security-reviewer"],
+    "index_state": {
+      "pool_state": "idle",
+      "note": "Index still shows idle — the race condition window"
+    },
+    "config_json_state": {
+      "pool_state": "draining",
+      "note": "Config.json already updated to draining by stop-review-team"
+    }
+  },
+  "submitter_inputs": {
+    "pool_name": "review-pool-b",
+    "tasks": [{"subject": "Code review", "description": "..."}],
+    "submission_timeout_seconds": 300
+  },
+  "submitter_outputs": {
+    "routing_decision": "fell-back-pool-draining"
+  },
+  "expected": {
+    "routing_decision": "fell-back-pool-draining",
+    "task_files_written": false,
+    "mailbox_notification_sent": false,
+    "drain_check_exercised": true,
+    "config_reread": true,
+    "note": "Race condition handled: submitter always re-reads config.json before writing tasks, regardless of what inline discovery found in the index"
+  }
+}
