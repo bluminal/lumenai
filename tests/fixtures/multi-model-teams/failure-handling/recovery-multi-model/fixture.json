@@ -1,0 +1,108 @@
+[
+  {
+    "frame": "pool_active",
+    "description": "Pool mm-pool is active with 2 native and 2 external reviewers. Work has been submitted.",
+    "data": {
+      "pool_name": "mm-pool",
+      "multi_model": true,
+      "reviewers": ["code-reviewer", "security-reviewer", "codex", "gemini"]
+    },
+    "assertion": "pool_name is mm-pool; multi_model is true; 4 reviewers: code-reviewer, security-reviewer, codex, gemini"
+  },
+  {
+    "frame": "three_reviewers_completed",
+    "description": "security-reviewer, codex, and gemini complete successfully. code-reviewer has not responded.",
+    "data": {
+      "completed": ["security-reviewer", "codex", "gemini"],
+      "findings_count": {
+        "security-reviewer": 2,
+        "codex": 4,
+        "gemini": 3
+      }
+    },
+    "assertion": "3 reviewers completed; code-reviewer absent from completed list; findings_count totals 9 across 3 reviewers"
+  },
+  {
+    "frame": "code_reviewer_crashed",
+    "description": "code-reviewer process terminates without returning findings. Status is failed.",
+    "data": {
+      "reviewer": "code-reviewer",
+      "status": "failed"
+    },
+    "assertion": "reviewer is code-reviewer; status is failed"
+  },
+  {
+    "frame": "submitter_returns_failed",
+    "description": "Submitter observes the crash and returns a failed envelope to the host session with error code reviewer_crashed and completed task UUIDs.",
+    "data": {
+      "envelope": {
+        "status": "failed",
+        "error": {
+          "code": "reviewer_crashed",
+          "message": "Reviewer code-reviewer did not complete: process terminated"
+        },
+        "metadata": {
+          "pool_name": "mm-pool",
+          "multi_model": true,
+          "task_uuids": ["uuid-1", "uuid-2", "uuid-3", "uuid-4"],
+          "completed_at": "2026-04-26T08:15:00Z"
+        }
+      }
+    },
+    "assertion": "envelope.status is failed; error.code is reviewer_crashed; metadata contains pool_name mm-pool and 4 task_uuids"
+  },
+  {
+    "frame": "recovery_invoked",
+    "description": "Host session extracts crashed reviewer name and spawns a fresh code-reviewer via Task tool, requesting both markdown and findings_json outputs.",
+    "data": {
+      "invoked_by": "submitting_command_host_session",
+      "reviewer_name_extracted": "code-reviewer",
+      "spawn_method": "Task tool",
+      "findings_format_expected": ["markdown", "findings_json"]
+    },
+    "assertion": "invoked_by is submitting_command_host_session; reviewer_name_extracted is code-reviewer; spawn_method is Task tool; both markdown and findings_json formats expected"
+  },
+  {
+    "frame": "fresh_reviewer_completed",
+    "description": "Freshly spawned code-reviewer completes successfully, returning 3 findings in both markdown and findings_json. Source type tagged native-recovery.",
+    "data": {
+      "reviewer": "code-reviewer",
+      "findings_count": 3,
+      "has_findings_json": true,
+      "source_type": "native-recovery"
+    },
+    "assertion": "reviewer is code-reviewer; findings_count is 3; has_findings_json is true; source_type is native-recovery"
+  },
+  {
+    "frame": "partial_dedup_run",
+    "description": "D19 partial dedup runs Stages 1 (fingerprint) and 2 (lexical) only against the already-consolidated output from surviving reviewers. Stages 3-6 skipped. Zero CoVe LLM calls.",
+    "data": {
+      "stages_run": [1, 2],
+      "stages_not_run": [3, 4, 5, 6],
+      "cove_llm_calls": 0,
+      "dedup_mode": "partial",
+      "description": "Stage 1 fingerprint dedup + Stage 2 lexical dedup only"
+    },
+    "assertion": "stages_run contains exactly [1,2]; stages_not_run contains [3,4,5,6]; cove_llm_calls is 0; dedup_mode is partial"
+  },
+  {
+    "frame": "lightweight_merge",
+    "description": "3 recovered findings (post partial-dedup) merged with 9 surviving findings. Full re-consolidation not run. Total findings = 12.",
+    "data": {
+      "surviving_findings": 9,
+      "recovered_findings_after_dedup": 3,
+      "total_findings": 12,
+      "full_reconsolidation_run": false
+    },
+    "assertion": "surviving_findings is 9; recovered_findings_after_dedup is 3; total_findings is 12; full_reconsolidation_run is false"
+  },
+  {
+    "frame": "unified_report_emitted",
+    "description": "Unified report emitted with recovery header notice and native-recovery attribution on recovered findings.",
+    "data": {
+      "report_header_contains": "Note: reviewer code-reviewer was recovered from a pool failure.",
+      "recovered_findings_attribution": "native-recovery"
+    },
+    "assertion": "report_header_contains includes 'was recovered from a pool failure'; recovered_findings_attribution is native-recovery"
+  }
+]
