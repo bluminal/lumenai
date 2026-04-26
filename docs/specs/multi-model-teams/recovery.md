@@ -1,8 +1,27 @@
-## Status: Skeleton
-
 # Recovery — FR-MMT24 Per-Task Fallback Recovery Reference
 
-This document is the normative source of truth for FR-MMT24 per-task fallback recovery — what happens when a pool reviewer crashes and the submitter returns `status: failed`. Phase 8 (Task 66) replaces this skeleton with narrative prose, tutorial examples, and extended cross-references. The normative procedures, schemas, and verbatim requirement text below are complete from the start.
+---
+
+## Overview
+
+FR-MMT24 per-task fallback recovery is owned by the **submitting command's host session** — NOT by the pool infrastructure or `standing-pool-submitter.md`. The pool's responsibility ends at routing the request and returning the envelope; recovery is entirely a host-side concern.
+
+When `standing-pool-submitter.md` returns an envelope with `status: failed` and `error.code: reviewer_crashed`, the submitting command (e.g., `/synthex:review-code`, `/synthex:performance-audit`) invokes the recovery procedure below. Recovery runs entirely within the submitting command's execution context — it does not re-enter the pool or re-invoke the submitter agent. This design ensures the pool infrastructure remains stateless: it routes work and reports results; it does not own the logic for what happens when routing fails.
+
+---
+
+## Recovery Decision Tree
+
+```
+Pool returns envelope
+├── status: success
+│   └─→ surface report as normal
+└── status: failed
+    ├── error.code: reviewer_crashed
+    │   └─→ invoke FR-MMT24 recovery (§2 below)
+    └── error.code: pool_lead_crashed OR drain_timed_out
+        └─→ terminal failure; spawn fresh full review team (no recovery)
+```
 
 ---
 
@@ -10,19 +29,9 @@ This document is the normative source of truth for FR-MMT24 per-task fallback re
 
 - [`routing.md`](./routing.md) — Discovery, submission, and routing mode reference (Task 31)
 - [`pool-lifecycle.md`](./pool-lifecycle.md) — Pool storage schemas, state machine, writer-ordering rules, locking primitive (Task 29)
-- `review-code.md` (Task 54) — `/synthex:review-code` command; references this document for recovery invocation
-- `performance-audit.md` (Task 57) — `/synthex:performance-audit` command; references this document for recovery invocation
-- `standing-pool-submitter.md` (Task 35) — file-based submission agent; does NOT own recovery logic
-
----
-
-## 1. Overview
-
-FR-MMT24 per-task fallback recovery is owned by the **submitting command's host session** — NOT by `standing-pool-submitter.md`. The submitter's responsibility ends at returning the envelope.
-
-When `standing-pool-submitter.md` returns an envelope with `status: failed` and `error.code: reviewer_crashed`, the submitting command (e.g., `/synthex:review-code`, `/synthex:performance-audit`) invokes the recovery procedure described in §2. Recovery runs entirely within the submitting command's execution context — it does not re-enter the pool or re-invoke the submitter agent.
-
-This design ensures the pool infrastructure remains a stateless transport: the pool routes work and reports results; it does not own the logic for what happens when routing fails.
+- [`review-code.md`](./review-code.md) — `/synthex:review-code` command; references this document for recovery invocation
+- [`performance-audit.md`](./performance-audit.md) — `/synthex:performance-audit` command; references this document for recovery invocation
+- [`standing-pool-submitter.md`](./standing-pool-submitter.md) — file-based submission agent; does NOT own recovery logic
 
 ---
 
@@ -87,3 +96,61 @@ Recovery's partial dedup (multi-model pools only) reuses the parent plan's Stage
 - Only Stage 1 (fingerprint dedup) and Stage 2 (lexical dedup) are applied from the parent consolidation pipeline.
 - Stages 3–6 are explicitly NOT re-run in the recovery path.
 - The cost of recovery's partial dedup is approximately 5% of the cost of a full re-consolidation run.
+
+---
+
+## 5. Worked Example
+
+### Scenario
+
+A review command submits to `review-pool-a` (a two-reviewer multi-model pool) with native code-reviewer and security-reviewer sub-agents. After the code-reviewer completes successfully, the security-reviewer crashes mid-analysis.
+
+### Walkthrough
+
+**Pool Lead writes failure envelope:**
+```json
+{
+  "status": "failed",
+  "error": {
+    "code": "reviewer_crashed",
+    "message": "Reviewer security-reviewer did not complete: process terminated (exit code 127)"
+  },
+  "findings_json": {
+    "findings": [
+      {
+        "file": "auth/login.ts",
+        "line": 42,
+        "severity": "high",
+        "message": "Insufficient input validation on password field",
+        "source": { "source_type": "native-team", "reviewer_id": "code-reviewer" }
+      }
+    ]
+  }
+}
+```
+
+**Host session recovery (Steps 1–7):**
+
+1. Extract reviewer name: `security-reviewer`
+2. Spawn fresh security-reviewer sub-agent via Task tool
+3. Fresh sub-agent completes, returns security findings
+4. Lightweight merge: append security-reviewer's findings to code-reviewer's existing findings (no Stages 3–6 re-run)
+5. Apply partial dedup (Stages 1+2 only): fingerprint dedup and lexical dedup across the merged set
+6. Tag recovered findings: `source.source_type: "native-recovery"`
+7. Prepend header and emit merged report:
+
+**Final merged report:**
+```
+Note: reviewer security-reviewer was recovered from a pool failure. 
+Results below include recovered findings.
+
+## Code Quality Issues
+
+[code-reviewer findings: 1 issue]
+
+## Security Issues
+
+[security-reviewer recovered findings: 2 issues]
+```
+
+The original code-reviewer findings remain unchanged; the recovered security findings are de-duplicated (partial dedup only) and combined into the unified final report.

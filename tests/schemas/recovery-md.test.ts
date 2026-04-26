@@ -30,11 +30,6 @@ const lines = content.split('\n');
 
 describe('recovery.md — Task 48 [T] acceptance criteria', () => {
 
-  // ── [T] `## Status: Skeleton` header at top ──────────────────────────────
-  it('[T] first line is exactly "## Status: Skeleton"', () => {
-    expect(lines[0]).toBe('## Status: Skeleton');
-  });
-
   // ── [T] FR-MMT24 recovery owned by submitting command's host session ──────
   it('[T] FR-MMT24 recovery owned by submitting command host session (not standing-pool-submitter)', () => {
     expect(content).toMatch(/host session/);
