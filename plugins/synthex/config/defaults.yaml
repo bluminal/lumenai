@@ -276,3 +276,107 @@ documents:
   rfcs: docs/specs/rfcs
   runbooks: docs/runbooks
   retros: docs/retros
+
+# ────────────────────────────────────────────────────────────────────────────
+# Multi-model review (FR-MR5) — off by default; users opt in via /init or by
+# editing this config. When enabled, the orchestrator fans review work out
+# across multiple LLM families (OpenAI, Google, local-Ollama) for richer,
+# correlation-resistant consolidation. CLI-only (no API keys in Synthex).
+# ────────────────────────────────────────────────────────────────────────────
+multi_model_review:
+  # Master switch. When false, today's native-only review behavior is preserved
+  # byte-identically (FR-MR23 regression contract).
+  enabled: false
+
+  # Strict mode: when true, preflight failures abort the review. When false,
+  # missing CLIs degrade gracefully to whatever proposers are available.
+  strict_mode: false
+
+  # When true, native Synthex sub-agents participate alongside external adapters.
+  # When false, only externals run. Almost always true — set false only when
+  # specifically isolating external behavior.
+  include_native_reviewers: true
+
+  # Minimum number of unique families across all configured proposers (counting
+  # natives as `anthropic`). Below this, preflight emits a family-diversity
+  # warning. Default 2 mirrors PRD recommendation.
+  min_family_diversity: 2
+
+  # Minimum number of available proposers required to proceed. Below this,
+  # preflight aborts (strict_mode) or emits a critical warning (lenient).
+  min_proposers_to_proceed: 2
+
+  # External proposer adapter list. Each entry references a `*-review-prompter`
+  # agent name. Empty list means "natives only" — equivalent to today's review.
+  # Adapters not installed at preflight surface as `error_code: cli_missing`.
+  reviewers: []
+  # Example:
+  # reviewers:
+  #   - codex-review-prompter      # OpenAI / Codex CLI
+  #   - gemini-review-prompter     # Google / gcloud
+  #   - ollama-review-prompter     # Local model (qwen, llama, deepseek, etc.)
+
+  # Per-reviewer overrides. Each adapter may override its default model, family
+  # tag, or invocation flags. Use the agent name as the key.
+  per_reviewer:
+    # codex-review-prompter:
+    #   model: gpt-5
+    #   family: openai
+    # ollama-review-prompter:
+    #   model: qwen2.5-coder:32b
+    #   family: local-qwen
+
+  # Aggregator (consolidation step) configuration.
+  aggregator:
+    # `auto` resolves via FR-MR15 strict-total-order tier table (D17):
+    # Claude Opus > GPT-5 > Claude Sonnet > Gemini 2.5 Pro > DeepSeek V3 > Qwen 32B.
+    # When the strongest configured proposer is also a reviewer, the aggregator
+    # invocation is a separate freshly-spawned CLI call with judge-mode prompt.
+    # When no flagship matches, falls back to the host Claude session.
+    command: auto
+
+  # Per-command overrides. Each command can opt in or out independently.
+  per_command:
+    review_code:
+      enabled: false               # When true, /review-code uses multi-model
+      complexity_gate:             # FR-MR21a: skip multi-model on trivial diffs
+        threshold_lines_changed: 50
+        threshold_files_touched: 3
+        # Diffs touching these path globs ALWAYS escalate to multi-model:
+        always_escalate_paths:
+          - "**/auth/**"            # Authentication code — security-critical
+          - "**/payments/**"        # Payment flows — financial-critical
+          - "**/billing/**"         # Billing logic — financial-critical
+          - "**/migrations/**"      # DB migrations — irreversible / data-loss risk
+          - "**/security/**"        # Anything in a security namespace
+          - "**/secrets/**"         # Secret handling — credential exposure risk
+          - "**/crypto/**"          # Crypto code — subtle correctness matters
+    write_implementation_plan:
+      enabled: false               # When true, plan-review uses multi-model
+      # No complexity gate for plan review (FR-MR22): plans are always reviewed.
+
+  # Consolidation pipeline configuration.
+  consolidation:
+    # Stage 2 lexical Jaccard merge threshold (default 0.8 per FR-MR14).
+    stage2_jaccard_threshold: 0.8
+    # Stage 3 (embedding-based) — Phase 7 follow-up; not active in v1.
+    stage3_embedding_threshold: 0.85
+    stage4:
+      # Per-consolidation hard cap on Stage 4 LLM tiebreaker calls (D18).
+      # Prevents N² blow-up when many candidate pairs share buckets.
+      max_calls_per_consolidation: 25
+
+  # Per-finding minority-of-one demotion (FR-MR14b).
+  minority_of_one:
+    enabled: true
+    skip_categories: ["security"]   # Security findings never demoted
+
+  # Audit artifact (FR-MR24): per-invocation review record for traceability.
+  audit:
+    # When true, every multi-model invocation writes an audit file.
+    enabled: true
+    # Output directory; created if absent. Relative paths resolve against the
+    # project root.
+    output_path: "docs/reviews/"
+    # Where adapters write their raw invocation outputs (one file per call).
+    raw_output_path: "docs/reviews/raw/"
