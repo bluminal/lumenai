@@ -1,0 +1,142 @@
+{
+  "scenario": "end-to-end-nfr-mmt3",
+  "description": "End-to-end NFR-MMT3 latency validation: discovery step AND full routing overhead within budget. Three sub-cases: 0 pools, 1 pool, 10 pools.",
+  "nfr_mmt3": {
+    "discovery_budget_ms": 100,
+    "end_to_end_budget_ms": 500,
+    "pool_count_tested": [0, 1, 10]
+  },
+  "sub_cases": [
+    {
+      "name": "zero-pools",
+      "pool_count": 0,
+      "index_json": {"pools": []},
+      "expected": {
+        "routing_decision": "fell-back-no-pool",
+        "discovery_p95_ms": 5,
+        "end_to_end_p95_ms": 50
+      }
+    },
+    {
+      "name": "one-pool-match",
+      "pool_count": 1,
+      "index_json": {
+        "pools": [
+          {
+            "name": "review-pool",
+            "roster": ["code-reviewer", "security-reviewer"],
+            "pool_state": "idle",
+            "multi_model": false,
+            "last_active_at": "2026-04-26T05:00:00Z",
+            "ttl_minutes": 60
+          }
+        ]
+      },
+      "expected": {
+        "routing_decision": "routed-to-pool",
+        "discovery_p95_ms": 9,
+        "end_to_end_p95_ms": 50
+      }
+    },
+    {
+      "name": "ten-pools",
+      "pool_count": 10,
+      "index_json": {
+        "pools": [
+          {
+            "name": "pool-0",
+            "roster": ["performance-engineer"],
+            "pool_state": "idle",
+            "multi_model": false,
+            "last_active_at": "2026-04-26T05:00:00Z",
+            "ttl_minutes": 60
+          },
+          {
+            "name": "pool-1",
+            "roster": ["performance-engineer"],
+            "pool_state": "idle",
+            "multi_model": false,
+            "last_active_at": "2026-04-26T05:00:00Z",
+            "ttl_minutes": 60
+          },
+          {
+            "name": "pool-2",
+            "roster": ["performance-engineer"],
+            "pool_state": "idle",
+            "multi_model": false,
+            "last_active_at": "2026-04-26T05:00:00Z",
+            "ttl_minutes": 60
+          },
+          {
+            "name": "pool-3",
+            "roster": ["performance-engineer"],
+            "pool_state": "idle",
+            "multi_model": false,
+            "last_active_at": "2026-04-26T05:00:00Z",
+            "ttl_minutes": 60
+          },
+          {
+            "name": "pool-4",
+            "roster": ["performance-engineer"],
+            "pool_state": "idle",
+            "multi_model": false,
+            "last_active_at": "2026-04-26T05:00:00Z",
+            "ttl_minutes": 60
+          },
+          {
+            "name": "pool-5",
+            "roster": ["performance-engineer"],
+            "pool_state": "idle",
+            "multi_model": false,
+            "last_active_at": "2026-04-26T05:00:00Z",
+            "ttl_minutes": 60
+          },
+          {
+            "name": "pool-6",
+            "roster": ["performance-engineer"],
+            "pool_state": "idle",
+            "multi_model": false,
+            "last_active_at": "2026-04-26T05:00:00Z",
+            "ttl_minutes": 60
+          },
+          {
+            "name": "pool-7",
+            "roster": ["performance-engineer"],
+            "pool_state": "idle",
+            "multi_model": false,
+            "last_active_at": "2026-04-26T05:00:00Z",
+            "ttl_minutes": 60
+          },
+          {
+            "name": "pool-8",
+            "roster": ["performance-engineer"],
+            "pool_state": "idle",
+            "multi_model": false,
+            "last_active_at": "2026-04-26T05:00:00Z",
+            "ttl_minutes": 60
+          },
+          {
+            "name": "pool-9",
+            "roster": ["code-reviewer", "security-reviewer"],
+            "pool_state": "idle",
+            "multi_model": false,
+            "last_active_at": "2026-04-26T05:00:00Z",
+            "ttl_minutes": 60
+          }
+        ]
+      },
+      "expected": {
+        "routing_decision": "routed-to-pool",
+        "discovery_p95_ms": 12,
+        "end_to_end_p95_ms": 100
+      }
+    }
+  ],
+  "methodology": {
+    "measurement": "wall-clock around discovery substep AND full routing decision",
+    "runs": "multiple runs, P95 reported",
+    "env": "local SSD (MacBook dev machine)",
+    "ci_stable": true,
+    "note": "Actual timing values are projections based on Task 34a-pre smoke check (P95=9ms at 1-pool depth). End-to-end includes inline index.json read + filter + routing decision. Submitter invocation NOT included (that is pool I/O, not routing overhead)."
+  }
+}
