@@ -1,0 +1,25 @@
+{
+  "scenario": "timeout-fallback",
+  "description": "Standing-pool-submitter polls for report but pool times out before responding. Tasks are marked abandoned; command falls back to fresh-spawn review.",
+  "setup": {
+    "pool_name": "slow-pool",
+    "pool_roster": ["code-reviewer", "security-reviewer"],
+    "pool_state": "idle",
+    "submission_timeout_seconds": 30,
+    "submitted_tasks": [
+      {"subject": "Code review", "description": "..."},
+      {"subject": "Security review", "description": "..."}
+    ],
+    "pool_response": "none",
+    "elapsed_seconds": 35
+  },
+  "submitter_outputs": {
+    "routing_decision": "fell-back-timeout"
+  },
+  "expected": {
+    "routing_decision": "fell-back-timeout",
+    "tasks_marked_abandoned": true,
+    "verbatim_timeout_note": "Pool 'slow-pool' did not return a report within 30s; falling back to fresh-spawn review.",
+    "fresh_spawn_triggered": true
+  }
+}
