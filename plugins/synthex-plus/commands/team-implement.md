@@ -76,15 +76,17 @@ Run three validation checks before creating the team. These checks catch misconf
 
 #### 3a. One-team-per-session check
 
-Verify no existing team is active in the current session. Check `~/.claude/teams/` for directories containing a `config.json` file — a team is considered active if `~/.claude/teams/{team-name}/config.json` exists.
+Verify no existing **non-standing** team is active in the current session. Check `~/.claude/teams/` for directories containing a `config.json` file — a team is considered active if `~/.claude/teams/{team-name}/config.json` exists.
 
-- If an active team is found, **abort immediately** with:
+**Standing pool exemption (FR-MMT26):** When counting active teams, exclude all directories under `~/.claude/teams/standing/`. Standing pools (under `~/.claude/teams/standing/`) are exempt from the one-team-per-session limit per FR-MMT26 — they are long-lived infrastructure, not per-invocation teams. Only teams created by `team-implement` and similar session-scoped commands are subject to this check.
+
+- If an active non-standing team is found, **abort immediately** with:
   ```
   Error: An active team "{team_name}" already exists in this session.
   Complete or clean up the existing team before creating a new one.
   To clean up: check ~/.claude/teams/ for stale resources.
   ```
-- If no active team is found, proceed to the next check.
+- If no active non-standing team is found, proceed to the next check.
 
 #### 3b. Dependency check (Synthex plugin)
 

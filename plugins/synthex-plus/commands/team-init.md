@@ -61,9 +61,13 @@ Record this warning for display in the final summary (step 7).
 
 ### 4. Check for Orphaned Team Resources
 
-Check for directories under `~/.claude/teams/` that may be left over from previous sessions.
+This step runs two passes — one for non-standing teams, one for standing pools. The two passes use different orphan criteria and produce distinct warnings.
 
-**If orphaned team directories are found:** Display a warning for each one but do NOT fail. Continue with the remaining steps.
+#### Pass 1: Non-standing team orphan detection
+
+Scan `~/.claude/teams/` for directories that may be left over from previous sessions, excluding `~/.claude/teams/standing/`. Standing pools are governed by their own lifecycle rules (Pass 2) and must not be flagged by this non-standing orphan check.
+
+**If orphaned non-standing team directories are found:** Display a warning for each one but do NOT fail. Continue with the remaining steps.
 
 ```
 Warning: Found orphaned team resources at ~/.claude/teams/{name}. These may be left
@@ -71,6 +75,29 @@ over from a previous session. Consider cleaning up with: rm -rf ~/.claude/teams/
 ```
 
 Record these warnings for display in the final summary (step 7).
+
+#### Pass 2: Standing pool orphan detection (FR-MMT28)
+
+Scan `~/.claude/teams/standing/index.json` for standing pools that appear orphaned. A standing pool is orphaned when **both** of the following conditions are true:
+
+1. **TTL elapsed:** The pool's `ttl_minutes` has elapsed since `spawn_timestamp` (or `ttl_minutes` is 0 and the pool has exceeded its expected session lifetime).
+2. **Inactive for >24 hours:** The pool's `last_active_at` timestamp is more than 24 hours old.
+
+Both conditions must hold simultaneously — a pool that is TTL-elapsed but was recently active is NOT orphaned (it may be finishing work). A pool that has been inactive for 24h but has not yet exceeded its TTL is NOT orphaned.
+
+**If an orphaned standing pool is found:**
+
+1. Invoke the `standing-pool-cleanup` agent to perform cleanup.
+2. Emit the following FR-MMT28 warning (verbatim):
+   ```
+   Standing pool '{name}' appears orphaned (TTL elapsed and inactive for >24h). It has been cleaned up automatically.
+   ```
+
+**Suppression note:** FR-MMT22's one-time-per-session suppression marker lives in the calling command's session state (in `routing.md`), not in `team-init`. FR-MMT22 suppression does not suppress these FR-MMT28 orphan warnings — each pass operates independently.
+
+Record these FR-MMT28 warnings for display in the final summary (step 7).
+
+If `~/.claude/teams/standing/index.json` does not exist or is empty, skip Pass 2 silently.
 
 ### 5. Create Configuration File
 
