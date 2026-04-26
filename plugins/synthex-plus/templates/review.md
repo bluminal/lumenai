@@ -73,3 +73,81 @@ Each teammate's spawn prompt follows this structure:
 - Diff is under 200 lines with a single concern (use Synthex `review-code` instead)
 - Routine bug fixes confined to 1-2 files (use Synthex `review-code` instead)
 - Documentation-only or configuration-only changes (use Synthex `review-code` instead)
+
+---
+
+### Multi-Model Conditional Overlay (apply when multi_model=true)
+
+> **Composition note (D22):** There is no rendering engine. This overlay is a labeled prose section.
+> Commands compose teammate spawn prompts by reading this file and including the relevant overlay
+> sections verbatim (raw inclusion) when their flags resolve true. The host model interprets
+> conditional inclusion via command workflow markdown — not via Handlebars, Mustache, or any other
+> template engine. Test surface = raw-string match on what the command writes into the spawn-prompt
+> blob.
+
+This overlay is included verbatim into the team Lead's spawn prompt AND into each native reviewer's
+spawn prompt when `multi_model: true` is resolved for the team (per FR-MMT4/FR-MMT19 resolution
+chain). It is a single contiguous Markdown subtree; no fragments are scattered elsewhere in this
+file. Commands MUST include the entire subtree below — do not split or summarize.
+
+#### Lead Suppression (FR-MMT4 step 1)
+
+Include the following instruction verbatim in the team Lead's spawn prompt when multi_model=true:
+
+> "Multi-model mode is active for this team. Do NOT produce your own consolidated review report. After all native reviewers' tasks reach `completed` status, wait for a message of type `orchestrator-report` in your mailbox at `~/.claude/teams/<team-name>/inboxes/lead/orchestrator-report-*.json`. When it arrives, surface its `report` field as the team's review output to the calling caller (and, in standing-pool mode, write the report to the requesting command's `report-to` path). Do not edit, summarize, or re-rank the orchestrator's report content."
+
+**Rationale (FR-MMT4):** Without this suppression, two competing consolidated reports would surface
+to the user (one from the team Lead, one from the orchestrator), creating ambiguity about which is
+authoritative. The Lead's role under multi-model shifts to "publish the orchestrator's report" —
+a pass-through, not a producer. Suppression is spawn-time (not runtime) to guarantee race-freedom:
+the Lead never enters the natural consolidation code path when multi-model mode is active.
+
+#### Reviewer JSON-Envelope (FR-MMT20)
+
+Include the following instruction verbatim in each native reviewer's spawn prompt when multi_model=true:
+
+> "This team is running in multi-model mode. When you send your findings to Lead, your mailbox message must include BOTH (a) your normal markdown review report AND (b) a JSON envelope conforming to the canonical finding schema (`multi-model-review.md` FR-MR13). The JSON goes in the message's `findings_json` field; the markdown goes in the message's `report_markdown` field. The JSON must include every finding from your markdown report — no summary, no truncation. If you would mark this review PASS, send an empty `findings` array."
+
+**Rationale (FR-MMT20):** The orchestrator consumes native team findings via the canonical
+finding schema to avoid per-reviewer ad-hoc parsing. The JSON envelope is emitted only when
+`multi_model: true` is resolved; reviewers in standard non-multi-model invocations produce their
+standard markdown report only (byte-identical behavior preserved). The `findings_json` field IS the
+canonical finding schema from `multi-model-review.md` FR-MR13 — no new shape introduced here.
+Agent definition files (`plugins/synthex/agents/*.md`) are NOT modified; this is a template-only
+change (D5).
+
+---
+
+### Standing Pool Identity Confirm Overlay (apply when standing=true)
+
+> **Composition note (D22):** There is no rendering engine. This overlay is a labeled prose section.
+> Commands compose pool teammate spawn prompts by reading this file and including this overlay
+> verbatim (raw inclusion) when `standing=true` resolves for the pool. The host model interprets
+> conditional inclusion via command workflow markdown. This overlay fires **per task claim** (on
+> each transition from idle → active), NOT once at pool spawn — include it at the per-task
+> workflow point in the command's spawn prompt.
+
+This overlay is included verbatim into each pool teammate's spawn prompt when `standing: true`.
+It implements the idle-hour identity drift mitigation defined in FR-MMT5b.
+
+#### Identity Confirm Step (FR-MMT5b)
+
+Include the following instruction verbatim in each pool teammate's per-task workflow when standing=true:
+
+Read-on-spawn (preserved per §8 Assumptions) means a pool teammate adopts its full Synthex agent
+identity once at pool spawn and holds it for the pool's entire lifetime. For pools that idle for
+hours (default `ttl_minutes: 60`; user-configurable up to `0` for indefinite), Claude Code
+auto-compaction may evict portions of the teammate's context, including the agent definition itself.
+To detect this without complicating the spawn path:
+
+- Each pool teammate **unconditionally re-reads** its own agent file (e.g., `plugins/synthex/agents/code-reviewer.md`) before beginning review work on each newly-claimed task (transition from `idle` → `active`). No comparison is performed against the teammate's "current" understanding of its identity — post-compaction the teammate may not even retain a stable reference to compare against. The re-read itself is the fix: after compaction-evicted context is reloaded by the Read call, the teammate's effective agent definition is current. This is a single Read call; cost is negligible vs. a code review's typical token spend.
+- The identity confirm step (the unconditional re-read) is part of the standing-pool variant of the review template (added to `templates/review.md` under a `{{#if standing}}…{{/if}}` block).
+
+**Concrete instruction for teammates:** Before claiming and beginning work on each task from the
+pool's task list, unconditionally re-read your own agent file at
+`plugins/synthex/agents/<your-agent-name>.md` using the Read tool. Do this on every task claim,
+not just the first one. Do not skip this step even if you believe your identity context is intact —
+post-compaction state is not reliably introspectable.
+
+**Cost rationale (FR-MMT5b verbatim):** This is a single Read call; cost is negligible vs. a code
+review's typical token spend.

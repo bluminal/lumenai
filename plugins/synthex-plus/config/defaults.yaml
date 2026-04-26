@@ -145,3 +145,120 @@ documents:
   requirements: docs/reqs/main.md
   implementation_plan: docs/plans/main.md
   specs: docs/specs
+
+# -------------------------------------------------------------------
+# Lifecycle Settings (cross-cutting, not pool-specific)
+#
+# These settings govern submission and polling behavior for any command
+# that submits work to a standing pool.  They are top-level siblings of
+# standing_pools: (D23) — NOT nested inside standing_pools.lifecycle —
+# because they apply to the submitting command session, not to the pool.
+# -------------------------------------------------------------------
+lifecycle:
+  # Maximum seconds a submitting command session will poll the pool's
+  # task list waiting for a result before timing out and falling back.
+  # Applies to /review-code, /performance-audit, and any future command
+  # that supports pool routing (FR-MMT16a).  Default: 300 seconds (5 min).
+  submission_timeout_seconds: 300
+
+# -------------------------------------------------------------------
+# Standing Review Pools (Feature B)
+#
+# Cross-file config resolution rules (D17 / FR-MMT6):
+#
+#   standing_pools.*        — read from .synthex-plus/config.yaml ONLY.
+#                             Standing pools are a synthex-plus feature;
+#                             this namespace does NOT appear in standard
+#                             Synthex's config (.synthex/config.yaml).
+#
+#   multi_model_review.*    — read from .synthex/config.yaml ONLY.
+#                             Multi-model review is a standard Synthex
+#                             feature; synthex-plus commands re-use its
+#                             resolution chain and do NOT define their
+#                             own copy of these keys.
+#
+#   NO MERGE between the two files.  The two namespaces are disjoint
+#   by design.  A synthex-plus command needing both reads each from its
+#   respective file independently.
+#
+#   Example: /start-review-team --multi-model reads
+#     .synthex-plus/config.yaml → standing_pools.enabled
+#     .synthex/config.yaml      → multi_model_review.per_command.team_review.enabled
+#   Never from the same file.
+# -------------------------------------------------------------------
+standing_pools:
+  # Master switch for standing pool functionality.  When false,
+  # /start-review-team, /stop-review-team, and /list-teams are still
+  # available but pool routing by standard Synthex commands does not
+  # occur.  Default: false (opt-in).
+  enabled: false
+
+  # TTL: minimum idle time (in minutes) before a standing pool becomes
+  # eligible for shutdown via lazy enforcement.  "Idle" = the pool's
+  # task list has been continuously empty (no pending or in_progress
+  # tasks) for this duration.
+  #
+  # Lazy enforcement: TTL expiry does NOT trigger an automatic shutdown.
+  # Pools may outlive their nominal TTL until the next discovery event
+  # (a /list-teams call or any standard Synthex command performing pool
+  # routing) observes the expiry and reaps the pool.  See FR-MMT13 for
+  # the full discovery-time cleanup contract.
+  #
+  # Set to 0 to disable TTL-based reaping entirely (pool only stops via
+  # /stop-review-team or by host-level process death, which is then
+  # reaped by stale-pool cleanup at next discovery).  Default: 60 min.
+  ttl_minutes: 60
+
+  # Default pool name used by /start-review-team when --name is not
+  # provided.  Must satisfy the name validation regex:
+  # ^[a-z0-9][a-z0-9-]{0,47}$  (D18).  Default: "review-pool".
+  default_name: review-pool
+
+  # Default reviewer roster for /start-review-team when --reviewers is
+  # not provided.  List of Synthex agent names.  Chosen to match
+  # standard Synthex's code_review.reviewers default so that /review-code
+  # pool-routing hits succeed out of the box.  Default: two reviewers.
+  default_reviewers:
+    - code-reviewer
+    - security-reviewer
+
+  # Default for whether to enable Feature A (multi-model) when starting
+  # a pool.  When true, /start-review-team without --multi-model still
+  # spawns with multi-model enabled.  When false, must pass --multi-model
+  # explicitly to activate Feature A on the pool.  Default: false.
+  default_multi_model: false
+
+  # Storage namespace for standing pools.  Pools live under
+  # teams/standing/ to separate them from per-invocation teams.
+  # Tasks live in tasks/standing/.  Mailboxes at
+  # teams/standing/<name>/inboxes/.
+  #
+  # NOT user-configurable in v1 — these paths form the discovery
+  # convention (D6).  Changing them would break cross-session routing.
+  storage_root: ~/.claude/teams/standing
+  tasks_root: ~/.claude/tasks/standing
+
+  # Routing semantics: controls what happens when a standard Synthex
+  # command (e.g., /review-code) looks for a matching pool.
+  #
+  # "prefer-with-fallback"    — when a matching pool exists, route to it;
+  #                             otherwise spawn fresh sub-agents (today's
+  #                             behavior).  Silent fallback.  Default.
+  # "explicit-pool-required"  — when a matching pool exists, route to it;
+  #                             when no matching pool exists, the command
+  #                             aborts with a "no matching pool" error and
+  #                             a hint to run /start-review-team.  For
+  #                             users who want to enforce pool usage and
+  #                             catch misconfigurations.
+  routing_mode: prefer-with-fallback
+
+  # Roster matching: which reviewers must be present in a pool's roster
+  # for it to be considered a match for the command's requested roster.
+  #
+  # "covers"  — pool roster is a superset of the command's required
+  #             reviewers (e.g., a pool with [code-reviewer,
+  #             security-reviewer, performance-engineer] matches a
+  #             command requesting [code-reviewer, security-reviewer]).
+  # "exact"   — pool roster must equal the command's required reviewers
+  #             exactly (both sets identical).  Default: covers.
+  matching_mode: covers
