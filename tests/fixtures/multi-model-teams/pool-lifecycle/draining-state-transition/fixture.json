@@ -1,0 +1,218 @@
+[
+  {
+    "frame": "spawn",
+    "description": "Pool spawned in idle state; no tasks, no in-flight work.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 30,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 42100,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:00:00Z",
+      "pool_state": "idle"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "idle",
+          "last_active_at": "2026-04-25T10:00:00Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "assertion": "pool_state is idle; task list empty; pool available for routing"
+  },
+  {
+    "frame": "task-claimed",
+    "description": "Pool Lead claims task-001; transitions idle → active. Dual-write: config.json first, index.json second.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 30,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 42100,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:05:00Z",
+      "pool_state": "active"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "active",
+          "last_active_at": "2026-04-25T10:05:00Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "tasks": [
+      {
+        "id": "task-001",
+        "status": "in_progress",
+        "owner": "pool-lead",
+        "submitted_at": "2026-04-25T10:04:58Z",
+        "claimed_at": "2026-04-25T10:05:00Z"
+      }
+    ],
+    "assertion": "pool_state is active; task-001 is in_progress with owner=pool-lead"
+  },
+  {
+    "frame": "ttl-fires-draining",
+    "description": "30-minute TTL elapsed while task-001 still in-progress. Pool Lead transitions active → draining (FR-MMT14). config.json written first, then index.json.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 30,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 42100,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:05:00Z",
+      "pool_state": "draining"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "draining",
+          "last_active_at": "2026-04-25T10:05:00Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "tasks": [
+      {
+        "id": "task-001",
+        "status": "in_progress",
+        "owner": "pool-lead",
+        "submitted_at": "2026-04-25T10:04:58Z",
+        "claimed_at": "2026-04-25T10:05:00Z"
+      }
+    ],
+    "assertion": "pool_state is draining in both config.json and index.json; task-001 still in_progress; TTL has fired"
+  },
+  {
+    "frame": "new-task-rejected",
+    "description": "task-002 submitted during drain window. Pool Lead is draining and refuses to claim it. task-002 has no owner. pool_state remains draining.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 30,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 42100,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:05:00Z",
+      "pool_state": "draining"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "draining",
+          "last_active_at": "2026-04-25T10:05:00Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "tasks": [
+      {
+        "id": "task-001",
+        "status": "in_progress",
+        "owner": "pool-lead",
+        "submitted_at": "2026-04-25T10:04:58Z",
+        "claimed_at": "2026-04-25T10:05:00Z"
+      },
+      {
+        "id": "task-002",
+        "status": "pending",
+        "submitted_at": "2026-04-25T10:36:00Z"
+      }
+    ],
+    "assertion": "pool_state is draining; task-002 is unowned (no owner field); Pool Lead did not claim it"
+  },
+  {
+    "frame": "in-flight-completes",
+    "description": "task-001 completes. No more in-flight work. pool_state remains draining until Pool Lead writes the stopping transition.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 30,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 42100,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:05:00Z",
+      "pool_state": "draining"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "draining",
+          "last_active_at": "2026-04-25T10:05:00Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "tasks": [
+      {
+        "id": "task-001",
+        "status": "completed",
+        "owner": "pool-lead",
+        "submitted_at": "2026-04-25T10:04:58Z",
+        "claimed_at": "2026-04-25T10:05:00Z",
+        "completed_at": "2026-04-25T10:38:00Z"
+      },
+      {
+        "id": "task-002",
+        "status": "pending",
+        "submitted_at": "2026-04-25T10:36:00Z"
+      }
+    ],
+    "assertion": "task-001 is completed; pool_state still draining (Pool Lead observes zero in-flight tasks before writing stopping); task-002 still unowned"
+  },
+  {
+    "frame": "stopping",
+    "description": "Pool Lead observes zero in-flight tasks. Transitions draining → stopping. Dual-write: config.json first, then index.json.",
+    "config_json": {
+      "name": "review-pool",
+      "standing": true,
+      "reviewers": ["code-reviewer", "security-reviewer"],
+      "multi_model": false,
+      "ttl_minutes": 30,
+      "spawn_timestamp": "2026-04-25T10:00:00Z",
+      "host_pid": 42100,
+      "host_session_id": "sess-abc123",
+      "last_active_at": "2026-04-25T10:05:00Z",
+      "pool_state": "stopping"
+    },
+    "index_json": {
+      "pools": [
+        {
+          "name": "review-pool",
+          "pool_state": "stopping",
+          "last_active_at": "2026-04-25T10:05:00Z",
+          "metadata_dir": "~/.claude/teams/standing/review-pool"
+        }
+      ]
+    },
+    "assertion": "pool_state is stopping; Pool Lead wrote stopping only after last in-flight task completed"
+  },
+  {
+    "frame": "removed",
+    "description": "Pool Lead exited. Metadata directory and index entry deleted. index.json has empty pools array.",
+    "config_json": null,
+    "index_json": null,
+    "assertion": "index entry absent (null index_json); pool fully removed from storage"
+  }
+]
