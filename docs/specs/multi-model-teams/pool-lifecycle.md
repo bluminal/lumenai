@@ -1,19 +1,55 @@
-## Status: Skeleton
-
 # Pool Lifecycle — Normative Schema and Contract Reference
 
-This document is the normative source of truth for standing-pool storage schemas, state machine, writer-ordering rules, dual-write responsibility, locking primitive, and reconciliation rules. All implementation work in this plan builds against these contracts.
+## Overview
 
-Phase 8 (Task 66) replaces this skeleton with narrative prose, examples, and cross-references. The normative content below is complete from the start.
+This document is the normative source of truth for standing-pool storage schemas, state machine, writer-ordering rules, dual-write responsibility, locking primitive, and reconciliation rules. It covers how standing review pools are created, transition through states (idle → active → draining → stopping → removed), and coordinate updates across multiple writers via max-semantics and atomic locking. The storage lives in `~/.claude/teams/standing/` across two files: each pool's `config.json` (canonical, per-pool state) and a shared `index.json` (discovery cache with denormalized state for fast filtering). For how pools are discovered and submitted to (routing semantics), see [`routing.md`](#related-documentation). This document focuses on the storage lifecycle, state transitions, and the locking/writer-ordering contracts that keep the system consistent under concurrent writes.
 
 ---
 
 ## Related Documentation
 
-- [`architecture.md`](./architecture.md) — Option B rationale, native-team-vs-orchestrator separation, cross-session lifetime model (forthcoming, Task 3 / Task 65)
-- [`routing.md`](./routing.md) — Discovery procedure, required-reviewer-set computation, routing mode semantics (forthcoming)
-- [`recovery.md`](./recovery.md) — FR-MMT24 per-task fallback, stale-pool cleanup, partial-dedup entry point (forthcoming)
-- [`standing-pools.md`](../../plugins/synthex-plus/docs/standing-pools.md) — User-facing design doc (forthcoming, NFR-MMT8)
+- [`architecture.md`](./architecture.md) — Option B rationale, native-team-vs-orchestrator separation, cross-session lifetime model
+- [`routing.md`](./routing.md) — Discovery procedure, required-reviewer-set computation, routing mode semantics
+- [`recovery.md`](./recovery.md) — FR-MMT24 per-task fallback, stale-pool cleanup, partial-dedup entry point
+- [`standing-pools.md`](../../plugins/synthex-plus/docs/standing-pools.md) — User-facing design doc (NFR-MMT8)
+- [`start-review-team.md`](../../plugins/synthex-plus/docs/start-review-team.md) — Spawn command, pool creation contract (Task 25)
+- [`stop-review-team.md`](../../plugins/synthex-plus/docs/stop-review-team.md) — Shutdown command, graceful drain semantics (Task 26)
+
+---
+
+## State Machine Quick Reference
+
+A standing pool progresses through five states: `idle`, `active`, `draining`, `stopping`, and `removed`.
+
+```
+idle ↔ active              # Task claim (idle → active); last task completes (active → idle)
+idle → draining            # TTL fires, OR /stop-review-team received
+active → draining          # TTL fires while tasks in-progress, OR /stop-review-team received
+draining → stopping        # All in-flight tasks complete or stuck-task timeout fires
+stopping → removed         # Pool Lead exits; metadata directory and index entry deleted
+```
+
+| State | Routing Eligible | Description |
+|-------|------------------|-------------|
+| `idle` | ✓ Yes | No tasks pending or in-progress. Available for task submission. |
+| `active` | ✓ Yes | One or more tasks pending or in-progress. Accepting new submissions. |
+| `draining` | ✗ No | Completing in-flight tasks before shutdown; not accepting new submissions. |
+| `stopping` | ✗ No | Shutdown signal sent; in-flight tasks complete. Disappearing from discovery shortly. |
+| `removed` | N/A | Terminal state. Pool metadata and index entry deleted. |
+
+---
+
+## Locking Quick Reference
+
+Standing pools use a POSIX `mkdir`-based atomic lock to coordinate concurrent writes to the shared `index.json` file.
+
+**Acquire:** `mkdir ~/.claude/teams/standing/.index.lock` — succeeds only if the directory doesn't exist. If it exists, the lock is held by another process.
+
+**Release:** `rmdir ~/.claude/teams/standing/.index.lock` — removes the lock directory.
+
+**Polling:** On acquisition failure, retry up to 10 seconds with 100 ms between attempts.
+
+**Stale locks:** If a process crashes while holding the lock, the `.index.lock` directory persists. Manual cleanup: `rmdir ~/.claude/teams/standing/.index.lock`. In v1, there is no automatic stale-lock detection (no PID file, no age check); users must clean up manually if a process crashes.
 
 ---
 
@@ -229,3 +265,35 @@ POSIX guarantees that `mkdir` is atomic: exactly one caller succeeds; all others
 - `mkdir`/`rmdir` atomic semantics documented above.
 - Verbatim stale-lock cleanup error message present (see above).
 - 10-second timeout and 100 ms polling cadence documented above.
+
+---
+
+## Worked Example: Pool Startup and First Task
+
+**Scenario:** A user invokes `/synthex-plus:start-review-team --name review-pool --reviewers code-reviewer,security-reviewer --ttl 60`. The pool spawns, a new review task arrives, and a reviewer claims it.
+
+**Step 1: Spawn (start-review-team, Task 25)**
+- `/synthex-plus:start-review-team` acquires `.index.lock` (step 6 of spawn).
+- Creates `~/.claude/teams/standing/review-pool/config.json` with `pool_state: idle` and `spawn_timestamp` (the canonical write, step 7).
+- Adds an entry to `~/.claude/teams/standing/index.json` with denormalized `pool_state` and `last_active_at` (step 8, under lock).
+- Releases `.index.lock` and spawns the Pool Lead agent.
+- **State:** `idle`. **Index:** pool listed as idle, eligible for routing.
+
+**Step 2: Reviewer Claims Task (Task 27, Pool Lead polling)**
+- A submitter invokes `/synthex-plus:submit-to-review --pool review-pool --task-id task-123`. The routing layer discovers the pool (reads `index.json`, confirms state is `idle`), and routes the task.
+- Pool Lead observes the task list is no longer empty; claims the task.
+- Pool Lead writes `config.json` with `pool_state: active`, `last_active_at: <new timestamp>`, and updates `index.json` under lock.
+- **State:** `active`. **Index:** pool listed as active; routing still eligible.
+
+**Step 3: Teammate Idles (TeammateIdle Hook, Task 22)**
+- The reviewer agent completes the task and reports idle via the TeammateIdle hook.
+- Hook reads the team's `standing` flag (true) and computes idle timestamp.
+- Hook reads current `config.json.last_active_at`, compares against its own idle timestamp, writes `max(existing, new)` to `config.json` and `index.json` under lock.
+- **State:** `active` (no change to pool_state; only `last_active_at` updated). **Index:** `last_active_at` refreshed; pool remains active.
+
+**Step 4: Pool Shuts Down (stop-review-team, Task 26)**
+- User invokes `/synthex-plus:stop-review-team --name review-pool`.
+- Pool Lead receives shutdown message, acquires `.index.lock`, writes `config.json` with `pool_state: stopping` (since no tasks are in-flight), and updates `index.json`.
+- Releases lock. Pool Lead exits, deleting the metadata directory.
+- On next discovery pass, the stale index entry is reconciled (config.json doesn't exist); discovery removes the entry from `index.json`.
+- **State:** `removed`. **Index:** pool entry deleted; no longer discoverable.
