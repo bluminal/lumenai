@@ -169,28 +169,110 @@ All configurable settings for this hook live under `hooks.teammate_idle.work_ass
 | Max concurrent tasks | `task_list.max_concurrent_tasks` | If the team already has this many tasks in progress, the hook should not assign additional work even if the teammate is idle. This is a soft limit -- warn the lead rather than hard-block. |
 | Stuck task timeout | `lifecycle.stuck_task_timeout_minutes` | If an idle teammate was previously stuck on a task (timeout intervention by lead), the hook should still assign new work normally. The stuck task handling is the lead's responsibility. |
 
+## Standing Pool Branch
+
+When the hook fires, read `~/.claude/teams/<team-name>/config.json` and check the `standing` field before proceeding with any other logic.
+
+### Determining the Branch
+
+```
+TeammateIdle event fires
+    |
+    v
+Read ~/.claude/teams/<team-name>/config.json
+Check config.json["standing"]
+    |
+    |-- standing: true  --> take the Standing Pool Path (below)
+    |-- standing: false |
+    |-- field absent    --> take the Non-Standing Path (existing behavior, unchanged)
+```
+
+### Standing Pool Path (FR-MMT12)
+
+When `standing: true` is read from `config.json`:
+
+1. **Do NOT trigger teammate dismissal or shutdown.** Standing pool teammates remain alive
+   regardless of an empty task list. Skip the dismissal flow entirely.
+
+2. **Report idle status for observability.** Log or note that the teammate is idle. This
+   information is available to operators and monitoring without causing any lifecycle action.
+
+3. **Update `last_active_at` using max-semantics dual-write (FR-MMT12).**
+
+   **Debounce:** If the last `last_active_at` write was fewer than 30 seconds ago, skip this
+   write entirely. Track the debounce timestamp in hook state; proceed only when the elapsed
+   time since the last write is ≥ 30 seconds.
+
+   **Max-semantics write procedure:**
+
+   ```
+   proposed_ts = current UTC timestamp (ISO-8601)
+   read existing_ts = config.json["last_active_at"]
+   if proposed_ts <= existing_ts:
+       skip write  # existing value is already equal or newer; max(existing, new) = existing
+   else:
+       # max(existing, new) = proposed_ts; proceed with dual-write
+       write config.json (canonical):
+           write updated config to ~/.claude/teams/<name>/config.json.tmp
+           rename ~/.claude/teams/<name>/config.json.tmp
+                → ~/.claude/teams/<name>/config.json
+
+       write index.json (cache):
+           acquire .index.lock:
+               mkdir ~/.claude/teams/standing/.index.lock
+               (retry up to 10 seconds with 100 ms polling on contention)
+           write updated index entry to ~/.claude/teams/standing/.index.json.tmp
+           rename ~/.claude/teams/standing/.index.json.tmp
+                → ~/.claude/teams/standing/index.json
+           release .index.lock:
+               rmdir ~/.claude/teams/standing/.index.lock
+   ```
+
+   Write `config.json` first, then `index.json`. If the hook crashes between the two writes,
+   `config.json` holds the correct state and the next discovery operation reconciles the stale
+   index entry. This write ordering matches the crash-safety contract in FR-MMT9b §5.2.
+
+4. **Exit code 0** — exit 0 (allow idle — standing pool teammate simply waits for the next
+   task). The hook does not exit 2 on the standing path; task assignment to standing pool
+   teammates is managed by the Pool Lead, not this hook.
+
+### Non-Standing Path (Unchanged)
+
+When `standing` is `false` or the field is absent from `config.json`, the hook executes its
+original logic unchanged. See the Decision Flowchart below for the full non-standing flow.
+
+---
+
 ## Decision Flowchart
 
 ```
 TeammateIdle event fires
     |
     v
-Is work_assignment.enabled?
-    |-- No --> exit 0 (allow idle)
-    |-- Yes
-        |
-        v
-    Find pending tasks matching teammate's role
-        |
-        v
-    Filter to unblocked tasks (all blockedBy completed)
-        |
-        v
-    Any unblocked matches?
-        |-- Yes --> Assign highest priority (lowest task #)
-        |           --> TaskUpdate(owner, in_progress)
-        |           --> Notify teammate via mailbox
-        |           --> Notify lead via mailbox
+Read ~/.claude/teams/<team-name>/config.json
+Check config.json["standing"]
+    |
+    |-- standing: true ─────────────────────────────────────────────────────────────────────┐
+    |                                                                                        |
+    |-- standing: false / absent                                                             |
+        |                                                                              Standing Pool Path
+        v                                                                                    |
+Is work_assignment.enabled?                                                        Do NOT dismiss teammate
+    |-- No --> exit 0 (allow idle)                                                 Report idle (observability)
+    |-- Yes                                                                        Debounce check: last write < 30s ago?
+        |                                                                              |-- Yes --> skip write, exit 0
+        v                                                                              |-- No
+    Find pending tasks matching teammate's role                                            |
+        |                                                                                  v
+        v                                                                        Read last_active_at from config.json
+    Filter to unblocked tasks (all blockedBy completed)                          proposed_ts = current UTC
+        |                                                                        if proposed_ts > existing:
+        v                                                                            write config.json.tmp → rename
+    Any unblocked matches?                                                           acquire .index.lock (mkdir)
+        |-- Yes --> Assign highest priority (lowest task #)                          write .index.json.tmp → rename
+        |           --> TaskUpdate(owner, in_progress)                               release .index.lock (rmdir)
+        |           --> Notify teammate via mailbox                              exit 0 (allow idle — Pool Lead manages tasks)
+        |           --> Notify lead via mailbox                                  ────────────────────────────────────────────┘
         |           --> exit 2 (keep working)
         |
         |-- No --> Is allow_cross_functional true?
