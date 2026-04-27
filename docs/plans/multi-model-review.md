@@ -138,9 +138,9 @@ The three v1 adapters per D2 (Codex, Gemini, Ollama). All three are independent 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
 | 9 | Author `plugins/synthex/agents/codex-review-prompter.md` per FR-MR8 + FR-MR10. Documents: CLI invocation (`codex exec --json --sandbox read-only --approval-mode never`), capability tier (`agentic`), default family (`openai`), CLI presence check via `which codex`, output parsing for `codex exec --json` envelope, retry-once on parse failure with appended clarification, normalization to canonical envelope, install one-liner, auth setup pointer (`codex login`), known gotchas. **Schedule first in parallel batch** ([H] criteria). | L | Phase 1 | done |
-| 10 | Add `codex-review-prompter` to `plugin.json` agents array. **Coordinate with Tasks 14, 17.** | S | Task 9 | in progress |
-| 11 | Author Layer 1 schema validator at `tests/schemas/adapter-envelope.ts` (shared across all adapters) validating the Output envelope shape. Vitest suite. **Soft-dep on Task 9:** can be drafted against Task 4's envelope schema; inline sample assertions finalized once Task 9's recorded envelope exists. | M | Task 4 (hard); Task 9 (soft) | in progress |
-| 12 | Author Layer 2 behavioral fixture at `tests/fixtures/multi-model-review/adapters/codex/`: (a) recorded successful codex output, (b) recorded malformed output triggering retry, (c) recorded auth-failure output, (d) `cli_missing` simulation. Cached outputs verify each error_code surfaces correctly. | M | Tasks 9, 11 | pending |
+| 10 | Add `codex-review-prompter` to `plugin.json` agents array. **Coordinate with Tasks 14, 17.** | S | Task 9 | done |
+| 11 | Author Layer 1 schema validator at `tests/schemas/adapter-envelope.ts` (shared across all adapters) validating the Output envelope shape. Vitest suite. **Soft-dep on Task 9:** can be drafted against Task 4's envelope schema; inline sample assertions finalized once Task 9's recorded envelope exists. | M | Task 4 (hard); Task 9 (soft) | done |
+| 12 | Author Layer 2 behavioral fixture at `tests/fixtures/multi-model-review/adapters/codex/`: (a) recorded successful codex output, (b) recorded malformed output triggering retry, (c) recorded auth-failure output, (d) `cli_missing` simulation. Cached outputs verify each error_code surfaces correctly. | M | Tasks 9, 11 | in progress |
 
 **Task 9 Acceptance Criteria:**
 - `[T]` Agent definition includes every FR-MR8 responsibility numbered 1–8
@@ -154,8 +154,12 @@ The three v1 adapters per D2 (Codex, Gemini, Ollama). All three are independent 
 **Task 10 Acceptance Criteria:**
 - `[T]` `plugin.json` parses; agent registered
 
+**Task 10 Completion Notes:** Done. `codex-review-prompter` registered in `plugins/synthex/.claude-plugin/plugin.json` agents array (bundled PR with 14, 17 per Phase 2 scheduling note). 14 tests in `synthex-plugin-json.test.ts`. Commit `dc66971`.
+
 **Task 11 Acceptance Criteria:**
 - `[T]` Validator rejects envelopes missing `status`, with unknown `error_code`, or with `finding_id` containing line numbers
+
+**Task 11 Completion Notes:** Done. Shared `tests/schemas/adapter-envelope.ts` validator composing Task 4's envelope + Task 1's canonical-finding validators. Surfaces per-finding errors with `findings[INDEX]:` prefix. 26 tests in `adapter-envelope.test.ts`. `[T]` criterion passes (rejects missing status, unknown error_code, finding_id with line numbers in 3 forms). Commit `99f1a13`.
 
 **Task 12 Acceptance Criteria:**
 - `[T]` Fixture run produces canonical envelope
@@ -171,8 +175,8 @@ The three v1 adapters per D2 (Codex, Gemini, Ollama). All three are independent 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
 | 13 | Author `plugins/synthex/agents/gemini-review-prompter.md` per FR-MR8 + FR-MR10. Same structure as Codex; CLI is `gemini -p --output-format json`; `agentic` tier; family `google`; sandbox flags per FR-MR26 (read-only equivalent); install one-liner; `gcloud auth list` for auth check. **Schedule first in parallel batch** ([H] criteria). | M | Milestone 2.1 (pattern reference) | done |
-| 14 | Add `gemini-review-prompter` to `plugin.json`. **Coordinate with Tasks 10, 17.** | S | Task 13 | in progress |
-| 15 | Layer 1 schema validation reuses `adapter-envelope.ts` from Task 11 — add Vitest test asserting Gemini's recorded sample envelope passes. | S | Tasks 11, 13 | pending |
+| 14 | Add `gemini-review-prompter` to `plugin.json`. **Coordinate with Tasks 10, 17.** | S | Task 13 | done |
+| 15 | Layer 1 schema validation reuses `adapter-envelope.ts` from Task 11 — add Vitest test asserting Gemini's recorded sample envelope passes. | S | Tasks 11, 13 | in progress |
 | 15a | Layer 2 success-path fixture at `tests/fixtures/multi-model-review/adapters/gemini/successful/`: recorded successful gemini output. Surfaces Gemini-specific output-parsing quirks. | S | Tasks 13, 15 | pending |
 
 **Task 13 Acceptance Criteria:**
@@ -185,6 +189,8 @@ The three v1 adapters per D2 (Codex, Gemini, Ollama). All three are independent 
 
 **Task 14 Acceptance Criteria:**
 - `[T]` `plugin.json` parses; agent registered
+
+**Task 14 Completion Notes:** Done. `gemini-review-prompter` registered (bundled with 10, 17). Tests as Task 10. Commit `dc66971`.
 
 **Task 15 Acceptance Criteria:**
 - `[T]` Recorded Gemini sample envelope passes validator
@@ -200,8 +206,8 @@ The three v1 adapters per D2 (Codex, Gemini, Ollama). All three are independent 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
 | 16 | Author `plugins/synthex/agents/ollama-review-prompter.md` per FR-MR8 + FR-MR10. CLI is `ollama run` + HTTP API with `format: <schema>`; capability tier `text-only` (bundle is the only context); family `local-<model>` (dynamic family pattern based on configured model); install one-liner; no auth check (local). Document the v1 recommended-default-model question (Q2) inline as a TBD with placeholder. **Schedule first in parallel batch** ([H] criteria). | M | Milestone 2.1 (pattern reference) | done |
-| 17 | Add `ollama-review-prompter` to `plugin.json`. **Coordinate with Tasks 10, 14.** | S | Task 16 | in progress |
-| 18 | Layer 1: Vitest test asserting Ollama recorded sample envelope passes the shared validator. Specific assertion that `text-only` adapters produce envelopes without agentic-tier-only metadata. | S | Tasks 11, 16 | pending |
+| 17 | Add `ollama-review-prompter` to `plugin.json`. **Coordinate with Tasks 10, 14.** | S | Task 16 | done |
+| 18 | Layer 1: Vitest test asserting Ollama recorded sample envelope passes the shared validator. Specific assertion that `text-only` adapters produce envelopes without agentic-tier-only metadata. | S | Tasks 11, 16 | in progress |
 | 18a | Layer 2 success-path fixture at `tests/fixtures/multi-model-review/adapters/ollama/successful/`: recorded successful ollama output (text-only tier — bundle-only context). | S | Tasks 16, 18 | pending |
 
 **Task 16 Acceptance Criteria:**
@@ -215,6 +221,8 @@ The three v1 adapters per D2 (Codex, Gemini, Ollama). All three are independent 
 
 **Task 17 Acceptance Criteria:**
 - `[T]` `plugin.json` parses; agent registered
+
+**Task 17 Completion Notes:** Done. `ollama-review-prompter` registered (bundled with 10, 14). Tests as Task 10. Commit `dc66971`.
 
 **Task 18 Acceptance Criteria:**
 - `[T]` Validator passes Ollama envelope
