@@ -45,6 +45,61 @@ The caller resolves `config` from `.synthex/config.yaml` merged onto `defaults.y
 
 ## Behavior
 
+### Step 0 — Preflight (FR-MR20)
+
+Before assembling the bundle, run preflight to fail-fast on missing CLIs or insufficient configuration.
+
+#### 0a. Concurrent CLI presence + auth checks
+
+For each external adapter in `config.multi_model_review.reviewers`, dispatch BOTH the CLI presence check (`which <cli>`) AND the lightweight auth check (per the adapter's documented auth check command) **concurrently in a single parallel Bash batch**.
+
+> **All `which` and auth checks dispatch concurrently in a single parallel Bash batch.**
+
+Preflight wall-clock is bounded by the slowest single check + collation overhead — NOT by the sum of per-adapter check latencies. Adapters whose `which` returns non-zero are marked `cli_missing`; adapters whose auth check exits non-zero are marked `cli_auth_failed`. Auth checks that exit 0 are treated as authenticated regardless of advisory text on stdout/stderr.
+
+**Preflight target:** complete in < 2 seconds on a 3-adapter config (PRD acceptance).
+
+#### 0b. Family diversity check
+
+Compute `unique_families` across:
+- All native reviewers (counted as `anthropic`)
+- All AVAILABLE external adapters (passed both presence and auth checks)
+
+If `unique_families < config.multi_model_review.min_family_diversity`, emit a warning (does NOT block):
+> `"Family diversity warning: only N unique families across configured proposers (configured min: M)."`
+
+#### 0c. Self-preference check
+
+If the resolved aggregator family equals the family of the only non-anthropic proposer (i.e., aggregator and the sole external both come from the same family — e.g., `gpt-5` aggregator with codex-review-prompter as the only external), emit a SEPARATE warning (does NOT block):
+> `"Self-preference warning: aggregator '<name>' is from the same family as the only non-anthropic proposer."`
+
+This warning fires INDEPENDENTLY of the family-diversity warning — both can fire on the same invocation when applicable.
+
+#### 0d. min_proposers_to_proceed check
+
+Compute `available_proposers = native_reviewers (when include_native_reviewers) + external_adapters_passing_preflight`. If `available_proposers < config.multi_model_review.min_proposers_to_proceed`, BLOCK with error:
+> `"Insufficient proposers: <available> available, <min> required (config: min_proposers_to_proceed). Aborting."`
+
+#### 0e. Aggregator resolution check (D17 tier table)
+
+Resolve `config.multi_model_review.aggregator.command` per Step 2 of the workflow below. If `auto` and the D17 tier table yields no flagship match AND the host Claude session is not available as a fallback, BLOCK with error:
+> `"Aggregator resolution failed: 'auto' could not resolve via D17 tier table and host-fallback unavailable."`
+
+#### 0f. Preflight summary (FR-MR20)
+
+Emit the preflight summary string matching the regex:
+```
+^N reviewers configured, M available, K families, aggregator: <name>$
+```
+
+Concrete examples:
+- `4 reviewers configured, 4 available, 3 families, aggregator: codex-review-prompter`
+- `3 reviewers configured, 1 available, 2 families, aggregator: host-fallback`
+
+The summary is emitted regardless of warnings; blocked errors prevent the summary from being emitted (the error replaces it).
+
+---
+
 ### Step 1 — Bundle Assembly (D5, FR-MR28)
 
 Invoke the `context-bundle-assembler` agent ONCE with:
@@ -177,11 +232,12 @@ Return the unified envelope from Step 5 (with continuation_event populated per S
 - FR-MR12 (single-batch parallel fan-out — verbatim phrasing in Step 3)
 - FR-MR15 (aggregator tier-table)
 - FR-MR17 (native-only continuation, all-natives-failed, cloud-surface remediation)
+- FR-MR20 (preflight validation — Step 0; concurrent CLI+auth checks, family diversity, min_proposers, aggregator resolution, summary)
 - FR-MR28 (context bundle role)
 - FR-MR9 (adapter input/output envelope contract — Task 4)
 - D5 (single source of truth for bundle)
 - D6 (single parallel Task batch)
-- D17 (aggregator tier table — Step 2)
+- D17 (aggregator tier table — Step 2 and Step 0e)
 - D21 (path-and-reason header regex — Step 7)
 - NFR-MR2 (cloud-surface remediation — Step 6)
 - Task 5 (`context-bundle-assembler` — Step 1)
@@ -195,5 +251,5 @@ Return the unified envelope from Step 5 (with continuation_event populated per S
 This agent does NOT (yet):
 
 - **Consolidate findings.** Stages 1+2 land in Task 24+25 (Milestone 3.2). Stage 4 in Task 26. Stage 5 in Task 28. Contradiction scan in Task 29a/29b. Minority-of-one in Task 30. Aggregator bias-mitigation in Task 31.
-- **Run preflight.** Preflight (which/auth checks, family diversity, aggregator resolution check, FR-MR20 summary) is added inline in Task 21 as a Step 0 prepended to the workflow above.
+- **Run preflight.** ~~Preflight (which/auth checks, family diversity, aggregator resolution check, FR-MR20 summary) is added inline in Task 21 as a Step 0 prepended to the workflow above.~~ **DONE (Task 21):** Step 0 preflight is implemented above.
 - **Write audit artifacts.** Audit-writer integration lands in Phase 4 Milestone 4.0 (Task 39).
