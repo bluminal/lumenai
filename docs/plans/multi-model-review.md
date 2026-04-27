@@ -97,15 +97,17 @@ Establishes the substrate every adapter and integration depends on. No user-visi
 ### Milestone 1.2: Context Bundle Assembly Subroutine
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 5 | Author `plugins/synthex/agents/context-bundle-assembler.md` — Haiku-backed utility agent that assembles the FR-MR28 context bundle from a request shape (artifact path, touched files, project config). Implements assembly order (artifact → conventions → touched files → specs → overview), per-file size cap with Haiku summarization, total bundle cap with iterative summarization, the spec-matching heuristic per OQ-8 (filename-substring match for v1, with `context.spec_map` override hook), and the "narrow scope" error path when the artifact alone exceeds `max_bundle_bytes`. | L | Task 1, Task 2 | in progress |
-| 6 | Add `context-bundle-assembler` to `plugins/synthex/.claude-plugin/plugin.json` agents array. | S | Task 5 | pending |
-| 7 | Author Layer 1 schema validator at `tests/schemas/context-bundle.ts` validating bundle manifest shape (artifact present, file list, summarized-vs-verbatim flags, total bytes ≤ cap). Add Vitest suite with inline samples. | M | Task 5 | pending |
+| 5 | Author `plugins/synthex/agents/context-bundle-assembler.md` — Haiku-backed utility agent that assembles the FR-MR28 context bundle from a request shape (artifact path, touched files, project config). Implements assembly order (artifact → conventions → touched files → specs → overview), per-file size cap with Haiku summarization, total bundle cap with iterative summarization, the spec-matching heuristic per OQ-8 (filename-substring match for v1, with `context.spec_map` override hook), and the "narrow scope" error path when the artifact alone exceeds `max_bundle_bytes`. | L | Task 1, Task 2 | done |
+| 6 | Add `context-bundle-assembler` to `plugins/synthex/.claude-plugin/plugin.json` agents array. | S | Task 5 | in progress |
+| 7 | Author Layer 1 schema validator at `tests/schemas/context-bundle.ts` validating bundle manifest shape (artifact present, file list, summarized-vs-verbatim flags, total bytes ≤ cap). Add Vitest suite with inline samples. | M | Task 5 | in progress |
 | 8 | Add Layer 2 behavioral fixtures at `tests/fixtures/multi-model-review/context-bundle/`: (a) `oversized-bundle/` with > 500 KB of touched-file content; asserts bundle stays ≤ `max_bundle_bytes` and largest files are summarized. (b) `artifact-as-largest-file/` where artifact itself exceeds `max_file_bytes`; asserts agent emits "narrow scope" error rather than summarizing the artifact. (c) `oversized-artifact/` where artifact alone exceeds `max_bundle_bytes`; asserts same error path. | M | Task 5, Task 7 | pending |
 
 **Task 5 Acceptance Criteria:**
 - `[T]` Agent definition specifies inputs/outputs in canonical envelope shape
 - `[H]` Documents assembly order, size-cap algorithm, spec-matching heuristic, artifact-too-large error path
 - `[T]` Markdown rule explicitly forbids summarizing the artifact (raw-string check on .md content)
+
+**Task 5 Completion Note:** Done. `plugins/synthex/agents/context-bundle-assembler.md` Haiku-backed utility agent (FR-MR28, D5, OQ-8). 19 structural tests in `context-bundle-assembler-md.test.ts`. Both `[T]` criteria pass; `[H]` (assembly order, size-cap, spec-matching, narrow-scope error documented) approved during execution. Commit `4e8101e`.
 
 **Task 6 Acceptance Criteria:**
 - `[T]` `plugin.json` parses; new agent appears in agents array
