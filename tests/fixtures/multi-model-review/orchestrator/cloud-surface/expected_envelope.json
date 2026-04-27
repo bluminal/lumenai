@@ -1,0 +1,59 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "codex-review-prompter",
+      "source_type": "external",
+      "family": "openai",
+      "status": "failed",
+      "findings_count": 0,
+      "error_code": "cli_missing",
+      "usage": null
+    },
+    {
+      "reviewer_id": "gemini-review-prompter",
+      "source_type": "external",
+      "family": "google",
+      "status": "failed",
+      "findings_count": 0,
+      "error_code": "cli_missing",
+      "usage": null
+    },
+    {
+      "reviewer_id": "ollama-review-prompter",
+      "source_type": "external",
+      "family": "local",
+      "status": "failed",
+      "findings_count": 0,
+      "error_code": "cli_missing",
+      "usage": null
+    }
+  ],
+  "findings": [],
+  "path_and_reason_header": "Review path: cloud-surface-aborted (no external CLIs available; reviewers: 2 native)",
+  "aggregator_resolution": {
+    "name": "host-fallback",
+    "source": "host-fallback"
+  },
+  "continuation_event": {
+    "type": "cloud-surface-no-clis",
+    "details": "Multi-model review cannot run on this surface — no external review CLIs are available. See docs/specs/multi-model-review/adapter-recipes.md for setup, or run on a host with the configured CLIs installed."
+  }
+}

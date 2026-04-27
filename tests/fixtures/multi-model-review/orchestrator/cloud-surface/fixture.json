@@ -1,0 +1,16 @@
+{
+  "scenario": "cloud-surface",
+  "description": "Simulated cloud/web surface (no host bash). All `which` checks for configured external CLIs return non-zero. Orchestrator emits SINGLE remediation error pointing at adapter-recipes.md — NOT a per-CLI cli_missing cascade.",
+  "input": {
+    "command": "review-code",
+    "artifact_path": "src/api/handler.ts",
+    "native_reviewers": ["code-reviewer", "security-reviewer"],
+    "external_adapters": ["codex-review-prompter", "gemini-review-prompter", "ollama-review-prompter"],
+    "environment": "cloud-surface (no host bash; which always returns non-zero)"
+  },
+  "all_externals_unavailable": true,
+  "expected_continuation_type": "cloud-surface-no-clis",
+  "expected_NOT_a_per_cli_cascade": true,
+  "single_remediation_error_substring": "no external review CLIs are available",
+  "remediation_doc_reference": "adapter-recipes.md"
+}
