@@ -1,0 +1,111 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "codex-review-prompter",
+      "source_type": "external",
+      "family": "openai",
+      "status": "failed",
+      "findings_count": 0,
+      "error_code": "cli_missing",
+      "usage": null
+    },
+    {
+      "reviewer_id": "gemini-review-prompter",
+      "source_type": "external",
+      "family": "google",
+      "status": "failed",
+      "findings_count": 0,
+      "error_code": "cli_failed",
+      "usage": null
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "code.users-api.missing-input-validation",
+      "severity": "high",
+      "category": "correctness",
+      "title": "Missing input validation on user creation endpoint",
+      "description": "The createUser handler does not validate required fields before writing to the database, allowing malformed records.",
+      "file": "src/api/users.ts",
+      "line_range": { "start": 14, "end": 22 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "code.users-api.unhandled-async-error",
+      "severity": "medium",
+      "category": "reliability",
+      "title": "Unhandled promise rejection in async route handler",
+      "description": "The async handler does not wrap the database call in try/catch, so uncaught rejections will crash the process.",
+      "file": "src/api/users.ts",
+      "line_range": { "start": 31, "end": 45 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.users-api.idor-missing-ownership-check",
+      "severity": "critical",
+      "category": "security",
+      "title": "IDOR: no ownership check before returning user record",
+      "description": "The getUser endpoint fetches by ID from the path parameter without verifying the requesting user owns that record.",
+      "file": "src/api/users.ts",
+      "line_range": { "start": 58, "end": 67 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.users-api.password-logged-in-plaintext",
+      "severity": "high",
+      "category": "security",
+      "title": "Plaintext password written to application log",
+      "description": "A debug log statement on the registration path emits the raw password field before hashing.",
+      "file": "src/api/users.ts",
+      "line_range": { "start": 82, "end": 84 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    }
+  ],
+  "path_and_reason_header": "Review path: multi-model (above-threshold diff; reviewers: 2 native, 0 external succeeded)",
+  "aggregator_resolution": {
+    "name": "host-fallback",
+    "source": "host-fallback"
+  },
+  "continuation_event": {
+    "type": "all-externals-failed",
+    "details": "External reviewers codex-review-prompter (cli_missing), gemini-review-prompter (cli_failed) failed. Continuing with native-only review."
+  }
+}
