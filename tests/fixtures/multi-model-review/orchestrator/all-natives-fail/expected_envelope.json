@@ -1,0 +1,58 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "failed",
+      "findings_count": 0,
+      "error_code": "timeout",
+      "usage": null
+    },
+    {
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "failed",
+      "findings_count": 0,
+      "error_code": "sub_agent_failure",
+      "usage": null
+    },
+    {
+      "reviewer_id": "codex-review-prompter",
+      "source_type": "external",
+      "family": "openai",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": {
+        "input_tokens": 4312,
+        "output_tokens": 287,
+        "model": "gpt-5"
+      }
+    },
+    {
+      "reviewer_id": "gemini-review-prompter",
+      "source_type": "external",
+      "family": "google",
+      "status": "success",
+      "findings_count": 3,
+      "error_code": null,
+      "usage": {
+        "input_tokens": 4891,
+        "output_tokens": 341,
+        "model": "gemini-2.5-pro"
+      }
+    }
+  ],
+  "findings": [],
+  "path_and_reason_header": "Review path: native-only-failed (all natives failed; reviewers: 2 native)",
+  "aggregator_resolution": {
+    "name": "codex-review-prompter",
+    "source": "tier-table"
+  },
+  "continuation_event": {
+    "type": "all-natives-failed",
+    "details": "Native reviewers code-reviewer (timeout), security-reviewer (sub_agent_failure) failed. Cannot continue."
+  }
+}

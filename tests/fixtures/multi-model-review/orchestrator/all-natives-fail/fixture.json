@@ -1,0 +1,18 @@
+{
+  "scenario": "all-natives-fail",
+  "description": "2 native + 2 external; include_native_reviewers: true; both natives return error envelopes (timeout or sub-agent failure). Critical warning emitted; STOP — no consolidation possible.",
+  "input": {
+    "command": "review-code",
+    "artifact_path": "src/payments/handlePayment.ts",
+    "native_reviewers": ["code-reviewer", "security-reviewer"],
+    "external_adapters": ["codex-review-prompter", "gemini-review-prompter"],
+    "config_include_native_reviewers": true
+  },
+  "native_failures": [
+    { "reviewer_id": "code-reviewer", "error_code": "timeout" },
+    { "reviewer_id": "security-reviewer", "error_code": "sub_agent_failure" }
+  ],
+  "expected_critical_warning_verbatim": "All native Synthex reviewers failed. Cannot continue — multi-model review has no findings to consolidate. Check sub-agent error logs.",
+  "expected_continuation_type": "all-natives-failed",
+  "distinct_from_externals_failed_warning": "All external reviewers failed; continuing with natives only"
+}
