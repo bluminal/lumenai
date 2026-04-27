@@ -4,6 +4,9 @@
   "author": {
     "name": "Bluminal Labs"
   },
+  "agents": [
+    "./agents/context-bundle-assembler.md"
+  ],
   "commands": [
     "./commands/init.md",
     "./commands/next-priority.md",
