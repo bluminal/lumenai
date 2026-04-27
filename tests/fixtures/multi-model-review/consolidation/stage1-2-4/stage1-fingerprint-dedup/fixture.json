@@ -1,0 +1,120 @@
+{
+  "scenario": "stage1-fingerprint-dedup",
+  "description": "Planted exact-id duplicates: reviewer1 and reviewer2 each independently raise finding_id 'A'; reviewer3 raises 'B'; reviewer4 raises 'C'. Stage 1 collapses the two 'A' instances into one consolidated finding with raised_by[] containing both contributors.",
+  "input_findings": [
+    {
+      "finding_id": "security.handleLogin.missing-csrf-token",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing CSRF token check",
+      "description": "The login handler does not validate CSRF tokens, allowing cross-site request forgery from malicious origins.",
+      "file": "src/auth/login.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "reviewer1",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.handleLogin.missing-csrf-token",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing CSRF token check",
+      "description": "CSRF token validation is absent on the POST login endpoint, enabling forged cross-origin requests.",
+      "file": "src/auth/login.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "reviewer2",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "maintainability.handleLogin.no-input-validation",
+      "severity": "medium",
+      "category": "maintainability",
+      "title": "No input validation on login parameters",
+      "description": "The handleLogin function accepts username and password without validating length, type, or format.",
+      "file": "src/auth/login.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "reviewer3",
+        "family": "google",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "performance.handleLogin.synchronous-db-call",
+      "severity": "medium",
+      "category": "performance",
+      "title": "Synchronous database call blocks event loop",
+      "description": "The credential lookup uses a synchronous DB driver call, blocking the Node.js event loop under concurrent login requests.",
+      "file": "src/auth/login.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "reviewer4",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    }
+  ],
+  "config": {
+    "stage2_jaccard_threshold": 0.8,
+    "stage4_max_calls_per_consolidation": 25
+  },
+  "stage4_simulated_outcomes": [],
+  "expected_consolidation": {
+    "stage1_collapsed_count": 1,
+    "stage2_merged_count": 0,
+    "stage4_calls_dispatched": 0,
+    "stage4_calls_skipped": 0,
+    "audit_warning_emitted": false,
+    "audit_warning_text": null,
+    "final_findings_count": 3
+  },
+  "expected_consolidated_findings": [
+    {
+      "finding_id": "security.handleLogin.missing-csrf-token",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing CSRF token check",
+      "file": "src/auth/login.ts",
+      "symbol": "handleLogin",
+      "raised_by": [
+        { "reviewer_id": "reviewer1", "family": "anthropic", "source_type": "native-team" },
+        { "reviewer_id": "reviewer2", "family": "openai", "source_type": "external" }
+      ]
+    },
+    {
+      "finding_id": "maintainability.handleLogin.no-input-validation",
+      "severity": "medium",
+      "category": "maintainability",
+      "title": "No input validation on login parameters",
+      "file": "src/auth/login.ts",
+      "symbol": "handleLogin",
+      "raised_by": [
+        { "reviewer_id": "reviewer3", "family": "google", "source_type": "external" }
+      ]
+    },
+    {
+      "finding_id": "performance.handleLogin.synchronous-db-call",
+      "severity": "medium",
+      "category": "performance",
+      "title": "Synchronous database call blocks event loop",
+      "file": "src/auth/login.ts",
+      "symbol": "handleLogin",
+      "raised_by": [
+        { "reviewer_id": "reviewer4", "family": "anthropic", "source_type": "native-team" }
+      ]
+    }
+  ]
+}

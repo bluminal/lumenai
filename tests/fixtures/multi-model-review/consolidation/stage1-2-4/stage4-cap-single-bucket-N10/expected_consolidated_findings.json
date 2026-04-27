@@ -1,0 +1,92 @@
+[
+  {
+    "finding_id": "security.processPayment.unvalidated-amount-f01",
+    "severity": "high",
+    "category": "security",
+    "title": "Payment amount validation missing bounds",
+    "file": "src/payments/process.ts",
+    "symbol": "processPayment",
+    "raised_by": [{ "reviewer_id": "reviewer1", "family": "anthropic", "source_type": "native-team" }]
+  },
+  {
+    "finding_id": "security.processPayment.unvalidated-amount-f02",
+    "severity": "high",
+    "category": "security",
+    "title": "Payment amount validation missing maximum",
+    "file": "src/payments/process.ts",
+    "symbol": "processPayment",
+    "raised_by": [{ "reviewer_id": "reviewer2", "family": "openai", "source_type": "external" }]
+  },
+  {
+    "finding_id": "security.processPayment.unvalidated-amount-f03",
+    "severity": "high",
+    "category": "security",
+    "title": "Payment amount validation missing currency",
+    "file": "src/payments/process.ts",
+    "symbol": "processPayment",
+    "raised_by": [{ "reviewer_id": "reviewer3", "family": "google", "source_type": "external" }]
+  },
+  {
+    "finding_id": "security.processPayment.unvalidated-amount-f04",
+    "severity": "high",
+    "category": "security",
+    "title": "Payment amount validation missing overflow",
+    "file": "src/payments/process.ts",
+    "symbol": "processPayment",
+    "raised_by": [{ "reviewer_id": "reviewer4", "family": "anthropic", "source_type": "native-team" }]
+  },
+  {
+    "finding_id": "security.processPayment.unvalidated-amount-f05",
+    "severity": "medium",
+    "category": "security",
+    "title": "Payment amount validation missing precision",
+    "file": "src/payments/process.ts",
+    "symbol": "processPayment",
+    "raised_by": [{ "reviewer_id": "reviewer5", "family": "openai", "source_type": "external" }]
+  },
+  {
+    "finding_id": "security.processPayment.unvalidated-amount-f06",
+    "severity": "medium",
+    "category": "security",
+    "title": "Payment amount validation missing negative",
+    "file": "src/payments/process.ts",
+    "symbol": "processPayment",
+    "raised_by": [{ "reviewer_id": "reviewer6", "family": "google", "source_type": "external" }]
+  },
+  {
+    "finding_id": "security.processPayment.unvalidated-amount-f07",
+    "severity": "medium",
+    "category": "security",
+    "title": "Payment amount validation missing rounding",
+    "file": "src/payments/process.ts",
+    "symbol": "processPayment",
+    "raised_by": [{ "reviewer_id": "reviewer7", "family": "anthropic", "source_type": "native-team" }]
+  },
+  {
+    "finding_id": "security.processPayment.unvalidated-amount-f08",
+    "severity": "low",
+    "category": "security",
+    "title": "Payment amount validation missing schema",
+    "file": "src/payments/process.ts",
+    "symbol": "processPayment",
+    "raised_by": [{ "reviewer_id": "reviewer8", "family": "openai", "source_type": "external" }]
+  },
+  {
+    "finding_id": "security.processPayment.unvalidated-amount-f09",
+    "severity": "low",
+    "category": "security",
+    "title": "Payment amount validation missing type",
+    "file": "src/payments/process.ts",
+    "symbol": "processPayment",
+    "raised_by": [{ "reviewer_id": "reviewer9", "family": "google", "source_type": "external" }]
+  },
+  {
+    "finding_id": "security.processPayment.unvalidated-amount-f10",
+    "severity": "low",
+    "category": "security",
+    "title": "Payment amount validation missing format",
+    "file": "src/payments/process.ts",
+    "symbol": "processPayment",
+    "raised_by": [{ "reviewer_id": "reviewer10", "family": "anthropic", "source_type": "native-team" }]
+  }
+]

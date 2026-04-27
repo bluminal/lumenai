@@ -1,0 +1,89 @@
+{
+  "scenario": "stage4-llm-tiebreaker",
+  "description": "Planted ambiguous pair: F1 and F2 share a (file, symbol) bucket with moderate Jaccard overlap (0.667), above Stage 4's 30% pre-filter threshold but below Stage 2's 0.8 merge threshold. Stage 4 dispatches one LLM tiebreaker call. Verdict: merge. One consolidated finding results.",
+  "input_findings": [
+    {
+      "finding_id": "security.processPayment.token-missing-rotation",
+      "severity": "high",
+      "category": "security",
+      "title": "Payment token missing rotation check",
+      "description": "The payment nonce token is reused across retries instead of being rotated, enabling replay attacks on the payment processor.",
+      "file": "src/payments/process.ts",
+      "symbol": "processPayment",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "reviewer1",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.processPayment.token-rotation-absent",
+      "severity": "medium",
+      "category": "security",
+      "title": "Payment token rotation check absent",
+      "description": "Token rotation validation is missing from the payment flow, leaving retry paths vulnerable to replay.",
+      "file": "src/payments/process.ts",
+      "symbol": "processPayment",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "reviewer2",
+        "family": "openai",
+        "source_type": "external"
+      }
+    }
+  ],
+  "config": {
+    "stage2_jaccard_threshold": 0.8,
+    "stage4_max_calls_per_consolidation": 25
+  },
+  "jaccard_analysis": {
+    "f1_title": "Payment token missing rotation check",
+    "f1_tokens_after_stopword_removal": ["payment", "token", "missing", "rotation", "check"],
+    "f2_title": "Payment token rotation check absent",
+    "f2_tokens_after_stopword_removal": ["payment", "token", "rotation", "check", "absent"],
+    "intersection": ["payment", "token", "rotation", "check"],
+    "intersection_count": 4,
+    "union": ["payment", "token", "missing", "rotation", "check", "absent"],
+    "union_count": 6,
+    "jaccard": 0.667,
+    "above_30pct_prefilter": true,
+    "below_80pct_stage2_threshold": true,
+    "stage4_eligible": true
+  },
+  "stage4_simulated_outcomes": [
+    {
+      "pair_index": 0,
+      "finding_a_id": "security.processPayment.token-missing-rotation",
+      "finding_b_id": "security.processPayment.token-rotation-absent",
+      "verdict": "merge",
+      "winning_finding_index": 0
+    }
+  ],
+  "expected_consolidation": {
+    "stage1_collapsed_count": 0,
+    "stage2_merged_count": 0,
+    "stage4_calls_dispatched": 1,
+    "stage4_calls_skipped": 0,
+    "audit_warning_emitted": false,
+    "audit_warning_text": null,
+    "final_findings_count": 1
+  },
+  "expected_consolidated_findings": [
+    {
+      "finding_id": "security.processPayment.token-missing-rotation",
+      "severity": "high",
+      "category": "security",
+      "title": "Payment token missing rotation check",
+      "description": "The payment nonce token is reused across retries instead of being rotated, enabling replay attacks on the payment processor.",
+      "file": "src/payments/process.ts",
+      "symbol": "processPayment",
+      "raised_by": [
+        { "reviewer_id": "reviewer1", "family": "anthropic", "source_type": "native-team" },
+        { "reviewer_id": "reviewer2", "family": "openai", "source_type": "external" }
+      ]
+    }
+  ]
+}

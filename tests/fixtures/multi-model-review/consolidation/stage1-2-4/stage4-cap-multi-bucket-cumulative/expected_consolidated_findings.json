@@ -1,0 +1,142 @@
+[
+  {
+    "finding_id": "security.handleAuth.rate-limit-b1f1",
+    "severity": "high", "category": "security",
+    "title": "Auth rate limit missing enforcement check",
+    "file": "src/auth/handler.ts", "symbol": "handleAuth",
+    "raised_by": [{ "reviewer_id": "r1", "family": "anthropic", "source_type": "native-team" }]
+  },
+  {
+    "finding_id": "security.handleAuth.rate-limit-b1f2",
+    "severity": "high", "category": "security",
+    "title": "Auth rate limit missing header response",
+    "file": "src/auth/handler.ts", "symbol": "handleAuth",
+    "raised_by": [{ "reviewer_id": "r2", "family": "openai", "source_type": "external" }]
+  },
+  {
+    "finding_id": "security.handleAuth.rate-limit-b1f3",
+    "severity": "medium", "category": "security",
+    "title": "Auth rate limit missing backoff policy",
+    "file": "src/auth/handler.ts", "symbol": "handleAuth",
+    "raised_by": [{ "reviewer_id": "r3", "family": "google", "source_type": "external" }]
+  },
+  {
+    "finding_id": "security.handleAuth.rate-limit-b1f4",
+    "severity": "medium", "category": "security",
+    "title": "Auth rate limit missing config injection",
+    "file": "src/auth/handler.ts", "symbol": "handleAuth",
+    "raised_by": [{ "reviewer_id": "r4", "family": "anthropic", "source_type": "native-team" }]
+  },
+  {
+    "finding_id": "security.handleAuth.rate-limit-b1f5",
+    "severity": "low", "category": "security",
+    "title": "Auth rate limit missing logging audit",
+    "file": "src/auth/handler.ts", "symbol": "handleAuth",
+    "raised_by": [{ "reviewer_id": "r5", "family": "openai", "source_type": "external" }]
+  },
+  {
+    "finding_id": "maintainability.processOrder.validation-b2f1",
+    "severity": "high", "category": "maintainability",
+    "title": "Order validation missing schema definition",
+    "file": "src/orders/processor.ts", "symbol": "processOrder",
+    "raised_by": [{ "reviewer_id": "r6", "family": "google", "source_type": "external" }]
+  },
+  {
+    "finding_id": "maintainability.processOrder.validation-b2f2",
+    "severity": "high", "category": "maintainability",
+    "title": "Order validation missing type guards",
+    "file": "src/orders/processor.ts", "symbol": "processOrder",
+    "raised_by": [{ "reviewer_id": "r7", "family": "anthropic", "source_type": "native-team" }]
+  },
+  {
+    "finding_id": "maintainability.processOrder.validation-b2f3",
+    "severity": "medium", "category": "maintainability",
+    "title": "Order validation missing error handling",
+    "file": "src/orders/processor.ts", "symbol": "processOrder",
+    "raised_by": [{ "reviewer_id": "r8", "family": "openai", "source_type": "external" }]
+  },
+  {
+    "finding_id": "maintainability.processOrder.validation-b2f4",
+    "severity": "medium", "category": "maintainability",
+    "title": "Order validation missing bounds constraints",
+    "file": "src/orders/processor.ts", "symbol": "processOrder",
+    "raised_by": [{ "reviewer_id": "r9", "family": "google", "source_type": "external" }]
+  },
+  {
+    "finding_id": "maintainability.processOrder.validation-b2f5",
+    "severity": "low", "category": "maintainability",
+    "title": "Order validation missing format checks",
+    "file": "src/orders/processor.ts", "symbol": "processOrder",
+    "raised_by": [{ "reviewer_id": "r10", "family": "anthropic", "source_type": "native-team" }]
+  },
+  {
+    "finding_id": "performance.queryUsers.index-b3f1",
+    "severity": "high", "category": "performance",
+    "title": "User query index missing primary key",
+    "file": "src/db/users.ts", "symbol": "queryUsers",
+    "raised_by": [{ "reviewer_id": "r11", "family": "openai", "source_type": "external" }]
+  },
+  {
+    "finding_id": "performance.queryUsers.index-b3f2",
+    "severity": "high", "category": "performance",
+    "title": "User query index missing composite join",
+    "file": "src/db/users.ts", "symbol": "queryUsers",
+    "raised_by": [{ "reviewer_id": "r12", "family": "google", "source_type": "external" }]
+  },
+  {
+    "finding_id": "performance.queryUsers.index-b3f3",
+    "severity": "medium", "category": "performance",
+    "title": "User query index missing covering select",
+    "file": "src/db/users.ts", "symbol": "queryUsers",
+    "raised_by": [{ "reviewer_id": "r13", "family": "anthropic", "source_type": "native-team" }]
+  },
+  {
+    "finding_id": "performance.queryUsers.index-b3f4",
+    "severity": "medium", "category": "performance",
+    "title": "User query index missing partial filter",
+    "file": "src/db/users.ts", "symbol": "queryUsers",
+    "raised_by": [{ "reviewer_id": "r14", "family": "openai", "source_type": "external" }]
+  },
+  {
+    "finding_id": "performance.queryUsers.index-b3f5",
+    "severity": "low", "category": "performance",
+    "title": "User query index missing hint planner",
+    "file": "src/db/users.ts", "symbol": "queryUsers",
+    "raised_by": [{ "reviewer_id": "r15", "family": "google", "source_type": "external" }]
+  },
+  {
+    "finding_id": "security.sendNotification.recipient-b4f1",
+    "severity": "high", "category": "security",
+    "title": "Notification recipient missing format validation",
+    "file": "src/notifications/sender.ts", "symbol": "sendNotification",
+    "raised_by": [{ "reviewer_id": "r16", "family": "anthropic", "source_type": "native-team" }]
+  },
+  {
+    "finding_id": "security.sendNotification.recipient-b4f2",
+    "severity": "high", "category": "security",
+    "title": "Notification recipient missing domain allowlist",
+    "file": "src/notifications/sender.ts", "symbol": "sendNotification",
+    "raised_by": [{ "reviewer_id": "r17", "family": "openai", "source_type": "external" }]
+  },
+  {
+    "finding_id": "security.sendNotification.recipient-b4f3",
+    "severity": "medium", "category": "security",
+    "title": "Notification recipient missing count limit",
+    "file": "src/notifications/sender.ts", "symbol": "sendNotification",
+    "raised_by": [{ "reviewer_id": "r18", "family": "google", "source_type": "external" }]
+  },
+  {
+    "finding_id": "security.sendNotification.recipient-b4f4",
+    "severity": "medium", "category": "security",
+    "title": "Notification recipient missing ownership source",
+    "file": "src/notifications/sender.ts", "symbol": "sendNotification",
+    "raised_by": [{ "reviewer_id": "r19", "family": "anthropic", "source_type": "native-team" }]
+  },
+  {
+    "finding_id": "security.sendNotification.recipient-b4f5",
+    "severity": "low", "category": "security",
+    "title": "Notification recipient missing encoding check",
+    "file": "src/notifications/sender.ts", "symbol": "sendNotification",
+    "raised_by": [{ "reviewer_id": "r20", "family": "openai", "source_type": "external" }]
+  }
+]
