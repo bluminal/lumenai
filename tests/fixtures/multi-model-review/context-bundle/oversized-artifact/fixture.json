@@ -1,0 +1,28 @@
+{
+  "scenario": "oversized-artifact",
+  "description": "Artifact (250KB) alone exceeds max_bundle_bytes (200000). Assembler MUST emit narrow_scope_required error — same error path as fixture (b), even though the failure condition is different (artifact > total cap vs. artifact > per-file cap).",
+  "input": {
+    "artifact_path": "src/giant-file.ts",
+    "touched_files": ["src/giant-file.ts"],
+    "conventions": ["CLAUDE.md"],
+    "config": {
+      "max_bundle_bytes": 200000,
+      "max_file_bytes": 50000
+    }
+  },
+  "expected_assembler_output": {
+    "status": "error",
+    "error_code": "narrow_scope_required",
+    "error_message": "Artifact (250000 bytes) exceeds max_bundle_bytes (200000). Multi-model review cannot proceed at full fidelity. Narrow review scope (smaller diff, single file) and retry.",
+    "manifest": null,
+    "files": []
+  },
+  "expected": {
+    "status": "error",
+    "error_code": "narrow_scope_required",
+    "artifact_size_bytes": 250000,
+    "max_bundle_bytes": 200000,
+    "artifact_NOT_summarized": true,
+    "behavioral_rule_1_enforced": true
+  }
+}
