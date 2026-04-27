@@ -1,0 +1,13 @@
+{
+  "scenario": "ollama-successful",
+  "description": "Recorded successful Ollama output via /api/generate with format=<schema>. Text-only tier (bundle is the only context). usage mapped from prompt_eval_count → input_tokens and eval_count → output_tokens.",
+  "model_used": "qwen2.5-coder:32b",
+  "ollama_raw_response": {
+    "model": "qwen2.5-coder:32b",
+    "created_at": "2026-04-26T12:00:00Z",
+    "response": "{\"findings\": [{\"finding_id\": \"correctness.parseConfig.unhandled-yaml-error\", \"severity\": \"medium\", \"category\": \"correctness\", \"title\": \"parseConfig swallows YAML parse errors silently\", \"description\": \"When yaml.parse() throws, parseConfig catches the error and returns an empty object. Callers downstream cannot distinguish 'config not present' from 'config malformed'.\", \"file\": \"src/config/parseConfig.ts\", \"symbol\": \"parseConfig\", \"confidence\": \"high\"}]}",
+    "done": true,
+    "prompt_eval_count": 6240,
+    "eval_count": 287
+  }
+}
