@@ -207,11 +207,90 @@ Example outputs (per D21 + PRD examples):
 
 The header is required in the orchestrator's output and is validated by Task 22's `tests/schemas/orchestrator-output.ts`.
 
-### Step 8 — Return Unified Envelope
+## Consolidation Pipeline
 
-Return the unified envelope from Step 5 (with continuation_event populated per Step 6 if applicable, and path_and_reason_header populated per Step 7).
+After the unified envelope is assembled (Step 5) and failure handling is applied (Step 6), run the consolidation pipeline on the `findings[]` array before returning to the caller. Consolidation proceeds through Stages 1, 2, and 4 in sequence. Stages 5, 5b, and 6 are deferred to Milestone 3.3 (Tasks 28–31).
 
-**No consolidation in this initial scope.** Stages 1, 2, 4 (Milestone 3.2) and Stages 5, 5b, 6 (Milestone 3.3) layer onto this skeleton. The caller (review-code, write-implementation-plan) does not yet need to handle consolidated output until Milestone 3.2 ships.
+### Step 8a — Stage 1: Fingerprint Dedup (FR-MR14, Task 24)
+
+Group all findings by exact `finding_id`. Collapse each group into a single consolidated finding with all contributors recorded in `raised_by[]`.
+
+**Behavioral rules:**
+
+1. **`finding_id` MUST NOT contain line numbers** (validated against `canonical-finding-schema.md`). The Stage 1 dedup assumes stable IDs across reviewers — line numbers shift across edits and break dedup. Any finding whose `finding_id` violates the schema pattern (`not: { pattern: ":\\d+|L\\d+|line[-_]\\d+" }`) is treated as a schema error and surfaced in the audit artifact, not silently merged.
+2. Two findings sharing the same `finding_id` collapse to ONE consolidated finding. The consolidated finding's `raised_by[]` array contains entries for both contributors — each entry: `{ reviewer_id, family, source_type }`.
+3. Findings with unique `finding_id`s pass through unchanged (their `raised_by[]` contains one entry from their own `source` field).
+
+**Example:**
+
+- Input: 4 findings with `finding_id`s `[A, A, B, C]` (two reviewers raised A independently)
+- Output: 3 consolidated findings: `A` (raised_by 2 entries), `B` (raised_by 1), `C` (raised_by 1)
+
+Per-reviewer severity divergences for a collapsed finding are preserved in-place; Stage 5 reconciliation (Milestone 3.3, Task 28) resolves them.
+
+### Step 8b — Stage 2: Lexical Dedup within (file, symbol) Buckets (FR-MR14, Task 25)
+
+Group the Stage 1 output by `(file, symbol)` tuple. Within each bucket, compare normalized title tokens via Jaccard similarity. Merge any pair of findings whose Jaccard score is at or above `config.multi_model_review.consolidation.stage2_jaccard_threshold` (default 0.8 per FR-MR14; configurable via `defaults.yaml`).
+
+**Behavioral rules:**
+
+1. The Jaccard threshold is read from `config.multi_model_review.consolidation.stage2_jaccard_threshold`. It MUST NOT be hardcoded.
+2. **Title tokenization:** lowercase the title, remove stopwords (the, a, an, of, in, on, at, to, for, with, and, or, is, are, was, were), split on whitespace and punctuation. Compare token SETS (not multisets — duplicate tokens count once).
+3. When two findings merge, the consolidated finding **preserves the highest-severity description** (severity ranking: `critical` > `high` > `medium` > `low`). The lower-severity finding's description is discarded. Both reviewers contribute to `raised_by[]`.
+4. Findings already merged in Stage 1 enter Stage 2 as a single consolidated entry and are NOT re-merged.
+
+**Example:**
+
+- Bucket `(src/auth/login.ts, handleLogin)`:
+  - Finding A: title `"Missing CSRF token validation"` → tokens `{missing, csrf, token, validation}`
+  - Finding B: title `"CSRF check absent on POST"` → tokens `{csrf, check, absent, post}`
+  - Jaccard = |{csrf}| / |{missing, csrf, token, validation, check, absent, post}| = 1/7 ≈ 0.14 → **NOT merged** (below threshold)
+- Counter-example with near-identical titles:
+  - Finding A: `"Missing CSRF token check"` → tokens `{missing, csrf, token, check}`
+  - Finding B: `"CSRF token check missing"` → tokens `{missing, csrf, token, check}`
+  - Jaccard = 4/4 = 1.0 → **merged**
+
+### Step 8c — Stage 4: LLM Tiebreaker (D18 BOUNDED, FR-MR14, Task 26)
+
+For each `(file, symbol)` bucket that still contains candidate pairs after Stages 1 and 2, apply the LLM tiebreaker — but strictly bounded per D18.
+
+**D18 bound: pre-filter + per-consolidation cap.**
+
+#### Pre-filter (≥30% Jaccard)
+
+Candidate pairs MUST share ≥30% normalized-title Jaccard similarity before being submitted to the LLM judge. Pairs whose Jaccard falls below 30% are NOT submitted to the LLM. This 30% gate is distinct from Stage 2's `stage2_jaccard_threshold` (default 0.8): Stage 2 merges high-confidence pairs; Stage 4's 30% lower gate controls which remaining ambiguous pairs warrant LLM adjudication.
+
+#### Per-consolidation cap
+
+The TOTAL number of Stage 4 LLM calls across ALL `(file, symbol)` buckets in a single consolidation run MUST NOT exceed `config.multi_model_review.consolidation.stage4.max_calls_per_consolidation` (default 25 per `defaults.yaml`). This value is read from config; it MUST NOT be hardcoded.
+
+#### When the cap fires mid-consolidation
+
+Remaining buckets' candidate pairs are left unmerged — no additional LLM call is dispatched. A single audit warning is emitted recording the total skipped pair count across all remaining buckets:
+
+> `"Stage 4 cap reached: K LLM calls dispatched (configured max). N additional candidate pairs across remaining buckets left unmerged."`
+
+Only ONE such warning is emitted per consolidation run, regardless of how many buckets were skipped.
+
+#### Position randomization (bias mitigation, FR-MR15)
+
+When two findings are submitted to the LLM judge, alternate their presentation order based on `(invocation_counter mod 2)`. Even-numbered invocations (0, 2, 4, …) present finding A first; odd-numbered invocations (1, 3, 5, …) present finding B first. This alternating order ensures no finding is systematically advantaged by position across a consolidation run.
+
+**This alternating order rule is a normative behavioral rule documented here for compliance with FR-MR15 bias mitigation.** Operational verification of position-randomization effectiveness is deferred to Milestone 7.3, Task 61a.
+
+**Example:**
+
+- Bucket `(src/payments/handle.ts, processPayment)` has 3 candidate pairs A↔B, A↔C, B↔C — all above 30% Jaccard pre-filter.
+- Stage 4 dispatches up to 3 LLM calls (one per pair) using alternating order per invocation counter.
+- If the per-consolidation cap is reached mid-bucket, the remaining pairs in that bucket and all subsequent buckets are left unmerged, and a single audit warning records the total skipped count.
+
+---
+
+### Step 9 — Return Consolidated Envelope
+
+Return the consolidated envelope. The `findings[]` array now contains CONSOLIDATED findings (post-Stages 1, 2, 4) with `raised_by[]` populated for every finding. The `per_reviewer_results` table still contains per-reviewer raw counts (for audit traceability — these counts reflect pre-consolidation findings from each proposer).
+
+Stages 5 (severity reconciliation), 5b (contradiction scan), and 6 (minority-of-one) are deferred to Milestone 3.3.
 
 ---
 
@@ -221,8 +300,9 @@ Return the unified envelope from Step 5 (with continuation_event populated per S
 2. **The bundle is identical for every proposer.** Per D5; assembled once via `context-bundle-assembler`; delivered verbatim to all.
 3. **Native and external proposers are uniform downstream.** Same envelope shape, same `per_reviewer_results` array. The source_type field distinguishes them; nothing else.
 4. **Failure surfaces are distinct:** all-externals-failed (continue with warning), all-natives-failed (CRITICAL stop), cloud-surface (single remediation error). Each has verbatim warning text.
-5. **No consolidation in this scope.** That's Milestones 3.2 and 3.3.
-6. **Aggregator resolution is deterministic.** D17 strict total-order tier table; never returns ties.
+5. **Consolidation pipeline runs in sequence:** Stage 1 (fingerprint dedup) → Stage 2 (lexical dedup) → Stage 4 (LLM tiebreaker, bounded). No stage is skipped.
+6. **Stage 4 is bounded by D18:** pre-filter ≥30% Jaccard + per-consolidation cap from config. Never exceed `max_calls_per_consolidation`.
+7. **Aggregator resolution is deterministic.** D17 strict total-order tier table; never returns ties.
 
 ---
 
@@ -230,7 +310,8 @@ Return the unified envelope from Step 5 (with continuation_event populated per S
 
 - FR-MR11 (Sonnet-backed orchestrator)
 - FR-MR12 (single-batch parallel fan-out — verbatim phrasing in Step 3)
-- FR-MR15 (aggregator tier-table)
+- FR-MR14 (Stages 1, 2, 4 normative requirements — Steps 8a, 8b, 8c)
+- FR-MR15 (aggregator tier-table; Stage 4 bias-mitigation / alternating order)
 - FR-MR17 (native-only continuation, all-natives-failed, cloud-surface remediation)
 - FR-MR20 (preflight validation — Step 0; concurrent CLI+auth checks, family diversity, min_proposers, aggregator resolution, summary)
 - FR-MR28 (context bundle role)
@@ -238,18 +319,33 @@ Return the unified envelope from Step 5 (with continuation_event populated per S
 - D5 (single source of truth for bundle)
 - D6 (single parallel Task batch)
 - D17 (aggregator tier table — Step 2 and Step 0e)
+- D18 (Stage 4 bounded — pre-filter ≥30% Jaccard, per-consolidation cap — Step 8c)
 - D21 (path-and-reason header regex — Step 7)
 - NFR-MR2 (cloud-surface remediation — Step 6)
+- `multi_model_review.consolidation.stage2_jaccard_threshold` (Stage 2 merge threshold config key)
+- `multi_model_review.consolidation.stage4.max_calls_per_consolidation` (Stage 4 cap config key)
 - Task 5 (`context-bundle-assembler` — Step 1)
 - Task 4 (adapter contract — Step 3 input shape)
-- Task 1 (canonical finding schema — `output_schema` requirement on natives)
+- Task 1 (canonical finding schema — `output_schema` requirement on natives; `finding_id` validation for Stage 1)
 
 ---
 
-## Scope Constraints (this milestone — 3.1)
+## Scope Constraints (Milestones 3.1–3.2)
 
-This agent does NOT (yet):
+**DONE in this milestone (3.2, Tasks 24/25/26):**
 
-- **Consolidate findings.** Stages 1+2 land in Task 24+25 (Milestone 3.2). Stage 4 in Task 26. Stage 5 in Task 28. Contradiction scan in Task 29a/29b. Minority-of-one in Task 30. Aggregator bias-mitigation in Task 31.
+- ~~Stages 1+2 land in Task 24+25 (Milestone 3.2).~~ **DONE:** Stage 1 — Fingerprint dedup (Task 24, FR-MR14) and Stage 2 — Lexical dedup within (file, symbol) buckets (Task 25, FR-MR14) implemented above.
+- ~~Stage 4 in Task 26.~~ **DONE:** Stage 4 — LLM tiebreaker, D18-bounded (Task 26) implemented above.
+
+**Still pending (Milestone 3.3):**
+
+- Stage 5 — Severity reconciliation (Task 28)
+- Stage 5b — Contradiction scan / CoVe (Tasks 29a/29b)
+- Stage 6 — Minority-of-one detection (Task 30)
+- Aggregator bias-mitigation (Task 31)
+- Audit artifact writer (Milestone 4.0, Task 39)
+
+**Previously completed:**
+
 - **Run preflight.** ~~Preflight (which/auth checks, family diversity, aggregator resolution check, FR-MR20 summary) is added inline in Task 21 as a Step 0 prepended to the workflow above.~~ **DONE (Task 21):** Step 0 preflight is implemented above.
 - **Write audit artifacts.** Audit-writer integration lands in Phase 4 Milestone 4.0 (Task 39).
