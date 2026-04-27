@@ -66,3 +66,33 @@ describe('Tasks 10/14/17: synthex plugin.json adapter registrations', () => {
     expect(existsSync(join(AGENTS_DIR, 'context-bundle-assembler.md'))).toBe(true);
   });
 });
+
+describe('Task 20: orchestrator registration', () => {
+  let parsed: any;
+  beforeAll(() => {
+    const raw = readFileSync(PLUGIN_JSON, 'utf8');
+    parsed = JSON.parse(raw);
+  });
+
+  it('agents array contains ./agents/multi-model-review-orchestrator.md', () => {
+    expect(parsed.agents).toContain('./agents/multi-model-review-orchestrator.md');
+  });
+
+  it('multi-model-review-orchestrator.md exists on disk', () => {
+    expect(existsSync(join(AGENTS_DIR, 'multi-model-review-orchestrator.md'))).toBe(true);
+  });
+
+  // Non-regression: prior 4 entries must still be present
+  it('agents array still contains context-bundle-assembler (non-regression)', () => {
+    expect(parsed.agents).toContain('./agents/context-bundle-assembler.md');
+  });
+  it('agents array still contains codex-review-prompter (non-regression)', () => {
+    expect(parsed.agents).toContain('./agents/codex-review-prompter.md');
+  });
+  it('agents array still contains gemini-review-prompter (non-regression)', () => {
+    expect(parsed.agents).toContain('./agents/gemini-review-prompter.md');
+  });
+  it('agents array still contains ollama-review-prompter (non-regression)', () => {
+    expect(parsed.agents).toContain('./agents/ollama-review-prompter.md');
+  });
+});

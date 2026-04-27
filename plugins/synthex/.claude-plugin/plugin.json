@@ -8,6 +8,7 @@
     "./agents/codex-review-prompter.md",
     "./agents/context-bundle-assembler.md",
     "./agents/gemini-review-prompter.md",
+    "./agents/multi-model-review-orchestrator.md",
     "./agents/ollama-review-prompter.md"
   ],
   "commands": [
