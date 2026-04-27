@@ -1,0 +1,8 @@
+{
+  "status": "failed",
+  "error_code": "cli_auth_failed",
+  "error_message": "Codex CLI is installed but not authenticated. Run `codex login` to authenticate.",
+  "findings": [],
+  "usage": null,
+  "raw_output_path": "docs/reviews/raw/codex-c3d4e5f6.json"
+}

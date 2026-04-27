@@ -1,0 +1,15 @@
+{
+  "scenario": "auth-failure",
+  "description": "codex auth status exits non-zero (exit code 1); adapter returns cli_auth_failed without invoking the main CLI.",
+  "cli_presence_check": {
+    "command": "which codex",
+    "exit_status": 0,
+    "stdout": "/usr/local/bin/codex"
+  },
+  "auth_check": {
+    "command": "codex auth status",
+    "exit_status": 1,
+    "stderr": "Error: Not authenticated. Run `codex login` to authenticate."
+  },
+  "raw_output_path": "docs/reviews/raw/codex-c3d4e5f6.json"
+}
