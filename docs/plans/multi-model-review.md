@@ -324,24 +324,30 @@ The orchestrator agent and the consolidation pipeline stages that ship in v1 (St
 ### Milestone 3.2: Consolidation Pipeline — Stages 1, 2, 4
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 24 | Add Stage 1 fingerprint dedup to the orchestrator (FR-MR14). Group by exact `finding_id`; collapse groups into single consolidated finding with all contributors recorded. | M | Milestone 3.1 | in progress |
-| 25 | Add Stage 2 lexical dedup within `(file, symbol)` buckets (FR-MR14). Jaccard similarity on normalized title tokens; merge above configurable threshold (default 0.8). | M | Task 24 | in progress |
-| 26 | Add Stage 4 LLM-tiebreaker per D18 (bounded). Pre-filter and per-consolidation cap as defined in D18. **Position randomization** mitigates bias: tiebreaker prompt presents the two findings in alternating order across adjacent invocations; agent's markdown documents this as a behavioral rule alternating based on `(invocation_counter mod 2)`. | M | Task 25 | in progress |
-| 27 | Add Layer 2 fixtures at `tests/fixtures/multi-model-review/consolidation/stage1-2-4/`: planted exact-id duplicates (Stage 1), planted near-duplicate titles (Stage 2), planted ambiguous pairs (Stage 4), **planted N=10 same-bucket scenario** plus a multi-bucket scenario with cumulative pairs > K (asserts total Stage-4 calls per consolidation ≤ K per D18, asserts the single audit warning records total skipped pair count across all buckets). Cached outputs assert correct merges and contributor lists. | M | Tasks 24–26 | pending |
+| 24 | Add Stage 1 fingerprint dedup to the orchestrator (FR-MR14). Group by exact `finding_id`; collapse groups into single consolidated finding with all contributors recorded. | M | Milestone 3.1 | done |
+| 25 | Add Stage 2 lexical dedup within `(file, symbol)` buckets (FR-MR14). Jaccard similarity on normalized title tokens; merge above configurable threshold (default 0.8). | M | Task 24 | done |
+| 26 | Add Stage 4 LLM-tiebreaker per D18 (bounded). Pre-filter and per-consolidation cap as defined in D18. **Position randomization** mitigates bias: tiebreaker prompt presents the two findings in alternating order across adjacent invocations; agent's markdown documents this as a behavioral rule alternating based on `(invocation_counter mod 2)`. | M | Task 25 | done |
+| 27 | Add Layer 2 fixtures at `tests/fixtures/multi-model-review/consolidation/stage1-2-4/`: planted exact-id duplicates (Stage 1), planted near-duplicate titles (Stage 2), planted ambiguous pairs (Stage 4), **planted N=10 same-bucket scenario** plus a multi-bucket scenario with cumulative pairs > K (asserts total Stage-4 calls per consolidation ≤ K per D18, asserts the single audit warning records total skipped pair count across all buckets). Cached outputs assert correct merges and contributor lists. | M | Tasks 24–26 | in progress |
 
 **Task 24 Acceptance Criteria:**
 - `[T]` Two findings sharing `finding_id` collapse to one with both contributors listed
 - `[T]` Finding fingerprint never includes line numbers (validated against Task 1 schema)
 
+**Task 24 Completion Note:** Done. Stage 1 fingerprint dedup added as Step 8a in `multi-model-review-orchestrator.md`. Group by exact `finding_id`; collapse to one consolidated finding with `raised_by[]` populated; finding_id MUST NOT contain line numbers (Task 1 schema cross-reference). Both `[T]` criteria pass via tests in `orchestrator-consolidation.test.ts`. Bundled commit `6801d59`.
+
 **Task 25 Acceptance Criteria:**
 - `[T]` Jaccard threshold is configurable
 - `[T]` Merge produces a consolidated finding preserving the highest-severity description
+
+**Task 25 Completion Note:** Done. Stage 2 lexical dedup added as Step 8b. Jaccard on normalized title tokens within `(file, symbol)` buckets; threshold from `config.multi_model_review.consolidation.stage2_jaccard_threshold` (default 0.8); merge preserves highest-severity description. Both `[T]` criteria pass. Bundled commit `6801d59`.
 
 **Task 26 Acceptance Criteria:**
 - `[T]` Pre-filter (≥30% Jaccard) applied before any LLM call
 - `[T]` Total Stage-4 LLM-call count across all buckets in a single consolidation never exceeds `stage4.max_calls_per_consolidation`. When the cap is reached mid-consolidation, remaining buckets' candidates are left unmerged and a single audit warning records the total skipped pair count.
 - `[T]` Position-randomization rule documented in orchestrator markdown (raw-string match for "alternating order")
 - `[H]` Position randomization operationally verified during semantic eval (Milestone 7.3, Task 61a): two adjacent live invocations of Stage 4 with the same ambiguous pair confirmed to present findings in reversed order. Not expected in Layer 2 cached fixtures (deterministic cache keys return identical replay).
+
+**Task 26 Completion Note:** Done. Stage 4 LLM tiebreaker added as Step 8c (D18 BOUNDED). Pre-filter ≥30% Jaccard; per-consolidation cap from `max_calls_per_consolidation` (default 25); cap exhaustion → remaining pairs unmerged + single audit warning records total skipped count; position-randomization documented (`alternating order` per `invocation_counter mod 2`). 3 `[T]` criteria pass; `[H]` (operational position-randomization verification) deferred to Task 61a per its own description. Bundled commit `6801d59`.
 
 **Task 27 Acceptance Criteria:**
 - `[T]` All planted scenarios merge correctly
