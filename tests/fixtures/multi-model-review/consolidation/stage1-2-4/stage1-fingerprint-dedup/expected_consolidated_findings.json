@@ -1,0 +1,60 @@
+[
+  {
+    "finding_id": "security.handleLogin.missing-csrf-token",
+    "severity": "high",
+    "category": "security",
+    "title": "Missing CSRF token check",
+    "description": "The login handler does not validate CSRF tokens, allowing cross-site request forgery from malicious origins.",
+    "file": "src/auth/login.ts",
+    "symbol": "handleLogin",
+    "line_range": null,
+    "confidence": "high",
+    "source": {
+      "reviewer_id": "reviewer1",
+      "family": "anthropic",
+      "source_type": "native-team"
+    },
+    "raised_by": [
+      { "reviewer_id": "reviewer1", "family": "anthropic", "source_type": "native-team" },
+      { "reviewer_id": "reviewer2", "family": "openai", "source_type": "external" }
+    ]
+  },
+  {
+    "finding_id": "maintainability.handleLogin.no-input-validation",
+    "severity": "medium",
+    "category": "maintainability",
+    "title": "No input validation on login parameters",
+    "description": "The handleLogin function accepts username and password without validating length, type, or format.",
+    "file": "src/auth/login.ts",
+    "symbol": "handleLogin",
+    "line_range": null,
+    "confidence": "medium",
+    "source": {
+      "reviewer_id": "reviewer3",
+      "family": "google",
+      "source_type": "external"
+    },
+    "raised_by": [
+      { "reviewer_id": "reviewer3", "family": "google", "source_type": "external" }
+    ]
+  },
+  {
+    "finding_id": "performance.handleLogin.synchronous-db-call",
+    "severity": "medium",
+    "category": "performance",
+    "title": "Synchronous database call blocks event loop",
+    "description": "The credential lookup uses a synchronous DB driver call, blocking the Node.js event loop under concurrent login requests.",
+    "file": "src/auth/login.ts",
+    "symbol": "handleLogin",
+    "line_range": null,
+    "confidence": "medium",
+    "source": {
+      "reviewer_id": "reviewer4",
+      "family": "anthropic",
+      "source_type": "native-team"
+    },
+    "raised_by": [
+      { "reviewer_id": "reviewer4", "family": "anthropic", "source_type": "native-team" }
+    ]
+  }
+]

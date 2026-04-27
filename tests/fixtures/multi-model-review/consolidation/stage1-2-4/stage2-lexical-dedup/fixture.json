@@ -1,0 +1,100 @@
+{
+  "scenario": "stage2-lexical-dedup",
+  "description": "Planted near-duplicate titles in the same (file, symbol) bucket. Findings F1 and F2 have title token sets {missing, csrf, token, check} — Jaccard = 4/4 = 1.0, above the 0.8 threshold → merged. Finding F3 'Race condition in handler' has no overlapping tokens with F1/F2 → remains distinct. F2 has severity 'medium', F1 has severity 'high'; merged finding preserves 'high' description.",
+  "input_findings": [
+    {
+      "finding_id": "security.handleLogin.csrf-check-missing-f1",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing CSRF token check",
+      "description": "The POST /login endpoint is missing CSRF token validation, allowing forged requests from authenticated sessions.",
+      "file": "src/auth/login.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "reviewer1",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.handleLogin.csrf-check-missing-f2",
+      "severity": "medium",
+      "category": "security",
+      "title": "CSRF token check missing",
+      "description": "A CSRF token check is absent on the handleLogin function.",
+      "file": "src/auth/login.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "reviewer2",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "concurrency.handleLogin.race-condition",
+      "severity": "high",
+      "category": "concurrency",
+      "title": "Race condition in handler",
+      "description": "Concurrent login attempts can reach a race condition due to non-atomic read-modify-write on session state.",
+      "file": "src/auth/login.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "reviewer3",
+        "family": "google",
+        "source_type": "external"
+      }
+    }
+  ],
+  "config": {
+    "stage2_jaccard_threshold": 0.8,
+    "stage4_max_calls_per_consolidation": 25
+  },
+  "stage4_simulated_outcomes": [],
+  "notes": {
+    "jaccard_f1_vs_f2": "tokens(F1)={missing,csrf,token,check} tokens(F2)={csrf,token,check,missing} → intersection=4 union=4 → Jaccard=1.0 ≥ 0.8 → MERGE",
+    "jaccard_f1_vs_f3": "tokens(F1)={missing,csrf,token,check} tokens(F3)={race,condition,handler} → intersection=0 union=7 → Jaccard=0.0 < 0.8 → DISTINCT",
+    "severity_preservation": "F1=high, F2=medium → merge preserves high (F1 description wins)"
+  },
+  "expected_consolidation": {
+    "stage1_collapsed_count": 0,
+    "stage2_merged_count": 1,
+    "stage4_calls_dispatched": 0,
+    "stage4_calls_skipped": 0,
+    "audit_warning_emitted": false,
+    "audit_warning_text": null,
+    "final_findings_count": 2
+  },
+  "expected_consolidated_findings": [
+    {
+      "finding_id": "security.handleLogin.csrf-check-missing-f1",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing CSRF token check",
+      "description": "The POST /login endpoint is missing CSRF token validation, allowing forged requests from authenticated sessions.",
+      "file": "src/auth/login.ts",
+      "symbol": "handleLogin",
+      "raised_by": [
+        { "reviewer_id": "reviewer1", "family": "anthropic", "source_type": "native-team" },
+        { "reviewer_id": "reviewer2", "family": "openai", "source_type": "external" }
+      ]
+    },
+    {
+      "finding_id": "concurrency.handleLogin.race-condition",
+      "severity": "high",
+      "category": "concurrency",
+      "title": "Race condition in handler",
+      "description": "Concurrent login attempts can reach a race condition due to non-atomic read-modify-write on session state.",
+      "file": "src/auth/login.ts",
+      "symbol": "handleLogin",
+      "raised_by": [
+        { "reviewer_id": "reviewer3", "family": "google", "source_type": "external" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "finding_id": "security.processPayment.token-missing-rotation",
+    "severity": "high",
+    "category": "security",
+    "title": "Payment token missing rotation check",
+    "description": "The payment nonce token is reused across retries instead of being rotated, enabling replay attacks on the payment processor.",
+    "file": "src/payments/process.ts",
+    "symbol": "processPayment",
+    "line_range": null,
+    "confidence": "high",
+    "source": {
+      "reviewer_id": "reviewer1",
+      "family": "anthropic",
+      "source_type": "native-team"
+    },
+    "raised_by": [
+      { "reviewer_id": "reviewer1", "family": "anthropic", "source_type": "native-team" },
+      { "reviewer_id": "reviewer2", "family": "openai", "source_type": "external" }
+    ]
+  }
+]

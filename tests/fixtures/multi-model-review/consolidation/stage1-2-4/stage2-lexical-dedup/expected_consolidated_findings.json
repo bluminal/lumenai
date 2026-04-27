@@ -1,0 +1,41 @@
+[
+  {
+    "finding_id": "security.handleLogin.csrf-check-missing-f1",
+    "severity": "high",
+    "category": "security",
+    "title": "Missing CSRF token check",
+    "description": "The POST /login endpoint is missing CSRF token validation, allowing forged requests from authenticated sessions.",
+    "file": "src/auth/login.ts",
+    "symbol": "handleLogin",
+    "line_range": null,
+    "confidence": "high",
+    "source": {
+      "reviewer_id": "reviewer1",
+      "family": "anthropic",
+      "source_type": "native-team"
+    },
+    "raised_by": [
+      { "reviewer_id": "reviewer1", "family": "anthropic", "source_type": "native-team" },
+      { "reviewer_id": "reviewer2", "family": "openai", "source_type": "external" }
+    ]
+  },
+  {
+    "finding_id": "concurrency.handleLogin.race-condition",
+    "severity": "high",
+    "category": "concurrency",
+    "title": "Race condition in handler",
+    "description": "Concurrent login attempts can reach a race condition due to non-atomic read-modify-write on session state.",
+    "file": "src/auth/login.ts",
+    "symbol": "handleLogin",
+    "line_range": null,
+    "confidence": "high",
+    "source": {
+      "reviewer_id": "reviewer3",
+      "family": "google",
+      "source_type": "external"
+    },
+    "raised_by": [
+      { "reviewer_id": "reviewer3", "family": "google", "source_type": "external" }
+    ]
+  }
+]
