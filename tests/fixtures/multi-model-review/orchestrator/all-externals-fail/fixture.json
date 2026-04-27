@@ -1,0 +1,16 @@
+{
+  "scenario": "all-externals-fail",
+  "description": "2 native + 2 external. Both externals fail (cli_missing, cli_failed). FR-MR17 native-only continuation: no abort; verbatim warning; audit continuation event with per-external error_code.",
+  "input": {
+    "command": "review-code",
+    "artifact_path": "src/api/users.ts",
+    "native_reviewers": ["code-reviewer", "security-reviewer"],
+    "external_adapters": ["codex-review-prompter", "gemini-review-prompter"]
+  },
+  "external_failures": [
+    { "reviewer_id": "codex-review-prompter", "error_code": "cli_missing" },
+    { "reviewer_id": "gemini-review-prompter", "error_code": "cli_failed" }
+  ],
+  "expected_warning_verbatim": "All external reviewers failed; continuing with natives only",
+  "expected_continuation_type": "all-externals-failed"
+}
