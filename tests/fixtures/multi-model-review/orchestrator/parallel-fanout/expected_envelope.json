@@ -1,0 +1,168 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "codex-review-prompter",
+      "source_type": "external",
+      "family": "openai",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": {
+        "input_tokens": 4521,
+        "output_tokens": 312,
+        "model": "codex-1"
+      }
+    },
+    {
+      "reviewer_id": "gemini-review-prompter",
+      "source_type": "external",
+      "family": "google",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": {
+        "input_tokens": 5102,
+        "output_tokens": 287,
+        "model": "gemini-2.5-pro"
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "maintainability.handleLogin.no-input-validation",
+      "severity": "medium",
+      "category": "maintainability",
+      "title": "No input validation on handleLogin parameters",
+      "description": "The handleLogin function accepts username and password without validating length, type, or format, leading to unexpected behaviour on malformed input.",
+      "file": "src/auth/handleLogin.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "performance.handleLogin.synchronous-db-call",
+      "severity": "medium",
+      "category": "performance",
+      "title": "Synchronous database call blocks event loop in handleLogin",
+      "description": "The credential lookup uses a synchronous DB driver call, blocking the Node.js event loop under concurrent login requests.",
+      "file": "src/auth/handleLogin.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.handleLogin.missing-csrf-check",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing CSRF check in handleLogin",
+      "description": "The handleLogin function does not validate CSRF tokens, allowing cross-site request forgery attacks.",
+      "file": "src/auth/handleLogin.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.handleLogin.plaintext-password-log",
+      "severity": "high",
+      "category": "security",
+      "title": "Plaintext password logged on authentication failure",
+      "description": "On failed login, the raw password value is included in the error log output, risking credential exposure in log aggregators.",
+      "file": "src/auth/handleLogin.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "maintainability.tokenStore.unbounded-cache",
+      "severity": "medium",
+      "category": "maintainability",
+      "title": "Unbounded in-memory token cache in TokenStore",
+      "description": "The token cache in TokenStore grows indefinitely; no eviction policy or max-size cap is applied, risking OOM under sustained load.",
+      "file": "src/auth/tokenStore.ts",
+      "symbol": "TokenStore",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "security.handleLogin.timing-attack-vulnerability",
+      "severity": "high",
+      "category": "security",
+      "title": "Timing attack vulnerability in password comparison",
+      "description": "The password comparison uses a non-constant-time string equality check, enabling timing-based enumeration of valid credentials.",
+      "file": "src/auth/handleLogin.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "maintainability.handleLogin.missing-error-boundary",
+      "severity": "low",
+      "category": "maintainability",
+      "title": "Unhandled promise rejection in handleLogin async path",
+      "description": "The async handleLogin function lacks a top-level try/catch or .catch() handler; unhandled rejection crashes the process under Node.js default settings.",
+      "file": "src/auth/handleLogin.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    }
+  ],
+  "path_and_reason_header": "Review path: multi-model (above-threshold diff; reviewers: 2 native + 2 external)",
+  "aggregator_resolution": {
+    "name": "codex-review-prompter",
+    "source": "tier-table"
+  },
+  "continuation_event": null
+}
