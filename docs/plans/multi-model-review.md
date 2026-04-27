@@ -100,7 +100,7 @@ Establishes the substrate every adapter and integration depends on. No user-visi
 | 5 | Author `plugins/synthex/agents/context-bundle-assembler.md` — Haiku-backed utility agent that assembles the FR-MR28 context bundle from a request shape (artifact path, touched files, project config). Implements assembly order (artifact → conventions → touched files → specs → overview), per-file size cap with Haiku summarization, total bundle cap with iterative summarization, the spec-matching heuristic per OQ-8 (filename-substring match for v1, with `context.spec_map` override hook), and the "narrow scope" error path when the artifact alone exceeds `max_bundle_bytes`. | L | Task 1, Task 2 | done |
 | 6 | Add `context-bundle-assembler` to `plugins/synthex/.claude-plugin/plugin.json` agents array. | S | Task 5 | done |
 | 7 | Author Layer 1 schema validator at `tests/schemas/context-bundle.ts` validating bundle manifest shape (artifact present, file list, summarized-vs-verbatim flags, total bytes ≤ cap). Add Vitest suite with inline samples. | M | Task 5 | done |
-| 8 | Add Layer 2 behavioral fixtures at `tests/fixtures/multi-model-review/context-bundle/`: (a) `oversized-bundle/` with > 500 KB of touched-file content; asserts bundle stays ≤ `max_bundle_bytes` and largest files are summarized. (b) `artifact-as-largest-file/` where artifact itself exceeds `max_file_bytes`; asserts agent emits "narrow scope" error rather than summarizing the artifact. (c) `oversized-artifact/` where artifact alone exceeds `max_bundle_bytes`; asserts same error path. | M | Task 5, Task 7 | in progress |
+| 8 | Add Layer 2 behavioral fixtures at `tests/fixtures/multi-model-review/context-bundle/`: (a) `oversized-bundle/` with > 500 KB of touched-file content; asserts bundle stays ≤ `max_bundle_bytes` and largest files are summarized. (b) `artifact-as-largest-file/` where artifact itself exceeds `max_file_bytes`; asserts agent emits "narrow scope" error rather than summarizing the artifact. (c) `oversized-artifact/` where artifact alone exceeds `max_bundle_bytes`; asserts same error path. | M | Task 5, Task 7 | done |
 
 **Task 5 Acceptance Criteria:**
 - `[T]` Agent definition specifies inputs/outputs in canonical envelope shape
@@ -124,6 +124,8 @@ Establishes the substrate every adapter and integration depends on. No user-visi
 - `[T]` Fixture (a): bundle stays ≤ `max_bundle_bytes`; manifest correctly identifies summarized-vs-verbatim files
 - `[H]` Fixture (b): artifact-as-largest-file produces "narrow scope" error (not silent summary)
 - `[H]` Fixture (c): oversized-artifact produces "narrow scope" error
+
+**Task 8 Completion Note:** Done. 3 scenario fixtures under `tests/fixtures/multi-model-review/context-bundle/`: oversized-bundle (iterative summarization, artifact verbatim), artifact-as-largest-file (narrow_scope_required when artifact > max_file_bytes), oversized-artifact (narrow_scope_required when artifact > max_bundle_bytes). 48 tests in `context-bundle-fixtures.test.ts`. `[T]` (fixture a) passes; both `[H]` criteria (fixtures b and c — narrow scope error not silent summary) approved during execution. Commit `8133416`.
 
 **Parallelizable:** Tasks 5 and 6 are sequential. Task 7 starts after Task 5. Task 8 depends on 5 and 7.
 **Milestone Value:** Every adapter and the orchestrator can call a single, tested context-bundle subroutine. Eliminates per-reviewer bundle drift (D5).
