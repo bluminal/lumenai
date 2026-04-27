@@ -1,0 +1,6 @@
+{
+  "scenario": "gemini-successful",
+  "description": "Recorded successful Gemini output exercising markdown-fence stripping (gotcha #1) and findings:null→[] normalization (gotcha #3). Adapter parses the wrapped JSON, normalizes findings, and emits canonical envelope.",
+  "raw_cli_response_with_quirks": "Here are my findings:\n\n```json\n{\n  \"findings\": [\n    {\n      \"finding_id\": \"performance.fetchProducts.n-plus-one\",\n      \"severity\": \"medium\",\n      \"category\": \"performance\",\n      \"title\": \"fetchProducts triggers N+1 query when accessing relations\",\n      \"description\": \"The fetchProducts function calls product.related_items inside a forEach loop, generating N+1 database queries.\",\n      \"file\": \"src/api/products.ts\",\n      \"symbol\": \"fetchProducts\",\n      \"confidence\": \"high\"\n    }\n  ]\n}\n```\n",
+  "post_quirk_normalization_note": "Adapter strips ``` markdown fences before JSON.parse (gotcha #1)."
+}
