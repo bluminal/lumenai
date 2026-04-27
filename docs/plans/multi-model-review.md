@@ -324,9 +324,9 @@ The orchestrator agent and the consolidation pipeline stages that ship in v1 (St
 ### Milestone 3.2: Consolidation Pipeline — Stages 1, 2, 4
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 24 | Add Stage 1 fingerprint dedup to the orchestrator (FR-MR14). Group by exact `finding_id`; collapse groups into single consolidated finding with all contributors recorded. | M | Milestone 3.1 | pending |
-| 25 | Add Stage 2 lexical dedup within `(file, symbol)` buckets (FR-MR14). Jaccard similarity on normalized title tokens; merge above configurable threshold (default 0.8). | M | Task 24 | pending |
-| 26 | Add Stage 4 LLM-tiebreaker per D18 (bounded). Pre-filter and per-consolidation cap as defined in D18. **Position randomization** mitigates bias: tiebreaker prompt presents the two findings in alternating order across adjacent invocations; agent's markdown documents this as a behavioral rule alternating based on `(invocation_counter mod 2)`. | M | Task 25 | pending |
+| 24 | Add Stage 1 fingerprint dedup to the orchestrator (FR-MR14). Group by exact `finding_id`; collapse groups into single consolidated finding with all contributors recorded. | M | Milestone 3.1 | in progress |
+| 25 | Add Stage 2 lexical dedup within `(file, symbol)` buckets (FR-MR14). Jaccard similarity on normalized title tokens; merge above configurable threshold (default 0.8). | M | Task 24 | in progress |
+| 26 | Add Stage 4 LLM-tiebreaker per D18 (bounded). Pre-filter and per-consolidation cap as defined in D18. **Position randomization** mitigates bias: tiebreaker prompt presents the two findings in alternating order across adjacent invocations; agent's markdown documents this as a behavioral rule alternating based on `(invocation_counter mod 2)`. | M | Task 25 | in progress |
 | 27 | Add Layer 2 fixtures at `tests/fixtures/multi-model-review/consolidation/stage1-2-4/`: planted exact-id duplicates (Stage 1), planted near-duplicate titles (Stage 2), planted ambiguous pairs (Stage 4), **planted N=10 same-bucket scenario** plus a multi-bucket scenario with cumulative pairs > K (asserts total Stage-4 calls per consolidation ≤ K per D18, asserts the single audit warning records total skipped pair count across all buckets). Cached outputs assert correct merges and contributor lists. | M | Tasks 24–26 | pending |
 
 **Task 24 Acceptance Criteria:**
