@@ -1,0 +1,13 @@
+{
+  "scenario": "parallel-fanout",
+  "description": "2 native + 2 external proposers; single-batch parallel fan-out per FR-MR12; total outputs include all 4 reviewers' findings.",
+  "input": {
+    "command": "review-code",
+    "artifact_path": "src/auth/handleLogin.ts",
+    "native_reviewers": ["code-reviewer", "security-reviewer"],
+    "external_adapters": ["codex-review-prompter", "gemini-review-prompter"]
+  },
+  "expected_per_reviewer_results_count": 4,
+  "expected_total_findings": 7,
+  "wall_clock_verification_deferred_to": "Milestone 7.3 Task 61a"
+}
