@@ -1,0 +1,28 @@
+{
+  "scenario": "artifact-as-largest-file",
+  "description": "Artifact (80KB) exceeds max_file_bytes (50000) but is below max_bundle_bytes. Assembler MUST emit narrow_scope_required error rather than summarizing the artifact (Task 5 Behavioral Rule 1).",
+  "input": {
+    "artifact_path": "src/large-feature.ts",
+    "touched_files": ["src/large-feature.ts", "src/helpers.ts"],
+    "conventions": ["CLAUDE.md"],
+    "config": {
+      "max_bundle_bytes": 200000,
+      "max_file_bytes": 50000
+    }
+  },
+  "expected_assembler_output": {
+    "status": "error",
+    "error_code": "narrow_scope_required",
+    "error_message": "Artifact (80000 bytes) exceeds max_file_bytes (50000). Multi-model review cannot proceed at full fidelity. Narrow review scope (smaller diff, single file) and retry.",
+    "manifest": null,
+    "files": []
+  },
+  "expected": {
+    "status": "error",
+    "error_code": "narrow_scope_required",
+    "artifact_size_bytes": 80000,
+    "max_file_bytes": 50000,
+    "artifact_NOT_summarized": true,
+    "behavioral_rule_1_enforced": true
+  }
+}

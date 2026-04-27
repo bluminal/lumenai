@@ -1,0 +1,56 @@
+{
+  "scenario": "oversized-bundle",
+  "description": "Many touched files totaling >500KB; assembler iteratively summarizes largest non-artifact files to fit under max_bundle_bytes; artifact (5KB) remains verbatim.",
+  "input": {
+    "artifact_path": "src/auth/handleLogin.ts",
+    "touched_files": [
+      "src/auth/handleLogin.ts",
+      "src/utils/large-file-1.ts",
+      "src/utils/large-file-2.ts",
+      "src/utils/large-file-3.ts",
+      "src/utils/medium-file-1.ts"
+    ],
+    "conventions": ["CLAUDE.md", ".eslintrc"],
+    "config": {
+      "max_bundle_bytes": 200000,
+      "max_file_bytes": 50000
+    }
+  },
+  "expected_assembler_output": {
+    "status": "success",
+    "manifest": {
+      "artifact": { "path": "src/auth/handleLogin.ts", "size_bytes": 5000, "summarized": false },
+      "conventions": [
+        { "path": "CLAUDE.md", "size_bytes": 1500, "summarized": false },
+        { "path": ".eslintrc", "size_bytes": 800, "summarized": false }
+      ],
+      "touched_files": [
+        { "path": "src/auth/handleLogin.ts", "size_bytes": 5000, "summarized": false },
+        { "path": "src/utils/large-file-1.ts", "size_bytes": 92000, "summarized": true },
+        { "path": "src/utils/large-file-2.ts", "size_bytes": 88000, "summarized": true },
+        { "path": "src/utils/large-file-3.ts", "size_bytes": 75000, "summarized": true },
+        { "path": "src/utils/medium-file-1.ts", "size_bytes": 12000, "summarized": false }
+      ],
+      "specs": [],
+      "total_bytes": 195000
+    },
+    "files": [
+      { "path": "src/auth/handleLogin.ts", "content": "<5000 bytes verbatim>" },
+      { "path": "CLAUDE.md", "content": "<1500 bytes verbatim>" },
+      { "path": ".eslintrc", "content": "<800 bytes verbatim>" },
+      { "path": "src/utils/large-file-1.ts", "content": "<summarized>" },
+      { "path": "src/utils/large-file-2.ts", "content": "<summarized>" },
+      { "path": "src/utils/large-file-3.ts", "content": "<summarized>" },
+      { "path": "src/utils/medium-file-1.ts", "content": "<12000 bytes verbatim>" }
+    ]
+  },
+  "expected": {
+    "status": "success",
+    "total_bytes_within_cap": true,
+    "artifact_summarized": false,
+    "summarized_count": 3,
+    "verbatim_count": 4,
+    "max_bundle_bytes": 200000,
+    "actual_total_bytes": 195000
+  }
+}
