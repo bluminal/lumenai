@@ -179,7 +179,7 @@ The three v1 adapters per D2 (Codex, Gemini, Ollama). All three are independent 
 | 13 | Author `plugins/synthex/agents/gemini-review-prompter.md` per FR-MR8 + FR-MR10. Same structure as Codex; CLI is `gemini -p --output-format json`; `agentic` tier; family `google`; sandbox flags per FR-MR26 (read-only equivalent); install one-liner; `gcloud auth list` for auth check. **Schedule first in parallel batch** ([H] criteria). | M | Milestone 2.1 (pattern reference) | done |
 | 14 | Add `gemini-review-prompter` to `plugin.json`. **Coordinate with Tasks 10, 17.** | S | Task 13 | done |
 | 15 | Layer 1 schema validation reuses `adapter-envelope.ts` from Task 11 — add Vitest test asserting Gemini's recorded sample envelope passes. | S | Tasks 11, 13 | done |
-| 15a | Layer 2 success-path fixture at `tests/fixtures/multi-model-review/adapters/gemini/successful/`: recorded successful gemini output. Surfaces Gemini-specific output-parsing quirks. | S | Tasks 13, 15 | in progress |
+| 15a | Layer 2 success-path fixture at `tests/fixtures/multi-model-review/adapters/gemini/successful/`: recorded successful gemini output. Surfaces Gemini-specific output-parsing quirks. | S | Tasks 13, 15 | done |
 
 **Task 13 Acceptance Criteria:**
 - `[T]` Same FR-MR8 checklist as Codex
@@ -203,6 +203,8 @@ The three v1 adapters per D2 (Codex, Gemini, Ollama). All three are independent 
 - `[T]` Successful Gemini fixture produces canonical envelope
 - `[T]` Documented sandbox-flag set is a substring of the recorded invocation string
 
+**Task 15a Completion Notes:** Done. Layer 2 fixture at `tests/fixtures/multi-model-review/adapters/gemini/successful/` exercises markdown-fence quirk (gotcha #1) — raw_cli_response_with_quirks contains ```json fences; expected_envelope strips them. 16 tests in `gemini-fixtures.test.ts`. Both `[T]` criteria pass (canonical envelope; sandbox flag `--readonly` substring parity). Commit `f27283e`.
+
 **Parallelizable:** All Milestone 2.2 tasks parallelize with Milestone 2.3 tasks (modulo `plugin.json` coordination).
 **Milestone Value:** Second adapter (different family) operational with success-path coverage.
 
@@ -212,7 +214,7 @@ The three v1 adapters per D2 (Codex, Gemini, Ollama). All three are independent 
 | 16 | Author `plugins/synthex/agents/ollama-review-prompter.md` per FR-MR8 + FR-MR10. CLI is `ollama run` + HTTP API with `format: <schema>`; capability tier `text-only` (bundle is the only context); family `local-<model>` (dynamic family pattern based on configured model); install one-liner; no auth check (local). Document the v1 recommended-default-model question (Q2) inline as a TBD with placeholder. **Schedule first in parallel batch** ([H] criteria). | M | Milestone 2.1 (pattern reference) | done |
 | 17 | Add `ollama-review-prompter` to `plugin.json`. **Coordinate with Tasks 10, 14.** | S | Task 16 | done |
 | 18 | Layer 1: Vitest test asserting Ollama recorded sample envelope passes the shared validator. Specific assertion that `text-only` adapters produce envelopes without agentic-tier-only metadata. | S | Tasks 11, 16 | done |
-| 18a | Layer 2 success-path fixture at `tests/fixtures/multi-model-review/adapters/ollama/successful/`: recorded successful ollama output (text-only tier — bundle-only context). | S | Tasks 16, 18 | in progress |
+| 18a | Layer 2 success-path fixture at `tests/fixtures/multi-model-review/adapters/ollama/successful/`: recorded successful ollama output (text-only tier — bundle-only context). | S | Tasks 16, 18 | done |
 
 **Task 16 Acceptance Criteria:**
 - `[T]` FR-MR8 checklist
@@ -237,6 +239,8 @@ The three v1 adapters per D2 (Codex, Gemini, Ollama). All three are independent 
 **Task 18a Acceptance Criteria:**
 - `[T]` Successful Ollama fixture produces canonical envelope
 - `[T]` Documented invocation string in `ollama-review-prompter.md` matches the recorded invocation (FR-MR26 parity; sandbox flags N/A for local)
+
+**Task 18a Completion Notes:** Done. Layer 2 fixture at `tests/fixtures/multi-model-review/adapters/ollama/successful/` (text-only tier; HTTP API; usage mapping prompt_eval_count→input_tokens, eval_count→output_tokens; `source.family: local-qwen2.5-coder` dynamic). 17 tests in `ollama-fixtures.test.ts`. Both `[T]` criteria pass (canonical envelope; FR-MR26 HTTP API endpoint substring parity in lieu of sandbox flags which are N/A). Commit `277dd76`.
 
 **Parallelizable:** All three adapter milestones (2.1, 2.2, 2.3) run concurrently after Phase 1 — assign one engineer per adapter; cross-adapter coordination only for shared validator (Task 11) and `plugin.json` write contention (Tasks 10, 14, 17 serialize or single PR).
 **Milestone Value:** v1 adapter set complete. Three external families covered (OpenAI, Google, local) plus Anthropic via natives = four total. Sufficient for FR-MR4 family diversity.
