@@ -1,0 +1,10 @@
+{
+  "scenario": "cli-missing",
+  "description": "which codex returns nothing (exit code 1); Codex CLI is not installed; adapter returns cli_missing immediately.",
+  "cli_presence_check": {
+    "command": "which codex",
+    "exit_status": 1,
+    "stdout": ""
+  },
+  "raw_output_path": "docs/reviews/raw/codex-d4e5f6a7.json"
+}

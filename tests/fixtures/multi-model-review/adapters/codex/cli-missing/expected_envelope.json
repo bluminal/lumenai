@@ -1,0 +1,8 @@
+{
+  "status": "failed",
+  "error_code": "cli_missing",
+  "error_message": "The 'codex' CLI is not installed. Install: `npm install -g @openai/codex` (or see adapter-recipes.md).",
+  "findings": [],
+  "usage": null,
+  "raw_output_path": "docs/reviews/raw/codex-d4e5f6a7.json"
+}

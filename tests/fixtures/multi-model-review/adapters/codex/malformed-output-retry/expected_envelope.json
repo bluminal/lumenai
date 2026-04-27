@@ -1,0 +1,12 @@
+{
+  "status": "failed",
+  "error_code": "parse_failed",
+  "error_message": "Codex output could not be parsed into canonical envelope after retry. Raw output preserved at raw_output_path.",
+  "findings": [],
+  "usage": {
+    "input_tokens": 3800,
+    "output_tokens": 201,
+    "model": "codex-1"
+  },
+  "raw_output_path": "docs/reviews/raw/codex-b2c3d4e5.json"
+}

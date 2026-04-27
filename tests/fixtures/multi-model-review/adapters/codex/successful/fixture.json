@@ -1,0 +1,22 @@
+{
+  "scenario": "successful",
+  "description": "Codex CLI invoked successfully; two findings returned, normalized to canonical envelope.",
+  "recorded_cli_stdout": {
+    "model": "codex-1",
+    "usage": {
+      "input_tokens": 4521,
+      "output_tokens": 312
+    },
+    "response": {
+      "message": {
+        "content": [
+          {
+            "type": "text",
+            "text": "[{\"finding_id\":\"security.handleLogin.missing-csrf-check\",\"severity\":\"high\",\"category\":\"security\",\"title\":\"Missing CSRF check in handleLogin\",\"description\":\"The handleLogin function does not validate CSRF tokens, allowing cross-site request forgery attacks.\",\"file\":\"src/auth/handleLogin.ts\",\"symbol\":\"handleLogin\",\"line_range\":null,\"confidence\":\"high\"},{\"finding_id\":\"maintainability.tokenStore.unbounded-cache\",\"severity\":\"medium\",\"category\":\"maintainability\",\"title\":\"Unbounded in-memory token cache in TokenStore\",\"description\":\"The token cache in TokenStore grows indefinitely; no eviction policy or max-size cap is applied, risking OOM under sustained load.\",\"file\":\"src/auth/tokenStore.ts\",\"symbol\":\"TokenStore\",\"line_range\":null,\"confidence\":\"medium\"}]"
+          }
+        ]
+      }
+    }
+  },
+  "raw_output_path": "docs/reviews/raw/codex-a1b2c3d4.json"
+}

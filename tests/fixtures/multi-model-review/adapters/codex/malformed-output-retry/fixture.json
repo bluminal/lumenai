@@ -1,0 +1,13 @@
+{
+  "scenario": "malformed-output-retry",
+  "description": "First Codex call returns truncated/malformed JSON; retry also returns malformed output; adapter terminates with parse_failed.",
+  "first_call": {
+    "exit_status": 0,
+    "stdout": "{\"model\":\"codex-1\",\"usage\":{\"input_tokens\":3800,\"output_tokens\":201},\"response\":{\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"[{\\\"finding_id\\\":\\\"security.handleLogin.missing-csrf\\\",\\\"severity\\\":\\\"high\\\",\\\"category\\\":\\\"security\\\",\\\"title\\\":\\\"Missing CSRF\\\",\\\"description\\\":\\\"No CSRF validation"
+  },
+  "retry_call": {
+    "exit_status": 0,
+    "stdout": "Sorry, here are the findings: [{finding_id: missing-csrf, severity: high}]"
+  },
+  "raw_output_path": "docs/reviews/raw/codex-b2c3d4e5.json"
+}
