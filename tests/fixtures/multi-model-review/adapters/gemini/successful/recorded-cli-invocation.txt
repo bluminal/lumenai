@@ -1,0 +1,1 @@
+gemini -p "<prompt>" --output-format json --readonly --model gemini-2.5-pro

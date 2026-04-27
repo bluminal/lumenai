@@ -1,0 +1,29 @@
+{
+  "status": "success",
+  "error_code": null,
+  "error_message": null,
+  "findings": [
+    {
+      "finding_id": "performance.fetchProducts.n-plus-one",
+      "severity": "medium",
+      "category": "performance",
+      "title": "fetchProducts triggers N+1 query when accessing relations",
+      "description": "The fetchProducts function calls product.related_items inside a forEach loop, generating N+1 database queries.",
+      "file": "src/api/products.ts",
+      "symbol": "fetchProducts",
+      "line_range": null,
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      },
+      "confidence": "high"
+    }
+  ],
+  "usage": {
+    "input_tokens": 4521,
+    "output_tokens": 312,
+    "model": "gemini-2.5-pro"
+  },
+  "raw_output_path": "docs/reviews/raw/gemini-uuid-fixture-15a.json"
+}
