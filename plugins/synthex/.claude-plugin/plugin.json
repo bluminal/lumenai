@@ -5,7 +5,10 @@
     "name": "Bluminal Labs"
   },
   "agents": [
-    "./agents/context-bundle-assembler.md"
+    "./agents/codex-review-prompter.md",
+    "./agents/context-bundle-assembler.md",
+    "./agents/gemini-review-prompter.md",
+    "./agents/ollama-review-prompter.md"
   ],
   "commands": [
     "./commands/init.md",
