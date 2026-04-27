@@ -327,7 +327,7 @@ The orchestrator agent and the consolidation pipeline stages that ship in v1 (St
 | 24 | Add Stage 1 fingerprint dedup to the orchestrator (FR-MR14). Group by exact `finding_id`; collapse groups into single consolidated finding with all contributors recorded. | M | Milestone 3.1 | done |
 | 25 | Add Stage 2 lexical dedup within `(file, symbol)` buckets (FR-MR14). Jaccard similarity on normalized title tokens; merge above configurable threshold (default 0.8). | M | Task 24 | done |
 | 26 | Add Stage 4 LLM-tiebreaker per D18 (bounded). Pre-filter and per-consolidation cap as defined in D18. **Position randomization** mitigates bias: tiebreaker prompt presents the two findings in alternating order across adjacent invocations; agent's markdown documents this as a behavioral rule alternating based on `(invocation_counter mod 2)`. | M | Task 25 | done |
-| 27 | Add Layer 2 fixtures at `tests/fixtures/multi-model-review/consolidation/stage1-2-4/`: planted exact-id duplicates (Stage 1), planted near-duplicate titles (Stage 2), planted ambiguous pairs (Stage 4), **planted N=10 same-bucket scenario** plus a multi-bucket scenario with cumulative pairs > K (asserts total Stage-4 calls per consolidation ≤ K per D18, asserts the single audit warning records total skipped pair count across all buckets). Cached outputs assert correct merges and contributor lists. | M | Tasks 24–26 | in progress |
+| 27 | Add Layer 2 fixtures at `tests/fixtures/multi-model-review/consolidation/stage1-2-4/`: planted exact-id duplicates (Stage 1), planted near-duplicate titles (Stage 2), planted ambiguous pairs (Stage 4), **planted N=10 same-bucket scenario** plus a multi-bucket scenario with cumulative pairs > K (asserts total Stage-4 calls per consolidation ≤ K per D18, asserts the single audit warning records total skipped pair count across all buckets). Cached outputs assert correct merges and contributor lists. | M | Tasks 24–26 | done |
 
 **Task 24 Acceptance Criteria:**
 - `[T]` Two findings sharing `finding_id` collapse to one with both contributors listed
@@ -354,6 +354,8 @@ The orchestrator agent and the consolidation pipeline stages that ship in v1 (St
 - `[T]` Non-duplicate findings remain distinct
 - `[T]` Multi-bucket scenario: total Stage-4 calls per consolidation ≤ K; bounded behavior verified across buckets, not within a single bucket
 - `[T]` When the per-consolidation cap fires, exactly one audit warning is emitted recording total skipped pair count
+
+**Task 27 Completion Note:** Done. 5 scenario fixtures under `tests/fixtures/multi-model-review/consolidation/stage1-2-4/`: stage1-fingerprint-dedup, stage2-lexical-dedup, stage4-llm-tiebreaker, stage4-cap-single-bucket-N10, stage4-cap-multi-bucket-cumulative. Each fixture exercises documented Stage 1/2/4 behavior. Multi-bucket fixture proves D18 cap is PER-CONSOLIDATION (25 dispatched across 4 buckets, 15 skipped, single audit warning aggregates). 71 tests in `consolidation-fixtures.test.ts`. All 4 `[T]` criteria pass. Commit `a4eddc8`.
 
 **Parallelizable:** Sequential — stages depend on each other in pipeline order. Task 27 fixture can be authored in parallel with Tasks 25–26.
 **Milestone Value:** Orchestrator now produces a deduplicated findings list with bounded cost/latency. End-to-end usable for ensembles where embedding-based Stage 3 isn't critical.
