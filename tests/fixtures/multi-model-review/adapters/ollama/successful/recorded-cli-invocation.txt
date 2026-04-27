@@ -1,0 +1,1 @@
+curl -s http://localhost:11434/api/generate -H "Content-Type: application/json" -d '{"model": "qwen2.5-coder:32b", "prompt": "<prompt>", "stream": false, "format": <canonical-finding-schema>}'

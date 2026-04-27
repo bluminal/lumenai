@@ -1,0 +1,28 @@
+{
+  "status": "success",
+  "error_code": null,
+  "error_message": null,
+  "findings": [
+    {
+      "finding_id": "correctness.parseConfig.unhandled-yaml-error",
+      "severity": "medium",
+      "category": "correctness",
+      "title": "parseConfig swallows YAML parse errors silently",
+      "description": "When yaml.parse() throws, parseConfig catches the error and returns an empty object. Callers downstream cannot distinguish 'config not present' from 'config malformed'.",
+      "file": "src/config/parseConfig.ts",
+      "symbol": "parseConfig",
+      "source": {
+        "reviewer_id": "ollama-review-prompter",
+        "family": "local-qwen2.5-coder",
+        "source_type": "external"
+      },
+      "confidence": "high"
+    }
+  ],
+  "usage": {
+    "input_tokens": 6240,
+    "output_tokens": 287,
+    "model": "qwen2.5-coder:32b"
+  },
+  "raw_output_path": "docs/reviews/raw/ollama-uuid-fixture-18a.json"
+}
