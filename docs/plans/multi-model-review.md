@@ -455,16 +455,16 @@ Per D20, the audit-artifact writer is built command-agnostic from day one and li
 ### Milestone 4.1: review-code Command Update
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 33a | **Decision-framework skeleton.** Update `plugins/synthex/commands/review-code.md` to add the FR-MR21 8-step decision-order skeleton with stubs for both branches (multi-model and native-only). Document path-and-reason header format spec per D21. **Verifiable independently** — does not yet wire the orchestrator. | M | Milestone 3.3 | in progress |
-| 33b | **Wire orchestrator into multi-model branch.** Replace the 33a multi-model stub with an actual `multi-model-review-orchestrator` invocation. Native-only branch continues to call today's review-code logic byte-identically. | M | Task 33a, Milestone 3.3 | in progress |
-| 34 | Implement complexity gate logic inline per FR-MR21a: read config, compute `lines_changed` and `files_touched` from diff, check `always_escalate_paths` globs, decide native-only vs multi-model. Cache the gate decision for the loop's duration to prevent oscillation (FR-MR21 step 8 / D9). | M | Task 33a | in progress |
-| 35 | Add `--multi-model` and `--no-multi-model` invocation flags per FR-MR6; flags override both master switch and per-command config. | S | Task 33a | in progress |
+| 33a | **Decision-framework skeleton.** Update `plugins/synthex/commands/review-code.md` to add the FR-MR21 8-step decision-order skeleton with stubs for both branches (multi-model and native-only). Document path-and-reason header format spec per D21. **Verifiable independently** — does not yet wire the orchestrator. | M | Milestone 3.3 | done |
+| 33b | **Wire orchestrator into multi-model branch.** Replace the 33a multi-model stub with an actual `multi-model-review-orchestrator` invocation. Native-only branch continues to call today's review-code logic byte-identically. | M | Task 33a, Milestone 3.3 | done |
+| 34 | Implement complexity gate logic inline per FR-MR21a: read config, compute `lines_changed` and `files_touched` from diff, check `always_escalate_paths` globs, decide native-only vs multi-model. Cache the gate decision for the loop's duration to prevent oscillation (FR-MR21 step 8 / D9). | M | Task 33a | done |
+| 35 | Add `--multi-model` and `--no-multi-model` invocation flags per FR-MR6; flags override both master switch and per-command config. | S | Task 33a | done |
 | 36 | **Document path-and-reason header format spec per D21** in `review-code.md`: the three invariants and literal regex from D21. Two sub-formats:
   - With externals attempted: `reviewers: N native + M external` (PRD examples 1, 2, 3) OR `reviewers: N native, M external <qualifier>` (PRD example 6, e.g., "0 external succeeded").
   - Native-only: `reviewers: N native` (PRD examples 4, 5).
-Six PRD example variants are example renderings of the spec, not the contract. | S | Task 33a | in progress |
-| 37 | Layer 1 schema validator update at `tests/schemas/code-reviewer.ts` (existing) to additionally validate the path-and-reason header against the D21 regex. Vitest test for each of the six PRD example renderings — including the two no-externals variants (`reviewers: 2 native`) and the failed-externals variant (`reviewers: 2 native, 0 external succeeded`). | M | Task 36 | in progress |
-| 38 | Layer 2 fixtures at `tests/fixtures/multi-model-review/review-code/`: (a) trivial diff (12 lines, 1 file) → native-only path, byte-identical to the **redacted baseline snapshot** from Task 0; (b) above-threshold diff (127 lines) → multi-model path; (c) below-threshold diff but auth path → multi-model path via escalate-glob; (d) `--multi-model` overrides disabled config; (e) `--no-multi-model` overrides enabled config; (f) all-externals-fail fixture exercises FR-MR17 native-only continuation with warning (links Task 23a to command level). | L | Tasks 33b, 34–37 | in progress |
+Six PRD example variants are example renderings of the spec, not the contract. | S | Task 33a | done |
+| 37 | Layer 1 schema validator update at `tests/schemas/code-reviewer.ts` (existing) to additionally validate the path-and-reason header against the D21 regex. Vitest test for each of the six PRD example renderings — including the two no-externals variants (`reviewers: 2 native`) and the failed-externals variant (`reviewers: 2 native, 0 external succeeded`). | M | Task 36 | done |
+| 38 | Layer 2 fixtures at `tests/fixtures/multi-model-review/review-code/`: (a) trivial diff (12 lines, 1 file) → native-only path, byte-identical to the **redacted baseline snapshot** from Task 0; (b) above-threshold diff (127 lines) → multi-model path; (c) below-threshold diff but auth path → multi-model path via escalate-glob; (d) `--multi-model` overrides disabled config; (e) `--no-multi-model` overrides enabled config; (f) all-externals-fail fixture exercises FR-MR17 native-only continuation with warning (links Task 23a to command level). | L | Tasks 33b, 34–37 | done |
 
 **Task 33a Acceptance Criteria:**
 - `[T]` Decision order matches FR-MR21 verbatim (steps 1–8)
@@ -497,13 +497,27 @@ Six PRD example variants are example renderings of the spec, not the contract. |
 - `[T]` Fixture (a) byte-identical to the **redacted** Task 0 baseline (FR-MR23 regression)
 - `[T]` Fixture (f) FR-MR17 continuation produces visible warning text and audit-artifact entries
 
+**Task 33a Completion Note:** Done. FR-MR21 8-step decision framework added to `review-code.md` after Step 1b (preserves multi-model-teams Step 1b regression). Native-only branch stub present. Bundled commit `336f8e1`.
+
+**Task 33b Completion Note:** Done. Multi-model branch wires `multi-model-review-orchestrator` (command: review-code; artifact_path; native_reviewers; resolved config; per_reviewer_timeout_seconds). Native-only branch byte-identical to baseline (FR-MR23 — verified at runtime by Task 38(a)). Bundled commit `336f8e1`.
+
+**Task 34 Completion Note:** Done. Complexity gate sub-section (FR-MR21a): threshold_lines_changed/threshold_files_touched from `multi_model_review.per_command.review_code.complexity_gate`; always_escalate_paths globs; gate decision cached for loop duration (D9 oscillation prevention). Bundled commit `336f8e1`.
+
+**Task 35 Completion Note:** Done. --multi-model and --no-multi-model invocation flags (FR-MR6). Mutually exclusive. Override master switch + per-command config + complexity gate. Bundled commit `336f8e1`.
+
+**Task 36 Completion Note:** Done. D21 path-and-reason header spec sub-section: 3 invariants verbatim, literal regex, 2 sub-formats (`N native + M external` and `N native, M external <qualifier>` and `N native`), all 6 PRD example renderings. Bundled commit `336f8e1`.
+
+**Task 37 Completion Note:** Done. `tests/schemas/code-reviewer.ts` extended with `validatePathAndReasonHeader` using PATH_AND_REASON_HEADER_REGEX from Task 22. 21 tests in `code-reviewer.test.ts` cover all 6 PRD examples + 4 rejection cases. Bundled commit `336f8e1`.
+
+**Task 38 Completion Note:** Done. 6 fixtures under `tests/fixtures/multi-model-review/review-code/`: trivial-diff-native-only (FR-MR23 byte-baseline), above-threshold-multi-model, auth-path-escalated (always_escalate glob), --multi-model and --no-multi-model flag overrides, all-externals-fail-continuation (FR-MR17 + audit). 56 tests in `review-code-fixtures-mmr.test.ts`. All 3 `[T]` criteria pass. Commit `e402d5c`.
+
 **Parallelizable:** Tasks 33a, 34, 35, 36 can run in parallel after Milestone 3.3 (33a is prerequisite for 33b only). Task 37 follows 36. Task 38 follows all.
 **Milestone Value:** `review-code` is multi-model-capable end-to-end. Users can run `/review-code --multi-model` and get a consolidated multi-family review. Default behavior preserved.
 
 ### Milestone 4.2: Cross-Cutting Credential-Scope Test
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 41 | **Cross-cutting Layer 2 credential-leak test (FR-MR2).** Invoke review-code with multi-model enabled. Grep ALL paths the orchestrator writes during a representative invocation: audit file, raw-output files at `raw_output_path`, orchestrator stderr, `.synthex/config.yaml` after init, the bundle manifest. Pattern set: `sk-`, `AIzaSy`, `AWS_SECRET`, `AWS_ACCESS_KEY_ID`, OAuth bearer prefixes (`Bearer `, `bearer_`), `xoxb-`, `glpat-`, `ghp_`, `gho_`. | M | Milestone 4.0, Milestone 4.1 | pending |
+| 41 | **Cross-cutting Layer 2 credential-leak test (FR-MR2).** Invoke review-code with multi-model enabled. Grep ALL paths the orchestrator writes during a representative invocation: audit file, raw-output files at `raw_output_path`, orchestrator stderr, `.synthex/config.yaml` after init, the bundle manifest. Pattern set: `sk-`, `AIzaSy`, `AWS_SECRET`, `AWS_ACCESS_KEY_ID`, OAuth bearer prefixes (`Bearer `, `bearer_`), `xoxb-`, `glpat-`, `ghp_`, `gho_`. | M | Milestone 4.0, Milestone 4.1 | in progress |
 
 **Task 41 Acceptance Criteria:**
 - `[T]` Audit file contains expected sections
