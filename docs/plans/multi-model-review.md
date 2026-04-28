@@ -736,9 +736,9 @@ Lower-priority but planned work that ships in subsequent releases. Not required 
 ### Milestone 8.1: Version Bumps and Changelog
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 63 | Bump `plugins/synthex/.claude-plugin/plugin.json` version. | S | Phase 6 | in progress |
-| 64 | Bump top-level `.claude-plugin/marketplace.json` version AND the synthex-plugin entry's version per CLAUDE.md release rules. | S | Task 63 | in progress |
-| 65 | Add `CHANGELOG.md` entry covering all FR-MR features shipped in v1, with link reference at the bottom. Mentions `multi_model_review` config addition, new orchestrator + adapter agents, `init` updates, audit artifacts, complexity gate. **Mentions `docs/reviews/` as default audit output directory and notes users should add it to `.gitignore` if they prefer not to commit review artifacts.** | S | Tasks 63–64 | in progress |
+| 63 | Bump `plugins/synthex/.claude-plugin/plugin.json` version. | S | Phase 6 | done |
+| 64 | Bump top-level `.claude-plugin/marketplace.json` version AND the synthex-plugin entry's version per CLAUDE.md release rules. | S | Task 63 | done |
+| 65 | Add `CHANGELOG.md` entry covering all FR-MR features shipped in v1, with link reference at the bottom. Mentions `multi_model_review` config addition, new orchestrator + adapter agents, `init` updates, audit artifacts, complexity gate. **Mentions `docs/reviews/` as default audit output directory and notes users should add it to `.gitignore` if they prefer not to commit review artifacts.** | S | Tasks 63–64 | done |
 
 **Task 63 Acceptance Criteria:**
 - `[T]` Synchronized new version string with Task 64
@@ -752,6 +752,11 @@ Lower-priority but planned work that ships in subsequent releases. Not required 
 - `[H]` Changelog entry follows existing format
 - `[H]` Mentions `multi_model_review` config addition, new orchestrator + adapter agents, `init` updates, audit artifacts, complexity gate
 - `[H]` Mentions `docs/reviews/` as default audit output directory and `.gitignore` recommendation
+
+**Completion Notes:**
+- **Task 63:** Done. `plugins/synthex/.claude-plugin/plugin.json` version field added/synced to 0.5.0 (was absent; now matches marketplace.json synthex entry). Both `[T]` criteria pass. Bundled commit `4741f61`.
+- **Task 64:** Done. `.claude-plugin/marketplace.json` top-level version + synthex entry version both bumped 0.4.0 → 0.5.0 (synced with Task 63). synthex-plus entry unchanged at 0.1.2 (out of scope). Both `[T]` criteria pass. Bundled commit `4741f61`.
+- **Task 65:** Done. `CHANGELOG.md` `## [0.5.0] - 2026-04-28` entry added at top with Keep-a-Changelog format. Mentions all v1 features: multi_model_review config (FR-MR5), orchestrator + 3 adapters + utility agents, /init multi-model setup prompt (FR-MR19/27), audit artifacts (FR-MR24), complexity gate (FR-MR21a), docs/reviews/ as default output + .gitignore recommendation. Link reference at bottom. 17 tests in `release-v050.test.ts`. All 3 `[H]` criteria (Keep-a-Changelog format; comprehensive feature mention; docs/reviews + .gitignore note) approved during execution. Bundled commit `4741f61`.
 
 **Parallelizable:** Sequential.
 **Milestone Value:** Release shipped. Plugin upgrade detection works for users.
