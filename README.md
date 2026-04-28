@@ -104,6 +104,16 @@ Where standard Synthex spawns ephemeral subagents (each unaware of the others), 
 
 See the [Synthex+ README](./plugins/synthex-plus/README.md) for full documentation.
 
+## Multi-Model Review
+
+Multi-model review fans review prompts out to multiple LLM-family proposers (OpenAI, Google, local-Ollama) via CLI adapters and consolidates findings into a single deduplicated, severity-reconciled, attributed list.
+
+The primary benefit: catching correlated-error blind spots — bugs and issues that any single LLM family would miss but that show up when multiple families review independently.
+
+**Off by default.** Opt in via `/synthex:init` (interactive prompt) or by editing `.synthex/config.yaml`. CLI-only — Synthex does not store API keys.
+
+See [`docs/specs/multi-model-review/architecture.md`](docs/specs/multi-model-review/architecture.md) for the full design and [`docs/specs/multi-model-review/adapter-recipes.md`](docs/specs/multi-model-review/adapter-recipes.md) for per-adapter setup.
+
 ## Automated Testing
 
 All agents are tested using a three-layer testing pyramid. Since agents are pure markdown (no runtime code), testing works by invoking agents with synthetic fixtures and validating their outputs.
