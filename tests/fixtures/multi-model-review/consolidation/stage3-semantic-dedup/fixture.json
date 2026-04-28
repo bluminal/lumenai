@@ -1,0 +1,54 @@
+{
+  "scenario": "stage3-semantic-dedup",
+  "description": "Planted semantically-similar findings (different wording, same meaning) → merged at Stage 3 (cosine ≥ 0.85). Truly distinct findings remain separate.",
+  "input_findings": [
+    {
+      "finding_id": "perf.api.fetchUsers.n-plus-one",
+      "title": "fetchUsers triggers N+1 query when accessing user.related",
+      "description": "Accessing user.related inside the .map() loop on line of fetchUsers generates N+1 database queries.",
+      "file": "src/api/users.ts",
+      "symbol": "fetchUsers",
+      "severity": "medium",
+      "category": "performance",
+      "source": { "reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team" }
+    },
+    {
+      "finding_id": "perf.api.fetchUsers.lazy-loading",
+      "title": "Lazy-loaded user.related causes per-user database round-trip in fetchUsers",
+      "description": "fetchUsers iterates users and accesses .related lazily, producing one query per user.",
+      "file": "src/api/users.ts",
+      "symbol": "fetchUsers",
+      "severity": "high",
+      "category": "performance",
+      "source": { "reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external" }
+    },
+    {
+      "finding_id": "security.auth.handleLogin.csrf",
+      "title": "Missing CSRF token validation in handleLogin",
+      "description": "handleLogin POST endpoint does not validate CSRF tokens.",
+      "file": "src/auth/handleLogin.ts",
+      "symbol": "handleLogin",
+      "severity": "high",
+      "category": "security",
+      "source": { "reviewer_id": "security-reviewer", "family": "anthropic", "source_type": "native-team" }
+    }
+  ],
+  "config": {
+    "stage3_embedding_threshold": 0.85,
+    "stage3_stage4_floor": 0.7,
+    "stage4_max_calls_per_consolidation": 25
+  },
+  "simulated_cosine_similarities": {
+    "finding_0_vs_finding_1": 0.91,
+    "finding_0_vs_finding_2": 0.12,
+    "finding_1_vs_finding_2": 0.08
+  },
+  "embedding_source_used": "host-session",
+  "expected_stage3_outcome": {
+    "merged_pairs": [{ "indices": [0, 1], "cosine": 0.91, "merged_severity": "high" }],
+    "forwarded_to_stage4": [],
+    "left_unmerged": [],
+    "final_findings_count": 2,
+    "stage3_calls_dispatched": 1
+  }
+}
