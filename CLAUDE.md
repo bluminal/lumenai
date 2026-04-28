@@ -89,6 +89,7 @@ The plugin system uses the `"version"` field in `marketplace.json` to detect upg
 | `tech-lead` | Full-stack orchestrator, primary coding agent | Execution + Orchestration |
 | `lead-frontend-engineer` | Frontend tech lead, delegates to framework specialists | Execution + Delegation |
 | `product-manager` | Requirements gathering, implementation planning, product strategy | Planning + Strategy |
+| `multi-model-review-orchestrator` | Sonnet-backed; orchestrates multi-model review (fan-out, consolidation pipeline, audit emission). Invoked by `/synthex:review-code` (when multi-model branch fires) and `/synthex:write-implementation-plan` (when multi-model is enabled). | Execution + Orchestration |
 
 ### Specialist Layer
 
@@ -121,20 +122,25 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 | `findings-consolidator` | Dedup, group, and sort findings from multiple reviewers (preserves attribution) | Utility |
 | `plan-linter` | Structural audit of implementation plan drafts against the template rubric | Utility |
 | `plan-scribe` | Applies Product Manager's decided edits to the plan document mechanically | Utility |
+| `context-bundle-assembler` | Haiku-backed; assembles the canonical context bundle delivered to every multi-model review proposer (FR-MR28, D5) | Utility |
+| `audit-artifact-writer` | Haiku-backed; writes per-invocation audit-artifact markdown files for multi-model review runs (FR-MR24). Command-agnostic per D20. | Utility |
+| `codex-review-prompter` | Haiku-backed; OpenAI Codex CLI adapter for multi-model review (`agentic` tier; family `openai`) | Utility |
+| `gemini-review-prompter` | Haiku-backed; Google Gemini CLI adapter for multi-model review (`agentic` tier; family `google`) | Utility |
+| `ollama-review-prompter` | Haiku-backed; local Ollama HTTP API adapter for multi-model review (`text-only` tier; family `local-<model>`) | Utility |
 
 ## Commands
 
 | Command | Purpose | Agents Orchestrated |
 |---------|---------|-------------------|
-| `init` | Initialize project configuration and directories | — |
+| `init` | Initialize project configuration and directories. Includes a "Configure Multi-Model Review (optional)" prompt section per FR-MR19: detects installed CLIs, runs auth checks, surfaces 3 options (Enable with detected / Enable later / Skip), and surfaces FR-MR27 data-transmission warning before writing `enabled: true`. | — |
 | `next-priority` | Execute next highest-priority tasks | Tech Lead |
 | `refine-requirements` | Improve PRD clarity through multi-agent review | PM + Tech Lead + Lead Frontend Engineer |
-| `write-implementation-plan` | Transform PRD into implementation plan | PM + Architect + Design System Agent + Tech Lead |
-| `review-code` | Multi-perspective code review | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
+| `write-implementation-plan` | Transform PRD into implementation plan. Supports multi-model plan-review via the orchestrator (FR-MR22); no complexity gate applied. Use `--multi-model` / `--no-multi-model` to override config. | PM + Architect + design-system-agent + Tech Lead |
+| `review-code` | Multi-perspective code review. Supports multi-model review via FR-MR21 8-step decision framework + complexity gate (FR-MR21a). Use `--multi-model` / `--no-multi-model` to override config. When multi-model is active, fans out to native + external proposers via the orchestrator. | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
 | `write-adr` | Create Architecture Decision Record | Architect (interactive) |
 | `write-rfc` | Create Request for Comments | Architect + PM + Tech Lead + Security Reviewer |
 | `test-coverage-analysis` | Analyze test gaps, optionally write tests | Quality Engineer |
-| `design-system-audit` | Audit frontend for design system compliance | Design System Agent |
+| `design-system-audit` | Audit frontend for design system compliance | design-system-agent |
 | `retrospective` | Structured cycle retrospective | Metrics Analyst + Retrospective Facilitator |
 | `reliability-review` | Operational readiness assessment | SRE Agent + Terraform Plan Reviewer (opt.) |
 | `performance-audit` | Full-stack performance analysis | Performance Engineer |
@@ -193,8 +199,8 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 |---------|---------|-------------|
 | `review_loops.max_cycles` | 2 | Global max review loop iterations for all commands |
 | `review_loops.min_severity_to_address` | high | Global minimum severity that must be resolved |
-| `refine_requirements.reviewers` | product-manager, tech-lead, designer | Sub-agents that review PRD for clarity |
-| `implementation_plan.reviewers` | architect, designer, tech-lead | Sub-agents that review draft implementation plans |
+| `refine_requirements.reviewers` | product-manager, tech-lead, design-system-agent | Sub-agents that review PRD for clarity |
+| `implementation_plan.reviewers` | architect, design-system-agent, tech-lead | Sub-agents that review draft implementation plans |
 | `implementation_plan.concurrent_tasks` | 3 | Max parallelizable tasks per milestone in the plan |
 | `implementation_plan.review_loops.max_cycles` | 3 | Per-command override (higher for high-stakes plans) |
 | `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `review-code` command |
