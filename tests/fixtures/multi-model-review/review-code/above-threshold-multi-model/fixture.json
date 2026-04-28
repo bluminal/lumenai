@@ -1,0 +1,50 @@
+{
+  "scenario": "above-threshold-multi-model",
+  "description": "127 lines changed across 5 files; multi_model_review.enabled: true + per_command.review_code.enabled: true. Complexity gate decides multi-model (above threshold_lines_changed: 50 AND threshold_files_touched: 3).",
+  "input": {
+    "command": "review-code",
+    "target": "staged changes",
+    "diff_stats": {
+      "lines_changed": 127,
+      "files_touched": 5,
+      "files": [
+        "src/services/userService.ts",
+        "src/repositories/userRepository.ts",
+        "src/models/user.ts",
+        "src/controllers/userController.ts",
+        "src/validators/userValidator.ts"
+      ]
+    }
+  },
+  "config": {
+    "multi_model_review": {
+      "enabled": true,
+      "per_command": {
+        "review_code": {
+          "enabled": true,
+          "complexity_gate": {
+            "threshold_lines_changed": 50,
+            "threshold_files_touched": 3,
+            "always_escalate_paths": [
+              "**/auth/**",
+              "**/payments/**",
+              "**/billing/**",
+              "**/migrations/**",
+              "**/security/**",
+              "**/secrets/**",
+              "**/crypto/**"
+            ]
+          }
+        }
+      },
+      "reviewers": [
+        "codex-review-prompter",
+        "gemini-review-prompter"
+      ]
+    }
+  },
+  "invocation_flags": {},
+  "expected_routing": "multi-model",
+  "expected_routing_reason": "above-threshold diff",
+  "expected_routing_decision": "multi-model"
+}

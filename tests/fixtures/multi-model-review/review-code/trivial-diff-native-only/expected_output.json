@@ -1,0 +1,45 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 0,
+      "error_code": null,
+      "usage": null
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "code.format-utils.missing-null-guard",
+      "severity": "low",
+      "category": "correctness",
+      "title": "Missing null guard in formatCurrency helper",
+      "description": "The formatCurrency function does not guard against null or undefined input, which will throw at runtime if called with an uninitialized value.",
+      "file": "src/utils/format.ts",
+      "line_range": { "start": 4, "end": 7 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    }
+  ],
+  "path_and_reason_header": "Review path: native-only (below-threshold diff; reviewers: 2 native)",
+  "aggregator_resolution": {
+    "name": "findings-consolidator",
+    "source": "configured"
+  },
+  "continuation_event": null
+}

@@ -1,0 +1,75 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": null
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "code.products-api.missing-pagination",
+      "severity": "medium",
+      "category": "performance",
+      "title": "Product list endpoint returns unbounded result set",
+      "description": "The listProducts endpoint does not apply pagination, meaning a large catalog will be returned in a single response. This risks high memory usage and slow response times.",
+      "file": "src/api/products.ts",
+      "line_range": { "start": 22, "end": 31 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "code.product-model.missing-price-validation",
+      "severity": "medium",
+      "category": "correctness",
+      "title": "Product price field accepts negative values",
+      "description": "The product model does not validate that price is non-negative, allowing invalid records to be persisted.",
+      "file": "src/models/product.ts",
+      "line_range": { "start": 9, "end": 13 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.products-api.missing-auth-check",
+      "severity": "high",
+      "category": "security",
+      "title": "Product creation endpoint lacks authentication check",
+      "description": "The createProduct handler does not verify the caller is authenticated before writing to the products table, allowing unauthenticated product creation.",
+      "file": "src/api/products.ts",
+      "line_range": { "start": 41, "end": 48 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    }
+  ],
+  "path_and_reason_header": "Review path: native-only (below-threshold diff; reviewers: 2 native)",
+  "aggregator_resolution": {
+    "name": "findings-consolidator",
+    "source": "configured"
+  },
+  "continuation_event": null
+}

@@ -1,0 +1,174 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 3,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "codex-review-prompter",
+      "source_type": "external",
+      "family": "openai",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": {
+        "input_tokens": 5241,
+        "output_tokens": 408
+      }
+    },
+    {
+      "reviewer_id": "gemini-review-prompter",
+      "source_type": "external",
+      "family": "google",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": {
+        "input_tokens": 4987,
+        "output_tokens": 371
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "code.user-service.missing-transaction-rollback",
+      "severity": "high",
+      "category": "reliability",
+      "title": "Missing transaction rollback on partial user creation failure",
+      "description": "The createUser service method writes to two tables sequentially without a transaction. If the second write fails, the first write is not rolled back, leaving the database in an inconsistent state.",
+      "file": "src/services/userService.ts",
+      "line_range": { "start": 23, "end": 41 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "code.user-validator.missing-email-format-check",
+      "severity": "medium",
+      "category": "correctness",
+      "title": "Email validation does not check format, only presence",
+      "description": "The userValidator checks that the email field is present but does not validate it against an RFC 5321 pattern, allowing malformed addresses through.",
+      "file": "src/validators/userValidator.ts",
+      "line_range": { "start": 12, "end": 17 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "code.user-repository.n-plus-one-query",
+      "severity": "medium",
+      "category": "performance",
+      "title": "N+1 query pattern in user repository list method",
+      "description": "The listUsers method fetches each user's roles with an individual query per user rather than a single JOIN, causing N+1 query behaviour under load.",
+      "file": "src/repositories/userRepository.ts",
+      "line_range": { "start": 55, "end": 72 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.user-controller.missing-rate-limit",
+      "severity": "high",
+      "category": "security",
+      "title": "No rate limiting on user registration endpoint",
+      "description": "The registerUser controller endpoint does not apply rate limiting, enabling automated account-creation abuse and credential stuffing attacks.",
+      "file": "src/controllers/userController.ts",
+      "line_range": { "start": 18, "end": 26 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "code.user-service.missing-transaction-rollback",
+      "severity": "high",
+      "category": "reliability",
+      "title": "Missing transaction rollback on partial user creation failure",
+      "description": "The createUser method lacks atomicity; a failure after the first DB write leaves orphaned records.",
+      "file": "src/services/userService.ts",
+      "line_range": { "start": 23, "end": 41 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "code.user-model.no-index-on-email",
+      "severity": "low",
+      "category": "performance",
+      "title": "User model email field lacks a database index",
+      "description": "Queries that filter or sort by email will perform full table scans as the email column has no index defined in the model schema.",
+      "file": "src/models/user.ts",
+      "line_range": { "start": 8, "end": 14 },
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "security.user-controller.missing-rate-limit",
+      "severity": "high",
+      "category": "security",
+      "title": "No rate limiting on registration endpoint",
+      "description": "The registration route has no rate-limit middleware, making it trivial to enumerate accounts or flood the registration flow.",
+      "file": "src/controllers/userController.ts",
+      "line_range": { "start": 18, "end": 26 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "code.user-repository.n-plus-one-query",
+      "severity": "medium",
+      "category": "performance",
+      "title": "N+1 query in user list retrieval",
+      "description": "Each user record triggers a separate roles lookup; consolidating with a JOIN or a bulk fetch would reduce DB round trips significantly.",
+      "file": "src/repositories/userRepository.ts",
+      "line_range": { "start": 55, "end": 72 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    }
+  ],
+  "path_and_reason_header": "Review path: multi-model (above-threshold diff; reviewers: 2 native + 2 external)",
+  "aggregator_resolution": {
+    "name": "findings-consolidator",
+    "source": "configured"
+  },
+  "continuation_event": null
+}

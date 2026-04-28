@@ -1,0 +1,46 @@
+{
+  "scenario": "auth-path-escalated",
+  "description": "12 lines changed in src/auth/handleLogin.ts (matches **/auth/** glob); diff is BELOW quantitative thresholds (50 lines, 3 files) but always_escalate_paths fires. Gate decides multi-model via escalate-glob.",
+  "input": {
+    "command": "review-code",
+    "target": "staged changes",
+    "diff_stats": {
+      "lines_changed": 12,
+      "files_touched": 1,
+      "files": ["src/auth/handleLogin.ts"]
+    }
+  },
+  "config": {
+    "multi_model_review": {
+      "enabled": true,
+      "per_command": {
+        "review_code": {
+          "enabled": true,
+          "complexity_gate": {
+            "threshold_lines_changed": 50,
+            "threshold_files_touched": 3,
+            "always_escalate_paths": [
+              "**/auth/**",
+              "**/payments/**",
+              "**/billing/**",
+              "**/migrations/**",
+              "**/security/**",
+              "**/secrets/**",
+              "**/crypto/**"
+            ]
+          }
+        }
+      },
+      "reviewers": [
+        "codex-review-prompter",
+        "gemini-review-prompter"
+      ]
+    }
+  },
+  "invocation_flags": {},
+  "expected_routing": "multi-model",
+  "expected_routing_reason": "auth path escalated",
+  "escalate_glob_matched": "**/auth/**",
+  "escalate_glob_matched_file": "src/auth/handleLogin.ts",
+  "below_quantitative_threshold": true
+}

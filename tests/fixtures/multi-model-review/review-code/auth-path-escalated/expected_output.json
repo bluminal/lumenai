@@ -1,0 +1,144 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "codex-review-prompter",
+      "source_type": "external",
+      "family": "openai",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": {
+        "input_tokens": 2105,
+        "output_tokens": 218
+      }
+    },
+    {
+      "reviewer_id": "gemini-review-prompter",
+      "source_type": "external",
+      "family": "google",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": {
+        "input_tokens": 1988,
+        "output_tokens": 195
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "code.handleLogin.implicit-any-session",
+      "severity": "low",
+      "category": "correctness",
+      "title": "Session object typed as implicit any in handleLogin",
+      "description": "The session parameter in handleLogin is not explicitly typed, falling through to implicit any. A typed interface would catch shape mismatches at compile time.",
+      "file": "src/auth/handleLogin.ts",
+      "line_range": { "start": 3, "end": 5 },
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.handleLogin.missing-csrf-check",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing CSRF token validation in handleLogin",
+      "description": "The handleLogin function does not validate a CSRF token before processing credentials, allowing cross-site request forgery attacks against the login flow.",
+      "file": "src/auth/handleLogin.ts",
+      "line_range": { "start": 7, "end": 10 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.handleLogin.credentials-in-log",
+      "severity": "critical",
+      "category": "security",
+      "title": "Raw credentials written to application log",
+      "description": "A debug log statement on the login path emits the raw password before hashing, exposing credentials in log aggregation systems.",
+      "file": "src/auth/handleLogin.ts",
+      "line_range": { "start": 11, "end": 11 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.handleLogin.missing-csrf-check",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing CSRF check in handleLogin",
+      "description": "The handleLogin function does not validate CSRF tokens, allowing cross-site request forgery attacks.",
+      "file": "src/auth/handleLogin.ts",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "security.handleLogin.no-account-lockout",
+      "severity": "high",
+      "category": "security",
+      "title": "No account lockout after repeated failed login attempts",
+      "description": "The login handler does not track or limit failed attempts per account, enabling brute-force credential attacks.",
+      "file": "src/auth/handleLogin.ts",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "security.handleLogin.credentials-in-log",
+      "severity": "critical",
+      "category": "security",
+      "title": "Plaintext password in log statement",
+      "description": "A debug log emits the raw password value before it is hashed, creating a credential exposure risk in any log sink.",
+      "file": "src/auth/handleLogin.ts",
+      "line_range": { "start": 11, "end": 11 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    }
+  ],
+  "path_and_reason_header": "Review path: multi-model (auth path escalated; reviewers: 2 native + 2 external)",
+  "aggregator_resolution": {
+    "name": "findings-consolidator",
+    "source": "configured"
+  },
+  "continuation_event": null
+}

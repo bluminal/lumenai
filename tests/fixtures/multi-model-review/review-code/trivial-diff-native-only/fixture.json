@@ -1,0 +1,42 @@
+{
+  "scenario": "trivial-diff-native-only",
+  "description": "12 lines changed across 1 file; no always_escalate_paths match; multi_model_review.enabled: true + per_command.review_code.enabled: true. Complexity gate decides native-only (below threshold_lines_changed: 50, threshold_files_touched: 3).",
+  "input": {
+    "command": "review-code",
+    "target": "staged changes",
+    "diff_stats": {
+      "lines_changed": 12,
+      "files_touched": 1,
+      "files": ["src/utils/format.ts"]
+    }
+  },
+  "config": {
+    "multi_model_review": {
+      "enabled": true,
+      "per_command": {
+        "review_code": {
+          "enabled": true,
+          "complexity_gate": {
+            "threshold_lines_changed": 50,
+            "threshold_files_touched": 3,
+            "always_escalate_paths": [
+              "**/auth/**",
+              "**/payments/**",
+              "**/billing/**",
+              "**/migrations/**",
+              "**/security/**",
+              "**/secrets/**",
+              "**/crypto/**"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "invocation_flags": {},
+  "expected_routing": "native-only",
+  "expected_routing_reason": "below-threshold diff",
+  "expected_baseline_match": true,
+  "baseline_snapshot_path": "tests/__snapshots__/multi-model-review/baseline/review-code-baseline.snapshot.md",
+  "baseline_snapshot_note": "FR-MR23 byte-identical regression contract: expected_output structure must match the redacted Task 0 baseline. Empirical byte comparison is deferred to runtime (orchestrator execution); this fixture anchors the structural forward-check."
+}

@@ -1,0 +1,53 @@
+{
+  "scenario": "no-multi-model-flag-overrides-enabled",
+  "description": "multi_model_review.enabled: true in config, but --no-multi-model flag passed at invocation. FR-MR6: CLI flag overrides resolved-config, native-only branch is taken.",
+  "input": {
+    "command": "review-code",
+    "target": "staged changes",
+    "diff_stats": {
+      "lines_changed": 89,
+      "files_touched": 4,
+      "files": [
+        "src/api/products.ts",
+        "src/api/categories.ts",
+        "src/models/product.ts",
+        "src/models/category.ts"
+      ]
+    }
+  },
+  "config": {
+    "multi_model_review": {
+      "enabled": true,
+      "per_command": {
+        "review_code": {
+          "enabled": true,
+          "complexity_gate": {
+            "threshold_lines_changed": 50,
+            "threshold_files_touched": 3,
+            "always_escalate_paths": [
+              "**/auth/**",
+              "**/payments/**",
+              "**/billing/**",
+              "**/migrations/**",
+              "**/security/**",
+              "**/secrets/**",
+              "**/crypto/**"
+            ]
+          }
+        }
+      },
+      "reviewers": [
+        "codex-review-prompter",
+        "gemini-review-prompter"
+      ]
+    }
+  },
+  "invocation_flags": {
+    "--no-multi-model": true
+  },
+  "resolved_config_before_flag": "multi-model-enabled",
+  "resolved_config_after_flag": "multi-model-disabled",
+  "expected_routing": "native-only",
+  "expected_routing_reason": "flag override",
+  "fr_mr6_flag_override": "--no-multi-model overrides enabled: true"
+}

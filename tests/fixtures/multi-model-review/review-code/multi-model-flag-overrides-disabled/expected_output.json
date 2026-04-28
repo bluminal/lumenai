@@ -1,0 +1,114 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "codex-review-prompter",
+      "source_type": "external",
+      "family": "openai",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": {
+        "input_tokens": 2341,
+        "output_tokens": 187
+      }
+    },
+    {
+      "reviewer_id": "gemini-review-prompter",
+      "source_type": "external",
+      "family": "google",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": {
+        "input_tokens": 2209,
+        "output_tokens": 164
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "code.order-service.missing-idempotency-key",
+      "severity": "medium",
+      "category": "reliability",
+      "title": "Order creation lacks idempotency key validation",
+      "description": "The createOrder method does not check for a caller-supplied idempotency key, enabling duplicate order creation if the client retries after a timeout.",
+      "file": "src/services/orderService.ts",
+      "line_range": { "start": 18, "end": 29 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.order-service.missing-ownership-check",
+      "severity": "high",
+      "category": "security",
+      "title": "Order retrieval does not verify caller owns the order",
+      "description": "The getOrder handler fetches orders by ID without confirming the requesting user is the order owner, allowing unauthorized access to other users' order data.",
+      "file": "src/services/orderService.ts",
+      "line_range": { "start": 44, "end": 51 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "code.order-service.missing-idempotency-key",
+      "severity": "medium",
+      "category": "reliability",
+      "title": "No idempotency key on order creation",
+      "description": "createOrder should accept and store an idempotency key to prevent duplicate orders on client retries.",
+      "file": "src/services/orderService.ts",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "security.order-service.missing-ownership-check",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing ownership check before returning order",
+      "description": "The getOrder endpoint does not verify the caller owns the requested order, exposing a horizontal privilege escalation vector.",
+      "file": "src/services/orderService.ts",
+      "line_range": { "start": 44, "end": 51 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    }
+  ],
+  "path_and_reason_header": "Review path: multi-model (above-threshold diff; reviewers: 2 native + 2 external)",
+  "aggregator_resolution": {
+    "name": "findings-consolidator",
+    "source": "configured"
+  },
+  "continuation_event": null
+}

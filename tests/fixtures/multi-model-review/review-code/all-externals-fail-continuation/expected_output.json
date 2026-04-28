@@ -1,0 +1,96 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "codex-review-prompter",
+      "source_type": "external",
+      "family": "openai",
+      "status": "failed",
+      "findings_count": 0,
+      "error_code": "cli_missing",
+      "usage": null
+    },
+    {
+      "reviewer_id": "gemini-review-prompter",
+      "source_type": "external",
+      "family": "google",
+      "status": "failed",
+      "findings_count": 0,
+      "error_code": "cli_missing",
+      "usage": null
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "code.notification-service.missing-retry-logic",
+      "severity": "medium",
+      "category": "reliability",
+      "title": "Notification delivery has no retry on transient failure",
+      "description": "The sendNotification method does not retry on transient delivery errors (e.g., network timeout). A failed delivery silently drops the notification.",
+      "file": "src/services/notificationService.ts",
+      "line_range": { "start": 27, "end": 38 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "code.notification-worker.unbounded-queue",
+      "severity": "medium",
+      "category": "performance",
+      "title": "Notification worker processes unbounded in-memory queue",
+      "description": "The worker pulls notifications from an unbounded in-memory array. Under high load this grows without limit; a bounded queue with backpressure is needed.",
+      "file": "src/workers/notificationWorker.ts",
+      "line_range": { "start": 12, "end": 25 },
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.notifications-api.missing-recipient-validation",
+      "severity": "high",
+      "category": "security",
+      "title": "Notification recipient not validated against caller's allowed targets",
+      "description": "The createNotification endpoint accepts an arbitrary recipient ID without verifying the caller has permission to send to that recipient, enabling notification spam or data disclosure.",
+      "file": "src/api/notifications.ts",
+      "line_range": { "start": 19, "end": 28 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    }
+  ],
+  "path_and_reason_header": "Review path: multi-model (above-threshold diff; reviewers: 2 native, 0 external succeeded)",
+  "aggregator_resolution": {
+    "name": "host-fallback",
+    "source": "host-fallback"
+  },
+  "continuation_event": {
+    "type": "all-externals-failed",
+    "details": "External reviewers codex-review-prompter (cli_missing), gemini-review-prompter (cli_missing) failed. Continuing with native-only review."
+  }
+}

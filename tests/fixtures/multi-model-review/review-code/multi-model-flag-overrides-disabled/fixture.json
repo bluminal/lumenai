@@ -1,0 +1,51 @@
+{
+  "scenario": "multi-model-flag-overrides-disabled",
+  "description": "multi_model_review.enabled: false in config, but --multi-model flag passed at invocation. FR-MR6: CLI flag overrides resolved-config, multi-model branch is taken.",
+  "input": {
+    "command": "review-code",
+    "target": "staged changes",
+    "diff_stats": {
+      "lines_changed": 34,
+      "files_touched": 2,
+      "files": [
+        "src/services/orderService.ts",
+        "src/models/order.ts"
+      ]
+    }
+  },
+  "config": {
+    "multi_model_review": {
+      "enabled": false,
+      "per_command": {
+        "review_code": {
+          "enabled": false,
+          "complexity_gate": {
+            "threshold_lines_changed": 50,
+            "threshold_files_touched": 3,
+            "always_escalate_paths": [
+              "**/auth/**",
+              "**/payments/**",
+              "**/billing/**",
+              "**/migrations/**",
+              "**/security/**",
+              "**/secrets/**",
+              "**/crypto/**"
+            ]
+          }
+        }
+      },
+      "reviewers": [
+        "codex-review-prompter",
+        "gemini-review-prompter"
+      ]
+    }
+  },
+  "invocation_flags": {
+    "--multi-model": true
+  },
+  "resolved_config_before_flag": "multi-model-disabled",
+  "resolved_config_after_flag": "multi-model-enabled",
+  "expected_routing": "multi-model",
+  "expected_routing_reason": "flag override",
+  "fr_mr6_flag_override": "--multi-model overrides enabled: false"
+}
