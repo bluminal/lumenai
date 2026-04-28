@@ -432,6 +432,8 @@ The "Cross-Domain Findings" section is unique to team-review. It highlights find
 
 #### 9d. FAIL handling and re-review loop
 
+> **Multi-model mode:** When `multi_model_active: true`, the FAIL loop re-invokes the orchestrator on each cycle per FR-MMT21 step 9. See the multi-model FAIL cycle note in Step 3 below.
+
 If the consolidated verdict is **FAIL**, enter a fix-and-re-review loop. **WARN does NOT trigger the loop** -- MEDIUM-only findings are informational.
 
 This loop runs up to `review_loops.max_cycles` iterations (default: 3):
@@ -449,6 +451,10 @@ This loop runs up to `review_loops.max_cycles` iterations (default: 3):
    After creating the tasks, the lead also sends a `SendMessage` (type: `message`) to each reviewer with a brief notification: which files changed, which of their prior findings are expected to be addressed, and a pointer to the new review task on the shared task list. This direct message ensures reviewers are promptly aware of the re-review scope without needing to poll the task list.
 
    Reviewers claim and execute these new tasks following the same pattern as Step 8. The key advantage is that reviewers retain context from the prior cycle -- they know what they flagged previously and can verify fixes more efficiently.
+
+   **Multi-model FAIL cycle (when `multi_model_active` is `true`):** Each FAIL re-review cycle also re-runs the orchestrator. After the lead creates new review tasks and reviewers complete them, re-invoke the `multi-model-review-orchestrator` via the Task tool (same as Step 5g) with the updated diff scope for the re-review. The orchestrator runs the full consolidation pipeline on the combined new native findings + fresh external adapter results. The Lead again waits for the `orchestrator-report` message and surfaces it as the cycle's consolidated report.
+
+   > **Cost guidance:** ~2-3× per-cycle token cost vs native-only FAIL cycles (each cycle invokes N adapter agents + 1 orchestrator consolidation pass, plus the native team re-review).
 
 4. **Re-consolidate:** Apply the same consolidation rules from 9a-9c on the new findings.
 
