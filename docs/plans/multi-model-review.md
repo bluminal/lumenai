@@ -689,7 +689,7 @@ Lower-priority but planned work that ships in subsequent releases. Not required 
 | 57 | Author `llm-review-prompter.md` per FR-MR8 + FR-MR10. Universal escape-hatch (50+ providers via `llm` plugins). `text-only` tier. Family inferred from model-ID prefix. | M | Phase 6 | done |
 | 58 | Author `bedrock-review-prompter.md` per FR-MR8 + FR-MR10. AWS Bedrock CLI. `text-only` tier. Family inferred from Bedrock model ID. | M | Phase 6 | done |
 | 59 | Author `claude-review-prompter.md` per FR-MR8 + FR-MR10. Specialty adapter (use only for second Anthropic voice with different model than host session). `agentic` tier. Family `anthropic`. Doc explicitly notes "not in default-recommended set" per FR-MR10. | M | Phase 6 | done |
-| 60 | Add all three to `plugin.json` (single PR). Layer 1 validator tests for each via shared validator. **NFR-MR5 verification:** each of Tasks 57–59 implemented in exactly 3 file changes (adapter `.md` + `plugin.json` entry + adapter-recipes doc entry). Any orchestrator change required during 57–59 is treated as a defect against the extensibility contract. | S | Tasks 57–59 | in progress |
+| 60 | Add all three to `plugin.json` (single PR). Layer 1 validator tests for each via shared validator. **NFR-MR5 verification:** each of Tasks 57–59 implemented in exactly 3 file changes (adapter `.md` + `plugin.json` entry + adapter-recipes doc entry). Any orchestrator change required during 57–59 is treated as a defect against the extensibility contract. | S | Tasks 57–59 | done |
 
 **Task 57 Acceptance Criteria:**
 - `[T]` FR-MR8 checklist
@@ -715,15 +715,17 @@ Lower-priority but planned work that ships in subsequent releases. Not required 
 - `[T]` Envelope validator passes for all
 - `[T]` Each of Tasks 57–59 implemented in exactly 3 file changes; PR diff verified
 
+**Task 60 Completion Notes:** Done. plugin.json registration for llm/bedrock/claude adapters; adapter-recipes.md sections 4/5/6 appended (writing-a-new-adapter renumbered to §7); fastfollow-adapter-envelopes.test.ts (validator tests for all 3); synthex-plugin-json.test.ts extended with registration assertions; adapter-recipes-md.test.ts updated for §7 renumber. NFR-MR5 verified: 0 orchestrator changes; 3 file changes per adapter (.md + plugin.json + recipes). 176 tests across the 3 affected files; all pass. Commit `0c71550`.
+
 **Parallelizable:** Tasks 57, 58, 59 are independent — three engineers can author concurrently. Task 60 is the integration step.
 **Milestone Value:** Adapter set covers all PRD-listed v1 options. Bedrock and `llm` cover users who can't or won't install per-vendor CLIs. NFR-MR5 extensibility verified empirically.
 
 ### Milestone 7.3: Layer 3 Semantic Eval
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 61 | Author Layer 3 LLM-as-judge promptfoo entries for orchestrator: corpus of 5–10 real multi-reviewer scenarios; judge prompt asks "would a human accept this consolidation?". **Includes a Task-call-sequencing semantic eval** covering the FR-MR12 single-batch property (the verifiability gap noted in cycle-1 review against Task 23). | L | Phase 6 | pending |
-| 61a | **Runtime-only orchestrator behavioral checks (Layer 3, live invocation).** Author Layer 3 promptfoo entries for two orchestrator behaviors that cannot be verified against cached fixtures: (1) **Wall-clock parallel fan-out** — issue a real 4-proposer fan-out (2 native + 2 external, real CLIs) and assert wall-clock latency is within 1.5× the slowest single proposer's measured latency (NFR-MR3); pads the cycle-1 deferral of Task 23's wall-clock assertion. (2) **Position randomization in Stage 4** — invoke the Stage 4 tiebreaker twice in succession with the same ambiguous pair; assert the two recorded prompts present the findings in reversed order (verifies Task 26's randomization rule operationally). Live invocations bypass cache by definition; entries are tagged manual-trigger-only per CLAUDE.md testing pyramid. | M | Task 61 | pending |
-| 62 | Establish quality baseline; document expected pass rate; gate future PRs on regression. | M | Tasks 61, 61a | pending |
+| 61 | Author Layer 3 LLM-as-judge promptfoo entries for orchestrator: corpus of 5–10 real multi-reviewer scenarios; judge prompt asks "would a human accept this consolidation?". **Includes a Task-call-sequencing semantic eval** covering the FR-MR12 single-batch property (the verifiability gap noted in cycle-1 review against Task 23). | L | Phase 6 | in progress |
+| 61a | **Runtime-only orchestrator behavioral checks (Layer 3, live invocation).** Author Layer 3 promptfoo entries for two orchestrator behaviors that cannot be verified against cached fixtures: (1) **Wall-clock parallel fan-out** — issue a real 4-proposer fan-out (2 native + 2 external, real CLIs) and assert wall-clock latency is within 1.5× the slowest single proposer's measured latency (NFR-MR3); pads the cycle-1 deferral of Task 23's wall-clock assertion. (2) **Position randomization in Stage 4** — invoke the Stage 4 tiebreaker twice in succession with the same ambiguous pair; assert the two recorded prompts present the findings in reversed order (verifies Task 26's randomization rule operationally). Live invocations bypass cache by definition; entries are tagged manual-trigger-only per CLAUDE.md testing pyramid. | M | Task 61 | in progress |
+| 62 | Establish quality baseline; document expected pass rate; gate future PRs on regression. | M | Tasks 61, 61a | in progress |
 
 **Task 61 Acceptance Criteria:**
 - `[H]` Promptfoo entries authored; corpus of 5+ scenarios
