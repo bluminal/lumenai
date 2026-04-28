@@ -387,3 +387,34 @@ multi_model_review:
     # FR-MMT30a: when true, audit artifact captures per-finding attribution telemetry
     # (consolidated_finding_id, raised_by[], consensus_count, minority_of_one)
     record_finding_attribution_telemetry: true
+
+  # External CLI permission model (ADR-003 / D27).
+  # Per-CLI permission mode for external review-prompter adapters.
+  # Three patterns:
+  #   - read-only       (Pattern 1, default): adapter invokes its CLI with
+  #                     read-only / plan-mode / --sandbox flags. The CLI cannot
+  #                     edit files, run shell commands, or modify state. Safe
+  #                     default for every environment.
+  #   - parent-mediated (Pattern 3): adapter invokes its CLI in a mode that
+  #                     proxies tool-use approval requests back to the parent
+  #                     Claude session (Codex app-server requestApproval,
+  #                     Claude Code canUseTool over --output-format stream-json).
+  #                     The parent session decides per request. Use this for
+  #                     CLIs that natively support approval proxying.
+  #   - sandbox-yolo    (Pattern 2): adapter invokes its CLI with full tool
+  #                     permissions inside an OS-level sandbox. Faster but
+  #                     riskier. Requires explicit user confirmation at spawn.
+  #                     Opt in only when you trust the CLI inside the sandbox.
+  #
+  # Defaults applied per CLI in Task 82 (Codex + Claude Code default to
+  # parent-mediated; all others default to read-only). For now the key exists
+  # with read-only as the universal default.
+  external_permission_mode:
+    # Universal default applied to any CLI not explicitly listed below.
+    # Override per CLI by adding `<cli-name>: <mode>` entries.
+    default: read-only
+    # Per-CLI overrides (Task 82 will populate Codex + Claude Code).
+    # codex-review-prompter: parent-mediated
+    # claude-review-prompter: parent-mediated
+    # gemini-review-prompter: read-only
+    # ollama-review-prompter: read-only
