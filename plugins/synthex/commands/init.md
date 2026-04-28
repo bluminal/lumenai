@@ -16,9 +16,10 @@ Set up the Synthex plugin configuration for a project. This command scaffolds th
 
 1. **Creates the project configuration file** at `.synthex/config.yaml` (or custom path)
 2. **Prompts for concurrent task parallelism** — detects CPU count and asks the user to choose a concurrency level (Yolo, Aggressive, Default, or custom)
-3. **Updates `.gitignore`** to exclude the worktrees directory (`.claude/worktrees/`) if not already present
-4. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`, `docs/specs/decisions/`, `docs/specs/rfcs/`, `docs/runbooks/`, `docs/retros/`) if they don't exist
-5. **Provides guidance** on customizing the configuration for your project
+3. **Configures multi-model review (optional)** — scans for installed CLIs, runs auth checks, and offers opt-in options for multi-model review
+4. **Updates `.gitignore`** to exclude the worktrees directory (`.claude/worktrees/`) if not already present
+5. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`, `docs/specs/decisions/`, `docs/specs/rfcs/`, `docs/runbooks/`, `docs/retros/`) if they don't exist
+6. **Provides guidance** on customizing the configuration for your project
 
 ## Workflow
 
@@ -97,7 +98,108 @@ Replace **both** `concurrent_tasks` values in the config file at `@{config_path}
 - `implementation_plan.concurrent_tasks` — set to the chosen value
 - `next_priority.concurrent_tasks` — set to the chosen value
 
-### 4. Update .gitignore
+### 4. Configure Multi-Model Review (optional)
+
+Prompt the user to opt in to multi-model review. Multi-model review fans review prompts out to multiple LLM-family proposers (OpenAI, Google, local Ollama, etc.) and consolidates findings into a single attributed list. Off by default; this step allows the user to enable it during init.
+
+#### 4a. Detection Scan
+
+Emit a progress indicator before beginning:
+
+```
+Detecting installed CLIs...
+```
+
+For each candidate CLI in `[codex, gemini, ollama, llm, aws, claude]`, run BOTH a `which` check AND a lightweight auth check per the adapter's documented auth check command (D22 — auth pre-validation):
+
+| CLI | `which` check | Auth check command |
+|-----|---------------|--------------------|
+| `codex` | `which codex` | `codex auth status` |
+| `gemini` | `which gemini` | `gcloud auth list` |
+| `ollama` | `which ollama` | `curl -sf http://localhost:11434/api/tags > /dev/null` |
+| `llm` | `which llm` | `llm keys list` |
+| `aws` | `which aws` | `aws sts get-caller-identity --output text` |
+| `claude` | `which claude` | `claude --version` |
+
+**All `which` and auth checks dispatch concurrently in a single parallel Bash batch** — preflight wall-clock is bounded by the slowest single check + collation overhead, not by the sum of per-CLI latencies.
+
+Auth checks that exit 0 are treated as authenticated regardless of advisory text on stdout/stderr. Only the exit code determines the auth result.
+
+Bucket results into three groups after collation:
+
+- **detected-and-authenticated** — `which` AND auth check both exited 0
+- **detected-but-unauthenticated** — `which` exited 0; auth check exited non-zero
+- **not-detected** — `which` exited non-zero
+
+#### 4b. Surface Three Options via AskUserQuestion
+
+Use the `AskUserQuestion` tool to present the options:
+
+> **Enable multi-model review (optional)?**
+>
+> Multi-model review fans review prompts out to multiple LLM-family proposers (OpenAI, Google, local Ollama, etc.) and consolidates findings into a single attributed list. This catches errors a single model would miss. Off by default; opt in by selecting one of the options below.
+>
+> Detection results: detected-and-authenticated [`<list of authenticated CLIs>`]; detected-but-unauthenticated [`<list with remediation hints>`]; not-detected [`<list>`].
+>
+> 1. **Enable with detected CLIs** — write `multi_model_review.enabled: true` + `reviewers: [<ONLY authenticated CLIs by name>]` to `.synthex/config.yaml`. Option label lists ONLY authenticated CLIs (D22 — option only includes CLIs that pass both `which` AND auth check).
+> 2. **Enable later (show snippet)** — print a commented-out `multi_model_review:` YAML snippet matching the `multi_model_review:` block structure from `defaults.yaml`; detected CLIs appear as commented-out reviewers. User can uncomment when ready.
+> 3. **Skip** — do not write any `multi_model_review` config. Default behavior preserved.
+
+If the detection results include detected-but-unauthenticated CLIs, surface them SEPARATELY with remediation hints (per D22 — e.g., `"Detected but unauthenticated: gemini — run \`gcloud auth login\` to enable"`).
+
+If no CLIs are detected-and-authenticated, option 1 is still presented but its label reads "Enable with detected CLIs (none currently authenticated — authenticate a CLI first)". The option remains available; the user can still choose it and fix auth afterward.
+
+#### 4c. Data-Transmission Warning (FR-MR27)
+
+BEFORE writing `enabled: true` to config (option 1 only), surface the following warning verbatim:
+
+> **Heads up — data transmission**
+>
+> Multi-model review sends your code, diffs, and (for write-implementation-plan) draft plan markdown to the configured external CLIs. Each CLI relays this content to its underlying provider (OpenAI, Google, etc.) per the provider's terms of service. Synthex does not store, log, or modify this content beyond what's needed to invoke the CLI.
+>
+> If you need to keep all review content local, configure ONLY local-model adapters (Ollama, Bedrock with on-prem model) and remove hosted-model adapters from `reviewers`.
+
+Proceed to write the config only after this warning is displayed.
+
+#### 4d. Apply the Chosen Option
+
+**Option 1 — Enable with detected CLIs:**
+
+1. Display the data-transmission warning (step 4c).
+2. Write the following keys to `.synthex/config.yaml`:
+   - `multi_model_review.enabled: true`
+   - `multi_model_review.reviewers: [<authenticated CLIs only>]` — list contains ONLY the CLIs that passed both `which` AND auth check (D22). Do NOT include detected-but-unauthenticated CLIs in this list.
+3. Run the orchestrator's preflight subroutine (FR-MR20). Report the preflight summary in FR-MR20 format:
+   - `N reviewers configured, M available, K families, aggregator: <name>`
+   - **Preflight failure during init prints remediation but does NOT abort init.** The user can fix CLI auth and re-run preflight later.
+4. Create `docs/reviews/` via `mkdir -p docs/reviews/` if not already present. Surface this in the init confirmation output (e.g., `"Created docs/reviews/ for audit artifacts"`).
+
+**Option 2 — Enable later (show snippet):**
+
+Print the following commented-out YAML snippet (structure matches the `multi_model_review:` block in `defaults.yaml`) to the terminal so the user can copy it into `.synthex/config.yaml` when ready:
+
+```yaml
+# multi_model_review:
+#   enabled: true
+#   reviewers:
+#     # - codex-review-prompter      # OpenAI / Codex CLI  (codex login)
+#     # - gemini-review-prompter     # Google / gcloud     (gcloud auth login)
+#     # - ollama-review-prompter     # Local model         (ollama serve)
+#   aggregator:
+#     command: auto
+```
+
+Detected CLIs appear as commented-out reviewers in the snippet. Do NOT write any `multi_model_review` keys to `.synthex/config.yaml`.
+
+**Option 3 — Skip:**
+
+Do not write any `multi_model_review` config. The feature remains disabled (default behavior preserved per FR-MR23).
+
+#### Anti-pattern: do NOT write API keys to config
+
+Synthex is CLI-only. The config does NOT contain API keys. Auth is the responsibility of each CLI's native auth flow (`codex login`, `gcloud auth login`, `ollama serve`, etc.). Never prompt for or store API keys during init.
+
+### 5. Update .gitignore
 
 Check if `.gitignore` exists in the project root. If it does, check whether it already contains an entry for the worktrees base path (`.claude/worktrees` by default, or the value from the config file).
 
@@ -111,7 +213,7 @@ Check if `.gitignore` exists in the project root. If it does, check whether it a
 - **If `.gitignore` exists and already contains the path:** Do nothing.
 - **If `.gitignore` does not exist:** Create it with the worktrees entry above.
 
-### 5. Create Document Directories
+### 6. Create Document Directories
 
 Create the following directories if they don't already exist:
 - `docs/reqs/` — Product requirements documents
@@ -124,7 +226,7 @@ Create the following directories if they don't already exist:
 
 Do NOT create any files inside these directories — just the directories.
 
-### 6. Confirm and Guide
+### 7. Confirm and Guide
 
 Inform the user what was created and provide guidance:
 
@@ -141,6 +243,7 @@ Created:
   docs/specs/rfcs/               — Requests for Comments (RFCs)
   docs/runbooks/                 — Operational runbooks
   docs/retros/                   — Retrospective documents
+  docs/reviews/                  — Multi-model review audit artifacts (if multi-model enabled)
 
 Next steps:
   1. Review .synthex/config.yaml and customize for your project
