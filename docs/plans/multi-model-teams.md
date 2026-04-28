@@ -139,18 +139,20 @@ Per **D22**, `templates/review.md` exposes overlays as labeled prose sections (n
 
 ---
 
-## Phase 2 — Feature A: Multi-Model on /team-review (Bridge and Orchestrator Integration)
+## Phase 2 — Feature A: Multi-Model on /team-review (Bridge and Orchestrator Integration) — **COMPLETE**
 
 Wires the multi-model-review-orchestrator into `/team-review`. Depends on parent's Phase 3 (orchestrator + consolidation pipeline).
+
+**Phase 2 Status:** Complete. All 15 tasks (7–21) across Milestones 2.1, 2.2, 2.3 are done. Feature A (multi-model `/team-review` integration) is shipped.
 
 ### Milestone 2.1: Orchestrator-team bridge — pulling native findings
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 7 | Author `plugins/synthex-plus/agents/team-orchestrator-bridge.md` — Haiku-backed utility agent (per ADR-002) that exposes the FR-MMT3 step 5 bridge: read native teammate mailbox messages from `~/.claude/teams/<team-name>/inboxes/lead/<reviewer>-<timestamp>.json`, parse `findings_json.findings` per FR-MMT20 mailbox shape, validate against canonical finding schema (parent Task 1), normalize to canonical envelope with `source.source_type: "native-team"`. Implements FR-MMT20 bridge rules 1–5. **Terminology:** uses "Pool Lead" only when describing standing-pool variant; for ephemeral team variant uses "Lead". | L | Phase 1; parent Phase 3 (orchestrator); parent Task 1 | pending |
-| 8 | Add `team-orchestrator-bridge` to `plugins/synthex-plus/.claude-plugin/plugin.json` agents array. (synthex-plus's current `plugin.json` has no `agents` array; this task creates it.) **Tasks 33 and 36 extend this same array; all three additions land in coordinated PRs to avoid array-overwrite races.** | S | Task 7 | pending |
-| 9 | Author Layer 1 schema validator at `tests/schemas/team-orchestrator-bridge.ts` validating: (a) bridge input shape; (b) bridge output — array of canonical findings each with `source.source_type: "native-team"`. Vitest with inline samples. (Flat `tests/schemas/` path per Cross-Cutting Notes.) | M | Task 7; parent Task 1 | pending |
-| 10 | Author Layer 2 fixtures at `tests/fixtures/multi-model-teams/bridge/`: (a) `well-formed-mailbox/` — two reviewers each emit complete `findings_json`; bridge produces canonical envelope with both reviewers' findings; attribution preserved. (b) `malformed-findings-json/` — one reviewer's `findings_json` unparseable; bridge sends one clarification and on second failure marks contribution as `parse_failed`; second reviewer flows through. (c) `missing-findings-json/` — one reviewer's mailbox lacks `findings_json` entirely; bridge follows same one-retry-then-`parse_failed` pattern. | M | Tasks 7, 9 | pending |
+| 7 | Author `plugins/synthex-plus/agents/team-orchestrator-bridge.md` — Haiku-backed utility agent (per ADR-002) that exposes the FR-MMT3 step 5 bridge: read native teammate mailbox messages from `~/.claude/teams/<team-name>/inboxes/lead/<reviewer>-<timestamp>.json`, parse `findings_json.findings` per FR-MMT20 mailbox shape, validate against canonical finding schema (parent Task 1), normalize to canonical envelope with `source.source_type: "native-team"`. Implements FR-MMT20 bridge rules 1–5. **Terminology:** uses "Pool Lead" only when describing standing-pool variant; for ephemeral team variant uses "Lead". | L | Phase 1; parent Phase 3 (orchestrator); parent Task 1 | done |
+| 8 | Add `team-orchestrator-bridge` to `plugins/synthex-plus/.claude-plugin/plugin.json` agents array. (synthex-plus's current `plugin.json` has no `agents` array; this task creates it.) **Tasks 33 and 36 extend this same array; all three additions land in coordinated PRs to avoid array-overwrite races.** | S | Task 7 | done |
+| 9 | Author Layer 1 schema validator at `tests/schemas/team-orchestrator-bridge.ts` validating: (a) bridge input shape; (b) bridge output — array of canonical findings each with `source.source_type: "native-team"`. Vitest with inline samples. (Flat `tests/schemas/` path per Cross-Cutting Notes.) | M | Task 7; parent Task 1 | done |
+| 10 | Author Layer 2 fixtures at `tests/fixtures/multi-model-teams/bridge/`: (a) `well-formed-mailbox/` — two reviewers each emit complete `findings_json`; bridge produces canonical envelope with both reviewers' findings; attribution preserved. (b) `malformed-findings-json/` — one reviewer's `findings_json` unparseable; bridge sends one clarification and on second failure marks contribution as `parse_failed`; second reviewer flows through. (c) `missing-findings-json/` — one reviewer's mailbox lacks `findings_json` entirely; bridge follows same one-retry-then-`parse_failed` pattern. | M | Tasks 7, 9 | done |
 
 **Task 7 Acceptance Criteria:**
 - `[T]` Agent declares Haiku model (utility-layer per ADR-002)
@@ -174,19 +176,28 @@ Wires the multi-model-review-orchestrator into `/team-review`. Depends on parent
 - `[T]` Fixture (b): exactly one clarification SendMessage, second-failure marked `parse_failed`; well-formed reviewer flows through
 - `[T]` Fixture (c): missing-`findings_json` exercises identical retry-then-`parse_failed` path
 
+**Task 7 Completion Notes:** Done. Created `plugins/synthex-plus/agents/team-orchestrator-bridge.md` — Haiku-backed bridge agent implementing FR-MMT3 step 5 and FR-MMT20 bridge rules 1–5 verbatim. All [T] criteria pass. Commit `2776105`.
+
+**Task 8 Completion Notes:** Done. Added `agents: ['./agents/team-orchestrator-bridge.md']` array to `plugins/synthex-plus/.claude-plugin/plugin.json`. All tests pass. Commit `7d6ed6e`.
+
+**Task 9 Completion Notes:** Done. `tests/schemas/team-orchestrator-bridge.ts` + `team-orchestrator-bridge.test.ts` — 27 tests validating bridge input/output shapes, source_type enforcement, parse_failed error case. All [T] criteria pass.
+
+**Task 10 Completion Notes:** Done. `tests/fixtures/multi-model-teams/bridge/` — 3 scenarios: well-formed-mailbox, malformed-findings-json, missing-findings-json. 9 tests in `bridge-fixtures.test.ts`. All [T] criteria pass. Commit `3c86002`.
+
 **Parallelizable:** Tasks 7 and 9 in parallel after Phase 1 + parent's Phase 3. Tasks 8 and 10 follow.
 **Milestone Value:** Orchestrator can ingest native team findings without touching reviewer agent files.
+**Status:** Complete.
 
 ### Milestone 2.2: /team-review command — multi-model parameter, overlay composition, and orchestrator wire-up
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 11 | Update `plugins/synthex-plus/commands/team-review.md` to accept the `multi_model` parameter per FR-MMT19. Resolution chain: command parameter > `multi_model_review.per_command.team_review.enabled` > `multi_model_review.enabled` > `false`. Add a parameter table row and a workflow step. **Insertion point:** add the resolution step immediately after the existing "Load Configuration" step; name it `Resolve multi-model state` and reference it from later steps by that name (NOT by step number — current numbering is in flux). | S | Phase 1; parent Phase 6 (init must surface `multi_model_review` first) | pending |
-| 12 | Update `team-review.md` Compose-team-creation-prompt step (refer by behavioral name) with **explicit overlay-composition logic per D22**: when `multi_model: true`, the command MUST include the `### Multi-Model Conditional Overlay (apply when multi_model=true)` section from `templates/review.md` **verbatim** in BOTH the Lead's spawn prompt AND each reviewer's spawn prompt (overlay contains both sub-instructions; host model routes per role). When `multi_model: false`, overlay is omitted. **No template-rendering layer; composition is verbatim Markdown insertion.** Acceptance verifies the composed spawn-prompt blob (raw-string match), not a rendered template output. | M | Tasks 4, 11 | pending |
-| 13 | Update `team-review.md` workflow with a new sub-step (after team creation, before verification): when `multi_model: true`, instantiate the parent plan's `multi-model-review-orchestrator` agent in the host session via the Task tool. Pass: artifact (diff scope), native-reviewer list, command name = `team-review`, config override flags. Orchestrator runs in parallel with the team's review work (FR-MMT21 step 2). Document the orchestrator's run-mode: NOT spawned as a teammate; runs via Task tool from the host session (FR-MMT3 criterion 2). **Insert by behavioral position, not step number.** | M | Task 11; parent Phase 3 | pending |
-| 14 | Update `team-review.md` Consolidate step (refer by behavioral name "Consolidate") to bypass the Lead's natural consolidation when `multi_model: true`. Per FR-MMT21 step 8, Lead's role becomes "publish the orchestrator's report verbatim." After orchestrator completes (Task 13), it writes its report to `~/.claude/teams/<team-name>/inboxes/lead/orchestrator-report-<timestamp>.json`; Lead's spawn prompt (composed per Task 12 with multi-model overlay) waits for and surfaces this. | M | Tasks 4, 13 | pending |
-| 15 | Update `team-review.md` FAIL re-review loop (behavioral name "FAIL re-review loop") to invoke the orchestrator on each FAIL cycle per FR-MMT21 step 9. Each cycle re-runs both native team review AND orchestrator. Add a one-line cost-guidance comment "~2-3× per-cycle token cost vs native-only FAIL cycles" (PRD-locked language). | S | Tasks 13, 14 | pending |
-| 16 | Add multi-model-pool roster validation to `team-review.md` Read-the-review-template step (behavioral name "Read template"), per FR-MMT20 "Pool-spawn-time validation". If `multi_model: true` AND any active reviewer is outside the v1-supported set (`code-reviewer, security-reviewer, design-system-agent, performance-engineer`), abort with the verbatim FR-MMT20 error: `"Multi-model mode is not supported for reviewer '<name>' in v1. Supported reviewers for multi-model pools: code-reviewer, security-reviewer, design-system-agent, performance-engineer. Either remove this reviewer from the roster, or omit --multi-model."` **Sequenced after Task 11 to avoid same-file edit conflicts.** | S | Task 11 | pending |
+| 11 | Update `plugins/synthex-plus/commands/team-review.md` to accept the `multi_model` parameter per FR-MMT19. Resolution chain: command parameter > `multi_model_review.per_command.team_review.enabled` > `multi_model_review.enabled` > `false`. Add a parameter table row and a workflow step. **Insertion point:** add the resolution step immediately after the existing "Load Configuration" step; name it `Resolve multi-model state` and reference it from later steps by that name (NOT by step number — current numbering is in flux). | S | Phase 1; parent Phase 6 (init must surface `multi_model_review` first) | done |
+| 12 | Update `team-review.md` Compose-team-creation-prompt step (refer by behavioral name) with **explicit overlay-composition logic per D22**: when `multi_model: true`, the command MUST include the `### Multi-Model Conditional Overlay (apply when multi_model=true)` section from `templates/review.md` **verbatim** in BOTH the Lead's spawn prompt AND each reviewer's spawn prompt (overlay contains both sub-instructions; host model routes per role). When `multi_model: false`, overlay is omitted. **No template-rendering layer; composition is verbatim Markdown insertion.** Acceptance verifies the composed spawn-prompt blob (raw-string match), not a rendered template output. | M | Tasks 4, 11 | done |
+| 13 | Update `team-review.md` workflow with a new sub-step (after team creation, before verification): when `multi_model: true`, instantiate the parent plan's `multi-model-review-orchestrator` agent in the host session via the Task tool. Pass: artifact (diff scope), native-reviewer list, command name = `team-review`, config override flags. Orchestrator runs in parallel with the team's review work (FR-MMT21 step 2). Document the orchestrator's run-mode: NOT spawned as a teammate; runs via Task tool from the host session (FR-MMT3 criterion 2). **Insert by behavioral position, not step number.** | M | Task 11; parent Phase 3 | done |
+| 14 | Update `team-review.md` Consolidate step (refer by behavioral name "Consolidate") to bypass the Lead's natural consolidation when `multi_model: true`. Per FR-MMT21 step 8, Lead's role becomes "publish the orchestrator's report verbatim." After orchestrator completes (Task 13), it writes its report to `~/.claude/teams/<team-name>/inboxes/lead/orchestrator-report-<timestamp>.json`; Lead's spawn prompt (composed per Task 12 with multi-model overlay) waits for and surfaces this. | M | Tasks 4, 13 | done |
+| 15 | Update `team-review.md` FAIL re-review loop (behavioral name "FAIL re-review loop") to invoke the orchestrator on each FAIL cycle per FR-MMT21 step 9. Each cycle re-runs both native team review AND orchestrator. Add a one-line cost-guidance comment "~2-3× per-cycle token cost vs native-only FAIL cycles" (PRD-locked language). | S | Tasks 13, 14 | done |
+| 16 | Add multi-model-pool roster validation to `team-review.md` Read-the-review-template step (behavioral name "Read template"), per FR-MMT20 "Pool-spawn-time validation". If `multi_model: true` AND any active reviewer is outside the v1-supported set (`code-reviewer, security-reviewer, design-system-agent, performance-engineer`), abort with the verbatim FR-MMT20 error: `"Multi-model mode is not supported for reviewer '<name>' in v1. Supported reviewers for multi-model pools: code-reviewer, security-reviewer, design-system-agent, performance-engineer. Either remove this reviewer from the roster, or omit --multi-model."` **Sequenced after Task 11 to avoid same-file edit conflicts.** | S | Task 11 | done |
 
 **Task 11 Acceptance Criteria:**
 - `[T]` `multi_model` parameter in parameter table
@@ -222,18 +233,31 @@ Wires the multi-model-review-orchestrator into `/team-review`. Depends on parent
 - `[T]` Validation skipped when `multi_model: false`
 - `[T]` Sequenced after Task 11
 
+**Task 11 Completion Notes:** Done. Added `multi_model` parameter to parameter table and `### 1a. Resolve multi-model state` step with 4-step resolution chain to `team-review.md`. All [T] criteria pass.
+
+**Task 12 Completion Notes:** Done. Added `#### 5b-4. Multi-model overlay composition` to `team-review.md` Step 5b with verbatim inclusion of `### Multi-Model Conditional Overlay (apply when multi_model=true)` from `templates/review.md` per D22. 3488 tests pass.
+
+**Task 13 Completion Notes:** Done. Added `#### 5g. Instantiate multi-model orchestrator` to `team-review.md` — Task tool invocation (not Teammate API), FR-MMT21 step 2 parallelism verbatim, 4 required inputs. All [T] criteria pass.
+
+**Task 14 Completion Notes:** Done. Added `#### 9-pre. Multi-model consolidation bypass` to `team-review.md` Step 9 — Lead waits for orchestrator-report, produces exactly one report, native-only branch byte-identical. Commit `3c2897f`.
+
+**Task 15 Completion Notes:** Done. Added multi-model FAIL cycle re-invocation and `~2-3×` cost guidance verbatim to `team-review.md` Step 9d. All [T] criteria pass.
+
+**Task 16 Completion Notes:** Done. Added `#### 5a-validation. Multi-model reviewer roster validation` to `team-review.md` Step 5a — verbatim FR-MMT20 error for unsupported v1 reviewers, skip when multi_model=false. All [T] criteria pass.
+
 **Parallelizable:** Task 11 first; Task 16 sequences after 11 (same-file). Tasks 12, 13 sequence after 11. Tasks 14, 15 sequence after 13.
 **Milestone Value:** `/team-review --multi-model` end-to-end functional. Native-only path byte-identical to baseline.
+**Status:** Complete.
 
 ### Milestone 2.3: Feature A integration testing
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 17 | Author Layer 1 validator extension at `tests/schemas/team-review-multi-model.ts` validating: (a) **composed Lead spawn-prompt blob** contains FR-MMT4 suppression text verbatim when `multi_model: true` (Q2 — assert against the spawn-prompt blob the command produces, NOT a live teammate, NOT a "rendered template" — per D22); (b) composed reviewer spawn-prompt blobs contain FR-MMT20 envelope clause verbatim; (c) team-review output (multi-model branch) matches `## Code Review Report` shape from parent's Task 22 orchestrator-output validator. Vitest. | M | Tasks 4, 12, 14; parent Task 22 | pending |
-| 18 | Layer 2 fixture at `tests/fixtures/multi-model-teams/team-review/multi-model-enabled/`: 2 native reviewers (code-reviewer + security-reviewer) + 2 external (codex + gemini, recorded). Asserts: (a) native and external run in parallel — sequencing only per D24; wall-clock deferred to Phase 10 Task 77; (b) orchestrator pulls native findings via bridge; (c) unified report is the only consolidated output (Lead's mailbox contains exactly one); (d) report matches `## Code Review Report` with attribution split between `native-team` and `external`; (e) audit artifact includes `team_metadata` block (validates against extended schema from Phase 8 Task 61). | L | Tasks 11–16, 17 | pending |
-| 19 | Layer 2 fixture at `tests/fixtures/multi-model-teams/team-review/multi-model-disabled/`: same 2 native reviewers, multi-model disabled. Asserts: (a) byte-identical to Task 0 baseline; (b) **no** `multi-model-review-orchestrator` Task invocation in trace (FR-MMT3 criterion 8 regression); (c) Lead produces its own consolidated report; (d) **composed reviewer spawn-prompt blobs do NOT contain FR-MMT20 envelope clause** (raw-string negative match per D22). | M | Tasks 11–16, 17 | pending |
-| 20 | Layer 2 fixture at `tests/fixtures/multi-model-teams/team-review/cross-domain-enrichment/`: multi-model enabled; one reviewer sends a cross-domain mailbox message to security-reviewer mid-review. Asserts: (a) cross-domain mailbox messages still flow under multi-model (FR-MMT4 "Kept" responsibility); (b) receiving reviewer's `findings_json` reflects the cross-domain context; (c) orchestrator's input findings carry the cross-domain context already embedded (orchestrator does not separately consume them). | M | Task 18 | pending |
-| 21 | Layer 2 fixture at `tests/fixtures/multi-model-teams/team-review/fail-reviewer-roster/`: `team-review --multi-model` invoked with `quality-engineer` in roster. Asserts abort before team spawn with verbatim FR-MMT20 error message. | S | Task 16 | pending |
+| 17 | Author Layer 1 validator extension at `tests/schemas/team-review-multi-model.ts` validating: (a) **composed Lead spawn-prompt blob** contains FR-MMT4 suppression text verbatim when `multi_model: true` (Q2 — assert against the spawn-prompt blob the command produces, NOT a live teammate, NOT a "rendered template" — per D22); (b) composed reviewer spawn-prompt blobs contain FR-MMT20 envelope clause verbatim; (c) team-review output (multi-model branch) matches `## Code Review Report` shape from parent's Task 22 orchestrator-output validator. Vitest. | M | Tasks 4, 12, 14; parent Task 22 | done |
+| 18 | Layer 2 fixture at `tests/fixtures/multi-model-teams/team-review/multi-model-enabled/`: 2 native reviewers (code-reviewer + security-reviewer) + 2 external (codex + gemini, recorded). Asserts: (a) native and external run in parallel — sequencing only per D24; wall-clock deferred to Phase 10 Task 77; (b) orchestrator pulls native findings via bridge; (c) unified report is the only consolidated output (Lead's mailbox contains exactly one); (d) report matches `## Code Review Report` with attribution split between `native-team` and `external`; (e) audit artifact includes `team_metadata` block (validates against extended schema from Phase 8 Task 61). | L | Tasks 11–16, 17 | done |
+| 19 | Layer 2 fixture at `tests/fixtures/multi-model-teams/team-review/multi-model-disabled/`: same 2 native reviewers, multi-model disabled. Asserts: (a) byte-identical to Task 0 baseline; (b) **no** `multi-model-review-orchestrator` Task invocation in trace (FR-MMT3 criterion 8 regression); (c) Lead produces its own consolidated report; (d) **composed reviewer spawn-prompt blobs do NOT contain FR-MMT20 envelope clause** (raw-string negative match per D22). | M | Tasks 11–16, 17 | done |
+| 20 | Layer 2 fixture at `tests/fixtures/multi-model-teams/team-review/cross-domain-enrichment/`: multi-model enabled; one reviewer sends a cross-domain mailbox message to security-reviewer mid-review. Asserts: (a) cross-domain mailbox messages still flow under multi-model (FR-MMT4 "Kept" responsibility); (b) receiving reviewer's `findings_json` reflects the cross-domain context; (c) orchestrator's input findings carry the cross-domain context already embedded (orchestrator does not separately consume them). | M | Task 18 | done |
+| 21 | Layer 2 fixture at `tests/fixtures/multi-model-teams/team-review/fail-reviewer-roster/`: `team-review --multi-model` invoked with `quality-engineer` in roster. Asserts abort before team spawn with verbatim FR-MMT20 error message. | S | Task 16 | done |
 
 **Task 17 Acceptance Criteria:**
 - `[T]` Validator inspects **composed spawn-prompt blob** (the string the command writes when spawning Lead/reviewers) for FR-MMT4 suppression verbatim (Q2 resolution: composed-prompt-blob, not live teammate, not "rendered template")
@@ -262,8 +286,19 @@ Wires the multi-model-review-orchestrator into `/team-review`. Depends on parent
 - `[T]` Fixture aborts with verbatim FR-MMT20 error (raw-string match)
 - `[T]` No team spawned on filesystem (post-test directory check)
 
+**Task 17 Completion Notes:** Done. `tests/schemas/team-review-multi-model.ts` + `team-review-multi-model.test.ts` — 25 tests validating spawn-prompt blob assertions for FR-MMT4/FR-MMT20 verbatim text, output shape, multi-model disabled regression. All [T] criteria pass.
+
+**Task 18 Completion Notes:** Done. `tests/fixtures/multi-model-teams/team-review/multi-model-enabled/` — 8 tests: exactly one orchestrator-report in Lead mailbox, native-team+external attribution, team_metadata block, D24 sequencing. Commit `d7e96f8`.
+
+**Task 19 Completion Notes:** Done. `tests/fixtures/multi-model-teams/team-review/multi-model-disabled/` — 8 tests: FR-MMT3 criterion 8 regression (no orchestrator invocation), D22 overlay absence, Lead produces own report, baseline match. Commit `2723741`.
+
+**Task 20 Completion Notes:** Done. `tests/fixtures/multi-model-teams/team-review/cross-domain-enrichment/` — 7 tests: FR-MMT4 does not block cross-domain messages, enrichment embedded in security-reviewer's findings_json, orchestrator receives via bridge not direct message parsing.
+
+**Task 21 Completion Notes:** Done. `tests/fixtures/multi-model-teams/team-review/fail-reviewer-roster/` — 6 tests: abort before Teammate spawn for quality-engineer, verbatim FR-MMT20 error message, all four v1 reviewer names listed. Commit `e35a48f`.
+
 **Parallelizable:** Tasks 17 and 19 in parallel. Tasks 18, 20, 21 sequence after 17.
 **Milestone Value:** Feature A end-to-end verified across enabled/disabled/cross-domain/error-roster paths. `/team-review --multi-model` ships.
+**Status:** Complete.
 
 ---
 
