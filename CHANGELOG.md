@@ -5,6 +5,24 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-28
+
+### Added — Multi-model review (off by default)
+
+- **Multi-model review orchestrator** (`multi-model-review-orchestrator`): fans review prompts to multiple LLM-family proposers (OpenAI, Google, local-Ollama) via CLI adapters and consolidates findings into a single deduplicated, severity-reconciled, attributed list.
+- **CLI adapters** for v1: `codex-review-prompter` (OpenAI), `gemini-review-prompter` (Google), `ollama-review-prompter` (local). All Haiku-backed; documented per-adapter install/auth/sandbox flags.
+- **Utility agents**: `context-bundle-assembler` (single-source-of-truth context for all proposers per FR-MR28), `audit-artifact-writer` (per-invocation traceability per FR-MR24).
+- **Configuration**: new `multi_model_review:` block in `.synthex/config.yaml` (and `plugins/synthex/config/defaults.yaml`) per FR-MR5. Includes `enabled`, `strict_mode`, `min_family_diversity`, `reviewers`, `aggregator`, `consolidation`, `audit` keys plus per-command overrides.
+- **`/synthex:init`** now includes a "Configure Multi-Model Review (optional)" prompt that detects installed CLIs, runs auth checks, and surfaces 3 options (Enable with detected / Enable later snippet / Skip). Includes the FR-MR27 data-transmission warning.
+- **`/synthex:review-code`** supports multi-model review via the FR-MR21 8-step decision framework with complexity gate (FR-MR21a). Use `--multi-model` / `--no-multi-model` flags to override config.
+- **`/synthex:write-implementation-plan`** supports multi-model plan-review (no complexity gate per FR-MR22).
+- **Audit artifacts**: every multi-model invocation writes a self-contained markdown file to `docs/reviews/` with all 7 FR-MR24 sections (invocation metadata, config snapshot, preflight result, per-reviewer results split native/external, consolidated findings with attribution, aggregator trace, optional continuation event). **Add `docs/reviews/` to your `.gitignore` if you prefer not to commit review artifacts** — these files are useful for cost analysis, debugging, and threshold tuning, but are not source code.
+
+### Documentation
+
+- New `docs/specs/multi-model-review/` directory: `architecture.md`, `adapter-recipes.md`, `failure-modes.md`, `adapter-contract.md`, plus the `_shared/canonical-finding-schema.md`.
+- README and CLAUDE.md updated with multi-model agent and command references.
+
 ## [0.4.0] - 2026-04-22
 
 ### Added
@@ -186,6 +204,7 @@ First public release of the LumenAI marketplace and the Synthex plugin.
 - Golden snapshot infrastructure for regression testing
 - Promptfoo integration for behavioral and semantic evaluation
 
+[0.5.0]: https://github.com/bluminal/lumenai/releases/tag/v0.5.0
 [0.4.0]: https://github.com/bluminal/lumenai/releases/tag/v0.4.0
 [0.3.6]: https://github.com/bluminal/lumenai/releases/tag/v0.3.6
 [0.3.5]: https://github.com/bluminal/lumenai/releases/tag/v0.3.5
