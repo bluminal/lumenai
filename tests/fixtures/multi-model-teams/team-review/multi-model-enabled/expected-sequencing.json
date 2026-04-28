@@ -1,0 +1,7 @@
+{
+  "note": "D24: wall-clock parallelism deferred to Phase 10 Task 77. This fixture records sequencing only.",
+  "native_reviewers_start": "concurrent_with_external_fan_out",
+  "external_reviewers_start": "concurrent_with_native_team",
+  "orchestrator_begins_consolidation": "after_all_native_tasks_completed_AND_all_external_returned",
+  "orchestrator_report_posted": "before_lead_surfaces_output"
+}

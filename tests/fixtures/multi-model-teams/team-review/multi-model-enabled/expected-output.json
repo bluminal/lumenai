@@ -1,0 +1,56 @@
+{
+  "path_and_reason_header": "Review path: team + external multi-model (team: review-a3f7b2c1; reviewers: 2 native + 2 external)",
+  "report": "## Code Review Report\n\n### Reviewed: main..HEAD\n### Date: 2026-04-26\n\n---\n\n### Overall Verdict: FAIL\n\n| Reviewer | Verdict | Findings |\n|----------|---------|----------|\n| Craftsmanship (code-reviewer) | WARN | 1 medium |\n| Security (security-reviewer) | FAIL | 1 high |\n| Codex (codex-review-prompter) | FAIL | 1 high |\n| Gemini (gemini-review-prompter) | WARN | 1 medium |\n\n---\n\n### HIGH Findings\n\n**SQL injection risk in searchUsers** (security, raised_by: security-reviewer [native-team], codex-review-prompter [external])\n- File: src/users/repository.ts, symbol: searchUsers\n- The searchUsers function uses raw string concatenation in SQL queries.\n\n---\n\n### MEDIUM Findings\n\n**Missing null check in getUserById** (correctness, raised_by: code-reviewer [native-team])\n- File: src/users/service.ts, symbol: getUserById\n\n**Input validation gap in createUser** (security, raised_by: gemini-review-prompter [external])\n- File: src/users/service.ts, symbol: createUser\n\n---\n\n### What's Done Well\n\n- Good separation of concerns in the user service layer\n- Security-relevant operations are centralized\n\n---\n\n### Summary\n\nTwo high-confidence cross-reviewer findings: SQL injection risk confirmed by both native security reviewer and Codex. Recommend addressing HIGH findings before merge.\n",
+  "findings": [
+    {
+      "finding_id": "security.searchUsers.sql-injection",
+      "severity": "high",
+      "category": "security",
+      "title": "SQL injection risk in searchUsers",
+      "description": "The searchUsers function uses raw string concatenation in SQL queries.",
+      "file": "src/users/repository.ts",
+      "symbol": "searchUsers",
+      "raised_by": [
+        {"reviewer_id": "security-reviewer", "family": "anthropic", "source_type": "native-team"},
+        {"reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external"}
+      ],
+      "source": {"reviewer_id": "security-reviewer", "family": "anthropic", "source_type": "native-team"}
+    },
+    {
+      "finding_id": "correctness.getUserById.missing-null-check",
+      "severity": "medium",
+      "category": "correctness",
+      "title": "Missing null check in getUserById",
+      "description": "The getUserById function does not check for null before accessing user.email.",
+      "file": "src/users/service.ts",
+      "symbol": "getUserById",
+      "raised_by": [
+        {"reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team"}
+      ],
+      "source": {"reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team"}
+    },
+    {
+      "finding_id": "security.createUser.input-validation-gap",
+      "severity": "medium",
+      "category": "security",
+      "title": "Input validation gap in createUser",
+      "description": "The createUser function does not validate required fields.",
+      "file": "src/users/service.ts",
+      "symbol": "createUser",
+      "raised_by": [
+        {"reviewer_id": "gemini-review-prompter", "family": "google", "source_type": "external"}
+      ],
+      "source": {"reviewer_id": "gemini-review-prompter", "family": "google", "source_type": "external"}
+    }
+  ],
+  "audit_artifact": {
+    "command": "team-review",
+    "team_metadata": {
+      "team_name": "review-a3f7b2c1",
+      "native_reviewers": ["code-reviewer", "security-reviewer"],
+      "external_reviewers": ["codex-review-prompter", "gemini-review-prompter"],
+      "multi_model": true
+    },
+    "_note": "team_metadata block present per FR-MMT30/Task 61 — schema validation deferred to Task 61 (Phase 8)"
+  }
+}

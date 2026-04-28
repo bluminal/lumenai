@@ -1,0 +1,23 @@
+{
+  "command": "team-review",
+  "target": "main..HEAD",
+  "multi_model": true,
+  "team_name": "review-a3f7b2c1",
+  "config": {
+    "multi_model_review": {
+      "enabled": false,
+      "per_command": {
+        "team_review": {
+          "enabled": true
+        }
+      },
+      "reviewers": [
+        {"adapter": "codex-review-prompter", "model": "gpt-4o"},
+        {"adapter": "gemini-review-prompter", "model": "gemini-2.5-pro"}
+      ],
+      "include_native_reviewers": true
+    }
+  },
+  "native_reviewers": ["code-reviewer", "security-reviewer"],
+  "external_reviewers": ["codex-review-prompter", "gemini-review-prompter"]
+}

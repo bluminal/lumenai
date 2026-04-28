@@ -1,0 +1,12 @@
+{
+  "lead_mailbox_path": "~/.claude/teams/review-a3f7b2c1/inboxes/lead/",
+  "messages": [
+    {
+      "filename_pattern": "orchestrator-report-*.json",
+      "count": 1,
+      "note": "Exactly one orchestrator-report. No Lead-side consolidated-report file."
+    }
+  ],
+  "consolidated_report_from_lead": false,
+  "note": "FR-MMT4 Lead Suppression: Lead publishes orchestrator report verbatim, does not produce its own."
+}
