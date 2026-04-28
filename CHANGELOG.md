@@ -5,6 +5,53 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex-plus 0.2.0] - 2026-04-26
+
+### Added
+
+**Feature A — Multi-model `/team-review`**
+- `/synthex-plus:team-review` now accepts `--multi-model` flag (FR-MMT3/FR-MMT19). When enabled, the `multi-model-review-orchestrator` runs alongside the native team, external LLM adapters review in parallel, and findings from all sources are consolidated into a single unified report.
+- Resolution chain for `multi_model` flag: command parameter → `multi_model_review.per_command.team_review.enabled` → `multi_model_review.enabled` → `false` (off by default).
+- Lead suppression (FR-MMT4): team Lead publishes the orchestrator's consolidated report verbatim instead of producing a competing one.
+- Native reviewers emit structured JSON findings alongside their markdown reports when multi-model mode is active (FR-MMT20).
+- Multi-model FAIL re-review cycles re-run the orchestrator at each cycle (~2–3× per-cycle token cost vs native-only).
+- Roster validation: aborts before team spawn if any reviewer is outside the v1-supported set (`code-reviewer`, `security-reviewer`, `design-system-agent`, `performance-engineer`).
+
+**Feature B — Standing Review Pools**
+- Three new commands: `/synthex-plus:start-review-team`, `/synthex-plus:stop-review-team`, `/synthex-plus:list-teams`.
+- Pool state stored at `~/.claude/teams/standing/<name>/config.json`; discovery index at `~/.claude/teams/standing/index.json`.
+- `/synthex:review-code` and `/synthex:performance-audit` automatically route to running pools when `standing_pools.enabled: true` (off by default).
+- Pool lifecycle: `idle ↔ active → draining → stopping`. Graceful drain on shutdown signal; in-flight tasks complete first.
+- Multi-model pools: start with `--multi-model` to run the orchestrator alongside pool reviewers.
+- Stale-pool detection via `host_pid` check (FR-MMT22); stale pools cleaned up automatically on discovery.
+- Identity drift mitigation (FR-MMT5b): pool reviewers unconditionally re-read their agent file before each task claim.
+
+**Audit Artifact Extensions**
+- Multi-model `/team-review` audit artifacts include `team_metadata` block (team name, reviewers, multi_model flag).
+- Pool-routing commands include `pool_routing` block (pool name, routing mode, routing decision).
+- Per-finding attribution telemetry (FR-MMT30a): opt-out via `multi_model_review.audit.record_finding_attribution_telemetry: false`.
+
+**New configuration keys** (`.synthex-plus/config.yaml`):
+- `standing_pools.*` — all nine pool-config keys
+- `lifecycle.submission_timeout_seconds: 300`
+
+**New agent** (`plugins/synthex-plus/agents/`):
+- `team-orchestrator-bridge` — Haiku-backed bridge between native team mailboxes and the multi-model-review-orchestrator
+
+**New documentation**:
+- `plugins/synthex-plus/docs/standing-pools.md` — user-facing design guide
+- `docs/specs/multi-model-teams/` — normative specifications (architecture, pool-lifecycle, routing, recovery)
+
+## [0.5.1] - 2026-04-26
+
+### Changed
+
+- `/review-code` and `/performance-audit` now discover and route to standing review pools (via Synthex+) when `standing_pools.enabled: true` in `.synthex-plus/config.yaml`. Off by default — existing behavior unchanged.
+
+**New configuration key** (`.synthex/config.yaml`):
+- `multi_model_review.per_command.team_review.enabled: false` — per-command override for multi-model mode in `/team-review`
+- `multi_model_review.audit.record_finding_attribution_telemetry: true` — enable per-finding source attribution in audit artifacts
+
 ## [0.5.0] - 2026-04-28
 
 ### Added — Multi-model review (off by default)
@@ -204,6 +251,8 @@ First public release of the LumenAI marketplace and the Synthex plugin.
 - Golden snapshot infrastructure for regression testing
 - Promptfoo integration for behavioral and semantic evaluation
 
+[synthex-plus 0.2.0]: https://github.com/bluminal/lumenai/releases/tag/synthex-plus-v0.2.0
+[0.5.1]: https://github.com/bluminal/lumenai/releases/tag/v0.5.1
 [0.5.0]: https://github.com/bluminal/lumenai/releases/tag/v0.5.0
 [0.4.0]: https://github.com/bluminal/lumenai/releases/tag/v0.4.0
 [0.3.6]: https://github.com/bluminal/lumenai/releases/tag/v0.3.6
