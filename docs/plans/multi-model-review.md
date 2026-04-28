@@ -657,12 +657,14 @@ Lower-priority but planned work that ships in subsequent releases. Not required 
 ### Milestone 7.1: Stage 3 Semantic Dedup
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 54 | Resolve Q1 (Stage 3 fallback): decide between requiring `llm embed` vs. host-session embedding fallback. Document decision as a new D-row. | S | Phase 6 | in progress |
-| 55 | Implement Stage 3 between current Stages 2 and 4: cosine similarity on title+description embeddings; merge above 0.85; pairs in [0.7, 0.85) flow to existing Stage 4 LLM tiebreaker. **Replaces D18's textual pre-filter with embedding similarity** as the primary Stage 4 input gate. The D18 max-calls cap remains. | M | Task 54 | in progress |
-| 56 | Layer 2 fixture: planted semantically-similar findings (different wording, same meaning) → merged at Stage 3. | M | Task 55 | in progress |
+| 54 | Resolve Q1 (Stage 3 fallback): decide between requiring `llm embed` vs. host-session embedding fallback. Document decision as a new D-row. | S | Phase 6 | done |
+| 55 | Implement Stage 3 between current Stages 2 and 4: cosine similarity on title+description embeddings; merge above 0.85; pairs in [0.7, 0.85) flow to existing Stage 4 LLM tiebreaker. **Replaces D18's textual pre-filter with embedding similarity** as the primary Stage 4 input gate. The D18 max-calls cap remains. | M | Task 54 | done |
+| 56 | Layer 2 fixture: planted semantically-similar findings (different wording, same meaning) → merged at Stage 3. | M | Task 55 | done |
 
 **Task 54 Acceptance Criteria:**
 - `[H]` Decision documented
+
+**Task 54 Completion Notes:** Done. D23 added to Decisions table: Stage 3 embedding source falls back to host-session when `llm embed` unavailable (mirrors orchestrator's host-fallback pattern; zero install required). Q1 marked Resolved → D23. `[H]` approved during execution. Bundled commit `6a4e41a`.
 
 **Task 55 Acceptance Criteria:**
 - `[T]` Stage 3 runs between 2 and 4 in pipeline order
@@ -670,9 +672,13 @@ Lower-priority but planned work that ships in subsequent releases. Not required 
 - `[T]` Embedding source matches Q1 resolution
 - `[T]` D18 max-calls cap continues to apply at Stage 4
 
+**Task 55 Completion Notes:** Done. Stage 3 added as Step 8b-2 between Stages 2 and 4 (Phase 7 implementation). Embedding source resolution per D23. Auto-merge ≥0.85 cosine; forward to Stage 4 in [0.7, 0.85). D18 cap continues at Stage 4. Both thresholds configurable per defaults.yaml. All 4 `[T]` criteria pass. Bundled commit `6a4e41a`.
+
 **Task 56 Acceptance Criteria:**
 - `[T]` Planted semantic duplicates merge
 - `[T]` Truly distinct findings remain separate
+
+**Task 56 Completion Notes:** Done. Fixture at `tests/fixtures/multi-model-review/consolidation/stage3-semantic-dedup/`: 3 findings, planted near-semantic-dup pair (cosine 0.91 → merged), distinct security finding (cosine 0.12/0.08 → kept separate). 26 tests in `stage3-semantic-dedup-fixture.test.ts`. Both `[T]` criteria pass. Bundled commit `6a4e41a`.
 
 **Parallelizable:** Sequential.
 **Milestone Value:** Consolidation pipeline reaches full PRD scope. Reduces near-duplicate noise in consolidated reports.
@@ -680,9 +686,9 @@ Lower-priority but planned work that ships in subsequent releases. Not required 
 ### Milestone 7.2: Fast-Follow Adapters
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 57 | Author `llm-review-prompter.md` per FR-MR8 + FR-MR10. Universal escape-hatch (50+ providers via `llm` plugins). `text-only` tier. Family inferred from model-ID prefix. | M | Phase 6 | pending |
-| 58 | Author `bedrock-review-prompter.md` per FR-MR8 + FR-MR10. AWS Bedrock CLI. `text-only` tier. Family inferred from Bedrock model ID. | M | Phase 6 | pending |
-| 59 | Author `claude-review-prompter.md` per FR-MR8 + FR-MR10. Specialty adapter (use only for second Anthropic voice with different model than host session). `agentic` tier. Family `anthropic`. Doc explicitly notes "not in default-recommended set" per FR-MR10. | M | Phase 6 | pending |
+| 57 | Author `llm-review-prompter.md` per FR-MR8 + FR-MR10. Universal escape-hatch (50+ providers via `llm` plugins). `text-only` tier. Family inferred from model-ID prefix. | M | Phase 6 | in progress |
+| 58 | Author `bedrock-review-prompter.md` per FR-MR8 + FR-MR10. AWS Bedrock CLI. `text-only` tier. Family inferred from Bedrock model ID. | M | Phase 6 | in progress |
+| 59 | Author `claude-review-prompter.md` per FR-MR8 + FR-MR10. Specialty adapter (use only for second Anthropic voice with different model than host session). `agentic` tier. Family `anthropic`. Doc explicitly notes "not in default-recommended set" per FR-MR10. | M | Phase 6 | in progress |
 | 60 | Add all three to `plugin.json` (single PR). Layer 1 validator tests for each via shared validator. **NFR-MR5 verification:** each of Tasks 57–59 implemented in exactly 3 file changes (adapter `.md` + `plugin.json` entry + adapter-recipes doc entry). Any orchestrator change required during 57–59 is treated as a defect against the extensibility contract. | S | Tasks 57–59 | pending |
 
 **Task 57 Acceptance Criteria:**
