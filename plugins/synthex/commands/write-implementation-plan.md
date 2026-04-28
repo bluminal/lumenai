@@ -73,6 +73,18 @@ Check for a project configuration file at `@{config_path}`. If it exists, load t
 
 Projects can customize by running `init` to create `.synthex/config.yaml`, then editing it. They can add reviewers (e.g., a security reviewer, compliance reviewer), disable defaults that aren't relevant, adjust max review cycles, or change the minimum severity threshold. See the Project Configuration section below for full details.
 
+### Invocation Flags (FR-MR6)
+
+The command accepts two mutually exclusive flags:
+- `--multi-model` — force multi-model plan review regardless of config
+- `--no-multi-model` — force native-only plan review regardless of config
+
+Flag value overrides BOTH the master `multi_model_review.enabled` config AND the per-command `multi_model_review.per_command.write_implementation_plan.enabled` config.
+
+When neither flag is set, the resolved config determines the path. **No complexity gate is consulted (FR-MR22)** — when multi-model is enabled (by config or flag), the orchestrator runs.
+
+> **Contrast with `review-code`:** `review-code` has a complexity gate (FR-MR21a) that can skip multi-model for trivial diffs. `write-implementation-plan` has NO complexity gate — plans are always substantive enough to warrant full multi-model review when enabled. This distinction is explicit per FR-MR22.
+
 ### 2. Read and Understand Requirements
 
 Read the PRD at `@{requirements_path}` thoroughly. Understand:
@@ -126,6 +138,8 @@ Before sending the draft to expensive peer reviewers, run a fast structural audi
 5. Proceed to Step 6 with the linter-clean draft.
 
 Plan Linter runs exactly once per draft cycle. It is not re-invoked between review cycles -- by that point the structural issues are resolved and further linting adds no value.
+
+> **plan-linter (pre-review structural check) is UNAFFECTED by multi-model.** The plan-linter runs BEFORE the orchestrator (or before the native-only review path) — its sole job is structural validation of the draft plan markdown (sections present, well-formed tables, etc.). It does not consume reviewer findings and is not part of the orchestrator's reviewer set.
 
 ### 6. Peer Review Loop
 
@@ -181,9 +195,32 @@ This is the core quality mechanism. The draft plan is reviewed by specialist sub
 └─────────────────┘
 ```
 
-**Step 6a: Spawn Reviewers**
+**Step 6a: Resolve Multi-Model Branch**
 
-For each enabled reviewer in the configuration, launch a **fresh** sub-agent IN PARALLEL with:
+Determine whether multi-model plan review is active for this invocation:
+
+1. Check for `--multi-model` / `--no-multi-model` flags (see "### Invocation Flags (FR-MR6)" above). Flag value overrides config.
+2. If no flag is set, read `multi_model_review.enabled` and `multi_model_review.per_command.write_implementation_plan.enabled` from the resolved config.
+3. **No complexity gate is consulted (FR-MR22).** Unlike `review-code`, there is no "trivial plan" path — when multi-model is enabled (by config or flag), the orchestrator ALWAYS runs for plan review.
+
+<!-- native-only path: today's write-implementation-plan native reviewer logic byte-identical to baseline (FR-MR23) -->
+
+**Multi-model active → invoke orchestrator:**
+
+When multi-model is active, invoke the `multi-model-review-orchestrator` agent with:
+- `command: "write-implementation-plan"`
+- `artifact_path` = the current draft plan path
+- `native_reviewers: ["architect", "design-system-agent", "tech-lead"]` (the three native plan reviewers)
+- `config` = the resolved `multi_model_review` block (from `.synthex/config.yaml` merged onto `defaults.yaml`)
+- `per_reviewer_timeout_seconds` = from `multi_model_review.per_reviewer_timeout_seconds` config (default 180)
+
+The orchestrator fans out to the three native reviewers AND all configured external adapters in a single parallel Task batch (FR-MR12), runs the full consolidation pipeline (Stages 1, 2, 4, 5, 5b, 6), and returns a unified consolidated envelope with `findings[]` attributed by reviewer.
+
+Receive the unified consolidated envelope and pass its consolidated findings list directly to the Product Manager (Step 6d). The PM receives a single consolidated findings list with attribution — it does NOT process raw per-reviewer outputs.
+
+**Native-only active → spawn native reviewers directly:**
+
+When multi-model is NOT active (`multi_model_review.enabled: false` AND no `--multi-model` flag, OR `--no-multi-model` flag is set): run today's native-only path byte-identically (FR-MR23). For each enabled reviewer in the configuration, launch a **fresh** sub-agent IN PARALLEL with:
 - The full draft implementation plan (current version)
 - The PRD for reference
 - The reviewer's specific focus area
@@ -234,7 +271,9 @@ Each reviewer must produce feedback in this structure:
 
 **Step 6c: Consolidate Findings**
 
-Before the Product Manager reads the raw reviewer outputs, invoke the **findings-consolidator** sub-agent (Haiku-backed) with all reviewer outputs from Step 6a. The consolidator:
+**Multi-model path:** The `multi-model-review-orchestrator` has already run the full consolidation pipeline (Stages 1–6) internally. The unified consolidated envelope returned in Step 6a contains the final `findings[]` with full attribution. Pass the consolidated findings directly to the Product Manager — do NOT invoke the `findings-consolidator` again (it would be redundant). The PM receives a single consolidated findings list with attribution from all native and external reviewers, so PM's decision-and-revision flow is unchanged — it simply processes fewer, better-attributed findings.
+
+**Native-only path:** Before the Product Manager reads the raw reviewer outputs, invoke the **findings-consolidator** sub-agent (Haiku-backed) with all reviewer outputs from Step 6a. The consolidator:
 
 - Deduplicates findings that multiple reviewers raised about the same issue
 - Groups findings by plan section
@@ -246,12 +285,14 @@ Pass the consolidated findings list to the Product Manager instead of the raw re
 
 **Step 6d: Product Manager Addresses Feedback**
 
-The Product Manager receives the consolidated findings and:
+The Product Manager receives the consolidated findings (from the orchestrator envelope on the multi-model path, or from the findings-consolidator on the native-only path) and:
 1. **Must address** all CRITICAL and HIGH findings (per `review_loops.min_severity_to_address` config)
 2. **May address** MEDIUM and LOW findings at its discretion
 3. **Has final say** on requirements content — if a reviewer suggests changing *what* to build, the PM decides. But feedback on *clarity* (is this task clear enough to execute?) carries high weight.
 4. **Asks the user** for guidance when unsure how to handle feedback — especially architectural trade-offs, scope questions, or conflicting reviewer opinions
 5. Documents how each CRITICAL/HIGH finding was addressed (accepted, modified, or rejected with reasoning)
+
+**PM's decision-and-revision flow is UNCHANGED by multi-model.** The `plan-scribe` still applies edits to the plan document. Multi-model only changes who contributes findings and how they are consolidated before the PM receives them — downstream PM behavior is identical whether the findings arrived from the orchestrator or from the native-only findings-consolidator.
 
 **Step 6e: Re-review if Needed**
 
