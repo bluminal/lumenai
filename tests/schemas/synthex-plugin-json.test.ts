@@ -67,6 +67,61 @@ describe('Tasks 10/14/17: synthex plugin.json adapter registrations', () => {
   });
 });
 
+describe('Task 60: fast-follow adapter registrations', () => {
+  let parsed: any;
+  beforeAll(() => {
+    const raw = readFileSync(PLUGIN_JSON, 'utf8');
+    parsed = JSON.parse(raw);
+  });
+
+  // 1. All 3 new adapters present in agents array
+  it('agents array contains bedrock-review-prompter entry', () => {
+    expect(parsed.agents).toContain('./agents/bedrock-review-prompter.md');
+  });
+
+  it('agents array contains claude-review-prompter entry', () => {
+    expect(parsed.agents).toContain('./agents/claude-review-prompter.md');
+  });
+
+  it('agents array contains llm-review-prompter entry', () => {
+    expect(parsed.agents).toContain('./agents/llm-review-prompter.md');
+  });
+
+  // 2. All 3 new agent files exist on disk
+  it('bedrock-review-prompter.md exists on disk', () => {
+    expect(existsSync(join(AGENTS_DIR, 'bedrock-review-prompter.md'))).toBe(true);
+  });
+
+  it('claude-review-prompter.md exists on disk', () => {
+    expect(existsSync(join(AGENTS_DIR, 'claude-review-prompter.md'))).toBe(true);
+  });
+
+  it('llm-review-prompter.md exists on disk', () => {
+    expect(existsSync(join(AGENTS_DIR, 'llm-review-prompter.md'))).toBe(true);
+  });
+
+  // 3. Non-regression: existing entries still present
+  it('agents array still contains multi-model-review-orchestrator (non-regression)', () => {
+    expect(parsed.agents).toContain('./agents/multi-model-review-orchestrator.md');
+  });
+
+  it('agents array still contains context-bundle-assembler (non-regression)', () => {
+    expect(parsed.agents).toContain('./agents/context-bundle-assembler.md');
+  });
+
+  it('agents array still contains codex-review-prompter (non-regression)', () => {
+    expect(parsed.agents).toContain('./agents/codex-review-prompter.md');
+  });
+
+  it('agents array still contains gemini-review-prompter (non-regression)', () => {
+    expect(parsed.agents).toContain('./agents/gemini-review-prompter.md');
+  });
+
+  it('agents array still contains ollama-review-prompter (non-regression)', () => {
+    expect(parsed.agents).toContain('./agents/ollama-review-prompter.md');
+  });
+});
+
 describe('Task 20: orchestrator registration', () => {
   let parsed: any;
   beforeAll(() => {

@@ -119,7 +119,145 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 ---
 
-## 4. Writing a New Adapter (NFR-MR5)
+## 4. llm (Universal Escape-Hatch)
+
+### Install one-liner
+
+```bash
+pip install llm
+```
+
+Or, for isolated installation (recommended):
+
+```bash
+pipx install llm
+```
+
+### Auth setup
+
+**Per-plugin — no single global auth command.** Set API keys per provider:
+
+```bash
+llm keys set openai          # set OPENAI_API_KEY
+llm keys set anthropic       # set ANTHROPIC_API_KEY
+llm keys set mistral         # set MISTRAL_API_KEY
+```
+
+Auth is per-plugin; missing-key errors surface as `cli_failed` from `llm` itself rather than `cli_auth_failed`.
+
+### Recommended models
+
+Any model the user has installed via `llm install <plugin>`. The `llm` CLI supports 50+ providers via plugins (OpenAI, Anthropic, Google, Mistral, Cohere, Meta, and more). Install the plugin for your target provider first:
+
+```bash
+llm install llm-anthropic     # for Claude models
+llm install llm-mistral       # for Mistral/Mixtral models
+llm install llm-gemini        # for Gemini models
+```
+
+OpenAI is built-in (no separate install needed).
+
+### Sandbox flags
+
+**N/A — `llm` is a stateless CLI; no filesystem access beyond reading the prompt from stdin or argument.** Per FR-MR26, sandbox flags are not applicable. The `llm` CLI operates as a stateless subprocess: reads prompt, calls provider API, writes response to stdout. No filesystem reads or writes beyond stdin/stdout.
+
+### Known gotchas
+
+1. **Plugin per provider:** The `llm` CLI requires a separate plugin install for most providers: `llm install llm-anthropic`, `llm install llm-mistral`, etc. Missing plugin → `cli_failed`.
+2. **`-s` flag varies by version:** Newer `llm` versions support system prompts via `-s`; older versions require `--system`. If `-s` causes an "unrecognized option" error, fall back to `--system`.
+3. **No native sandbox:** `llm` runs as a user process with no filesystem access beyond stdin/stdout. Sandbox flags do not apply (FR-MR26 N/A).
+4. **Usage reporting is plugin-dependent:** Not all `llm` provider plugins report token counts. When usage is unavailable, set `usage: null` in the canonical envelope per NFR-MR4.
+
+---
+
+## 5. Bedrock (AWS)
+
+### Install one-liner
+
+```bash
+pip install awscli
+```
+
+On macOS with Homebrew:
+
+```bash
+brew install awscli
+```
+
+After installation, configure credentials:
+
+```bash
+aws configure
+```
+
+### Auth setup
+
+```bash
+aws sts get-caller-identity
+```
+
+Returns `{"Account": "...", "UserId": "...", "Arn": "..."}` when credentials are valid. Credentials can be configured via environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`), `~/.aws/credentials`, IAM role, or AWS SSO.
+
+### Recommended flagship model
+
+`anthropic.claude-3-opus-20240229-v1:0` (as of 2026-04). Set via `multi_model_review.per_reviewer.bedrock-review-prompter.model`.
+
+### Sandbox flags
+
+**N/A — the `aws` CLI runs as the configured OS user using AWS credentials (env vars, `~/.aws/credentials`, or IAM role). No subprocess sandboxing to configure.** Per FR-MR26, authorization is handled entirely through AWS IAM and credential resolution.
+
+### Known gotchas
+
+1. **Per-family request body shape:** Bedrock requires different JSON request bodies per model family. Anthropic uses `messages` + `anthropic_version`; Meta uses `prompt` string; Cohere uses `message` + `chat_history`. Passing the wrong request shape returns HTTP 400 (`ValidationException`).
+2. **Region must be set:** `aws bedrock-runtime` requires a region. Set `AWS_REGION` (or `AWS_DEFAULT_REGION`) to a supported region (e.g., `us-east-1`, `us-west-2`).
+3. **Model access opt-in required:** AWS Bedrock requires explicit model-access opt-in in the AWS console before the API will work. Navigate to AWS console → Amazon Bedrock → Model access → enable the desired model. A 403 `AccessDeniedException` is treated as `cli_auth_failed`.
+4. **`/tmp` output file cleanup:** The AWS CLI writes Bedrock's response to a local file (`/tmp/bedrock-output-<uuid>.json`). The adapter MUST delete it after reading to avoid leaking potentially sensitive output.
+
+---
+
+## 6. Claude (Specialty Anthropic Second-Voice)
+
+> ⚠️ **NOT in the default-recommended set per FR-MR10.** This is a SPECIALTY adapter intended only for deliberate second-Anthropic-voice scenarios (e.g., host is Sonnet, adapter targets Opus). Adding it alongside a host Anthropic session reduces family-diversity score. Must be opted in explicitly.
+
+### Install one-liner
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+### Auth setup
+
+```bash
+claude auth status
+```
+
+Verify authentication status. Because this adapter shares the same credential store as the host Claude Code session, re-authentication is typically not required when running as a sub-agent within an existing Claude Code session.
+
+### Recommended flagship model
+
+Any Anthropic model DIFFERENT from the host session model (e.g., if host is `claude-sonnet-4-6`, target `claude-opus-4-5`). Set via `multi_model_review.per_reviewer.claude-review-prompter.model`. Using the same model as the host provides no diversity benefit.
+
+### Sandbox flags (FR-MR26)
+
+```bash
+--permission-mode acceptEdits --tools ""
+```
+
+- `--permission-mode acceptEdits` — restricts autonomous operations to file edits only (no shell execution)
+- `--tools ""` — disables all built-in tools (Bash, file read/write), forcing text-only response
+
+This is the Claude CLI's equivalent of Codex's `--sandbox read-only --approval-mode never`. Semantic intent is identical; flag names differ.
+
+### Known gotchas
+
+1. **Self-preference risk:** When the host session is also Anthropic, this adapter adds to the Anthropic count without adding family diversity. The orchestrator's preflight emits a self-preference warning (FR-MR15) when applicable.
+2. **Model must differ from host:** If the same model is configured for both host and adapter, the adapter runs but provides no diversity benefit — it is a misconfiguration. The orchestrator's preflight diversity check is the enforcement point.
+3. **Auth shared with host:** `claude` uses the same credential store as the Claude Code session. A non-zero `claude auth status` exit is only a genuine auth failure when running outside an established session context.
+4. **Sandbox flag variance from Codex:** Claude CLI does not expose `--sandbox read-only` or `--approval-mode never`. The equivalent is `--permission-mode acceptEdits --tools ""`. Verify against `claude --help` when upgrading the Claude CLI.
+
+---
+
+## 7. Writing a New Adapter (NFR-MR5)
 
 Per NFR-MR5, new adapters are added by authoring **a single new agent markdown file** under `plugins/synthex/agents/<name>-review-prompter.md`. NO orchestrator code changes required.
 

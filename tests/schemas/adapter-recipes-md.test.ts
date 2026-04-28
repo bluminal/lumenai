@@ -215,7 +215,7 @@ describe('Task 50: adapter-recipes.md', () => {
     let newAdapterSection: string;
 
     beforeAll(() => {
-      const parts = content.split('## 4. Writing a New Adapter');
+      const parts = content.split('## 7. Writing a New Adapter');
       newAdapterSection = parts[1] ?? '';
     });
 
