@@ -132,6 +132,10 @@
 ```
 Missing required `source` field — INVALID.
 
+### `native-recovery` source_type (FR-MMT24)
+
+The `native-recovery` value applies when a multi-model team's reviewer sub-agent fails (timeout, sub-agent error) and the FR-MMT24 fallback path spawns a fresh native sub-agent to replace it. The replacement finding carries `source_type: "native-recovery"` to distinguish it from the original `native-team` findings — useful for audit-artifact attribution and post-hoc reliability analysis.
+
 ## Used by
 
 - Task 7 (context-bundle.ts schema validator — references finding shape)
