@@ -534,9 +534,9 @@ Adds multi-model review to the plan-review step. Reuses orchestrator from Phase 
 ### Milestone 5.1: write-implementation-plan Command Update
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 42 | Update `plugins/synthex/commands/write-implementation-plan.md` plan-review step: when multi-model is active, invoke `multi-model-review-orchestrator` with native sub-agents (Architect + `design-system-agent` + Tech Lead) AND external adapters in single parallel batch. PM agent receives consolidated findings in unchanged shape. **Note:** Task can begin after Phase 3; does not strictly require Phase 4. Coordinate with Phase 4 owners on Task 39 (Milestone 4.0) ownership when Phases 4 and 5 ship simultaneously. | L | Phase 3 (orchestrator), Milestone 4.0 (audit writer) | pending |
-| 43 | Add `--multi-model` / `--no-multi-model` invocation flags per FR-MR6. | S | Task 42 | pending |
-| 44 | Document that `plan-linter` (pre-review structural check) is unaffected — runs before orchestrator as today. | S | Task 42 | pending |
+| 42 | Update `plugins/synthex/commands/write-implementation-plan.md` plan-review step: when multi-model is active, invoke `multi-model-review-orchestrator` with native sub-agents (Architect + `design-system-agent` + Tech Lead) AND external adapters in single parallel batch. PM agent receives consolidated findings in unchanged shape. **Note:** Task can begin after Phase 3; does not strictly require Phase 4. Coordinate with Phase 4 owners on Task 39 (Milestone 4.0) ownership when Phases 4 and 5 ship simultaneously. | L | Phase 3 (orchestrator), Milestone 4.0 (audit writer) | in progress |
+| 43 | Add `--multi-model` / `--no-multi-model` invocation flags per FR-MR6. | S | Task 42 | in progress |
+| 44 | Document that `plan-linter` (pre-review structural check) is unaffected — runs before orchestrator as today. | S | Task 42 | in progress |
 | 45 | Layer 2 fixture at `tests/fixtures/multi-model-review/write-implementation-plan/`: (a) draft plan + multi-model enabled → orchestrator invoked, native + external in one batch, PM receives consolidated findings; (b) multi-model disabled → byte-identical to the **redacted** Task 0 baseline (FR-MR23 regression). | L | Tasks 42–44, Task 0 | pending |
 | 46 | Audit-artifact writer (Task 39, command-agnostic) reused; add Layer 2 assertion that audit file is written for write-implementation-plan invocations with the FR-MR24 file-naming pattern. | S | Task 45, Milestone 4.0 | pending |
 
