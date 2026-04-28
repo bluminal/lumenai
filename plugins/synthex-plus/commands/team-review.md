@@ -11,6 +11,7 @@ Unlike `review-code` which spawns isolated subagent reviewers that cannot commun
 | `target` | File paths, directory, or git diff range to review | staged changes | No |
 | `template` | Team composition template to use | Value from config `teams.default_review_template`, falling back to `review` | No |
 | `config_path` | Path to Synthex+ configuration | `.synthex-plus/config.yaml` | No |
+| `multi_model` | Enable multi-model review: run the `multi-model-review-orchestrator` alongside the native team per FR-MMT3/FR-MMT19. Overrides config when explicitly set. | Resolved via `Resolve multi-model state` chain (see Workflow) | No |
 
 **Config resolution order:** command parameter > project config (`{config_path}`) > plugin defaults (`config/defaults.yaml`) > hardcoded fallback.
 
@@ -25,6 +26,21 @@ Extract the following values for use in subsequent steps:
 - `cost_guidance.*` -- cost estimation constants
 - `review_loops.*` -- review cycle limits (max_cycles, min_severity_to_address)
 - `documents.specs` -- specification paths for reviewer context
+
+After configuration is loaded, resolve multi-model state per the `Resolve multi-model state` step before proceeding.
+
+### 1a. Resolve multi-model state
+
+Resolve the `multi_model` flag using the following resolution chain (highest priority first):
+
+1. **Command parameter** — if `multi_model` was passed explicitly (e.g., `--multi-model` flag or `multi_model=true/false`), use that value. This overrides all config settings.
+2. **Per-command config** — if no command parameter, read `multi_model_review.per_command.team_review.enabled` from the resolved config (`.synthex/config.yaml` merged onto `plugins/synthex/config/defaults.yaml`).
+3. **Global config** — if the per-command key is absent or null, fall back to `multi_model_review.enabled`.
+4. **Default** — if neither config key is set, resolve to `false`.
+
+Store the resolved boolean as `multi_model_active`. Subsequent steps reference this as the "Resolve multi-model state" result.
+
+When `multi_model_active` is `true`, subsequent steps apply the multi-model overlays per FR-MMT3/FR-MMT4/FR-MMT20. When `false`, behavior is byte-identical to today's `/team-review` (no orchestrator spawned, no overlay composed).
 
 ### 2. Determine Review Scope
 
