@@ -1,0 +1,47 @@
+{
+  "scenario": "minority-of-one-non-security-demoted",
+  "description": "A finding raised by only one reviewer (minority-of-one) in the correctness category. Stage 6 applies the standard demotion: severity is lowered one level from high to medium.",
+  "consolidated_findings": [
+    {
+      "finding_id": "correctness.calculateDiscount.off-by-one-boundary",
+      "severity": "high",
+      "category": "correctness",
+      "title": "Off-by-one boundary error in discount calculation",
+      "description": "The calculateDiscount function uses > instead of >= for the tier boundary comparison at line 34, causing customers at the exact tier threshold to receive the wrong discount tier.",
+      "file": "src/pricing/calculateDiscount.ts",
+      "symbol": "calculateDiscount",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        { "reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team" }
+      ]
+    }
+  ],
+  "config": {
+    "stage6_minority_of_one_demotion_enabled": true,
+    "stage6_security_exemption": true,
+    "stage2_jaccard_threshold": 0.8,
+    "stage4_max_calls_per_consolidation": 25
+  },
+  "expected_stage6_output": {
+    "severity": "medium",
+    "severity_demoted": true,
+    "original_severity": "high",
+    "demoted_from": "high",
+    "demoted_to": "medium",
+    "demotion_reason": "minority_of_one_non_security",
+    "exemption_applied": null,
+    "minority_of_one": true
+  },
+  "notes": {
+    "minority_of_one_detected": "raised_by has exactly 1 entry → minority-of-one rule applies",
+    "no_security_exemption": "category=correctness (not security) → no exemption applies → demotion proceeds",
+    "demotion_amount": "one level down: high → medium (severity ranking: critical=4, high=3, medium=2, low=1)",
+    "low_stays_low": "If original severity were low, it remains low (cannot demote below low)"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "scenario": "severity-two-level-diff",
+  "description": "One consolidated finding raised by 2 reviewers with a two-level severity disagreement (critical vs low). Stage 5 triggers the judge step which produces a verdict with reasoning.",
+  "consolidated_findings": [
+    {
+      "finding_id": "security.processPayment.unvalidated-amount",
+      "severity": "critical",
+      "category": "security",
+      "title": "Payment amount not validated before processing",
+      "description": "The processPayment function passes the caller-supplied amount to the payment gateway without bounds or sign validation, enabling negative-amount exploits.",
+      "file": "src/payments/processPayment.ts",
+      "symbol": "processPayment",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        { "reviewer_id": "security-reviewer", "family": "anthropic", "source_type": "native-team" },
+        { "reviewer_id": "gemini-review-prompter", "family": "google", "source_type": "external" }
+      ],
+      "per_reviewer_severities": [
+        { "reviewer_id": "security-reviewer", "severity": "critical" },
+        { "reviewer_id": "gemini-review-prompter", "severity": "low" }
+      ]
+    }
+  ],
+  "config": {
+    "stage5_two_level_gap_threshold": 2,
+    "stage2_jaccard_threshold": 0.8,
+    "stage4_max_calls_per_consolidation": 25
+  },
+  "stage5_simulated_judge_verdict": {
+    "verdict_severity": "medium",
+    "reasoning": "The security-reviewer rates this critical due to the direct financial exploit vector, while gemini-review-prompter rates it low citing existing rate-limiting controls downstream. Given that amount validation is a basic input hygiene requirement and the exploit path — while mitigated in part by rate limiting — remains exploitable in bulk or in test environments, a medium severity is appropriate: the issue warrants fixing but is not imminently critical given the downstream controls."
+  },
+  "expected_stage5_output": {
+    "severity": "medium",
+    "severity_range": { "min": "low", "max": "critical" },
+    "severity_reasoning": "The security-reviewer rates this critical due to the direct financial exploit vector, while gemini-review-prompter rates it low citing existing rate-limiting controls downstream. Given that amount validation is a basic input hygiene requirement and the exploit path — while mitigated in part by rate limiting — remains exploitable in bulk or in test environments, a medium severity is appropriate: the issue warrants fixing but is not imminently critical given the downstream controls.",
+    "judge_step_triggered": true
+  },
+  "notes": {
+    "gap_explanation": "critical=4, low=1 → gap of 3 levels. Threshold is 2, so judge step IS triggered.",
+    "judge_verdict": "Judge selects medium as the reconciled severity with full CoT reasoning.",
+    "range_population": "severity_range always populated with full raw spread: {min: low, max: critical}",
+    "reasoning_non_empty": "severity_reasoning must be a non-empty string when judge step fires"
+  }
+}

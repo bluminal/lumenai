@@ -1,0 +1,186 @@
+{
+  "scenario": "contradiction-29a-boundary",
+  "description": "Boundary check for Task 29a contradiction scanner. Three groups of findings test: (1) same file + same symbol → candidate, (2) same file + no symbol + ranges within 5 lines → candidate, (3) same file + no symbol + ranges 7 lines apart → NOT a candidate.",
+  "consolidated_findings": [
+    {
+      "finding_id": "security.authenticateUser.session-not-invalidated",
+      "severity": "high",
+      "category": "security",
+      "title": "Session not invalidated on password change",
+      "description": "When a user changes their password, existing sessions are not invalidated, leaving potentially compromised sessions active.",
+      "file": "src/auth/authenticateUser.ts",
+      "symbol": "authenticateUser",
+      "line_range": { "start": 30, "end": 38 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        { "reviewer_id": "security-reviewer", "family": "anthropic", "source_type": "native-team" }
+      ]
+    },
+    {
+      "finding_id": "security.authenticateUser.sessions-cleared-on-pw-change",
+      "severity": "low",
+      "category": "security",
+      "title": "Sessions correctly cleared on password change",
+      "description": "The authenticateUser function does invalidate sessions on password change via the session manager — this is handled correctly.",
+      "file": "src/auth/authenticateUser.ts",
+      "symbol": "authenticateUser",
+      "line_range": { "start": 30, "end": 40 },
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      },
+      "raised_by": [
+        { "reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external" }
+      ]
+    },
+    {
+      "finding_id": "correctness.parseConfig.missing-default-value",
+      "severity": "medium",
+      "category": "correctness",
+      "title": "Missing default for optional config key",
+      "description": "parseConfig does not set a default for the 'timeout' key, causing a TypeError when config file omits it.",
+      "file": "src/config/parseConfig.ts",
+      "symbol": null,
+      "line_range": { "start": 45, "end": 50 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        { "reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team" }
+      ]
+    },
+    {
+      "finding_id": "correctness.parseconfig.timeout-has-fallback",
+      "severity": "low",
+      "category": "correctness",
+      "title": "Timeout config key has fallback in parseConfig",
+      "description": "parseConfig applies a default timeout value via nullish coalescing — the TypeError concern is not present.",
+      "file": "src/config/parseConfig.ts",
+      "symbol": null,
+      "line_range": { "start": 48, "end": 53 },
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      },
+      "raised_by": [
+        { "reviewer_id": "gemini-review-prompter", "family": "google", "source_type": "external" }
+      ]
+    },
+    {
+      "finding_id": "performance.parseconfig.regex-compiled-in-loop",
+      "severity": "medium",
+      "category": "performance",
+      "title": "Regex compiled on every parseConfig invocation",
+      "description": "A validation regex is compiled inside parseConfig's main loop, wasting CPU on repeated compilations.",
+      "file": "src/config/parseConfig.ts",
+      "symbol": null,
+      "line_range": { "start": 10, "end": 18 },
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        { "reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team" }
+      ]
+    },
+    {
+      "finding_id": "performance.parseconfig.no-repeated-regex",
+      "severity": "low",
+      "category": "performance",
+      "title": "No repeated regex compilation observed in parseConfig",
+      "description": "Inspection shows the regex is cached in a module-level constant, not re-compiled per invocation.",
+      "file": "src/config/parseConfig.ts",
+      "symbol": null,
+      "line_range": { "start": 60, "end": 68 },
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      },
+      "raised_by": [
+        { "reviewer_id": "gemini-review-prompter", "family": "google", "source_type": "external" }
+      ]
+    }
+  ],
+  "config": {
+    "stage5b_proximity_line_threshold": 5,
+    "stage2_jaccard_threshold": 0.8,
+    "stage4_max_calls_per_consolidation": 25
+  },
+  "finding_groups": {
+    "group_F1_F2": {
+      "description": "Same file + same symbol → contradiction candidate",
+      "finding_ids": [
+        "security.authenticateUser.session-not-invalidated",
+        "security.authenticateUser.sessions-cleared-on-pw-change"
+      ],
+      "detection_basis": "same_file_same_symbol",
+      "expected_candidate": true
+    },
+    "group_F3_F4": {
+      "description": "Same file + no symbol + line ranges within 5 lines apart → contradiction candidate",
+      "finding_ids": [
+        "correctness.parseConfig.missing-default-value",
+        "correctness.parseconfig.timeout-has-fallback"
+      ],
+      "detection_basis": "same_file_no_symbol_proximity",
+      "proximity_calculation": "F3 end=50, F4 start=48 → overlap; min distance=0 <= 5 threshold",
+      "expected_candidate": true
+    },
+    "group_F5_F6": {
+      "description": "Same file + no symbol + line ranges 7 lines apart → NOT a contradiction candidate (boundary)",
+      "finding_ids": [
+        "performance.parseconfig.regex-compiled-in-loop",
+        "performance.parseconfig.no-repeated-regex"
+      ],
+      "detection_basis": "same_file_no_symbol_proximity",
+      "proximity_calculation": "F5 end=18, F6 start=60 → gap of 42 lines; 42 > 5 threshold → NOT a candidate",
+      "expected_candidate": false
+    }
+  },
+  "expected_stage5b_29a_output": {
+    "contradiction_candidate_pairs": [
+      {
+        "finding_a_id": "security.authenticateUser.session-not-invalidated",
+        "finding_b_id": "security.authenticateUser.sessions-cleared-on-pw-change",
+        "detection_reason": "same_file_same_symbol"
+      },
+      {
+        "finding_a_id": "correctness.parseConfig.missing-default-value",
+        "finding_b_id": "correctness.parseconfig.timeout-has-fallback",
+        "detection_reason": "same_file_no_symbol_proximity"
+      }
+    ],
+    "non_candidate_pairs": [
+      {
+        "finding_a_id": "performance.parseconfig.regex-compiled-in-loop",
+        "finding_b_id": "performance.parseconfig.no-repeated-regex",
+        "reason_excluded": "same_file_no_symbol_distance_exceeds_threshold",
+        "calculated_distance": 42,
+        "threshold": 5
+      }
+    ],
+    "total_candidate_pairs": 2
+  },
+  "notes": {
+    "boundary_rule": "For no-symbol findings in the same file: proximity is checked using min distance between line ranges. Distance = max(0, start_B - end_A, start_A - end_B). If distance <= threshold (5), it's a candidate.",
+    "F3_F4_proximity": "F3 range [45,50], F4 range [48,53] → they overlap (start_F4=48 < end_F3=50), so distance=0 → candidate",
+    "F5_F6_distance": "F5 range [10,18], F6 range [60,68] → distance = 60 - 18 = 42 > 5 → NOT a candidate",
+    "same_symbol_always_candidate": "Same file + same non-null symbol is ALWAYS a candidate regardless of line range distance"
+  }
+}

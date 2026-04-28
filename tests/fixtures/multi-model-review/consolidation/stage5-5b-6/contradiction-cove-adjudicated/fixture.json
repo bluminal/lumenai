@@ -1,0 +1,86 @@
+{
+  "scenario": "contradiction-cove-adjudicated",
+  "description": "Two findings in the same file + same symbol make mutually incompatible claims about password storage. Task 29a detects the contradiction pair; Task 29b CoVe adjudicates, picking Finding A as the winner. Finding B is marked superseded but remains visible in output.",
+  "consolidated_findings": [
+    {
+      "finding_id": "security.storeCredentials.uses-bcrypt",
+      "severity": "low",
+      "category": "security",
+      "title": "Credential storage uses bcrypt correctly",
+      "description": "The storeCredentials function hashes passwords with bcrypt (cost factor 12) before persisting to the database — this is correct and follows best practice.",
+      "file": "src/auth/storeCredentials.ts",
+      "symbol": "storeCredentials",
+      "line_range": { "start": 14, "end": 22 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        { "reviewer_id": "security-reviewer", "family": "anthropic", "source_type": "native-team" }
+      ]
+    },
+    {
+      "finding_id": "security.storeCredentials.plaintext-password",
+      "severity": "critical",
+      "category": "security",
+      "title": "Passwords stored in plaintext",
+      "description": "The storeCredentials function writes the raw password string directly to the users table without hashing, exposing all credentials on any database leak.",
+      "file": "src/auth/storeCredentials.ts",
+      "symbol": "storeCredentials",
+      "line_range": { "start": 14, "end": 22 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      },
+      "raised_by": [
+        { "reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external" }
+      ]
+    }
+  ],
+  "config": {
+    "stage5b_proximity_line_threshold": 5,
+    "stage2_jaccard_threshold": 0.8,
+    "stage4_max_calls_per_consolidation": 25
+  },
+  "stage5b_29a_detection": {
+    "contradiction_pairs_found": [
+      {
+        "finding_a_id": "security.storeCredentials.uses-bcrypt",
+        "finding_b_id": "security.storeCredentials.plaintext-password",
+        "detection_reason": "same_file_same_symbol",
+        "incompatible_claims": [
+          "Finding A claims: uses bcrypt correctly",
+          "Finding B claims: stores plaintext password"
+        ]
+      }
+    ]
+  },
+  "stage5b_29b_cove_adjudication": {
+    "winner_finding_id": "security.storeCredentials.uses-bcrypt",
+    "loser_finding_id": "security.storeCredentials.plaintext-password",
+    "cove_reasoning": "Code verification shows a bcrypt.hash() call at line 17 of storeCredentials.ts with cost factor 12. Finding A ('uses bcrypt correctly') is consistent with the code; Finding B ('stores plaintext password') contradicts the actual implementation. Finding A is the accurate finding."
+  },
+  "expected_stage5b_output": {
+    "findings_count": 2,
+    "winner": {
+      "finding_id": "security.storeCredentials.uses-bcrypt",
+      "superseded_by_verification": false,
+      "verification_reasoning": null
+    },
+    "loser": {
+      "finding_id": "security.storeCredentials.plaintext-password",
+      "superseded_by_verification": true,
+      "verification_reasoning": "Code verification shows a bcrypt.hash() call at line 17 of storeCredentials.ts with cost factor 12. Finding A ('uses bcrypt correctly') is consistent with the code; Finding B ('stores plaintext password') contradicts the actual implementation. Finding A is the accurate finding."
+    }
+  },
+  "notes": {
+    "both_visible": "BOTH findings remain in the output array — loser is marked superseded_by_verification=true but NOT removed",
+    "winner_unchanged": "Winner finding is unmodified; superseded_by_verification remains false (or absent)",
+    "loser_marked": "Loser gets superseded_by_verification=true AND verification_reasoning populated with CoVe rationale",
+    "detection_basis": "Same file + same symbol → automatic contradiction candidate per 29a rules"
+  }
+}

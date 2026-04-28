@@ -1,0 +1,119 @@
+{
+  "scenario": "external-aggregator-judge-mode",
+  "description": "When aggregator.command resolves to an external adapter (codex-review-prompter), the orchestrator packages the judge-mode system prompt into the adapter Task call's config.judge_mode_prompt field. This fixture records the Task call payload for assertion.",
+  "orchestrator_input": {
+    "command": "review-code",
+    "artifact_path": "src/payments/checkoutFlow.ts",
+    "native_reviewers": ["code-reviewer", "security-reviewer"],
+    "config": {
+      "multi_model_review": {
+        "aggregator": {
+          "command": "codex-review-prompter"
+        },
+        "reviewers": [
+          { "adapter": "codex-review-prompter", "model": "gpt-5", "family": "openai" }
+        ],
+        "include_native_reviewers": true,
+        "min_family_diversity": 2,
+        "min_proposers_to_proceed": 2
+      }
+    }
+  },
+  "consolidated_findings_ready_for_aggregation": [
+    {
+      "finding_id": "security.checkoutflow.missing-idempotency-key",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing idempotency key on payment creation",
+      "description": "createPayment does not send an idempotency key, risking duplicate charges on network retries.",
+      "file": "src/payments/checkoutFlow.ts",
+      "symbol": "checkoutFlow",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        { "reviewer_id": "security-reviewer", "family": "anthropic", "source_type": "native-team" }
+      ]
+    },
+    {
+      "finding_id": "correctness.checkoutflow.cart-not-validated",
+      "severity": "medium",
+      "category": "correctness",
+      "title": "Cart contents not re-validated before payment",
+      "description": "Prices are read from the client cart without server-side re-validation, enabling price manipulation.",
+      "file": "src/payments/checkoutFlow.ts",
+      "symbol": "checkoutFlow",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        { "reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team" },
+        { "reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external" }
+      ]
+    },
+    {
+      "finding_id": "performance.checkoutflow.n-plus-one-inventory-check",
+      "severity": "medium",
+      "category": "performance",
+      "title": "N+1 inventory check in checkout loop",
+      "description": "A separate DB query is issued per line item to verify stock, causing N+1 query behavior for large carts.",
+      "file": "src/payments/checkoutFlow.ts",
+      "symbol": "checkoutFlow",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      },
+      "raised_by": [
+        { "reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external" }
+      ]
+    },
+    {
+      "finding_id": "correctness.checkoutflow.no-rollback-on-partial-failure",
+      "severity": "high",
+      "category": "correctness",
+      "title": "No transaction rollback on partial payment failure",
+      "description": "If the payment gateway call succeeds but the order record creation fails, the charge is taken without an order record, leaving the customer in a bad state.",
+      "file": "src/payments/checkoutFlow.ts",
+      "symbol": "checkoutFlow",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        { "reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team" }
+      ]
+    }
+  ],
+  "aggregator_resolution": {
+    "name": "codex-review-prompter",
+    "source": "configured"
+  },
+  "expected_assertions": {
+    "recorded_task_call_file": "recorded-task-call.json",
+    "judge_mode_prompt_present": true,
+    "judge_mode_prompt_non_empty": true,
+    "judge_mode_prompt_in_config": true,
+    "judge_mode_prompt_exact_text": "You are acting as an impartial judge consolidating findings from multiple reviewers. Evaluate each finding on its merits, free of attribution bias. Position randomization has been applied to the input.",
+    "orchestrator_md_documents_judge_mode_prompt": true
+  },
+  "notes": {
+    "external_path": "When aggregator.command is a concrete adapter name (codex-review-prompter), orchestrator uses the external-aggregator path (Step 8g)",
+    "prompt_location": "judge_mode_prompt is injected into config object of the adapter Task call envelope",
+    "adapter_responsibility": "The adapter (codex-review-prompter) is responsible for surfacing this prompt to the underlying CLI as a system message",
+    "raw_string_match": "Test asserts exact judge_mode_prompt text matches orchestrator.md documentation"
+  }
+}
