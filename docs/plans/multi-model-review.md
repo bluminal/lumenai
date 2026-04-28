@@ -363,17 +363,19 @@ The orchestrator agent and the consolidation pipeline stages that ship in v1 (St
 ### Milestone 3.3: Severity Reconciliation, Contradiction Detection, Minority-of-One
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 28 | Add Stage 5 severity reconciliation (FR-MR14a): unanimous → use; one-level diff → max + record range; two-or-more diff → CoT judge step with reasoning recorded. Per-reviewer severities preserved in output. | M | Milestone 3.1 (Task 22), Milestone 3.2 | in progress |
-| 29a | **Contradiction scanner.** Add the contradiction-detection scan (FR-MR14): scan dedup'd findings for mutually incompatible claims at the same location. **"Same location":** same `file` AND same `symbol`, OR (when symbol is null) same `file` AND finding ranges overlap or are within 5 lines. Output: list of candidate contradiction pairs flagged for adjudication. | M | Task 28 | in progress |
-| 29b | **CoVe adjudicator.** For each candidate pair from 29a, run Chain-of-Verification per [arXiv:2309.11495]: re-read artifact independently, answer the underlying question, mark loser as `superseded_by_verification`. Output schema change: findings carry `superseded_by_verification: true|false` and a `verification_reasoning` field. | M | Task 29a | in progress |
-| 30 | Add minority-of-one demotion (FR-MR14b): single-reviewer findings demoted one severity level UNLESS category is `security` OR reviewer flagged high confidence. Never dropped. | S | Task 28 | in progress |
-| 31 | Add aggregator bias-mitigation (FR-MR15): position-randomization across per-reviewer findings before aggregation; judge-mode system prompt embedded in orchestrator's reasoning prompt for inline-aggregator path; **when `aggregator.command` resolves to an external adapter (per D17), the judge-mode system prompt is packaged into the adapter invocation, not assumed inline**; self-preference warning cross-referenced from preflight. | M | Tasks 28–30 | in progress |
-| 32 | Layer 2 fixtures at `tests/fixtures/multi-model-review/consolidation/`: (a) one-level severity disagreement → max + range; (b) two-level → judge step with reasoning; (c) planted contradiction pair detected by 29a + CoVe (29b) selects winner; (c2) **separate fixture for 29a alone**: planted contradiction at "same file + same symbol" detected; planted near-contradiction at "same file, 7 lines apart" NOT detected (boundary check); (d) minority-of-one security → not demoted; (e) minority-of-one non-security → demoted; (f) **external aggregator** fixture: `aggregator.command: codex-review-prompter`, asserts judge-mode prompt is packaged into the codex Task call (raw-string match in recorded prompt). | L | Tasks 28–31 | in progress |
+| 28 | Add Stage 5 severity reconciliation (FR-MR14a): unanimous → use; one-level diff → max + record range; two-or-more diff → CoT judge step with reasoning recorded. Per-reviewer severities preserved in output. | M | Milestone 3.1 (Task 22), Milestone 3.2 | done |
+| 29a | **Contradiction scanner.** Add the contradiction-detection scan (FR-MR14): scan dedup'd findings for mutually incompatible claims at the same location. **"Same location":** same `file` AND same `symbol`, OR (when symbol is null) same `file` AND finding ranges overlap or are within 5 lines. Output: list of candidate contradiction pairs flagged for adjudication. | M | Task 28 | done |
+| 29b | **CoVe adjudicator.** For each candidate pair from 29a, run Chain-of-Verification per [arXiv:2309.11495]: re-read artifact independently, answer the underlying question, mark loser as `superseded_by_verification`. Output schema change: findings carry `superseded_by_verification: true|false` and a `verification_reasoning` field. | M | Task 29a | done |
+| 30 | Add minority-of-one demotion (FR-MR14b): single-reviewer findings demoted one severity level UNLESS category is `security` OR reviewer flagged high confidence. Never dropped. | S | Task 28 | done |
+| 31 | Add aggregator bias-mitigation (FR-MR15): position-randomization across per-reviewer findings before aggregation; judge-mode system prompt embedded in orchestrator's reasoning prompt for inline-aggregator path; **when `aggregator.command` resolves to an external adapter (per D17), the judge-mode system prompt is packaged into the adapter invocation, not assumed inline**; self-preference warning cross-referenced from preflight. | M | Tasks 28–30 | done |
+| 32 | Layer 2 fixtures at `tests/fixtures/multi-model-review/consolidation/`: (a) one-level severity disagreement → max + range; (b) two-level → judge step with reasoning; (c) planted contradiction pair detected by 29a + CoVe (29b) selects winner; (c2) **separate fixture for 29a alone**: planted contradiction at "same file + same symbol" detected; planted near-contradiction at "same file, 7 lines apart" NOT detected (boundary check); (d) minority-of-one security → not demoted; (e) minority-of-one non-security → demoted; (f) **external aggregator** fixture: `aggregator.command: codex-review-prompter`, asserts judge-mode prompt is packaged into the codex Task call (raw-string match in recorded prompt). | L | Tasks 28–31 | done |
 
 **Task 28 Acceptance Criteria:**
 - `[T]` Unanimous severity passes through
 - `[T]` One-level disagreement uses max and records the range
 - `[T]` Two-level disagreement triggers judge step with reasoning text in output
+
+**Task 28 Completion Note:** Done. Stage 5 severity reconciliation added as Step 8d. Unanimous → use; one-level diff → max + `severity_range`; two-or-more → CoT judge step + `severity_reasoning`. Per-reviewer severities preserved in `raised_by[].severity`. Bundled commit `1d1aff5`.
 
 **Task 29a Acceptance Criteria:**
 - `[T]` Same `file` + same `symbol` pair identified as contradiction candidate
@@ -381,10 +383,14 @@ The orchestrator agent and the consolidation pipeline stages that ship in v1 (St
 - `[T]` Same `file`, no `symbol`, ranges 7+ lines apart → NOT identified (boundary)
 - `[T]` Output is a list of candidate pairs; no severity changes yet
 
+**Task 29a Completion Note:** Done. Stage 5b contradiction scanner added as Step 8e-1. "Same location" definition: same file + same symbol, OR same file + null symbol within 5 lines; 7+ lines apart NOT a candidate. Output: candidate pairs (no severity changes). Bundled commit `1d1aff5`.
+
 **Task 29b Acceptance Criteria:**
 - `[T]` CoVe pass produces an independent verdict per candidate pair
 - `[T]` Loser marked `superseded_by_verification: true` with `verification_reasoning` populated
 - `[T]` Both findings remain visible in output
+
+**Task 29b Completion Note:** Done. Stage 5b CoVe adjudicator added as Step 8e-2 (arXiv:2309.11495). Loser marked `superseded_by_verification: true` with `verification_reasoning`; both findings remain visible. Bundled commit `1d1aff5`.
 
 **Task 30 Acceptance Criteria:**
 - `[T]` Single-reviewer non-security finding demoted by exactly one level
@@ -392,15 +398,21 @@ The orchestrator agent and the consolidation pipeline stages that ship in v1 (St
 - `[T]` High-confidence flag overrides demotion
 - `[T]` Never dropped
 
+**Task 30 Completion Note:** Done. Stage 6 minority-of-one demotion added as Step 8f. `raised_by.length === 1` AND category != security AND confidence != high → demote one level (critical→high→medium→low→low). NEVER dropped. Bundled commit `1d1aff5`.
+
 **Task 31 Acceptance Criteria:**
 - `[T]` Position-randomization seed varies across invocations (sample 10 runs, confirm order variation)
 - `[T]` Judge-mode prompt phrase appears in inline aggregation prompt when host is aggregator
 - `[T]` When `aggregator.command` resolves to an external adapter, judge-mode prompt is packaged into the adapter invocation (verified by Task 32(f))
 
+**Task 31 Completion Note:** Done. Aggregator bias mitigation added as Step 8g. Position-randomization across reviewer findings (10-invocation seed variation); 'judge-mode' verbatim in inline aggregation prompt; `judge_mode_prompt` packaged into adapter Task call config when D17 picks external aggregator; self-preference warning cross-referenced from Step 0c. Bundled commit `1d1aff5`.
+
 **Task 32 Acceptance Criteria:**
 - `[T]` All planted scenarios produce correct outputs
 - `[T]` 29a boundary checks pass
 - `[T]` External-aggregator fixture (f) shows judge-mode prompt embedded in adapter Task call
+
+**Task 32 Completion Note:** Done. 6 fixtures under `tests/fixtures/multi-model-review/consolidation/stage5-5b-6/`: severity-one-level-diff, severity-two-level-diff, contradiction-cove-adjudicated, contradiction-29a-boundary (boundary at 5/7 lines), minority-of-one-security-not-demoted, minority-of-one-non-security-demoted, external-aggregator-judge-mode (recorded Task call with `judge_mode_prompt`). 97 tests in `orchestrator-stage5plus-fixtures.test.ts`. All 3 `[T]` criteria pass. Commit `88c7ccc`.
 
 **Parallelizable:** Tasks 28 and 30 can run concurrently. Task 29a depends on Task 28; 29b depends on 29a. Task 31 follows the others. Task 32 fixture can be authored in parallel with Tasks 28–31.
 **Milestone Value:** Consolidation pipeline is feature-complete for v1 (5 of 6 stages; Stage 3 in Phase 7). Orchestrator output now matches PRD's full canonical-finding-with-attribution shape.
