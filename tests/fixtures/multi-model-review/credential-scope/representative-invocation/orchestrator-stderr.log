@@ -1,0 +1,30 @@
+[synthex:orchestrator] Preflight started — checking 2 external adapters concurrently
+[synthex:orchestrator] CLI presence: codex — found (/usr/local/bin/codex)
+[synthex:orchestrator] CLI auth: codex — exit 0 (authenticated)
+[synthex:orchestrator] CLI presence: gemini — found (/usr/local/bin/gemini)
+[synthex:orchestrator] CLI auth: gemini — exit 0 (authenticated)
+[synthex:orchestrator] Preflight complete in 0.41s
+[synthex:orchestrator] Family diversity: 3 unique families (anthropic, openai, google) — min_family_diversity: 2 — OK
+[synthex:orchestrator] Aggregator resolution: 'codex-review-prompter' (source: configured)
+[synthex:orchestrator] 4 reviewers configured, 4 available, 3 families, aggregator: codex-review-prompter
+[synthex:orchestrator] Bundle assembly started — artifact_path: staged changes
+[synthex:orchestrator] Bundle assembled — 5 files, 12743 bytes
+[synthex:orchestrator] Fan-out: dispatching 4 proposers in single parallel batch
+[synthex:orchestrator]   native: code-reviewer (anthropic)
+[synthex:orchestrator]   native: security-reviewer (anthropic)
+[synthex:orchestrator]   external: codex-review-prompter (openai)
+[synthex:orchestrator]   external: gemini-review-prompter (google)
+[synthex:orchestrator] Proposer completed: code-reviewer — 3 findings
+[synthex:orchestrator] Proposer completed: security-reviewer — 1 finding
+[synthex:orchestrator] Proposer completed: codex-review-prompter — 4 findings
+[synthex:orchestrator] Proposer completed: gemini-review-prompter — 3 findings
+[synthex:orchestrator] All proposers complete — 11 raw findings collected
+[synthex:orchestrator] Stage 1 (fingerprint dedup): 11 -> 8 findings (3 collapsed)
+[synthex:orchestrator] Stage 2 (lexical dedup): 8 -> 6 findings (2 merged)
+[synthex:orchestrator] Stage 4 (LLM tiebreaker): 1 call dispatched, 0 skipped
+[synthex:orchestrator] Stage 5 (severity reconciliation): 1 multi-severity finding resolved
+[synthex:orchestrator] Stage 5b (contradiction scan): 0 contradiction candidates found
+[synthex:orchestrator] Stage 6 (minority-of-one demotion): 2 findings demoted
+[synthex:orchestrator] Consolidation complete — 6 findings in output envelope
+[synthex:orchestrator] Review path: multi-model (above-threshold diff; reviewers: 2 native + 2 external)
+[synthex:orchestrator] Audit artifact written: docs/reviews/2026-04-26-review-code-d4f8a2e.md
