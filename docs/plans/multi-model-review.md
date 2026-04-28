@@ -604,10 +604,10 @@ Surface the feature to new users at init time; ship the user-facing docs.
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
 | 49 | Author `docs/specs/multi-model-review/architecture.md` (final, replacing Phase 1 skeleton — replaces `## Status: Skeleton` with `## Status: Final`) — full architecture covering proposers, aggregator (D17 tier table), parallel fan-out, context bundle, consolidation pipeline (5 of 6 stages in v1 including D18 Stage 4 bounding), failure handling, deferred-Stage-3 path. Documents v1 vs. v2 explicitly. | L | Phase 5 | done |
-| 50 | Author `docs/specs/multi-model-review/adapter-recipes.md` documenting each v1 adapter: install one-liner, auth setup, recommended flagship model, sandbox flags, known gotchas. Include "writing a new adapter" section per NFR-MR5. **Schedule first in milestone batch** ([H] criteria). | M | Phase 2, Task 49 | in progress |
-| 51 | Author `docs/specs/multi-model-review/failure-modes.md` documenting graceful degradation, strict mode, all error_code values (FR-MR16), the FR-MR17 native-only continuation, the all-natives-fail critical-warning case (Task 23b), the cloud-surface remediation (Task 23c, NFR-MR2), and the OQ-6 aggregator-failure fallback (Q6 = (b) per PRD). | M | Phase 3, Task 49 | in progress |
-| 52 | Update `README.md` to add a "Multi-model review" section: (1) one sentence describing the feature, (2) one sentence on the primary benefit (correlated-error blind spots), (3) the off-by-default statement, (4) link to architecture doc and adapter recipes. | S | Task 49 | in progress |
-| 53 | Update `CLAUDE.md` agent table: add `multi-model-review-orchestrator` (Orchestration Layer) and the v1 adapters + `context-bundle-assembler` (Utility Layer). Add `init`, `review-code`, `write-implementation-plan` command-table updates noting multi-model integration. Use `design-system-agent` (not "Designer") consistently. | S | Phase 5 | pending |
+| 50 | Author `docs/specs/multi-model-review/adapter-recipes.md` documenting each v1 adapter: install one-liner, auth setup, recommended flagship model, sandbox flags, known gotchas. Include "writing a new adapter" section per NFR-MR5. **Schedule first in milestone batch** ([H] criteria). | M | Phase 2, Task 49 | done |
+| 51 | Author `docs/specs/multi-model-review/failure-modes.md` documenting graceful degradation, strict mode, all error_code values (FR-MR16), the FR-MR17 native-only continuation, the all-natives-fail critical-warning case (Task 23b), the cloud-surface remediation (Task 23c, NFR-MR2), and the OQ-6 aggregator-failure fallback (Q6 = (b) per PRD). | M | Phase 3, Task 49 | done |
+| 52 | Update `README.md` to add a "Multi-model review" section: (1) one sentence describing the feature, (2) one sentence on the primary benefit (correlated-error blind spots), (3) the off-by-default statement, (4) link to architecture doc and adapter recipes. | S | Task 49 | done |
+| 53 | Update `CLAUDE.md` agent table: add `multi-model-review-orchestrator` (Orchestration Layer) and the v1 adapters + `context-bundle-assembler` (Utility Layer). Add `init`, `review-code`, `write-implementation-plan` command-table updates noting multi-model integration. Use `design-system-agent` (not "Designer") consistently. | S | Phase 5 | in progress |
 
 **Task 49 Acceptance Criteria:**
 - `[H]` Doc covers all FR-MR architectural concerns
@@ -622,15 +622,21 @@ Surface the feature to new users at init time; ship the user-facing docs.
 - `[H]` Install one-liners are tested commands (manual verification on macOS + Linux)
 - `[H]` "Writing a new adapter" follows NFR-MR5 (markdown-only, no orchestrator changes required)
 
+**Task 50 Completion Note:** Done. `docs/specs/multi-model-review/adapter-recipes.md` with all 3 v1 adapters (Codex/Gemini/Ollama): install one-liner, auth setup, recommended flagship model, sandbox flags (or N/A for Ollama), known gotchas. Q2 TBD documented for Ollama. "Writing a new adapter" section per NFR-MR5 — 3-file-changes spec; no orchestrator changes invariant. 50 tests in `adapter-recipes-md.test.ts`. All 3 `[H]` (each adapter documented; install one-liners; new-adapter NFR-MR5) approved during execution. Commit `da4f2c1`.
+
 **Task 51 Acceptance Criteria:**
 - `[T]` All FR-MR16 error_code values documented
 - `[H]` FR-MR17 continuation flow described (both externals-fail and natives-fail variants)
 - `[H]` Cloud-surface remediation documented
 - `[H]` Aggregator-failure fallback recommendation documented (Q6 = (b))
 
+**Task 51 Completion Note:** Done. `docs/specs/multi-model-review/failure-modes.md` with all 7 FR-MR16 error_code values + retry behavior table; FR-MR17 externals-failed continuation (verbatim warning) + all-natives-failed CRITICAL stop (distinct verbatim warning); cloud-surface remediation (NFR-MR2) — single message vs per-CLI cascade; Q6 aggregator-failure host-fallback; strict mode (FR-MR18); failure-mode decision tree. 43 tests in `failure-modes-md.test.ts`. `[T]` (all 7 codes documented) passes; 3 `[H]` (continuation flow; cloud-surface; Q6) approved during execution. Commit `405a425`.
+
 **Task 52 Acceptance Criteria:**
 - `[H]` README section contains the four required elements
 - `[T]` Links resolve
+
+**Task 52 Completion Note:** Done. `Multi-Model Review` section in README.md with all 4 required elements: (1) one-sentence feature description, (2) primary benefit (correlated-error blind spots), (3) off-by-default statement, (4) links to architecture.md + adapter-recipes.md. 10 tests in `readme-mmr-section.test.ts`. `[T]` (links resolve) passes after Task 50 merge; `[H]` (4 required elements) approved during execution. Commit `ab7af92`.
 
 **Task 53 Acceptance Criteria:**
 - `[T]` New agents appear in agent table
