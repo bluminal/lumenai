@@ -159,6 +159,12 @@ By default, the loop continues across milestone boundaries. To stop at each mile
 |-----------|-------------|---------|
 | `exit_on_milestone_complete` | Output the completion signal after finishing a milestone, even if later milestones remain | `false` |
 
+## Standing Review Pools (via Synthex+)
+
+When [Synthex+](../synthex-plus/README.md) is installed and a standing review pool is running, `/review-code` and `/performance-audit` automatically route to the pool — no flags required. Routing is **off by default unless synthex-plus is initialized with `standing_pools.enabled: true`**.
+
+For setup and configuration, see the [Standing Pools guide](../synthex-plus/docs/standing-pools.md).
+
 ## License
 
 Apache 2.0 — See [LICENSE](../../LICENSE) for details.
