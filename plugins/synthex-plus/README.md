@@ -4,6 +4,14 @@
 
 Teams-optimized orchestration for [Synthex](../synthex/). Sustained multi-agent collaboration via Claude Code Agent Teams.
 
+## New in v0.2.0
+
+**Feature A — Multi-model `/team-review`:** Add `--multi-model` to any `team-review` invocation to run the multi-model-review-orchestrator alongside the native team. External LLM adapters (Codex, Gemini, etc.) review in parallel; findings are consolidated into a single unified report. Off by default — enable per-invocation with `--multi-model` or via config `multi_model_review.per_command.team_review.enabled: true`.
+
+**Feature B — Standing review pools:** Keep a team of reviewers warmed up in the background. `/synthex:review-code` and `/synthex:performance-audit` automatically route to a running pool when `standing_pools.enabled: true`. Start a pool with `/synthex-plus:start-review-team`. See [Standing Pools guide](../../docs/standing-pools.md) for full details.
+
+Both features are **off by default** — existing behavior is unchanged unless you explicitly enable them.
+
 ## Relationship to Synthex
 
 Synthex+ is a **companion plugin** to [Synthex](../synthex/), not a replacement. It builds on top of Synthex by reusing its agent definitions and extending its commands with persistent team orchestration.
@@ -146,6 +154,40 @@ Creates a planning team (Product Manager, Architect, Design System Agent, Tech L
 /team-plan requirements_path="docs/reqs/mobile-v2.md" plan_path="docs/plans/mobile-v2.md"
 ```
 
+### start-review-team
+
+Start a standing review pool — a persistent team of reviewers kept warm in the background. Once running, `/synthex:review-code` and `/synthex:performance-audit` automatically route to the pool when `standing_pools.enabled: true`, avoiding cold-start latency on repeated reviews.
+
+**Off by default.** Requires `standing_pools.enabled: true` in project config, or the `--standing` flag.
+
+```bash
+# Start the default standing review pool
+/synthex-plus:start-review-team
+
+# Start a pool with a custom team composition template
+/synthex-plus:start-review-team template="review"
+```
+
+See [Standing Pools guide](../../docs/standing-pools.md) for configuration options and lifecycle management.
+
+### stop-review-team
+
+Shut down the currently running standing review pool. All pool resources are released and routing falls back to standard on-demand team creation.
+
+```bash
+# Stop the running standing review pool
+/synthex-plus:stop-review-team
+```
+
+### list-teams
+
+List all active agent teams for the current project — both standing pools and any in-progress ephemeral teams started by `team-implement`, `team-review`, `team-plan`, or `team-refine`.
+
+```bash
+# Show all active teams
+/synthex-plus:list-teams
+```
+
 ## Team Templates
 
 Each command uses a team template that defines roles, communication patterns, and task decomposition rules. Three templates ship with the plugin:
@@ -273,3 +315,8 @@ Both `next-priority` and `team-implement` support ralph loops with identical com
 - [`docs/output-formats.md`](docs/output-formats.md) -- Canonical output format definitions (cost estimate, progress report, completion report)
 - [`templates/`](templates/) -- Team template definitions
 - [Synthex plugin](../synthex/) -- Base plugin with agent definitions and standard commands
+
+## See Also
+
+- [Standing Pools guide](../../docs/standing-pools.md) -- Full lifecycle management, configuration, and routing details for Feature B
+- [Multi-model Teams architecture](../../docs/specs/multi-model-teams/architecture.md) -- Architecture reference for Feature A (multi-model `/team-review`) and Feature B (standing review pools)
