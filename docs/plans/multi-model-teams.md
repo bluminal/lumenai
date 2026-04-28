@@ -56,11 +56,11 @@ Establishes the substrate for both features. No user-visible value yet; all mile
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 0 | Capture golden-snapshot fixtures of pre-feature behavior for `/team-review` (no `multi_model_review` config; default native-only) and for `/synthex:review-code` and `/synthex:performance-audit` running with no `standing_pools` section. Store under `tests/__snapshots__/multi-model-teams/baseline/`. **Snapshots capture deterministic envelope only** (template structure, Lead consolidation shape, audit-file presence/path); LLM finding bodies redacted to `<<finding-body>>` per parent Task 0 pattern. Used as regression baseline for FR-MMT3 acceptance criterion 8, FR-MR23-style byte-identical assertion, and NFR-MMT1. | S | None (parent Task 0 pattern available; parent plan multi-model-review.md v0.5.0 complete) | in progress |
+| 0 | Capture golden-snapshot fixtures of pre-feature behavior for `/team-review` (no `multi_model_review` config; default native-only) and for `/synthex:review-code` and `/synthex:performance-audit` running with no `standing_pools` section. Store under `tests/__snapshots__/multi-model-teams/baseline/`. **Snapshots capture deterministic envelope only** (template structure, Lead consolidation shape, audit-file presence/path); LLM finding bodies redacted to `<<finding-body>>` per parent Task 0 pattern. Used as regression baseline for FR-MMT3 acceptance criterion 8, FR-MR23-style byte-identical assertion, and NFR-MMT1. | S | None (parent Task 0 pattern available; parent plan multi-model-review.md v0.5.0 complete) | done |
 | 1 | Extend `plugins/synthex-plus/config/defaults.yaml` to add the entire `standing_pools:` section per FR-MMT6, with all **nine** keys (`enabled`, `ttl_minutes`, `default_name`, `default_reviewers`, `default_multi_model`, `storage_root`, `tasks_root`, `routing_mode`, `matching_mode`) and verbatim inline documentation per the PRD code block. Also add `lifecycle.submission_timeout_seconds: 300` **as a top-level sibling of `standing_pools:`** per D23. Include a section-header comment documenting cross-file resolution rules (D17/FR-MMT6): `standing_pools.*` from `.synthex-plus/config.yaml` only; `multi_model_review.*` from `.synthex/config.yaml` only; no merge. _(Plan-text fix: PRD lists 9 keys, plan originally said 8 — corrected during execution.)_ | S | None | done (iter 1) |
-| 2 | Add `multi_model_review.per_command.team_review.{enabled,strict_mode}` keys and `multi_model_review.audit.record_finding_attribution_telemetry` (default `true`, per FR-MMT30a/FR-MMT6) to `plugins/synthex/config/defaults.yaml`. Inline comment for `record_finding_attribution_telemetry` explains the privacy-sensitive opt-out rationale. **Parent plan multi-model-review.md v0.5.0 is complete; parent Task 2 has shipped — this task adds team_review-specific keys on top.** | S | Task 2a (gate) | in progress |
-| 2a | **Verify parent canonical-finding schema enum (Q3 resolution).** Parent plan multi-model-review.md v0.5.0 is complete; verify the canonical finding schema's `source.source_type` enum permits `native-team` (FR-MMT20), `native-recovery` (FR-MMT24), and `external`. If any value is missing, open parent-plan follow-up PR extending it before this plan's Task 2 lands. Phase 1 cannot close until all required values are in parent's schema and re-validated by parent's Task 7 validator. | S | None (parent plan complete) | in progress |
-| 3 | Author plan-side architecture skeleton at `docs/specs/multi-model-teams/architecture.md` (Phase 8 Task 65 replaces with full doc). **Skeleton includes all normative content from the start** — schemas, contracts, procedures; only narrative prose, examples, and cross-references are added in Phase 8. Covers: Option B rationale, native-team-vs-orchestrator separation, two-consolidation-surfaces contract (FR-MMT4), cross-session lifetime model (FR-MMT5a), forward references to forthcoming docs. Includes "Related documentation" section at top with links to `pool-lifecycle.md`, `routing.md`, `recovery.md`, `standing-pools.md`. Begins with `## Status: Skeleton`. | M | None (parent plan complete) | in progress |
+| 2 | Add `multi_model_review.per_command.team_review.{enabled,strict_mode}` keys and `multi_model_review.audit.record_finding_attribution_telemetry` (default `true`, per FR-MMT30a/FR-MMT6) to `plugins/synthex/config/defaults.yaml`. Inline comment for `record_finding_attribution_telemetry` explains the privacy-sensitive opt-out rationale. **Parent plan multi-model-review.md v0.5.0 is complete; parent Task 2 has shipped — this task adds team_review-specific keys on top.** | S | Task 2a (gate) | done |
+| 2a | **Verify parent canonical-finding schema enum (Q3 resolution).** Parent plan multi-model-review.md v0.5.0 is complete; verify the canonical finding schema's `source.source_type` enum permits `native-team` (FR-MMT20), `native-recovery` (FR-MMT24), and `external`. If any value is missing, open parent-plan follow-up PR extending it before this plan's Task 2 lands. Phase 1 cannot close until all required values are in parent's schema and re-validated by parent's Task 7 validator. | S | None (parent plan complete) | done |
+| 3 | Author plan-side architecture skeleton at `docs/specs/multi-model-teams/architecture.md` (Phase 8 Task 65 replaces with full doc). **Skeleton includes all normative content from the start** — schemas, contracts, procedures; only narrative prose, examples, and cross-references are added in Phase 8. Covers: Option B rationale, native-team-vs-orchestrator separation, two-consolidation-surfaces contract (FR-MMT4), cross-session lifetime model (FR-MMT5a), forward references to forthcoming docs. Includes "Related documentation" section at top with links to `pool-lifecycle.md`, `routing.md`, `recovery.md`, `standing-pools.md`. Begins with `## Status: Skeleton`. | M | None (parent plan complete) | done |
 
 **Task 0 Acceptance Criteria:**
 - `[T]` Snapshot files exist for `/team-review` and the two v1 routing-enabled commands with no relevant config sections present
@@ -68,6 +68,8 @@ Establishes the substrate for both features. No user-visible value yet; all mile
 - `[T]` Redaction replaces all finding bodies with `<<finding-body>>`; verified by raw-string scan
 - `[T]` `/team-review` snapshot records absence of any `multi-model-review-orchestrator` Task invocation in trace (FR-MMT3 criterion 8)
 - `[T]` Redaction strategy referenced from Task 14, 27, 28 byte-comparison criteria
+
+**Task 0 Completion Notes:** Done. Baseline snapshots at `tests/__snapshots__/multi-model-teams/baseline/` for /team-review, /review-code routing, /performance-audit routing + redaction-strategy.md. 21 tests in `mmt-baseline-snapshots.test.ts`. All 3 `[T]` criteria pass. Commit `97afd82`.
 
 **Task 1 Acceptance Criteria:**
 - `[T]` `defaults.yaml` parses as valid YAML
@@ -83,10 +85,14 @@ Establishes the substrate for both features. No user-visible value yet; all mile
 - `[T]` `multi_model_review.audit.record_finding_attribution_telemetry` defaults to `true`
 - `[T]` Parent's existing `multi_model_review:` consumers pass tests unchanged
 
+**Task 2 Completion Notes:** Done. Added `multi_model_review.per_command.team_review.enabled: false` (FR-MMT3) and `multi_model_review.audit.record_finding_attribution_telemetry: true` (FR-MMT30a) to `defaults.yaml`. 13 tests in `mmt-defaults-yaml.test.ts`; parent's defaults-yaml-mmr.test.ts regression (22 tests) still passes. All `[T]` criteria pass. Commit `d4f5c7a`.
+
 **Task 2a Acceptance Criteria:**
 - `[T]` Parent's canonical finding schema accepts both `native-team` and `native-recovery` as valid `source.source_type` enum values (verified against parent's Task 7 validator)
 - `[H]` If enum was closed, parent-plan PR opened and merged before Task 2 lands; PR linked from this task's status notes
 - `[T]` Q3 marked Resolved with reference to parent PR or task
+
+**Task 2a Completion Notes:** Done. Verified parent canonical-finding-schema.md and validator already include all 3 source_type enum values (native-team, external, native-recovery). Added FR-MMT24 use-case documentation for native-recovery to schema markdown. 12 tests in `mmt-canonical-finding-coord.test.ts` + canonical-finding.test.ts regression pass. Commit `152dfe0`.
 
 **Task 3 Acceptance Criteria:**
 - `[H]` Doc covers Option B rationale, native-team-vs-orchestrator boundaries, two-consolidation-surfaces contract, cross-session lifetime
@@ -94,6 +100,8 @@ Establishes the substrate for both features. No user-visible value yet; all mile
 - `[T]` Doc contains `## Status: Skeleton` header that Task 65 replaces
 - `[T]` Cross-references to FR-MMT numbers accurate
 - `[T]` Skeleton includes all normative schemas/contracts/procedures (narrative prose deferred to Task 65)
+
+**Task 3 Completion Notes:** Done. `docs/specs/multi-model-teams/architecture.md` skeleton with `## Status: Skeleton` (Task 65 will replace with Final). 6 sections (Overview, Feature A with ASCII bridge diagram, Feature B with 3 sub-sections, Audit Extensions, v1 Scope, Forthcoming Docs). FR-MMT cross-refs verified. 23 tests in `mmt-architecture-md.test.ts`. All `[T]` criteria pass; `[H]` (6 concerns each documented) approved during execution. Commit `9651a8c`.
 
 **Parallelizable:** Tasks 0, 1, 3 independent. Task 2 sequences after parent Task 2 (or co-PRs). Task 2a parallels 0/1/3 but gates Task 2 close.
 **Milestone Value:** Configuration surface for both features in place. Baseline snapshots ready. Architecture skeleton with normative content anchors forthcoming work. Parent enum coordination resolved.
