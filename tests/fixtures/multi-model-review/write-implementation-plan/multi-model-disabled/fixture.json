@@ -1,0 +1,14 @@
+{
+  "scenario": "wip-multi-model-disabled",
+  "description": "Draft plan + multi-model disabled. Native-only path; output byte-identical to redacted Task 0 baseline.",
+  "command": "write-implementation-plan",
+  "config": {
+    "multi_model_review": { "enabled": false }
+  },
+  "expected": {
+    "orchestrator_invoked": false,
+    "native_only_path": true,
+    "byte_identical_to_baseline": true,
+    "baseline_snapshot_path": "tests/__snapshots__/multi-model-review/baseline/write-implementation-plan-baseline.snapshot.md"
+  }
+}

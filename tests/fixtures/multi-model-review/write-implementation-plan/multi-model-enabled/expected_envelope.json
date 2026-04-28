@@ -1,0 +1,200 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "architect",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 2,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "design-system-agent",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "tech-lead",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": null
+    },
+    {
+      "reviewer_id": "codex-review-prompter",
+      "source_type": "external",
+      "family": "openai",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": {
+        "input_tokens": 4812,
+        "output_tokens": 389
+      }
+    },
+    {
+      "reviewer_id": "gemini-review-prompter",
+      "source_type": "external",
+      "family": "google",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "usage": {
+        "input_tokens": 4650,
+        "output_tokens": 342
+      }
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "plan.missing-rollback-strategy",
+      "severity": "high",
+      "category": "reliability",
+      "title": "Plan lacks rollback strategy for phased deployment",
+      "description": "The draft plan describes a phased deployment across three milestones but does not define a rollback procedure if Milestone 2 causes regressions in production. Each phase should document its rollback criteria and steps.",
+      "file": "docs/plans/sample-feature-draft.md",
+      "line_range": { "start": 42, "end": 58 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "architect",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        {
+          "reviewer_id": "architect",
+          "family": "anthropic",
+          "source_type": "native-team"
+        },
+        {
+          "reviewer_id": "codex-review-prompter",
+          "family": "openai",
+          "source_type": "external"
+        }
+      ]
+    },
+    {
+      "finding_id": "plan.underdefined-data-migration",
+      "severity": "high",
+      "category": "correctness",
+      "title": "Data migration step lacks idempotency guarantee",
+      "description": "The schema migration in Milestone 1 is not marked idempotent. If the migration runs twice due to a deployment retry, the plan provides no guard against duplicate data transformation.",
+      "file": "docs/plans/sample-feature-draft.md",
+      "line_range": { "start": 71, "end": 84 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "architect",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        {
+          "reviewer_id": "architect",
+          "family": "anthropic",
+          "source_type": "native-team"
+        }
+      ]
+    },
+    {
+      "finding_id": "plan.design-token-gap",
+      "severity": "medium",
+      "category": "design",
+      "title": "Proposed UI component uses undeclared design tokens",
+      "description": "The UI component described in Milestone 3 references a color token '--color-action-subtle' that does not exist in the current design system. Either the token must be added via the design-system pipeline or a mapped existing token used.",
+      "file": "docs/plans/sample-feature-draft.md",
+      "line_range": { "start": 112, "end": 119 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "design-system-agent",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        {
+          "reviewer_id": "design-system-agent",
+          "family": "anthropic",
+          "source_type": "native-team"
+        }
+      ]
+    },
+    {
+      "finding_id": "plan.acceptance-criteria-vague",
+      "severity": "medium",
+      "category": "completeness",
+      "title": "Milestone 2 acceptance criteria are not measurable",
+      "description": "Milestone 2 lists 'improved performance' as an acceptance criterion without a numeric target (e.g., p95 latency < 200ms). Acceptance criteria must be objectively verifiable.",
+      "file": "docs/plans/sample-feature-draft.md",
+      "line_range": { "start": 93, "end": 97 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "tech-lead",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        {
+          "reviewer_id": "tech-lead",
+          "family": "anthropic",
+          "source_type": "native-team"
+        }
+      ]
+    },
+    {
+      "finding_id": "plan.missing-rollback-strategy",
+      "severity": "high",
+      "category": "reliability",
+      "title": "No rollback plan defined for phased milestones",
+      "description": "The implementation plan lacks explicit rollback steps for each phase. If a milestone deployment causes production issues, the team has no documented revert path.",
+      "file": "docs/plans/sample-feature-draft.md",
+      "line_range": { "start": 42, "end": 58 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      },
+      "raised_by": [
+        {
+          "reviewer_id": "codex-review-prompter",
+          "family": "openai",
+          "source_type": "external"
+        }
+      ]
+    },
+    {
+      "finding_id": "plan.missing-monitoring-observability",
+      "severity": "medium",
+      "category": "observability",
+      "title": "Plan omits monitoring and alerting requirements",
+      "description": "The feature plan does not include any metrics, dashboards, or alerting requirements for the new functionality. Observability should be specified as a first-class deliverable, not left to the implementing engineer.",
+      "file": "docs/plans/sample-feature-draft.md",
+      "line_range": { "start": 130, "end": 145 },
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      },
+      "raised_by": [
+        {
+          "reviewer_id": "gemini-review-prompter",
+          "family": "google",
+          "source_type": "external"
+        }
+      ]
+    }
+  ],
+  "path_and_reason_header": "Review path: multi-model (plan review; reviewers: 3 native + 2 external)",
+  "aggregator_resolution": {
+    "name": "findings-consolidator",
+    "source": "configured"
+  },
+  "continuation_event": null
+}

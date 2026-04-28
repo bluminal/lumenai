@@ -1,0 +1,29 @@
+{
+  "scenario": "wip-multi-model-enabled",
+  "description": "Draft plan + multi-model enabled. Orchestrator invoked with 3 native (architect, design-system-agent, tech-lead) + 2 external (codex, gemini). PM receives unified consolidated envelope with attribution.",
+  "command": "write-implementation-plan",
+  "input": {
+    "requirements_path": "docs/reqs/sample-feature.md",
+    "draft_plan_path": "docs/plans/sample-feature-draft.md"
+  },
+  "config": {
+    "multi_model_review": {
+      "enabled": true,
+      "include_native_reviewers": true,
+      "reviewers": ["codex-review-prompter", "gemini-review-prompter"],
+      "per_command": {
+        "write_implementation_plan": { "enabled": true }
+      },
+      "audit": { "enabled": true, "output_path": "docs/reviews/" }
+    }
+  },
+  "expected": {
+    "orchestrator_invoked": true,
+    "native_reviewers_passed": ["architect", "design-system-agent", "tech-lead"],
+    "external_adapters": ["codex-review-prompter", "gemini-review-prompter"],
+    "consolidated_findings_count": 6,
+    "attribution_includes_native": true,
+    "attribution_includes_external": true,
+    "audit_file_written": true
+  }
+}
