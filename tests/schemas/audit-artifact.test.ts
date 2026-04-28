@@ -11,6 +11,7 @@ import {
   FILENAME_REGEX,
   REQUIRED_SECTIONS,
   COMMAND_VALUES,
+  POOL_ROUTING_DECISION_VALUES,
 } from './audit-artifact';
 
 // ---------------------------------------------------------------------------
@@ -101,6 +102,55 @@ const validSampleWithContinuation = validSampleReviewCode + `
 ## 7. Continuation Event
 - Type: all-externals-failed
 - Details: All external reviewers timed out; native results retained.
+`;
+
+const validSampleWithTeamMetadata = validSampleReviewCode + `
+## 8. Team Metadata
+- Team name: review-a3f7b2c1
+- Team type: standing-pool
+
+### Reviewer Roster
+| Reviewer ID | Spawn Timestamp |
+|-------------|-----------------|
+| code-reviewer | 2026-04-27T12:00:00Z |
+| security-reviewer | 2026-04-27T12:00:01Z |
+
+### Cross-Domain Messages
+Count: 1
+| From | To | Subject | Timestamp |
+|------|----|---------|-----------|
+| code-reviewer | security-reviewer | potential SQL injection in users.py | 2026-04-27T12:05:00Z |
+`;
+
+const validSampleWithPoolRouting = validSampleReviewCode + `
+## 9. Pool Routing
+- routing_decision: routed-to-pool
+- pool_name: review-pool
+- pool_multi_model: false
+- match_rationale: covers: pool roster {code-reviewer,security-reviewer} superset-of required {code-reviewer,security-reviewer}
+- would_have_routed: false
+`;
+
+const validSampleWithRecovery = validSampleReviewCode + `
+## 10. Recovery
+- occurred: true
+- failed_reviewer: performance-engineer
+- recovery_finding_count: 3
+`;
+
+const validSampleWithAttributionTelemetry = validSampleReviewCode + `
+## 11. Finding Attribution Telemetry
+### Finding: AUTH-001
+- consolidated_finding_id: AUTH-001
+- raised_by: code-reviewer (anthropic, native-team), codex-review-prompter (openai, external)
+- consensus_count: 2
+- minority_of_one: false
+
+### Finding: SEC-001
+- consolidated_finding_id: SEC-001
+- raised_by: security-reviewer (anthropic, native-team)
+- consensus_count: 1
+- minority_of_one: true
 `;
 
 /** Helper: strip a section heading (and its content up to next heading) from markdown. */
@@ -339,5 +389,169 @@ describe('validateAuditArtifact — edge cases', () => {
     expect(result.valid).toBe(false);
     // At minimum, all 6 required sections should be flagged
     expect(result.errors.length).toBeGreaterThanOrEqual(REQUIRED_SECTIONS.length);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateAuditArtifact — Team Metadata (Section 8)
+// ---------------------------------------------------------------------------
+
+describe('validateAuditArtifact — Team Metadata (Section 8)', () => {
+  it('passes when expectTeamMetadata: true and section is present', () => {
+    const result = validateAuditArtifact(validSampleWithTeamMetadata, { expectTeamMetadata: true });
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('fails when expectTeamMetadata: true and section is absent', () => {
+    const result = validateAuditArtifact(validSampleReviewCode, { expectTeamMetadata: true });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => /Team Metadata section \(Section 8\) expected/i.test(e))).toBe(true);
+  });
+
+  it('passes without error when expectTeamMetadata is false and section is absent', () => {
+    const result = validateAuditArtifact(validSampleReviewCode, { expectTeamMetadata: false });
+    expect(result.errors.some(e => /Team Metadata/i.test(e))).toBe(false);
+  });
+
+  it('passes without error when expectTeamMetadata is undefined (default) and section is absent', () => {
+    const result = validateAuditArtifact(validSampleReviewCode);
+    expect(result.errors.some(e => /Team Metadata/i.test(e))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateAuditArtifact — Pool Routing (Section 9)
+// ---------------------------------------------------------------------------
+
+describe('validateAuditArtifact — Pool Routing (Section 9)', () => {
+  it('passes when expectPoolRouting: true and section present with valid routing_decision enum', () => {
+    const result = validateAuditArtifact(validSampleWithPoolRouting, { expectPoolRouting: true });
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('fails when expectPoolRouting: true and section is absent', () => {
+    const result = validateAuditArtifact(validSampleReviewCode, { expectPoolRouting: true });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => /Pool Routing section \(Section 9\) expected/i.test(e))).toBe(true);
+  });
+
+  it('fails when routing_decision value is outside the FR-MMT30 enum', () => {
+    const badSample = validSampleReviewCode + `
+## 9. Pool Routing
+- routing_decision: unknown-decision
+- pool_name: review-pool
+`;
+    const result = validateAuditArtifact(badSample, { expectPoolRouting: true });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => /routing_decision value "unknown-decision" is not in the FR-MMT30 enum/.test(e))).toBe(true);
+  });
+
+  it('passes without error when expectPoolRouting is false and section is absent', () => {
+    const result = validateAuditArtifact(validSampleReviewCode, { expectPoolRouting: false });
+    expect(result.errors.some(e => /Pool Routing/i.test(e))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateAuditArtifact — Recovery (Section 10)
+// ---------------------------------------------------------------------------
+
+describe('validateAuditArtifact — Recovery (Section 10)', () => {
+  it('passes when expectRecovery: true and section is present', () => {
+    const result = validateAuditArtifact(validSampleWithRecovery, { expectRecovery: true });
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('fails when expectRecovery: true and section is absent', () => {
+    const result = validateAuditArtifact(validSampleReviewCode, { expectRecovery: true });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => /Recovery section \(Section 10\) expected/i.test(e))).toBe(true);
+  });
+
+  it('passes without error when expectRecovery is false and section is absent', () => {
+    const result = validateAuditArtifact(validSampleReviewCode, { expectRecovery: false });
+    expect(result.errors.some(e => /Recovery section/i.test(e))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateAuditArtifact — Attribution Telemetry (Section 11)
+// ---------------------------------------------------------------------------
+
+describe('validateAuditArtifact — Attribution Telemetry (Section 11)', () => {
+  it('passes when expectAttributionTelemetry: true and section present with all 3 required fields', () => {
+    const result = validateAuditArtifact(validSampleWithAttributionTelemetry, { expectAttributionTelemetry: true });
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('fails when expectAttributionTelemetry: true and section is absent', () => {
+    const result = validateAuditArtifact(validSampleReviewCode, { expectAttributionTelemetry: true });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => /Finding Attribution Telemetry section \(Section 11\) expected/i.test(e))).toBe(true);
+  });
+
+  it('fails when expectAttributionTelemetry: true and section present but missing consolidated_finding_id', () => {
+    const badSample = validSampleWithAttributionTelemetry.replace(/consolidated_finding_id[^\n]*/gi, '');
+    const result = validateAuditArtifact(badSample, { expectAttributionTelemetry: true });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => /consolidated_finding_id/.test(e))).toBe(true);
+  });
+
+  it('fails when expectAttributionTelemetry: true and section present but missing consensus_count', () => {
+    const badSample = validSampleWithAttributionTelemetry.replace(/consensus_count[^\n]*/gi, '');
+    const result = validateAuditArtifact(badSample, { expectAttributionTelemetry: true });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => /consensus_count/.test(e))).toBe(true);
+  });
+
+  it('fails when expectAttributionTelemetry: true and section present but missing minority_of_one', () => {
+    const badSample = validSampleWithAttributionTelemetry.replace(/minority_of_one[^\n]*/gi, '');
+    const result = validateAuditArtifact(badSample, { expectAttributionTelemetry: true });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => /minority_of_one/.test(e))).toBe(true);
+  });
+
+  it('passes when expectAttributionTelemetry: false and section is absent', () => {
+    const result = validateAuditArtifact(validSampleReviewCode, { expectAttributionTelemetry: false });
+    expect(result.errors.some(e => /Finding Attribution Telemetry section should be absent/i.test(e))).toBe(false);
+  });
+
+  it('fails when expectAttributionTelemetry: false and section is present (should be absent)', () => {
+    const result = validateAuditArtifact(validSampleWithAttributionTelemetry, { expectAttributionTelemetry: false });
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => /Finding Attribution Telemetry section should be absent/i.test(e))).toBe(true);
+  });
+
+  it('passes without Section 11 validation when expectAttributionTelemetry is undefined (default)', () => {
+    // Default behavior: no section 11 presence or absence check
+    const result = validateAuditArtifact(validSampleReviewCode);
+    expect(result.errors.some(e => /Finding Attribution Telemetry/.test(e))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POOL_ROUTING_DECISION_VALUES constant
+// ---------------------------------------------------------------------------
+
+describe('POOL_ROUTING_DECISION_VALUES', () => {
+  it('exports all 7 enum values', () => {
+    expect(POOL_ROUTING_DECISION_VALUES).toHaveLength(7);
+    expect(POOL_ROUTING_DECISION_VALUES).toContain('routed-to-pool');
+    expect(POOL_ROUTING_DECISION_VALUES).toContain('fell-back-no-pool');
+    expect(POOL_ROUTING_DECISION_VALUES).toContain('fell-back-roster-mismatch');
+    expect(POOL_ROUTING_DECISION_VALUES).toContain('fell-back-pool-draining');
+    expect(POOL_ROUTING_DECISION_VALUES).toContain('fell-back-pool-stale');
+    expect(POOL_ROUTING_DECISION_VALUES).toContain('fell-back-timeout');
+    expect(POOL_ROUTING_DECISION_VALUES).toContain('skipped-routing-mode-explicit');
+  });
+
+  it('does not include invalid values', () => {
+    expect(POOL_ROUTING_DECISION_VALUES).not.toContain('unknown-decision');
+    expect(POOL_ROUTING_DECISION_VALUES).not.toContain('routed-to-queue');
+    expect(POOL_ROUTING_DECISION_VALUES).not.toContain('');
   });
 });

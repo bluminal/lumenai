@@ -34,6 +34,7 @@ Implements `docs/reqs/multi-model-teams.md`. Bundles two features sharing archit
 | D24 | **NFR-MMT5 wall-clock parallelism verification deferred to Phase 10 (Layer 3).** v1 release accepts NFR-MMT5 as "verified by structural assertion" — Task 18 records sequencing only and asserts FR-MMT21 step 2 parallelism instruction is present in workflow markdown. Live wall-clock fixture (Task 77) ships post-v1, mirroring parent Task 23/61a precedent. | Architect cycle 1 finding; parent precedent | Live multi-model wall-clock measurement is expensive and flaky in CI. |
 | D25 | **NFR-MMT7 user-visible string copy locked verbatim in this plan and embedded in Task 55 body.** The four user-visible strings are reproduced word-for-word inside Task 55. Identical strings reused in Task 57 for `/performance-audit`. | Designer cycle 1 finding; FR-MMT7 | Two commands authoring strings independently invites UX drift. |
 | D26 | **FR-MMT5b identity-confirm and FR-MMT20 JSON-envelope overlay re-issued per task via SendMessage, not solely via spawn-prompt.** The Pool Lead embeds the FR-MMT5b identity-confirm instruction (re-read agent file before beginning review work) and the FR-MMT20 JSON-envelope clause in each per-task `SendMessage` to pool reviewers. Spawn-prompt overlays are still composed (D22) but are not treated as durable for behavioral enforcement in long-lived pools. | Task 26 spike; FR-MMT5b; FR-MMT20 | Spawn-prompt content lives in conversation history (not system prompt) and is subject to lossy compaction summary when a long-running reviewer accumulates sufficient context. Confirmed via `backendType: "in-process"` architecture and empirical test. Per-task `SendMessage` is always in post-compaction context, making overlay durability immune to compaction. Complexity M — one additional SendMessage per task assignment. |
+| D27 | **External CLI permission model = three patterns.** (1) Read-only by default: all adapters invoke CLIs with read-only/plan flags. (2) Parent-mediated (auto): Codex (`app-server` JSON-RPC `requestApproval`) and Claude Code (`canUseTool` over `--output-format stream-json`) use native approval-proxying — no config needed. (3) Sandbox-yolo: opt-in per CLI via `multi_model_review.external_permission_mode.<cli-name>: sandbox-yolo` with required user confirmation before spawn. | FR-MMT21; security; user request (2026-04-28) | Pattern 1 is safe default for all environments. Pattern 3 is chosen for CLIs with native support to give smooth UX without blocking. Pattern 2 is an explicit opt-in so users can't accidentally grant full permissions. |
 
 ## Open Questions
 
@@ -737,11 +738,11 @@ Extends parent's audit writer with team/pool/recovery blocks. Surfaces both feat
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 59 | Extend parent's audit writer (parent plan Task 39) to accept three optional blocks per FR-MMT30: `team_metadata` (present when `/team-review` with multi-model active per FR-MMT3), `pool_routing` (REQUIRED on every audit emitted by routing-enabled commands), `recovery` (present when FR-MMT24 fired). Extend writer's input schema (parent's writer is parameterized; this adds three optional named blocks). Per FR-MMT30 normative schema verbatim. | M | Phase 2, Phase 7; parent Task 39 | pending |
-| 60 | Implement FR-MMT30a per-finding attribution telemetry as a fourth optional block: `finding_attribution_telemetry` array, gated by `multi_model_review.audit.record_finding_attribution_telemetry` (default `true` per Task 2). Schema per FR-MMT30a verbatim (`consolidated_finding_id`, `raised_by[]`, `consensus_count`, `minority_of_one`). | M | Task 59; Task 2; Task 60a | pending |
-| 60a | **Coordinate parent orchestrator update for per-finding attribution data flow.** Parent's `multi-model-review-orchestrator.md` Stage 1+2 dedup must retain a `raised_by[]` map per consolidated finding (each entry: `reviewer_id`, `family`, `source_type`) and surface to the audit writer. Without this upstream change, Task 60 cannot populate `raised_by[]`. Coordinate as a parent-plan PR landing before Task 60. **Related to Q3.** | S | Parent Stages 1+2 (orchestrator implementation) | pending |
-| 61 | Extend parent's `tests/schemas/audit-artifact.ts` validator (parent Task 40) to validate the four new optional blocks. Vitest cases for each. Validate `pool_routing.routing_decision` enum covers all FR-MMT30 values; validate `finding_attribution_telemetry` presence/absence per config flag. | M | Tasks 59, 60 | pending |
-| 62 | Layer 2 fixture extensions: (a) Task 18 (multi-model `/team-review` enabled) → audit contains `team_metadata`; (b) Task 56(a) (pool-match `/review-code`) → audit contains `pool_routing.routing_decision: "routed-to-pool"`; (c) Task 56(c) (no-pool-fallback) → audit contains `pool_routing.routing_decision: "fell-back-no-pool"`; (d) Task 51 (recovery) → audit contains `recovery.occurred: true`; (e) any multi-model fixture with `record_finding_attribution_telemetry: true` → audit contains `finding_attribution_telemetry`; with flag `false` → block absent. | L | Tasks 59, 60, 61 | pending |
+| 59 | Extend parent's audit writer (parent plan Task 39) to accept three optional blocks per FR-MMT30: `team_metadata` (present when `/team-review` with multi-model active per FR-MMT3), `pool_routing` (REQUIRED on every audit emitted by routing-enabled commands), `recovery` (present when FR-MMT24 fired). Extend writer's input schema (parent's writer is parameterized; this adds three optional named blocks). Per FR-MMT30 normative schema verbatim. Done. Extended plugins/synthex/agents/audit-artifact-writer.md with three new optional input blocks (team_metadata, pool_routing, recovery) per FR-MMT30, rendering as Sections 8–10 after Section 7. match_rationale uses ASCII-friendly "covers/superset-of" notation per [H] criterion. Behavioral Rule 7 added. Source Authority updated. Commit pending. | M | Phase 2, Phase 7; parent Task 39 | done |
+| 60 | Implement FR-MMT30a per-finding attribution telemetry as a fourth optional block: `finding_attribution_telemetry` array, gated by `multi_model_review.audit.record_finding_attribution_telemetry` (default `true` per Task 2). Schema per FR-MMT30a verbatim (`consolidated_finding_id`, `raised_by[]`, `consensus_count`, `minority_of_one`). Done. Added Section 11 (Finding Attribution Telemetry) to audit-artifact-writer.md, gated by audit_config.record_finding_attribution_telemetry (default true). Omits section entirely when false. Each entry: consolidated_finding_id, raised_by[], consensus_count, minority_of_one (FR-MMT30a verbatim). Behavioral Rule 8 added. Commit pending. | M | Task 59; Task 2; Task 60a | done |
+| 60a | **Coordinate parent orchestrator update for per-finding attribution data flow.** Parent's `multi-model-review-orchestrator.md` Stage 1+2 dedup must retain a `raised_by[]` map per consolidated finding (each entry: `reviewer_id`, `family`, `source_type`) and surface to the audit writer. Without this upstream change, Task 60 cannot populate `raised_by[]`. Coordinate as a parent-plan PR landing before Task 60. **Related to Q3.** Done. Verified parent multi-model-review-orchestrator.md already retains raised_by[] in Stages 1+2+3 (Steps 8a, 8b, 8b-2) and returns populated raised_by[] per finding in Step 9 envelope. Canonical-finding-schema.md and canonical-finding.ts validator already define and validate the raised_by field. No parent PR needed — implementation already complete. Task 60 precondition satisfied. | S | Parent Stages 1+2 (orchestrator implementation) | done |
+| 61 | Extend parent's `tests/schemas/audit-artifact.ts` validator (parent Task 40) to validate the four new optional blocks. Vitest cases for each. Validate `pool_routing.routing_decision` enum covers all FR-MMT30 values; validate `finding_attribution_telemetry` presence/absence per config flag. Done. Extended tests/schemas/audit-artifact.ts with POOL_ROUTING_DECISION_VALUES (7-value enum), PoolRoutingDecision type, and 4 new ValidateOptions fields (expectTeamMetadata, expectPoolRouting, expectRecovery, expectAttributionTelemetry). Extended tests/schemas/audit-artifact.test.ts with 29 new tests (47 total, was 18). All 7 routing_decision enum values validated. Attribution telemetry presence/absence per config flag validated. Commit pending. | M | Tasks 59, 60 | done |
+| 62 | Layer 2 fixture extensions: (a) Task 18 (multi-model `/team-review` enabled) → audit contains `team_metadata`; (b) Task 56(a) (pool-match `/review-code`) → audit contains `pool_routing.routing_decision: "routed-to-pool"`; (c) Task 56(c) (no-pool-fallback) → audit contains `pool_routing.routing_decision: "fell-back-no-pool"`; (d) Task 51 (recovery) → audit contains `recovery.occurred: true`; (e) any multi-model fixture with `record_finding_attribution_telemetry: true` → audit contains `finding_attribution_telemetry`; with flag `false` → block absent. Done. Created tests/fixtures/multi-model-teams/audit/audit-extensions-fixture.test.ts — 53 tests across 7 describe blocks covering all 5 sub-cases: (a) team_metadata Section 8 with roster and cross-domain messages, (b) pool-match routing_decision: routed-to-pool, (c) no-pool-fallback routing_decision: fell-back-no-pool, (d) recovery.occurred: true with failed_reviewer, (e) attribution telemetry flag=true present/flag=false absent. Integration describe block verifies ordinal ordering of sections 8–11. Commit pending. | L | Tasks 59, 60, 61 | done |
 
 **Task 59 Acceptance Criteria:**
 - `[T]` Writer accepts three new optional blocks; existing parent tests (Task 40) pass unchanged
@@ -773,6 +774,7 @@ Extends parent's audit writer with team/pool/recovery blocks. Surfaces both feat
 
 **Parallelizable:** Task 60a runs in parallel with 59/60 (parent coordination is independent of writer authoring). Tasks 59 and 60 sequence (60 depends on 59 and 60a). Task 61 follows. Task 62 fixtures follow.
 **Milestone Value:** Audit pipeline complete with team/pool/recovery/attribution blocks.
+**Status:** Complete. Tasks 59, 60, 60a, 61, 62 done.
 
 ### Milestone 8.2: team-init updates and documentation
 
@@ -934,6 +936,55 @@ Lower-priority post-v1 work. Ships alongside parent's Milestone 7.3. **NFR-MMT5 
 
 **Parallelizable:** Sequential.
 **Milestone Value:** Quality regression protection beyond schema and behavioral tests.
+
+---
+
+## Phase 11 — External CLI Permission Architecture
+
+Implements the three-pattern permission model for external CLI adapter agents. Ensures CLI invocations are safe by default and that users can opt into more permissive modes only with explicit configuration.
+
+**Architectural decision:** ADR-003 (external CLI permission model). See Cross-Cutting Notes.
+
+### Milestone 11.1: Permission model implementation and config
+
+| # | Task | Complexity | Dependencies | Status |
+|---|------|-----------|--------------|--------|
+| 79 | Add ADR-003 to plan Decisions table: "External CLI permission model = Pattern 1 (read-only) by default, Pattern 3 (parent-mediated) auto-selected for CLIs that support it (Codex app-server, Claude Code canUseTool), Pattern 2 (sandbox-yolo) as per-CLI config opt-in." Add `multi_model_review.external_permission_mode.<cli-name>: read-only | sandbox-yolo | parent-mediated` config key to `.synthex/config/defaults.yaml` (parent namespace) with default `read-only` and inline documentation. | S | None | pending |
+| 80 | Update `plugins/synthex/agents/codex-review-prompter.md` to: (a) invoke Codex via `app-server` JSON-RPC mode by default (Pattern 3 — parent-mediated); (b) parse `requestApproval` JSON-RPC messages from Codex stdout; (c) proxy approval requests to the parent Claude session via the Task tool's structured output; (d) document the `app-server` protocol in the agent. Fall back to Pattern 1 (read-only) when `app-server` mode is unavailable. | M | Task 79 | pending |
+| 81 | Update `plugins/synthex/agents/gemini-review-prompter.md` and all other non-Codex, non-Claude external adapter agents to invoke their CLIs in Pattern 1 (read-only) mode by default: add `--sandbox`, `--no-auto-edit`, or equivalent read-only flags per CLI. Add config-read step: when `multi_model_review.external_permission_mode.<cli-name>: sandbox-yolo` is set, use Pattern 2 with OS sandbox. Document the safety rationale in each agent. | M | Task 79 | pending |
+| 82 | Add `external_permission_mode` config block to `.synthex/config/defaults.yaml` (all CLI names default to `read-only`; Codex defaults to `parent-mediated`; Claude Code defaults to `parent-mediated`). Add Layer 1 schema validator extension for the new config key. | S | Tasks 80, 81 | pending |
+| 83 | Update `start-review-team` and `/review-code` / `/performance-audit` commands to display a one-line warning when any CLI in the resolved roster has `sandbox-yolo` mode configured: "⚠ <cli-name> is configured in sandbox-yolo mode — CLI will run with full tool permissions inside an OS sandbox." Require explicit confirmation (`y/N`) before spawning. | S | Task 81 | pending |
+| 84 | Layer 1 schema tests for permission model config and adapter read-only invocation flags. Layer 2 fixture: codex app-server requestApproval flow (permission proxied to parent); gemini read-only mode invocation; sandbox-yolo config + confirmation prompt. | M | Tasks 80, 81, 82, 83 | pending |
+
+**Task 79 Acceptance Criteria:**
+- `[T]` ADR-003 present in Decisions table with Pattern 1/2/3 description
+- `[T]` `multi_model_review.external_permission_mode` config key present in defaults.yaml with `read-only` default
+- `[H]` Config key inline docs explain when to use each mode
+
+**Task 80 Acceptance Criteria:**
+- `[T]` Codex adapter uses app-server JSON-RPC mode (raw-string check for `app-server` invocation flag)
+- `[T]` requestApproval parsing documented and implemented in agent markdown
+- `[T]` Fallback to Pattern 1 when app-server unavailable (raw-string check)
+
+**Task 81 Acceptance Criteria:**
+- `[T]` Each non-Pattern-3 adapter documents its read-only flag (e.g., `--sandbox`, `--no-auto-edit`)
+- `[T]` Config-read step for `sandbox-yolo` override present (raw-string check)
+
+**Task 82 Acceptance Criteria:**
+- `[T]` defaults.yaml config block present with all CLI names
+- `[T]` Codex and Claude Code default to `parent-mediated`; all others default to `read-only`
+
+**Task 83 Acceptance Criteria:**
+- `[T]` Warning string matches verbatim
+- `[T]` Confirmation prompt required for sandbox-yolo; skipped for read-only and parent-mediated
+
+**Task 84 Acceptance Criteria:**
+- `[T]` Layer 1 schema test validates `external_permission_mode` enum per CLI
+- `[T]` Layer 2 fixture: Codex requestApproval flow proxied to parent
+- `[T]` Layer 2 fixture: gemini read-only invocation (no destructive tool-use)
+
+**Parallelizable:** Task 79 first. Tasks 80 and 81 in parallel after 79. Task 82 follows. Tasks 83 and 84 in parallel after 82.
+**Milestone Value:** External CLI invocations are safe by default. Users can enable more permissive modes with explicit acknowledgment. Codex and Claude Code benefit from native approval proxying without interrupting review flow.
 
 ---
 
