@@ -1,0 +1,7 @@
+{
+  "lead_produces_consolidated_report": true,
+  "orchestrator_report_waited_for": false,
+  "report": "## Code Review Report\n\n### Reviewed: main..HEAD\n### Date: 2026-04-26\n\n---\n\n### Overall Verdict: WARN\n\n| Reviewer | Verdict | Findings |\n|----------|---------|----------|\n| Craftsmanship (code-reviewer) | WARN | 1 medium |\n| Security (security-reviewer) | PASS | 0 |\n\n---\n\n### MEDIUM Findings\n\n**Missing null check in getUserById** (correctness, code-reviewer)\n- File: src/users/service.ts, symbol: getUserById\n\n---\n\n### What's Done Well\n\n- Good separation of concerns in the user service layer\n\n---\n\n### Summary\n\nOne medium issue found. Safe to merge after addressing the null check.\n",
+  "baseline_match": true,
+  "note": "Output matches Task 0 baseline schema (same section headings, same native artifacts)"
+}

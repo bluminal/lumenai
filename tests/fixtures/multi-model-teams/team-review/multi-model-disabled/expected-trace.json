@@ -1,0 +1,5 @@
+{
+  "multi_model_review_orchestrator_task_invoked": false,
+  "orchestrator_task_invocations_count": 0,
+  "note": "FR-MMT3 criterion 8: no multi-model-review-orchestrator Task invocation when multi_model=false. Regression fixture."
+}

@@ -1,0 +1,6 @@
+{
+  "multi_model_overlay_included": false,
+  "lead_spawn_prompt_contains_fr_mmt4_suppression": false,
+  "reviewer_spawn_prompts_contain_fr_mmt20_envelope": false,
+  "note": "D22: when multi_model=false, overlay is omitted entirely from all spawn prompts. Raw-string negative match assertion."
+}
