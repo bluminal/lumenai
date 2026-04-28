@@ -15,5 +15,8 @@
     "./commands/start-review-team.md",
     "./commands/stop-review-team.md",
     "./commands/list-teams.md"
+  ],
+  "agents": [
+    "./agents/team-orchestrator-bridge.md"
   ]
 }
