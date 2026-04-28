@@ -1,0 +1,47 @@
+{
+  "scenario": "severity-one-level-diff",
+  "description": "One consolidated finding raised by 2 reviewers with a one-level severity disagreement (high vs medium). Stage 5 applies max severity without invoking the judge step.",
+  "consolidated_findings": [
+    {
+      "finding_id": "security.validateToken.weak-signature-algorithm",
+      "severity": "high",
+      "category": "security",
+      "title": "Weak signature algorithm used in token validation",
+      "description": "The validateToken function uses HS256 which is considered weak for high-security contexts; RS256 or ES256 is recommended.",
+      "file": "src/auth/validateToken.ts",
+      "symbol": "validateToken",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        { "reviewer_id": "security-reviewer", "family": "anthropic", "source_type": "native-team" },
+        { "reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external" }
+      ],
+      "per_reviewer_severities": [
+        { "reviewer_id": "security-reviewer", "severity": "high" },
+        { "reviewer_id": "codex-review-prompter", "severity": "medium" }
+      ]
+    }
+  ],
+  "config": {
+    "stage5_two_level_gap_threshold": 2,
+    "stage2_jaccard_threshold": 0.8,
+    "stage4_max_calls_per_consolidation": 25
+  },
+  "expected_stage5_output": {
+    "severity": "high",
+    "severity_range": { "min": "medium", "max": "high" },
+    "severity_reasoning": null,
+    "judge_step_triggered": false
+  },
+  "notes": {
+    "gap_explanation": "high=3, medium=2 → gap of 1 level. Threshold is 2, so judge step NOT triggered.",
+    "max_rule": "When gap < threshold, Stage 5 takes the max severity: high wins over medium.",
+    "range_population": "severity_range always populated when severities differ: {min: medium, max: high}",
+    "reasoning_null": "severity_reasoning is null when no judge step fires"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "scenario": "minority-of-one-security-not-demoted",
+  "description": "A finding raised by only one reviewer (minority-of-one) in the security category. Stage 6 exempts security findings from severity demotion per FR-MR14b security carve-out.",
+  "consolidated_findings": [
+    {
+      "finding_id": "security.resetPassword.token-not-single-use",
+      "severity": "high",
+      "category": "security",
+      "title": "Password reset token is not invalidated after use",
+      "description": "The resetPassword function does not mark the reset token as used after successful password change, allowing replay attacks within the token's validity window.",
+      "file": "src/auth/resetPassword.ts",
+      "symbol": "resetPassword",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      },
+      "raised_by": [
+        { "reviewer_id": "security-reviewer", "family": "anthropic", "source_type": "native-team" }
+      ]
+    }
+  ],
+  "config": {
+    "stage6_minority_of_one_demotion_enabled": true,
+    "stage6_security_exemption": true,
+    "stage2_jaccard_threshold": 0.8,
+    "stage4_max_calls_per_consolidation": 25
+  },
+  "expected_stage6_output": {
+    "severity": "high",
+    "severity_demoted": false,
+    "demotion_reason": null,
+    "exemption_applied": "security_category_exemption",
+    "minority_of_one": true
+  },
+  "notes": {
+    "minority_of_one_detected": "raised_by has exactly 1 entry → minority-of-one rule applies",
+    "security_exemption": "category=security → security carve-out fires → demotion is SKIPPED",
+    "severity_unchanged": "high remains high; it is NOT demoted to medium",
+    "rationale": "Security findings may be unique to a single reviewer because other reviewers missed it, not because it is wrong. Demotion would suppress legitimate security findings."
+  }
+}

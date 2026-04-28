@@ -1,0 +1,34 @@
+{
+  "description": "Recorded Task call payload sent by the orchestrator to codex-review-prompter when it acts as the external aggregator. This is the FR-MR9 input envelope with judge_mode_prompt injected per Step 8g.",
+  "task_call": {
+    "agent": "codex-review-prompter",
+    "input": {
+      "command": "review-code",
+      "context_bundle": {
+        "manifest": {
+          "artifact_path": "src/payments/checkoutFlow.ts",
+          "touched_files": ["src/payments/checkoutFlow.ts"],
+          "bundle_bytes": 4200
+        },
+        "files": [
+          {
+            "path": "src/payments/checkoutFlow.ts",
+            "content": "// placeholder — assembled by context-bundle-assembler"
+          }
+        ]
+      },
+      "findings_to_consolidate": [
+        "security.checkoutflow.missing-idempotency-key",
+        "correctness.checkoutflow.cart-not-validated",
+        "performance.checkoutflow.n-plus-one-inventory-check",
+        "correctness.checkoutflow.no-rollback-on-partial-failure"
+      ],
+      "config": {
+        "model": "gpt-5",
+        "family": "openai",
+        "raw_output_path": "/tmp/audit/codex-review-prompter-a3f2b1c4.json",
+        "judge_mode_prompt": "You are acting as an impartial judge consolidating findings from multiple reviewers. Evaluate each finding on its merits, free of attribution bias. Position randomization has been applied to the input."
+      }
+    }
+  }
+}
