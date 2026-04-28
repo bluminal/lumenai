@@ -656,9 +656,9 @@ Lower-priority but planned work that ships in subsequent releases. Not required 
 ### Milestone 7.1: Stage 3 Semantic Dedup
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 54 | Resolve Q1 (Stage 3 fallback): decide between requiring `llm embed` vs. host-session embedding fallback. Document decision as a new D-row. | S | Phase 6 | pending |
-| 55 | Implement Stage 3 between current Stages 2 and 4: cosine similarity on title+description embeddings; merge above 0.85; pairs in [0.7, 0.85) flow to existing Stage 4 LLM tiebreaker. **Replaces D18's textual pre-filter with embedding similarity** as the primary Stage 4 input gate. The D18 max-calls cap remains. | M | Task 54 | pending |
-| 56 | Layer 2 fixture: planted semantically-similar findings (different wording, same meaning) → merged at Stage 3. | M | Task 55 | pending |
+| 54 | Resolve Q1 (Stage 3 fallback): decide between requiring `llm embed` vs. host-session embedding fallback. Document decision as a new D-row. | S | Phase 6 | in progress |
+| 55 | Implement Stage 3 between current Stages 2 and 4: cosine similarity on title+description embeddings; merge above 0.85; pairs in [0.7, 0.85) flow to existing Stage 4 LLM tiebreaker. **Replaces D18's textual pre-filter with embedding similarity** as the primary Stage 4 input gate. The D18 max-calls cap remains. | M | Task 54 | in progress |
+| 56 | Layer 2 fixture: planted semantically-similar findings (different wording, same meaning) → merged at Stage 3. | M | Task 55 | in progress |
 
 **Task 54 Acceptance Criteria:**
 - `[H]` Decision documented
