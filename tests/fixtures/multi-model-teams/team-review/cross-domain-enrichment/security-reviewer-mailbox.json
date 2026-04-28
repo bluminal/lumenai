@@ -1,0 +1,26 @@
+{
+  "from": "security-reviewer",
+  "to": "lead",
+  "type": "review_findings",
+  "report_markdown": "## Security Review Report\n\n### Verdict: FAIL\n\n**Cross-domain tip acknowledged:** Investigated code-reviewer's tip about src/users/repository.ts:88 and confirmed SQL injection risk.\n\n### HIGH Findings\n\n**SQL injection in searchUsers (confirmed via cross-domain tip)**\n`src/users/repository.ts:88` — Raw string concatenation in SQL query confirmed exploitable.\n",
+  "findings_json": {
+    "verdict": "FAIL",
+    "findings": [
+      {
+        "finding_id": "security.searchUsers.sql-injection-confirmed",
+        "severity": "high",
+        "category": "security",
+        "title": "SQL injection in searchUsers (confirmed via cross-domain tip)",
+        "description": "Raw string concatenation in SQL query confirmed exploitable. Cross-domain tip from code-reviewer prompted security-focused investigation.",
+        "file": "src/users/repository.ts",
+        "symbol": "searchUsers",
+        "line_range": {"start": 88, "end": 92},
+        "source": {
+          "reviewer_id": "security-reviewer",
+          "family": "anthropic",
+          "source_type": "native-team"
+        }
+      }
+    ]
+  }
+}

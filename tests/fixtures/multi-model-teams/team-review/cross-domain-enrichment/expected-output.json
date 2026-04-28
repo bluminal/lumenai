@@ -1,0 +1,22 @@
+{
+  "cross_domain_messages_blocked_by_fr_mmt4": false,
+  "note_fr_mmt4_kept_responsibilities": "FR-MMT4 suppression only affects the Lead's consolidated-report production. Cross-domain reviewer-to-reviewer messages are unaffected — they are a separate communication channel.",
+  "orchestrator_input_findings_include_cross_domain_context": true,
+  "orchestrator_consumes_cross_domain_messages_directly": false,
+  "findings": [
+    {
+      "finding_id": "security.searchUsers.sql-injection-confirmed",
+      "severity": "high",
+      "category": "security",
+      "title": "SQL injection in searchUsers (confirmed via cross-domain tip)",
+      "description": "Raw string concatenation in SQL query confirmed exploitable. Cross-domain tip from code-reviewer prompted security-focused investigation.",
+      "file": "src/users/repository.ts",
+      "symbol": "searchUsers",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    }
+  ]
+}

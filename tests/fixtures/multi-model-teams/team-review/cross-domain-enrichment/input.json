@@ -1,0 +1,15 @@
+{
+  "command": "team-review",
+  "target": "main..HEAD",
+  "multi_model": true,
+  "team_name": "review-a3f7b2c1",
+  "config": {
+    "multi_model_review": {
+      "per_command": {"team_review": {"enabled": true}},
+      "reviewers": [{"adapter": "codex-review-prompter", "model": "gpt-4o"}],
+      "include_native_reviewers": true
+    }
+  },
+  "native_reviewers": ["code-reviewer", "security-reviewer"],
+  "external_reviewers": ["codex-review-prompter"]
+}

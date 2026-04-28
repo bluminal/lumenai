@@ -1,0 +1,8 @@
+{
+  "from": "code-reviewer",
+  "to": "security-reviewer",
+  "type": "message",
+  "body": "FYI: in src/users/repository.ts line 88, I noticed raw string concatenation that may be a SQL injection risk. Flagging as code quality issue on my end, but you should evaluate from a security angle.",
+  "file_hint": "src/users/repository.ts",
+  "line_hint": 88
+}
