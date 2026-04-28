@@ -723,23 +723,29 @@ Lower-priority but planned work that ships in subsequent releases. Not required 
 ### Milestone 7.3: Layer 3 Semantic Eval
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 61 | Author Layer 3 LLM-as-judge promptfoo entries for orchestrator: corpus of 5–10 real multi-reviewer scenarios; judge prompt asks "would a human accept this consolidation?". **Includes a Task-call-sequencing semantic eval** covering the FR-MR12 single-batch property (the verifiability gap noted in cycle-1 review against Task 23). | L | Phase 6 | in progress |
-| 61a | **Runtime-only orchestrator behavioral checks (Layer 3, live invocation).** Author Layer 3 promptfoo entries for two orchestrator behaviors that cannot be verified against cached fixtures: (1) **Wall-clock parallel fan-out** — issue a real 4-proposer fan-out (2 native + 2 external, real CLIs) and assert wall-clock latency is within 1.5× the slowest single proposer's measured latency (NFR-MR3); pads the cycle-1 deferral of Task 23's wall-clock assertion. (2) **Position randomization in Stage 4** — invoke the Stage 4 tiebreaker twice in succession with the same ambiguous pair; assert the two recorded prompts present the findings in reversed order (verifies Task 26's randomization rule operationally). Live invocations bypass cache by definition; entries are tagged manual-trigger-only per CLAUDE.md testing pyramid. | M | Task 61 | in progress |
-| 62 | Establish quality baseline; document expected pass rate; gate future PRs on regression. | M | Tasks 61, 61a | in progress |
+| 61 | Author Layer 3 LLM-as-judge promptfoo entries for orchestrator: corpus of 5–10 real multi-reviewer scenarios; judge prompt asks "would a human accept this consolidation?". **Includes a Task-call-sequencing semantic eval** covering the FR-MR12 single-batch property (the verifiability gap noted in cycle-1 review against Task 23). | L | Phase 6 | done |
+| 61a | **Runtime-only orchestrator behavioral checks (Layer 3, live invocation).** Author Layer 3 promptfoo entries for two orchestrator behaviors that cannot be verified against cached fixtures: (1) **Wall-clock parallel fan-out** — issue a real 4-proposer fan-out (2 native + 2 external, real CLIs) and assert wall-clock latency is within 1.5× the slowest single proposer's measured latency (NFR-MR3); pads the cycle-1 deferral of Task 23's wall-clock assertion. (2) **Position randomization in Stage 4** — invoke the Stage 4 tiebreaker twice in succession with the same ambiguous pair; assert the two recorded prompts present the findings in reversed order (verifies Task 26's randomization rule operationally). Live invocations bypass cache by definition; entries are tagged manual-trigger-only per CLAUDE.md testing pyramid. | M | Task 61 | done |
+| 62 | Establish quality baseline; document expected pass rate; gate future PRs on regression. | M | Tasks 61, 61a | done |
 
 **Task 61 Acceptance Criteria:**
 - `[H]` Promptfoo entries authored; corpus of 5+ scenarios
 - `[H]` Judge prompt elicits scoring with reasoning
 - `[H]` Includes Task-call-sequencing eval for FR-MR12 verification
 
+**Task 61 Completion Notes:** Done. `tests/promptfoo/multi-model-review/orchestrator-consolidation-judge.yaml` with 6 test entries (5 LLM-as-judge consolidation scenarios @ threshold 0.7 + FR-MR12 single-batch sequencing eval @ threshold 0.9). Corpus dir with 6 scenario files (security-csrf, performance-n-plus-one, correctness-race-condition, design-tokens, plan-review, fanout-trace). All 3 `[H]` (entries authored; judge prompt with rubric; FR-MR12 eval included) approved during execution. Bundled commit `44b4901`.
+
 **Task 61a Acceptance Criteria:**
 - `[H]` Wall-clock entry: measured wall-clock for 4-proposer live fan-out within 1.5× the slowest single proposer's latency (NFR-MR3); recorded as Layer 3 metric, not asserted on cached fixtures
 - `[H]` Position-randomization entry: two adjacent live invocations of Stage 4 tiebreaker with the same ambiguous pair present findings in reversed order
 - `[T]` Both entries tagged manual-trigger-only and excluded from per-PR Layer 1 + Layer 2 default suite
 
+**Task 61a Completion Notes:** Done. `orchestrator-runtime-checks.yaml` with 2 LIVE test entries (NFR-MR3 wall-clock ≤ 1.5× via JS assertion; position-randomization order-flip check). Tagged `[layer3, manual-trigger-only, mmr, live, requires-clis]` — excluded from per-PR Layer 1+2 default suite. 2 `[H]` approved + 1 `[T]` (manual-trigger tagging) verified. Bundled commit `44b4901`.
+
 **Task 62 Acceptance Criteria:**
 - `[H]` Baseline documented in `docs/specs/multi-model-review/test-baseline.md`
 - `[H]` CI integration planned (manual-trigger only per CLAUDE.md testing pyramid)
+
+**Task 62 Completion Notes:** Done. `docs/specs/multi-model-review/test-baseline.md` (`## Status: Final`). Layer 3 coverage table; expected pass rates (≥80% consolidation; 100% FR-MR12/NFR-MR3/position-randomization); CI integration plan (per-release/per-quarter/ad-hoc; manual-trigger per CLAUDE.md pyramid); regression policy. Both `[H]` approved during execution. Bundled commit `44b4901`.
 
 **Parallelizable:** Sequential — Task 61a depends on Task 61's promptfoo scaffolding; Task 62 depends on both.
 **Milestone Value:** Quality regression protection beyond schema and behavioral tests. Validates aggregator quality, FR-MR12 single-batch property, parallel-fan-out wall-clock (NFR-MR3), and Stage 4 position-randomization holistically — runtime-only behaviors deferred from Layer 2 cached fixtures.
