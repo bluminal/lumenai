@@ -15,6 +15,7 @@ import {
   findSection,
   type ParsedOutput,
 } from './helpers.js';
+import { PATH_AND_REASON_HEADER_REGEX } from './orchestrator-output.js';
 
 // ── Expected Sections ────────────────────────────────────────────
 // Accept alternative names the agent may use.
@@ -122,3 +123,45 @@ export function validateCodeReviewerOutput(text: string): ValidationResult {
 }
 
 export { parseMarkdownOutput };
+
+// ── D21 Path-and-Reason Header Validation (Task 37) ──────────────
+
+export interface HeaderValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+/**
+ * Validates a path-and-reason header string against the D21 literal regex.
+ *
+ * D21 regex (verbatim):
+ *   Review path: [^()]+\([^)]+; reviewers: \d+ native(?:\s*[+,]\s*\d+ external(?:\s+\w+)?)?\)
+ *
+ * Three invariants:
+ *   1. Begins `Review path:`
+ *   2. Parenthetical reason clause follows
+ *   3. `reviewers:` suffix states `N native` and, when externals were attempted, `+ M external`
+ *      (or `, M external <qualifier>` for the failed-externals variant)
+ */
+export function validatePathAndReasonHeader(header: string): HeaderValidationResult {
+  if (!header.startsWith('Review path:')) {
+    return { valid: false, error: 'Header must begin with "Review path:"' };
+  }
+
+  if (!header.includes('(') || !header.includes(')')) {
+    return { valid: false, error: 'Header must contain a parenthetical reason clause' };
+  }
+
+  if (!header.includes('reviewers:')) {
+    return { valid: false, error: 'Header must contain a "reviewers:" suffix' };
+  }
+
+  if (!PATH_AND_REASON_HEADER_REGEX.test(header)) {
+    return {
+      valid: false,
+      error: `Header does not match D21 regex. Got: "${header}"`,
+    };
+  }
+
+  return { valid: true };
+}

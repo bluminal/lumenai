@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { validateCodeReviewerOutput } from './code-reviewer.js';
+import { validateCodeReviewerOutput, validatePathAndReasonHeader } from './code-reviewer.js';
 import {
   parseMarkdownOutput,
   areFindingsSorted,
@@ -243,5 +243,92 @@ No existing patterns identified for comparison (new file).
     const result = validateCodeReviewerOutput(sampleOutput);
     expect(result.errors).toEqual([]);
     expect(result.valid).toBe(true);
+  });
+});
+
+// ── D21 Path-and-Reason Header Validation (Task 37) ──────────────
+
+describe('validatePathAndReasonHeader — D21 spec (Task 37)', () => {
+
+  // ── Six PRD example renderings: all must PASS ─────────────────
+
+  it('PRD example 1: multi-model, above-threshold diff, 2+2 reviewers', () => {
+    const result = validatePathAndReasonHeader(
+      'Review path: multi-model (above-threshold diff; reviewers: 2 native + 2 external)'
+    );
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('PRD example 2: multi-model, auth path escalated, 2+3 reviewers', () => {
+    const result = validatePathAndReasonHeader(
+      'Review path: multi-model (auth path escalated; reviewers: 2 native + 3 external)'
+    );
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('PRD example 3: multi-model, above-threshold diff, 1+2 reviewers', () => {
+    const result = validatePathAndReasonHeader(
+      'Review path: multi-model (above-threshold diff; reviewers: 1 native + 2 external)'
+    );
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('PRD example 4: native-only, below-threshold diff, 2 native reviewers', () => {
+    const result = validatePathAndReasonHeader(
+      'Review path: native-only (below-threshold diff; reviewers: 2 native)'
+    );
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('PRD example 5: native-only, disabled by --no-multi-model flag, 2 native reviewers', () => {
+    const result = validatePathAndReasonHeader(
+      'Review path: native-only (multi-model disabled by --no-multi-model flag; reviewers: 2 native)'
+    );
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('PRD example 6: multi-model, above-threshold diff, failed-externals variant (0 external succeeded)', () => {
+    const result = validatePathAndReasonHeader(
+      'Review path: multi-model (above-threshold diff; reviewers: 2 native, 0 external succeeded)'
+    );
+    expect(result.valid).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  // ── Rejection tests ───────────────────────────────────────────
+
+  it('rejects header missing "Review path:" prefix', () => {
+    const result = validatePathAndReasonHeader(
+      'multi-model (above-threshold diff; reviewers: 2 native + 2 external)'
+    );
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeDefined();
+  });
+
+  it('rejects header without parenthetical clause', () => {
+    const result = validatePathAndReasonHeader(
+      'Review path: multi-model reviewers: 2 native'
+    );
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeDefined();
+  });
+
+  it('rejects header with "reviewers:" missing', () => {
+    const result = validatePathAndReasonHeader(
+      'Review path: multi-model (above-threshold diff; 2 native + 2 external)'
+    );
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeDefined();
+  });
+
+  it('rejects empty string', () => {
+    const result = validatePathAndReasonHeader('');
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeDefined();
   });
 });
