@@ -1,0 +1,18 @@
+{
+  "scenario": "enabled-with-detected-mixed",
+  "description": "Detection scan finds codex (auth), gemini (no-auth), ollama (auth). User picks option 1. Config matches authenticated CLIs only; gemini surfaced separately with remediation hint.",
+  "detection_results": {
+    "detected_and_authenticated": ["codex", "ollama"],
+    "detected_but_unauthenticated": [{ "cli": "gemini", "remediation_hint": "run `gcloud auth login` to enable" }],
+    "not_detected": ["llm", "aws", "claude"]
+  },
+  "user_choice": 1,
+  "expected_config_writes": {
+    "multi_model_review.enabled": true,
+    "multi_model_review.reviewers": ["codex-review-prompter", "ollama-review-prompter"]
+  },
+  "expected_option_label_includes": ["codex", "ollama"],
+  "expected_option_label_excludes": ["gemini"],
+  "expected_remediation_hints_section_includes": ["gemini", "gcloud auth login"],
+  "expected_docs_reviews_created": true
+}

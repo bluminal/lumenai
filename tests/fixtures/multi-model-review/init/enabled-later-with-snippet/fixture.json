@@ -1,0 +1,15 @@
+{
+  "scenario": "enabled-later-with-snippet",
+  "description": "User picks option 2. No config written. Commented-out YAML snippet printed with detected CLIs.",
+  "detection_results": {
+    "detected_and_authenticated": ["codex", "ollama"],
+    "detected_but_unauthenticated": [{ "cli": "gemini", "remediation_hint": "run `gcloud auth login` to enable" }],
+    "not_detected": ["llm", "aws", "claude"]
+  },
+  "user_choice": 2,
+  "expected_config_writes": {},
+  "expected_yaml_snippet_starts_with": "multi_model_review:",
+  "expected_yaml_snippet_includes_commented_reviewers": ["codex-review-prompter", "gemini-review-prompter", "ollama-review-prompter"],
+  "expected_yaml_snippet_yaml_valid": true,
+  "expected_docs_reviews_created": false
+}

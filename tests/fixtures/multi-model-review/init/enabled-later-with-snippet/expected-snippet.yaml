@@ -1,0 +1,8 @@
+# multi_model_review:
+#   enabled: true
+#   reviewers:
+#     # - codex-review-prompter      # OpenAI / Codex CLI  (codex login)
+#     # - gemini-review-prompter     # Google / gcloud     (gcloud auth login)
+#     # - ollama-review-prompter     # Local model         (ollama serve)
+#   aggregator:
+#     command: auto

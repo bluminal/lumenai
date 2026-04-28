@@ -1,0 +1,13 @@
+{
+  "scenario": "skip",
+  "description": "User picks option 3 (Skip). No multi_model_review section in config; no docs/reviews/ created.",
+  "detection_results": {
+    "detected_and_authenticated": ["codex", "ollama"],
+    "detected_but_unauthenticated": [{ "cli": "gemini", "remediation_hint": "run `gcloud auth login` to enable" }],
+    "not_detected": ["llm", "aws", "claude"]
+  },
+  "user_choice": 3,
+  "expected_config_writes": {},
+  "expected_no_multi_model_section": true,
+  "expected_docs_reviews_created": false
+}
