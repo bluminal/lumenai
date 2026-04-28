@@ -1,0 +1,35 @@
+{
+  "scenario": "credential-scope-representative",
+  "description": "Representative multi-model review-code invocation; all output paths populated; pattern set scanned for credential leakage. FR-MR2 acceptance.",
+  "command": "review-code",
+  "config": {
+    "multi_model_review": {
+      "enabled": true,
+      "reviewers": ["codex-review-prompter", "gemini-review-prompter"],
+      "audit": {
+        "enabled": true,
+        "output_path": "docs/reviews/",
+        "raw_output_path": "docs/reviews/raw/"
+      }
+    }
+  },
+  "credential_pattern_set": [
+    "sk-",
+    "AIzaSy",
+    "AWS_SECRET",
+    "AWS_ACCESS_KEY_ID",
+    "Bearer ",
+    "bearer_",
+    "xoxb-",
+    "glpat-",
+    "ghp_",
+    "gho_"
+  ],
+  "scanned_paths": [
+    "audit_file",
+    "raw_output_files",
+    "orchestrator_stderr",
+    "synthex_config_yaml_post_init",
+    "bundle_manifest"
+  ]
+}

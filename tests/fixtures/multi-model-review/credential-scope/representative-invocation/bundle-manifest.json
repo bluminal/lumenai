@@ -1,0 +1,69 @@
+{
+  "bundle_id": "d4f8a2e",
+  "assembled_at": "2026-04-26T09:14:24Z",
+  "artifact_path": "staged changes",
+  "total_bytes": 12743,
+  "max_bundle_bytes": 262144,
+  "max_file_bytes": 65536,
+  "truncated": false,
+  "files": [
+    {
+      "path": "src/controllers/userController.ts",
+      "size_bytes": 2814,
+      "summarized": false,
+      "included_reason": "touched_file"
+    },
+    {
+      "path": "src/repositories/userRepository.ts",
+      "size_bytes": 1932,
+      "summarized": false,
+      "included_reason": "touched_file"
+    },
+    {
+      "path": "src/models/user.ts",
+      "size_bytes": 1247,
+      "summarized": false,
+      "included_reason": "touched_file"
+    },
+    {
+      "path": "src/services/userService.ts",
+      "size_bytes": 3108,
+      "summarized": false,
+      "included_reason": "touched_file"
+    },
+    {
+      "path": "src/validators/userValidator.ts",
+      "size_bytes": 976,
+      "summarized": false,
+      "included_reason": "touched_file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "size_bytes": 1842,
+      "summarized": false,
+      "included_reason": "convention_file"
+    },
+    {
+      "path": ".eslintrc.json",
+      "size_bytes": 412,
+      "summarized": false,
+      "included_reason": "convention_file"
+    },
+    {
+      "path": ".prettierrc",
+      "size_bytes": 148,
+      "summarized": false,
+      "included_reason": "convention_file"
+    }
+  ],
+  "spec_files": [],
+  "convention_files": [
+    "CLAUDE.md",
+    ".eslintrc.json",
+    ".prettierrc"
+  ],
+  "diff_stats": {
+    "lines_changed": 127,
+    "files_touched": 5
+  }
+}

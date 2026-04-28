@@ -1,0 +1,80 @@
+{
+  "adapter": "codex-review-prompter",
+  "model": "codex-1",
+  "family": "openai",
+  "status": "success",
+  "invocation_id": "d4f8a2e-codex",
+  "timestamp": "2026-04-26T09:14:38Z",
+  "usage": {
+    "input_tokens": 5120,
+    "output_tokens": 384,
+    "total_tokens": 5504
+  },
+  "findings": [
+    {
+      "finding_id": "missing-input-validation-handleGetUser",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing input validation on user-supplied path parameter",
+      "description": "The path parameter 'id' is passed directly to the repository without sanitization or type checking. An attacker could supply unexpected input leading to unintended behavior.",
+      "file": "src/controllers/userController.ts",
+      "symbol": "handleGetUser",
+      "line_range": { "start": 24, "end": 31 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "unhandled-rejection-findById",
+      "severity": "medium",
+      "category": "correctness",
+      "title": "Unhandled promise rejection in repository layer",
+      "description": "findById does not catch promise rejections. A failed database query propagates as an unhandled rejection, which can crash the Node process in non-recovery configurations.",
+      "file": "src/repositories/userRepository.ts",
+      "symbol": "findById",
+      "line_range": { "start": 14, "end": 20 },
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "missing-rate-limit-handleGetUser",
+      "severity": "medium",
+      "category": "security",
+      "title": "No rate limiting applied to user lookup endpoint",
+      "description": "The controller does not enforce per-IP or per-user rate limiting, leaving the endpoint open to enumeration.",
+      "file": "src/controllers/userController.ts",
+      "symbol": "handleGetUser",
+      "line_range": { "start": 18, "end": 23 },
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "error-details-leak-handleGetUser",
+      "severity": "low",
+      "category": "security",
+      "title": "Error details exposed in HTTP response body",
+      "description": "The catch block forwards the raw error message to the client. Internal stack traces or database error messages may leak implementation details.",
+      "file": "src/controllers/userController.ts",
+      "symbol": "handleGetUser",
+      "line_range": { "start": 42, "end": 45 },
+      "confidence": "low",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    }
+  ],
+  "raw_path": "docs/reviews/raw/d4f8a2e-codex-review-prompter.json"
+}

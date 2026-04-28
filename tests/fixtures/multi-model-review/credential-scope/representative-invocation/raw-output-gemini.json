@@ -1,0 +1,64 @@
+{
+  "adapter": "gemini-review-prompter",
+  "model": "gemini-2.5-pro",
+  "family": "google",
+  "status": "success",
+  "invocation_id": "d4f8a2e-gemini",
+  "timestamp": "2026-04-26T09:14:41Z",
+  "usage": {
+    "input_tokens": 4876,
+    "output_tokens": 297,
+    "total_tokens": 5173
+  },
+  "findings": [
+    {
+      "finding_id": "missing-input-validation-handleGetUser",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing input validation on user-supplied path parameter",
+      "description": "Path parameter 'id' is not validated before use. Type coercion or injection via crafted input is possible.",
+      "file": "src/controllers/userController.ts",
+      "symbol": "handleGetUser",
+      "line_range": { "start": 24, "end": 31 },
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "redundant-null-check-toDTO",
+      "severity": "low",
+      "category": "style",
+      "title": "Redundant null check before optional chaining",
+      "description": "The explicit null check `if (x !== null)` before `x?.property` is redundant. Optional chaining already handles null safely.",
+      "file": "src/models/user.ts",
+      "symbol": "toDTO",
+      "line_range": { "start": 38, "end": 41 },
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "missing-index-user-email",
+      "severity": "medium",
+      "category": "performance",
+      "title": "Missing database index on frequently queried email column",
+      "description": "The email field is used in WHERE clauses across multiple query paths but has no index defined in the schema or migration files.",
+      "file": "src/repositories/userRepository.ts",
+      "symbol": "findByEmail",
+      "line_range": { "start": 26, "end": 32 },
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    }
+  ],
+  "raw_path": "docs/reviews/raw/d4f8a2e-gemini-review-prompter.json"
+}
