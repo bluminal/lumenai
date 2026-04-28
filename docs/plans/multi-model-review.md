@@ -686,23 +686,29 @@ Lower-priority but planned work that ships in subsequent releases. Not required 
 ### Milestone 7.2: Fast-Follow Adapters
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 57 | Author `llm-review-prompter.md` per FR-MR8 + FR-MR10. Universal escape-hatch (50+ providers via `llm` plugins). `text-only` tier. Family inferred from model-ID prefix. | M | Phase 6 | in progress |
-| 58 | Author `bedrock-review-prompter.md` per FR-MR8 + FR-MR10. AWS Bedrock CLI. `text-only` tier. Family inferred from Bedrock model ID. | M | Phase 6 | in progress |
-| 59 | Author `claude-review-prompter.md` per FR-MR8 + FR-MR10. Specialty adapter (use only for second Anthropic voice with different model than host session). `agentic` tier. Family `anthropic`. Doc explicitly notes "not in default-recommended set" per FR-MR10. | M | Phase 6 | in progress |
-| 60 | Add all three to `plugin.json` (single PR). Layer 1 validator tests for each via shared validator. **NFR-MR5 verification:** each of Tasks 57–59 implemented in exactly 3 file changes (adapter `.md` + `plugin.json` entry + adapter-recipes doc entry). Any orchestrator change required during 57–59 is treated as a defect against the extensibility contract. | S | Tasks 57–59 | pending |
+| 57 | Author `llm-review-prompter.md` per FR-MR8 + FR-MR10. Universal escape-hatch (50+ providers via `llm` plugins). `text-only` tier. Family inferred from model-ID prefix. | M | Phase 6 | done |
+| 58 | Author `bedrock-review-prompter.md` per FR-MR8 + FR-MR10. AWS Bedrock CLI. `text-only` tier. Family inferred from Bedrock model ID. | M | Phase 6 | done |
+| 59 | Author `claude-review-prompter.md` per FR-MR8 + FR-MR10. Specialty adapter (use only for second Anthropic voice with different model than host session). `agentic` tier. Family `anthropic`. Doc explicitly notes "not in default-recommended set" per FR-MR10. | M | Phase 6 | done |
+| 60 | Add all three to `plugin.json` (single PR). Layer 1 validator tests for each via shared validator. **NFR-MR5 verification:** each of Tasks 57–59 implemented in exactly 3 file changes (adapter `.md` + `plugin.json` entry + adapter-recipes doc entry). Any orchestrator change required during 57–59 is treated as a defect against the extensibility contract. | S | Tasks 57–59 | in progress |
 
 **Task 57 Acceptance Criteria:**
 - `[T]` FR-MR8 checklist
 - `[T]` Correct tier and family declarations
 
+**Task 57 Completion Notes:** Done. `plugins/synthex/agents/llm-review-prompter.md` (text-only; family dynamic from model-ID prefix; 10-row mapping table; install `pip install llm`; sandbox N/A; auth N/A per per-plugin model). 48 tests in `llm-adapter-md.test.ts`. Both `[T]` criteria pass. Commit `aea8cc9`.
+
 **Task 58 Acceptance Criteria:**
 - `[T]` FR-MR8 checklist
 - `[T]` Correct tier and family declarations
+
+**Task 58 Completion Notes:** Done. `plugins/synthex/agents/bedrock-review-prompter.md` (text-only; family dynamic from Bedrock model ID; 7-row mapping table; install `pip install awscli`; auth `aws sts get-caller-identity`; sandbox N/A; gotchas: per-family request body, region, model-access opt-in, /tmp cleanup). 49 tests in `bedrock-adapter-md.test.ts`. Both `[T]` criteria pass. Commit `ebcde91`.
 
 **Task 59 Acceptance Criteria:**
 - `[T]` FR-MR8 checklist
 - `[T]` Correct tier and family declarations
 - `[T]` Doc explicitly notes specialty status
+
+**Task 59 Completion Notes:** Done. `plugins/synthex/agents/claude-review-prompter.md` (specialty adapter; agentic; family anthropic; CLI: `claude --model X --output-format json --permission-mode acceptEdits --tools '' -p`; auth `claude auth status`; install `npm install -g @anthropic-ai/claude-code`). Specialty status NOT-in-default-recommended-set documented with FR-MR15 self-preference warning + cross-family alternatives. 54 tests in `claude-adapter-md.test.ts`. All 3 `[T]` criteria pass (incl. specialty notation). Commit `c3100a7`.
 
 **Task 60 Acceptance Criteria:**
 - `[T]` All three registered
