@@ -14,8 +14,8 @@ describe('Task 3: architecture.md skeleton', () => {
     expect(existsSync(ARCH_PATH)).toBe(true);
   });
 
-  it('contains "## Status: Skeleton" header (Task 49 will replace with Final)', () => {
-    expect(content).toMatch(/## Status: Skeleton/);
+  it('contains "## Status: Final" header (Task 49 replaced the skeleton)', () => {
+    expect(content).toMatch(/## Status: Final/);
   });
 
   describe('All 6 architecture concerns covered', () => {
@@ -25,7 +25,7 @@ describe('Task 3: architecture.md skeleton', () => {
       'Parallel Fan-Out',
       'Context Bundle',
       'Audit Artifact',
-      'Forthcoming Docs',
+      'Cross-References to Forthcoming Documentation',
     ])('section: %s', (heading) => {
       expect(content).toContain(heading);
     });
@@ -56,8 +56,8 @@ describe('Task 3: architecture.md skeleton', () => {
     });
   });
 
-  it('forwards reference to Task 49 (Phase 6) for final pass', () => {
-    expect(content).toContain('Task 49');
+  it('documents the final architecture (Task 49 delivered: Status: Final present)', () => {
+    expect(content).toContain('## Status: Final');
   });
 
   it('is non-trivial length (skeleton must have substance per [H] criterion)', () => {
