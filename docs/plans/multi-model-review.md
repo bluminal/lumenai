@@ -517,7 +517,7 @@ Six PRD example variants are example renderings of the spec, not the contract. |
 ### Milestone 4.2: Cross-Cutting Credential-Scope Test
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 41 | **Cross-cutting Layer 2 credential-leak test (FR-MR2).** Invoke review-code with multi-model enabled. Grep ALL paths the orchestrator writes during a representative invocation: audit file, raw-output files at `raw_output_path`, orchestrator stderr, `.synthex/config.yaml` after init, the bundle manifest. Pattern set: `sk-`, `AIzaSy`, `AWS_SECRET`, `AWS_ACCESS_KEY_ID`, OAuth bearer prefixes (`Bearer `, `bearer_`), `xoxb-`, `glpat-`, `ghp_`, `gho_`. | M | Milestone 4.0, Milestone 4.1 | in progress |
+| 41 | **Cross-cutting Layer 2 credential-leak test (FR-MR2).** Invoke review-code with multi-model enabled. Grep ALL paths the orchestrator writes during a representative invocation: audit file, raw-output files at `raw_output_path`, orchestrator stderr, `.synthex/config.yaml` after init, the bundle manifest. Pattern set: `sk-`, `AIzaSy`, `AWS_SECRET`, `AWS_ACCESS_KEY_ID`, OAuth bearer prefixes (`Bearer `, `bearer_`), `xoxb-`, `glpat-`, `ghp_`, `gho_`. **Status:** Done. `tests/fixtures/multi-model-review/credential-scope/representative-invocation/` with 6 sample output files (audit, codex+gemini raw, stderr, post-init config, bundle manifest) — all credential-clean. 72 assertions in `credential-leak.test.ts` (60 grep checks: 10 patterns × 6 files). FR-MR2 cross-cutting acceptance closed. All 3 `[T]` criteria pass. Commit `0e02964`. | M | Milestone 4.0, Milestone 4.1 | done |
 
 **Task 41 Acceptance Criteria:**
 - `[T]` Audit file contains expected sections
