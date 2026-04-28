@@ -1,0 +1,114 @@
+{
+  "scenario": "correctness-race-condition",
+  "description": "Correctness finding consolidation: race condition in async task queue raised by code-reviewer (native) with high confidence. gemini-review-prompter raises a contradictory finding claiming the code is safe due to a misread of the mutex usage. Stage 5b (CoVe) adjudicates the contradiction. The correct finding (race condition exists) wins; the incorrect one is marked superseded_by_verification.",
+  "input": {
+    "command": "review-code",
+    "artifact_path": "src/workers/taskQueue.ts",
+    "native_reviewers": ["code-reviewer", "security-reviewer"],
+    "external_adapters": ["codex-review-prompter", "gemini-review-prompter"]
+  },
+  "raw_findings": [
+    {
+      "finding_id": "correctness.taskQueue.race-condition-counter",
+      "severity": "high",
+      "category": "correctness",
+      "title": "Race condition in concurrent task counter increment",
+      "description": "The shared taskCounter is incremented with `++` outside any mutex or atomic operation. Under concurrent worker execution, multiple workers can read the same value and produce duplicate task IDs.",
+      "file": "src/workers/taskQueue.ts",
+      "symbol": "TaskQueue",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "correctness.taskQueue.counter-is-safe",
+      "severity": "low",
+      "category": "correctness",
+      "title": "Task counter increment is safe due to AsyncMutex wrapper",
+      "description": "The taskCounter increment occurs inside the AsyncMutex-wrapped enqueue method, so concurrent access is serialized. No race condition exists.",
+      "file": "src/workers/taskQueue.ts",
+      "symbol": "TaskQueue",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "maintainability.taskQueue.missing-queue-drain-event",
+      "severity": "low",
+      "category": "maintainability",
+      "title": "TaskQueue does not emit drain event when queue empties",
+      "description": "Consumers relying on a drain event pattern to know when all tasks are done cannot hook into TaskQueue. Adding an EventEmitter drain event would simplify shutdown coordination.",
+      "file": "src/workers/taskQueue.ts",
+      "symbol": "TaskQueue",
+      "line_range": null,
+      "confidence": "low",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    }
+  ],
+  "consolidated_output": {
+    "findings": [
+      {
+        "finding_id": "correctness.taskQueue.race-condition-counter",
+        "severity": "high",
+        "category": "correctness",
+        "title": "Race condition in concurrent task counter increment",
+        "description": "The shared taskCounter is incremented with `++` outside any mutex or atomic operation. Under concurrent worker execution, multiple workers can read the same value and produce duplicate task IDs.",
+        "file": "src/workers/taskQueue.ts",
+        "symbol": "TaskQueue",
+        "line_range": null,
+        "confidence": "high",
+        "raised_by": [
+          { "reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team", "severity": "high" }
+        ]
+      },
+      {
+        "finding_id": "correctness.taskQueue.counter-is-safe",
+        "severity": "low",
+        "category": "correctness",
+        "title": "Task counter increment is safe due to AsyncMutex wrapper",
+        "description": "The taskCounter increment occurs inside the AsyncMutex-wrapped enqueue method, so concurrent access is serialized. No race condition exists.",
+        "file": "src/workers/taskQueue.ts",
+        "symbol": "TaskQueue",
+        "line_range": null,
+        "confidence": "medium",
+        "raised_by": [
+          { "reviewer_id": "gemini-review-prompter", "family": "google", "source_type": "external", "severity": "low" }
+        ],
+        "superseded_by_verification": true,
+        "verification_reasoning": "CoVe re-read of taskQueue.ts confirms the increment at line ~47 occurs in the dequeue path, NOT inside the AsyncMutex-wrapped enqueue. The AsyncMutex serializes enqueue only; dequeue runs concurrently. The race condition finding is correct; the counter-is-safe claim is factually wrong about the code path."
+      },
+      {
+        "finding_id": "maintainability.taskQueue.missing-queue-drain-event",
+        "severity": "low",
+        "category": "maintainability",
+        "title": "TaskQueue does not emit drain event when queue empties",
+        "description": "Consumers relying on a drain event pattern to know when all tasks are done cannot hook into TaskQueue. Adding an EventEmitter drain event would simplify shutdown coordination.",
+        "file": "src/workers/taskQueue.ts",
+        "symbol": "TaskQueue",
+        "line_range": null,
+        "confidence": "low",
+        "raised_by": [
+          { "reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external", "severity": "low" }
+        ],
+        "minority_of_one_demoted": false,
+        "_note": "already at low (floor); no further demotion possible"
+      }
+    ],
+    "path_and_reason_header": "Review path: multi-model (above-threshold diff; reviewers: 2 native + 2 external)",
+    "aggregator_resolution": { "name": "codex-review-prompter", "source": "tier-table" },
+    "continuation_event": null
+  },
+  "expected_judgement_notes": "Consolidation is correct: (1) race-condition and counter-safe findings are at same (file, symbol); CoVe adjudicates correctly — counter-safe is marked superseded_by_verification with reasoning; (2) drain-event finding already at low severity floor, not demoted further; (3) raised_by[] correctly attributed. The superseded finding remains visible (not dropped) per Stage 5b rules."
+}

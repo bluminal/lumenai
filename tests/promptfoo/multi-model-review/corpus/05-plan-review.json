@@ -1,0 +1,131 @@
+{
+  "scenario": "plan-review",
+  "description": "Implementation plan review consolidation: write-implementation-plan command invokes the orchestrator with architect + tech-lead + design-system-agent as native reviewers. Findings include a critical sequencing gap (task dependency cycle), a medium-severity milestone scope issue, and a low-severity documentation finding. Tests plan-review command path and cross-team finding attribution.",
+  "input": {
+    "command": "write-implementation-plan",
+    "artifact_path": "docs/plans/feature-checkout-redesign.md",
+    "native_reviewers": ["architect", "tech-lead", "design-system-agent"],
+    "external_adapters": ["codex-review-prompter"]
+  },
+  "raw_findings": [
+    {
+      "finding_id": "correctness.plan.circular-task-dependency",
+      "severity": "critical",
+      "category": "correctness",
+      "title": "Circular dependency between Task 3.2 and Task 3.4",
+      "description": "Task 3.2 (Implement payment gateway) lists Task 3.4 (Configure webhook handler) as a prerequisite. Task 3.4 lists Task 3.2 as a prerequisite. This circular dependency makes both tasks unschedulable and will block the milestone.",
+      "file": "docs/plans/feature-checkout-redesign.md",
+      "symbol": "Milestone 3",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "architect",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "correctness.plan.circular-task-dependency",
+      "severity": "critical",
+      "category": "correctness",
+      "title": "Task dependency cycle in Milestone 3 blocks parallel execution",
+      "description": "The dependency graph for Milestone 3 contains a cycle: Task 3.2 ↔ Task 3.4. Both claim the other as a prerequisite. The plan cannot be executed as written until this is resolved.",
+      "file": "docs/plans/feature-checkout-redesign.md",
+      "symbol": "Milestone 3",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "scope.plan.milestone2-overloaded",
+      "severity": "medium",
+      "category": "scope",
+      "title": "Milestone 2 contains 8 tasks exceeding the concurrent_tasks limit of 3",
+      "description": "Milestone 2 lists 8 tasks, but the project config sets concurrent_tasks: 3. A milestone with 8 tasks and 3-task parallelism requires at least 3 scheduling rounds. The plan should split Milestone 2 into two milestones to reflect realistic delivery sequencing.",
+      "file": "docs/plans/feature-checkout-redesign.md",
+      "symbol": "Milestone 2",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "tech-lead",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "maintainability.plan.missing-adr-reference",
+      "severity": "low",
+      "category": "maintainability",
+      "title": "Plan references checkout session storage without an ADR",
+      "description": "The plan describes a session-storage approach for checkout state but does not reference or link an ADR. Architecture decisions of this scope should be documented in docs/specs/decisions/ per project conventions.",
+      "file": "docs/plans/feature-checkout-redesign.md",
+      "symbol": null,
+      "line_range": null,
+      "confidence": "low",
+      "source": {
+        "reviewer_id": "design-system-agent",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    }
+  ],
+  "consolidated_output": {
+    "findings": [
+      {
+        "finding_id": "correctness.plan.circular-task-dependency",
+        "severity": "critical",
+        "category": "correctness",
+        "title": "Circular dependency between Task 3.2 and Task 3.4",
+        "description": "Task 3.2 (Implement payment gateway) lists Task 3.4 (Configure webhook handler) as a prerequisite. Task 3.4 lists Task 3.2 as a prerequisite. This circular dependency makes both tasks unschedulable and will block the milestone.",
+        "file": "docs/plans/feature-checkout-redesign.md",
+        "symbol": "Milestone 3",
+        "line_range": null,
+        "confidence": "high",
+        "raised_by": [
+          { "reviewer_id": "architect", "family": "anthropic", "source_type": "native-team", "severity": "critical" },
+          { "reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external", "severity": "critical" }
+        ]
+      },
+      {
+        "finding_id": "scope.plan.milestone2-overloaded",
+        "severity": "medium",
+        "category": "scope",
+        "title": "Milestone 2 contains 8 tasks exceeding the concurrent_tasks limit of 3",
+        "description": "Milestone 2 lists 8 tasks, but the project config sets concurrent_tasks: 3. A milestone with 8 tasks and 3-task parallelism requires at least 3 scheduling rounds. The plan should split Milestone 2 into two milestones to reflect realistic delivery sequencing.",
+        "file": "docs/plans/feature-checkout-redesign.md",
+        "symbol": "Milestone 2",
+        "line_range": null,
+        "confidence": "medium",
+        "raised_by": [
+          { "reviewer_id": "tech-lead", "family": "anthropic", "source_type": "native-team", "severity": "medium" }
+        ],
+        "minority_of_one_demoted": true,
+        "original_severity": "medium"
+      },
+      {
+        "finding_id": "maintainability.plan.missing-adr-reference",
+        "severity": "low",
+        "category": "maintainability",
+        "title": "Plan references checkout session storage without an ADR",
+        "description": "The plan describes a session-storage approach for checkout state but does not reference or link an ADR. Architecture decisions of this scope should be documented in docs/specs/decisions/ per project conventions.",
+        "file": "docs/plans/feature-checkout-redesign.md",
+        "symbol": null,
+        "line_range": null,
+        "confidence": "low",
+        "raised_by": [
+          { "reviewer_id": "design-system-agent", "family": "anthropic", "source_type": "native-team", "severity": "low" }
+        ],
+        "minority_of_one_demoted": false,
+        "_note": "already at low (floor); no further demotion possible"
+      }
+    ],
+    "path_and_reason_header": "Review path: multi-model (above-threshold diff; reviewers: 3 native + 1 external)",
+    "aggregator_resolution": { "name": "codex-review-prompter", "source": "tier-table" },
+    "continuation_event": null
+  },
+  "expected_judgement_notes": "Consolidation is correct: (1) circular-dependency finding merged from architect + codex; severity unanimous critical; raised_by[] cross-team attribution correct; (2) milestone2-overloaded: single tech-lead reviewer, minority-of-one demoted medium→low; (3) missing-adr: already at low floor, not demoted further; (4) path_and_reason_header correctly shows 3 native + 1 external for write-implementation-plan command."
+}

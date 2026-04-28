@@ -1,0 +1,219 @@
+description: |
+  Layer 3 LIVE invocation: orchestrator behaviors that cached fixtures cannot verify.
+
+  (1) Wall-clock parallel fan-out (NFR-MR3) — measured wall-clock for 4-proposer
+  fan-out (2 native + 2 external, real CLIs) must be ≤ 1.5× the slowest single
+  proposer's measured latency. Verifies that native and external proposers truly
+  run in parallel, not sequentially.
+
+  (2) Position randomization in Stage 4 — two adjacent invocations of the Stage 4
+  tiebreaker with the same ambiguous finding pair MUST present the findings in
+  reversed order (alternating-order rule per FR-MR15, Task 26's invocation_counter
+  mod 2 rule).
+
+  These tests REQUIRE LIVE CLI access (codex + gemini); they bypass cache by
+  definition. Do NOT run in CI. Run manually when validating a release candidate
+  or investigating a parallelism regression.
+
+  Source authority:
+  - NFR-MR3 (parallel execution wall-clock bound)
+  - FR-MR12 (single-batch parallel fan-out)
+  - FR-MR15 (aggregator bias mitigation, Stage 4 alternating order)
+  - Task 26 (Stage 4 position-randomization implementation)
+  - CLAUDE.md testing pyramid (Layer 3 manual-trigger convention)
+
+# Manual-trigger flag — excluded from per-PR Layer 1+2 default suite
+# live: requires real CLI access (codex, gemini)
+tags:
+  - layer3
+  - manual-trigger-only
+  - mmr
+  - live
+  - requires-clis
+
+providers:
+  - id: anthropic:claude-3-5-sonnet
+    config:
+      temperature: 0.0
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+tests:
+  # --------------------------------------------------------------------------
+  # Test 1: Wall-clock parallel fan-out (NFR-MR3)
+  #
+  # Issue a real 4-proposer fan-out (2 native + 2 external with real CLIs).
+  # Assert that the measured wall-clock is ≤ 1.5× the slowest single proposer's
+  # measured latency. If the proposers run sequentially, wall-clock ≈ sum of
+  # all latencies (>> 1.5×); if parallel, wall-clock ≈ max latency (≤ 1.5×).
+  #
+  # The test harness is expected to populate result.metadata with:
+  #   per_reviewer_latencies_ms: array of per-reviewer wall-clock latencies
+  #   fan_out_wall_clock_ms: total wall-clock from first dispatch to last response
+  #
+  # NFR-MR3 verbatim: "The end-to-end wall-clock time of a multi-model review
+  # should approximate max(per-reviewer times) + aggregator time, not the sum."
+  # The 1.5× bound provides headroom for orchestration overhead.
+  # --------------------------------------------------------------------------
+  - description: "S-MMR-RT-01: Wall-clock parallel fan-out ≤ 1.5× slowest single proposer (NFR-MR3, live)"
+    vars:
+      reviewers:
+        - id: code-reviewer
+          source_type: native-team
+          family: anthropic
+        - id: security-reviewer
+          source_type: native-team
+          family: anthropic
+        - id: codex-review-prompter
+          source_type: external
+          family: openai
+        - id: gemini-review-prompter
+          source_type: external
+          family: google
+    assert:
+      - type: javascript
+        value: |
+          // NFR-MR3: wall-clock for 4-proposer fan-out must be ≤ 1.5× slowest single proposer.
+          //
+          // Expected metadata shape (populated by the test harness via live orchestrator invocation):
+          //   result.metadata.per_reviewer_latencies_ms  — array of per-reviewer latencies in ms
+          //   result.metadata.fan_out_wall_clock_ms      — total measured wall-clock in ms
+          //
+          // If metadata is not populated (e.g., harness does not support live invocation),
+          // the test fails with an explanatory message rather than a misleading pass.
+
+          if (!result.metadata) {
+            return {
+              pass: false,
+              score: 0,
+              reason: 'SETUP ERROR: result.metadata is undefined. This test requires a live orchestrator invocation. Ensure the test harness populates per_reviewer_latencies_ms and fan_out_wall_clock_ms in result.metadata.',
+            };
+          }
+
+          const latencies = result.metadata.per_reviewer_latencies_ms;
+          const wallClock = result.metadata.fan_out_wall_clock_ms;
+
+          if (!Array.isArray(latencies) || latencies.length === 0) {
+            return {
+              pass: false,
+              score: 0,
+              reason: 'SETUP ERROR: result.metadata.per_reviewer_latencies_ms must be a non-empty array.',
+            };
+          }
+
+          if (typeof wallClock !== 'number' || wallClock <= 0) {
+            return {
+              pass: false,
+              score: 0,
+              reason: 'SETUP ERROR: result.metadata.fan_out_wall_clock_ms must be a positive number.',
+            };
+          }
+
+          const slowestSingle = Math.max(...latencies);
+          const ratio = wallClock / slowestSingle;
+          const limit = 1.5;
+          const pass = ratio <= limit;
+
+          return {
+            pass,
+            score: pass ? Math.max(0, 1.0 - (ratio - 1.0) / (limit - 1.0)) : 0,
+            reason: [
+              `fan_out_wall_clock=${wallClock}ms`,
+              `slowest_single=${slowestSingle}ms`,
+              `ratio=${ratio.toFixed(2)}×`,
+              pass
+                ? `PASS (≤ ${limit}× — proposers ran in parallel per NFR-MR3)`
+                : `FAIL (> ${limit}× — proposers may be running sequentially, violating NFR-MR3)`,
+              `per_reviewer_latencies=[${latencies.join(', ')}]ms`,
+            ].join(', '),
+          };
+
+  # --------------------------------------------------------------------------
+  # Test 2: Position randomization in Stage 4 (FR-MR15 / Task 26)
+  #
+  # Invoke the Stage 4 tiebreaker TWICE in succession with the same ambiguous
+  # finding pair. Assert that the two recorded prompts present the findings in
+  # REVERSED order (alternating-order rule: invocation_counter mod 2).
+  #
+  # Even-numbered invocations (0, 2, 4, …) present Finding A first.
+  # Odd-numbered invocations (1, 3, 5, …) present Finding B first.
+  # Adjacent invocations on the same pair MUST flip order.
+  #
+  # The test harness is expected to populate result.metadata with:
+  #   stage4_invocation_1_prompt: the prompt text sent to the LLM judge on the 1st call
+  #   stage4_invocation_2_prompt: the prompt text sent to the LLM judge on the 2nd call
+  #
+  # The prompts contain "Finding A:" and "Finding B:" markers; the test
+  # checks which marker appears first in each prompt to determine order.
+  # --------------------------------------------------------------------------
+  - description: "S-MMR-RT-02: Stage 4 position-randomization — adjacent invocations flip finding order (FR-MR15 / Task 26, live)"
+    assert:
+      - type: javascript
+        value: |
+          // FR-MR15 / Task 26: adjacent Stage 4 invocations with the same pair MUST
+          // present findings in reversed order (invocation_counter mod 2).
+          //
+          // Expected metadata shape (populated by harness via live Stage 4 invocations):
+          //   result.metadata.stage4_invocation_1_prompt — full prompt string for invocation 1
+          //   result.metadata.stage4_invocation_2_prompt — full prompt string for invocation 2
+          //
+          // Both prompts must contain the markers "Finding A:" and "Finding B:".
+          // The order of these markers must be DIFFERENT between the two prompts.
+
+          if (!result.metadata) {
+            return {
+              pass: false,
+              score: 0,
+              reason: 'SETUP ERROR: result.metadata is undefined. This test requires a live Stage 4 invocation. Ensure the harness populates stage4_invocation_1_prompt and stage4_invocation_2_prompt.',
+            };
+          }
+
+          const prompt1 = result.metadata.stage4_invocation_1_prompt;
+          const prompt2 = result.metadata.stage4_invocation_2_prompt;
+
+          if (typeof prompt1 !== 'string' || typeof prompt2 !== 'string') {
+            return {
+              pass: false,
+              score: 0,
+              reason: 'SETUP ERROR: stage4_invocation_1_prompt and stage4_invocation_2_prompt must both be strings in result.metadata.',
+            };
+          }
+
+          const findingAMarker = 'Finding A:';
+          const findingBMarker = 'Finding B:';
+
+          const aFirstInPrompt1 = prompt1.indexOf(findingAMarker) < prompt1.indexOf(findingBMarker);
+          const aFirstInPrompt2 = prompt2.indexOf(findingAMarker) < prompt2.indexOf(findingBMarker);
+
+          // Validate that both prompts actually contain the markers
+          if (!prompt1.includes(findingAMarker) || !prompt1.includes(findingBMarker)) {
+            return {
+              pass: false,
+              score: 0,
+              reason: `SETUP ERROR: stage4_invocation_1_prompt does not contain both "${findingAMarker}" and "${findingBMarker}" markers.`,
+            };
+          }
+
+          if (!prompt2.includes(findingAMarker) || !prompt2.includes(findingBMarker)) {
+            return {
+              pass: false,
+              score: 0,
+              reason: `SETUP ERROR: stage4_invocation_2_prompt does not contain both "${findingAMarker}" and "${findingBMarker}" markers.`,
+            };
+          }
+
+          // The key assertion: order must FLIP between invocation 1 and 2
+          const orderFlipped = aFirstInPrompt1 !== aFirstInPrompt2;
+
+          const order1 = aFirstInPrompt1 ? 'A first' : 'B first';
+          const order2 = aFirstInPrompt2 ? 'A first' : 'B first';
+
+          return {
+            pass: orderFlipped,
+            score: orderFlipped ? 1.0 : 0.0,
+            reason: orderFlipped
+              ? `PASS: order flipped between invocations (inv1=${order1}, inv2=${order2}) — alternating-order rule satisfied per FR-MR15 / Task 26`
+              : `FAIL: order did NOT flip (inv1=${order1}, inv2=${order2}) — Task 26 position-randomization rule violated; check invocation_counter mod 2 implementation`,
+          };

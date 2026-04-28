@@ -1,0 +1,100 @@
+{
+  "scenario": "security-csrf",
+  "description": "Security finding consolidation: CSRF vulnerability raised by security-reviewer (native) and codex-review-prompter (external). Fingerprint dedup merges to one finding with raised_by[] from both reviewers. Security exemption prevents minority-of-one demotion if only one raises it.",
+  "input": {
+    "command": "review-code",
+    "artifact_path": "src/api/payments/charge.ts",
+    "native_reviewers": ["code-reviewer", "security-reviewer"],
+    "external_adapters": ["codex-review-prompter", "gemini-review-prompter"]
+  },
+  "raw_findings": [
+    {
+      "finding_id": "security.charge.missing-csrf-token",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing CSRF token validation on charge endpoint",
+      "description": "The POST /charge endpoint does not validate CSRF tokens, allowing cross-site request forgery. An attacker can trick an authenticated user into initiating a charge.",
+      "file": "src/api/payments/charge.ts",
+      "symbol": "chargeHandler",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.charge.missing-csrf-token",
+      "severity": "critical",
+      "category": "security",
+      "title": "CSRF protection absent on payment charge handler",
+      "description": "No CSRF mitigation is present on the charge endpoint. Financial endpoints must validate the Origin header or use double-submit cookie pattern.",
+      "file": "src/api/payments/charge.ts",
+      "symbol": "chargeHandler",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "maintainability.charge.no-idempotency-key",
+      "severity": "medium",
+      "category": "maintainability",
+      "title": "Charge handler does not enforce idempotency key",
+      "description": "Payment processors support idempotency keys to prevent duplicate charges on network retry. The handler does not generate or validate an idempotency key.",
+      "file": "src/api/payments/charge.ts",
+      "symbol": "chargeHandler",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    }
+  ],
+  "consolidated_output": {
+    "findings": [
+      {
+        "finding_id": "security.charge.missing-csrf-token",
+        "severity": "critical",
+        "category": "security",
+        "title": "Missing CSRF token validation on charge endpoint",
+        "description": "The POST /charge endpoint does not validate CSRF tokens, allowing cross-site request forgery. An attacker can trick an authenticated user into initiating a charge.",
+        "file": "src/api/payments/charge.ts",
+        "symbol": "chargeHandler",
+        "line_range": null,
+        "confidence": "high",
+        "raised_by": [
+          { "reviewer_id": "security-reviewer", "family": "anthropic", "source_type": "native-team", "severity": "high" },
+          { "reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external", "severity": "critical" }
+        ],
+        "severity_range": { "min": "high", "max": "critical" }
+      },
+      {
+        "finding_id": "maintainability.charge.no-idempotency-key",
+        "severity": "low",
+        "category": "maintainability",
+        "title": "Charge handler does not enforce idempotency key",
+        "description": "Payment processors support idempotency keys to prevent duplicate charges on network retry. The handler does not generate or validate an idempotency key.",
+        "file": "src/api/payments/charge.ts",
+        "symbol": "chargeHandler",
+        "line_range": null,
+        "confidence": "medium",
+        "raised_by": [
+          { "reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team", "severity": "medium" }
+        ],
+        "minority_of_one_demoted": true,
+        "original_severity": "medium"
+      }
+    ],
+    "path_and_reason_header": "Review path: multi-model (above-threshold diff; reviewers: 2 native + 2 external)",
+    "aggregator_resolution": { "name": "codex-review-prompter", "source": "tier-table" },
+    "continuation_event": null
+  },
+  "expected_judgement_notes": "Consolidation is correct: (1) CSRF finding merged from 2 reviewers with raised_by[] populated; severity reconciled to critical (max, 1-level diff high→critical); (2) idempotency finding minority-of-one demoted from medium→low; security exemption does NOT apply (category is maintainability). Attribution is clean. No findings dropped."
+}
