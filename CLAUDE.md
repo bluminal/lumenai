@@ -31,6 +31,8 @@ lumenai/
 │   │   └── main.md             # Primary PRD
 │   ├── plans/                  # Implementation plans
 │   │   └── main.md             # Primary implementation plan
+│   ├── specs/
+│   │   └── multi-model-teams/  # Multi-model team pool specifications (architecture, lifecycle, routing, recovery)
 │   ├── agent-interactions.md   # Agent interaction map and orchestration flows
 │   └── research-sources.md     # Research sources behind agent designs
 ├── CLAUDE.md                   # This file
@@ -146,6 +148,27 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 | `performance-audit` | Full-stack performance analysis | Performance Engineer |
 
 See `docs/agent-interactions.md` for the complete interaction map and `docs/research-sources.md` for the research behind each agent's design.
+
+### Pool Routing (standing review pools)
+
+When a standing review pool is running (started via synthex-plus), `/review-code` and `/performance-audit` automatically route to it instead of invoking the default single-model reviewer sequence. Pool routing requires `standing_pools.enabled: true` in `.synthex-plus/config.yaml`. See `docs/specs/multi-model-teams/` for full pool specifications (architecture, lifecycle, routing rules, and recovery).
+
+## Commands (Synthex Plus)
+
+Synthex Plus extends Synthex with multi-model team orchestration, standing reviewer pools, and parallel execution workflows.
+
+| Command | Purpose | Notes |
+|---------|---------|-------|
+| `start-review-team` | Start a standing review pool | Launches persistent pool of reviewer agents; pool ID returned for routing |
+| `stop-review-team` | Stop a standing review pool | Gracefully drains in-flight reviews and tears down the pool |
+| `list-teams` | List running pools | Shows active pool IDs, reviewer composition, and current load |
+| `team-review` | Multi-model team code review | Fan-out review to all pool members; consolidates findings |
+| `team-implement` | Parallel task implementation | Distributes implementation tasks across a team |
+| `team-plan` | Collaborative implementation planning | Multi-model plan review and refinement |
+| `team-refine` | Team-based requirements refinement | Fan-out PRD review across agents |
+| `team-init` | Initialize a multi-model team project | Sets up `.synthex-plus/config.yaml` and pool configuration |
+
+See `docs/specs/multi-model-teams/` for pool specifications and `docs/plans/multi-model-teams.md` for the implementation plan.
 
 ## Project Configuration Framework
 
