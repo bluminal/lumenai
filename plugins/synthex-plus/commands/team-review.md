@@ -211,6 +211,29 @@ After composing the prompt:
 - Wait for confirmation that the team was created successfully before proceeding
 - If team creation fails, display the error and abort -- do not retry automatically
 
+#### 5g. Instantiate multi-model orchestrator (when `multi_model_active` is `true`)
+
+When `Resolve multi-model state` resolves to `multi_model_active: true`, immediately after the team is created (Step 5f confirmation received), instantiate the `multi-model-review-orchestrator` in the host session:
+
+**How to invoke:** Use the Task tool from the host session — NOT via the `Teammate` API. The orchestrator is not a teammate; it runs as a host-session agent alongside the team (FR-MMT3 step 3, criterion 2).
+
+**Task tool invocation — pass these four required inputs:**
+
+```
+{
+  command: "team-review",
+  artifact_path: <diff scope resolved in Step 2 — git range, file path, or staged-changes path>,
+  native_reviewers: <list of active reviewer names from the resolved template, e.g. ["code-reviewer", "security-reviewer"]>,
+  config: <resolved multi_model_review config block from .synthex/config.yaml merged onto defaults.yaml>
+}
+```
+
+**Parallelism:** The orchestrator **runs in parallel with team execution** (FR-MMT21 step 2). After issuing the orchestrator Task, do not wait for it before proceeding to Step 6 (Post-Creation Verification) and Step 7 (Create Review Tasks). The orchestrator and the native team execute concurrently; the orchestrator will wait for native review tasks to reach `completed` status before beginning consolidation.
+
+**Wall-clock time:** wall-clock time for a multi-model `/team-review` invocation is `max(slowest native reviewer, slowest external adapter)` — NOT the sum. Native and external work runs in parallel.
+
+**When `multi_model_active: false`:** This step is skipped entirely. No orchestrator is spawned. Behavior is byte-identical to standard `/team-review`.
+
 ### 6. Post-Creation Verification
 
 Post-creation verification follows the same procedure as team-implement Step 6 (inspect team metadata, handle missing roles, prompt-based fallback, display verification summary).
