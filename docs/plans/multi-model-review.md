@@ -736,9 +736,9 @@ Lower-priority but planned work that ships in subsequent releases. Not required 
 ### Milestone 8.1: Version Bumps and Changelog
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 63 | Bump `plugins/synthex/.claude-plugin/plugin.json` version. | S | Phase 6 | pending |
-| 64 | Bump top-level `.claude-plugin/marketplace.json` version AND the synthex-plugin entry's version per CLAUDE.md release rules. | S | Task 63 | pending |
-| 65 | Add `CHANGELOG.md` entry covering all FR-MR features shipped in v1, with link reference at the bottom. Mentions `multi_model_review` config addition, new orchestrator + adapter agents, `init` updates, audit artifacts, complexity gate. **Mentions `docs/reviews/` as default audit output directory and notes users should add it to `.gitignore` if they prefer not to commit review artifacts.** | S | Tasks 63–64 | pending |
+| 63 | Bump `plugins/synthex/.claude-plugin/plugin.json` version. | S | Phase 6 | in progress |
+| 64 | Bump top-level `.claude-plugin/marketplace.json` version AND the synthex-plugin entry's version per CLAUDE.md release rules. | S | Task 63 | in progress |
+| 65 | Add `CHANGELOG.md` entry covering all FR-MR features shipped in v1, with link reference at the bottom. Mentions `multi_model_review` config addition, new orchestrator + adapter agents, `init` updates, audit artifacts, complexity gate. **Mentions `docs/reviews/` as default audit output directory and notes users should add it to `.gitignore` if they prefer not to commit review artifacts.** | S | Tasks 63–64 | in progress |
 
 **Task 63 Acceptance Criteria:**
 - `[T]` Synchronized new version string with Task 64
