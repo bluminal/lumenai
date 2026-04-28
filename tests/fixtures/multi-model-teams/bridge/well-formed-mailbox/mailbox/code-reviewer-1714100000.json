@@ -1,0 +1,26 @@
+{
+  "from": "code-reviewer",
+  "to": "lead",
+  "type": "review_findings",
+  "report_markdown": "## Code Review Report\n\n### Verdict: WARN\n\nFound 1 medium issue.\n\n### MEDIUM Findings\n\n**Missing null check in getUserById**\n`src/users/service.ts:42` — The function does not check for null before accessing `user.email`.\n",
+  "findings_json": {
+    "verdict": "WARN",
+    "findings": [
+      {
+        "finding_id": "correctness.getUserById.missing-null-check",
+        "severity": "medium",
+        "category": "correctness",
+        "title": "Missing null check in getUserById",
+        "description": "The getUserById function does not check for null before accessing user.email, which will throw if the user is not found.",
+        "file": "src/users/service.ts",
+        "symbol": "getUserById",
+        "line_range": {"start": 42, "end": 44},
+        "source": {
+          "reviewer_id": "code-reviewer",
+          "family": "anthropic",
+          "source_type": "native-team"
+        }
+      }
+    ]
+  }
+}

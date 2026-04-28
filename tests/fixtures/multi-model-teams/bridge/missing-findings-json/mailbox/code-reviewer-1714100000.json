@@ -1,0 +1,6 @@
+{
+  "from": "code-reviewer",
+  "to": "lead",
+  "type": "review_findings",
+  "report_markdown": "## Code Review Report\n\n### Verdict: WARN\n\nFound some issues but forgot to include structured output."
+}

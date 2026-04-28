@@ -1,0 +1,7 @@
+{
+  "from": "code-reviewer",
+  "to": "lead",
+  "type": "review_findings",
+  "report_markdown": "## Code Review Report\n\n### Verdict: WARN\n\nFound 1 medium issue.",
+  "findings_json": "this is not valid JSON structure"
+}

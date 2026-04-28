@@ -1,0 +1,54 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "report_markdown": "## Code Review Report\n\n### Verdict: WARN\n\nFound 1 medium issue.\n\n### MEDIUM Findings\n\n**Missing null check in getUserById**\n`src/users/service.ts:42` — The function does not check for null before accessing `user.email`.\n"
+    },
+    {
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "report_markdown": "## Security Review Report\n\n### Verdict: FAIL\n\nFound 1 high severity issue.\n\n### HIGH Findings\n\n**SQL injection risk in searchUsers**\n`src/users/repository.ts:88` — Raw string concatenation used in SQL query.\n"
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "correctness.getUserById.missing-null-check",
+      "severity": "medium",
+      "category": "correctness",
+      "title": "Missing null check in getUserById",
+      "description": "The getUserById function does not check for null before accessing user.email, which will throw if the user is not found.",
+      "file": "src/users/service.ts",
+      "symbol": "getUserById",
+      "line_range": {"start": 42, "end": 44},
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "security.searchUsers.sql-injection",
+      "severity": "high",
+      "category": "security",
+      "title": "SQL injection risk in searchUsers",
+      "description": "The searchUsers function uses raw string concatenation to build SQL queries, allowing SQL injection if user input is not sanitized.",
+      "file": "src/users/repository.ts",
+      "symbol": "searchUsers",
+      "line_range": {"start": 88, "end": 92},
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    }
+  ]
+}

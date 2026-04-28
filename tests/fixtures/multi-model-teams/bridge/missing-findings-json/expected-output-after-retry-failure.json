@@ -1,0 +1,39 @@
+{
+  "per_reviewer_results": [
+    {
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "failed",
+      "findings_count": 0,
+      "error_code": "parse_failed",
+      "report_markdown": "## Code Review Report\n\n### Verdict: WARN\n\nFound some issues but forgot to include structured output."
+    },
+    {
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "status": "success",
+      "findings_count": 1,
+      "error_code": null,
+      "report_markdown": "## Security Review Report\n\n### Verdict: FAIL\n\nFound 1 high severity issue.\n\n### HIGH Findings\n\n**SQL injection risk in searchUsers**\n`src/users/repository.ts:88` — Raw string concatenation used in SQL query.\n"
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "security.searchUsers.sql-injection",
+      "severity": "high",
+      "category": "security",
+      "title": "SQL injection risk in searchUsers",
+      "description": "The searchUsers function uses raw string concatenation to build SQL queries, allowing SQL injection if user input is not sanitized.",
+      "file": "src/users/repository.ts",
+      "symbol": "searchUsers",
+      "line_range": {"start": 88, "end": 92},
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    }
+  ]
+}

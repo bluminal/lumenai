@@ -1,0 +1,5 @@
+{
+  "team_name": "review-a3f7b2c1",
+  "reviewer_names": ["code-reviewer", "security-reviewer"],
+  "mailbox_base_path": "~/.claude/teams"
+}

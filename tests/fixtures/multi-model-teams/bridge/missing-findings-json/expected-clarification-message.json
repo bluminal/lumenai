@@ -1,0 +1,5 @@
+{
+  "to": "code-reviewer",
+  "type": "message",
+  "body": "Your review findings mailbox message could not be parsed. The findings_json field must be a JSON object with a 'findings' array conforming to the canonical finding schema. Please re-send your findings with a well-formed findings_json envelope."
+}
