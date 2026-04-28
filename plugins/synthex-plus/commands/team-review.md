@@ -130,6 +130,19 @@ For each active role in the template, compose a spawn prompt with three layers:
    - The diff scope: commit range, file list, diff command to read the changeset
    - Convention sources from config (`code_review.convention_sources`)
 
+When `multi_model_active: true`, a fourth layer is added (Step 5b-4 below): the Multi-Model Conditional Overlay from `templates/review.md`, included verbatim.
+
+#### 5b-4. Multi-model overlay composition (when `multi_model_active` is `true`)
+
+When `Resolve multi-model state` resolves to `multi_model_active: true`, compose spawn prompts as follows — **no template engine; verbatim Markdown inclusion**:
+
+1. Read `plugins/synthex-plus/templates/review.md`.
+2. Extract the entire `### Multi-Model Conditional Overlay (apply when multi_model=true)` section verbatim — from the heading line through the end of the section (stop at the next `---` or `###` heading at the same level).
+3. Include this overlay verbatim in **both** the Lead's spawn prompt AND each native reviewer's spawn prompt. The overlay section contains both sub-instructions; the host model routes each sub-instruction to the appropriate role (Lead reads the Lead-suppression sub-section; reviewers read the Reviewer JSON-envelope sub-section).
+4. When `multi_model_active` is `false`, the overlay section is omitted entirely — it is NOT included in any spawn prompt.
+
+**Verification:** Inspect the composed spawn-prompt blob (the string written into the team creation prompt) and assert presence or absence of the overlay text as a raw-string match. This is the Q2 resolution per D22: the test surface is the composed spawn-prompt blob, not a live teammate or a rendered template.
+
 #### 5c. Include auto-compaction guidance (FR-CW3)
 
 The team creation prompt must include guidance about Claude Code's auto-compaction behavior:
