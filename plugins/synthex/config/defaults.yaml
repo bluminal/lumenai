@@ -354,6 +354,10 @@ multi_model_review:
     write_implementation_plan:
       enabled: false               # When true, plan-review uses multi-model
       # No complexity gate for plan review (FR-MR22): plans are always reviewed.
+    team_review:
+      enabled: false               # FR-MMT3: when true, /team-review uses multi-model orchestration
+      # No complexity gate for team-review (parallels FR-MR22's design for write-implementation-plan):
+      # team-review is invoked deliberately for high-risk changes; the user has already opted in
 
   # Consolidation pipeline configuration.
   consolidation:
@@ -380,3 +384,6 @@ multi_model_review:
     output_path: "docs/reviews/"
     # Where adapters write their raw invocation outputs (one file per call).
     raw_output_path: "docs/reviews/raw/"
+    # FR-MMT30a: when true, audit artifact captures per-finding attribution telemetry
+    # (consolidated_finding_id, raised_by[], consensus_count, minority_of_one)
+    record_finding_attribution_telemetry: true
