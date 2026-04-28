@@ -1,0 +1,63 @@
+{
+  "scenario": "fanout-trace",
+  "description": "FR-MR12 single-batch verification: an orchestrator execution trace showing Task-call dispatch timestamps for 4 proposers. ALL 4 proposers are dispatched at time T0 in a single parallel batch; NO proposer is dispatched after another proposer's response is received. Used for the Task-call-sequencing semantic eval in Task 61.",
+  "trace_metadata": {
+    "invocation_id": "mmr-2026-04-26-fanout-trace-001",
+    "command": "review-code",
+    "artifact_path": "src/auth/handleLogin.ts",
+    "batch_dispatch_timestamp_ms": 0
+  },
+  "task_dispatch_log": [
+    {
+      "event": "task_dispatched",
+      "task_id": "task-native-code-reviewer",
+      "reviewer_id": "code-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "dispatch_offset_ms": 0,
+      "batch_id": "batch-001",
+      "response_received_offset_ms": 3420
+    },
+    {
+      "event": "task_dispatched",
+      "task_id": "task-native-security-reviewer",
+      "reviewer_id": "security-reviewer",
+      "source_type": "native-team",
+      "family": "anthropic",
+      "dispatch_offset_ms": 0,
+      "batch_id": "batch-001",
+      "response_received_offset_ms": 4105
+    },
+    {
+      "event": "task_dispatched",
+      "task_id": "task-external-codex",
+      "reviewer_id": "codex-review-prompter",
+      "source_type": "external",
+      "family": "openai",
+      "dispatch_offset_ms": 0,
+      "batch_id": "batch-001",
+      "response_received_offset_ms": 6830
+    },
+    {
+      "event": "task_dispatched",
+      "task_id": "task-external-gemini",
+      "reviewer_id": "gemini-review-prompter",
+      "source_type": "external",
+      "family": "google",
+      "dispatch_offset_ms": 0,
+      "batch_id": "batch-001",
+      "response_received_offset_ms": 8210
+    }
+  ],
+  "fr_mr12_assertions": {
+    "all_dispatched_in_single_batch": true,
+    "batch_id_unique": "batch-001",
+    "any_proposer_dispatched_after_another_response": false,
+    "dispatch_offset_all_zero_ms": true,
+    "slowest_proposer_response_ms": 8210,
+    "earliest_dispatch_ms": 0,
+    "latest_dispatch_ms": 0
+  },
+  "expected_fr_mr12_verdict": "PASS",
+  "expected_judgement_notes": "All 4 proposers (code-reviewer, security-reviewer, codex-review-prompter, gemini-review-prompter) were dispatched at offset 0ms in the same batch (batch-001). No proposer was dispatched AFTER any other proposer's response was received (earliest response at 3420ms, all dispatches at 0ms). FR-MR12 single-batch property is satisfied. A FAIL verdict would require any dispatch_offset_ms to be > 0ms AND to occur after a response_received_offset_ms."
+}

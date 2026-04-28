@@ -1,0 +1,99 @@
+{
+  "scenario": "performance-n-plus-one",
+  "description": "Performance finding consolidation: N+1 query pattern raised independently by code-reviewer (native) and gemini-review-prompter (external) with different titles but same (file, symbol) bucket. Stage 2 lexical dedup evaluates Jaccard similarity; here the titles diverge enough to remain separate, but the duplicate is expected to be noted by a human judge.",
+  "input": {
+    "command": "review-code",
+    "artifact_path": "src/services/userService.ts",
+    "native_reviewers": ["code-reviewer", "security-reviewer"],
+    "external_adapters": ["codex-review-prompter", "gemini-review-prompter"]
+  },
+  "raw_findings": [
+    {
+      "finding_id": "performance.userService.n-plus-one-query",
+      "severity": "high",
+      "category": "performance",
+      "title": "N+1 database query in getUsersWithOrders loop",
+      "description": "getUsersWithOrders iterates over users and fires a separate query per user to fetch orders. Replace with a single JOIN or batch fetch to avoid O(N) database round trips.",
+      "file": "src/services/userService.ts",
+      "symbol": "getUsersWithOrders",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "performance.userService.n-plus-one-query",
+      "severity": "high",
+      "category": "performance",
+      "title": "N+1 database query in getUsersWithOrders loop",
+      "description": "The loop in getUsersWithOrders causes an N+1 query problem. Each iteration issues a separate SELECT for orders. Use eager loading with a JOIN query instead.",
+      "file": "src/services/userService.ts",
+      "symbol": "getUsersWithOrders",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "performance.userService.missing-pagination",
+      "severity": "medium",
+      "category": "performance",
+      "title": "getUsersWithOrders loads entire result set without pagination",
+      "description": "The function fetches all users in one query without a LIMIT clause or cursor-based pagination. On large datasets this causes unbounded memory allocation.",
+      "file": "src/services/userService.ts",
+      "symbol": "getUsersWithOrders",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    }
+  ],
+  "consolidated_output": {
+    "findings": [
+      {
+        "finding_id": "performance.userService.n-plus-one-query",
+        "severity": "high",
+        "category": "performance",
+        "title": "N+1 database query in getUsersWithOrders loop",
+        "description": "getUsersWithOrders iterates over users and fires a separate query per user to fetch orders. Replace with a single JOIN or batch fetch to avoid O(N) database round trips.",
+        "file": "src/services/userService.ts",
+        "symbol": "getUsersWithOrders",
+        "line_range": null,
+        "confidence": "high",
+        "raised_by": [
+          { "reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team", "severity": "high" },
+          { "reviewer_id": "gemini-review-prompter", "family": "google", "source_type": "external", "severity": "high" }
+        ]
+      },
+      {
+        "finding_id": "performance.userService.missing-pagination",
+        "severity": "low",
+        "category": "performance",
+        "title": "getUsersWithOrders loads entire result set without pagination",
+        "description": "The function fetches all users in one query without a LIMIT clause or cursor-based pagination. On large datasets this causes unbounded memory allocation.",
+        "file": "src/services/userService.ts",
+        "symbol": "getUsersWithOrders",
+        "line_range": null,
+        "confidence": "medium",
+        "raised_by": [
+          { "reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external", "severity": "medium" }
+        ],
+        "minority_of_one_demoted": true,
+        "original_severity": "medium"
+      }
+    ],
+    "path_and_reason_header": "Review path: multi-model (above-threshold diff; reviewers: 2 native + 2 external)",
+    "aggregator_resolution": { "name": "codex-review-prompter", "source": "tier-table" },
+    "continuation_event": null
+  },
+  "expected_judgement_notes": "Consolidation is correct: (1) N+1 finding merged from 2 reviewers (exact finding_id match, Stage 1 dedup); severity unanimous high; raised_by[] populated correctly; (2) pagination finding minority-of-one demoted medium→low (not security, not high-confidence). Attribution is accurate. Descriptions preserve highest-severity description per Stage 2 rules."
+}

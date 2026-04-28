@@ -1,0 +1,278 @@
+description: |
+  Layer 3 semantic eval: would a human accept the orchestrator's consolidation?
+  Corpus of 5 multi-reviewer scenarios drawn from real review-code/write-implementation-plan
+  invocations (scenarios 01–05) plus 1 FR-MR12 fan-out trace (scenario 06).
+  Manual-trigger only per CLAUDE.md testing pyramid.
+
+  Source authority:
+  - NFR-MR6 (consistent output contract)
+  - NFR-MR7 (Layer 3 semantic eval requirement)
+  - FR-MR12 (single-batch parallel fan-out)
+  - FR-MR14 (dedup + severity reconciliation)
+  - FR-MR14a (Stage 5 severity reconciliation rules)
+  - FR-MR14b (Stage 6 minority-of-one demotion, security exemption)
+  - FR-MR15 (aggregator bias mitigation, Stage 4 position-randomization)
+  - CLAUDE.md testing pyramid (Layer 3 manual-trigger convention)
+
+# Manual-trigger flag — excluded from per-PR Layer 1+2 default suite
+tags:
+  - layer3
+  - manual-trigger-only
+  - mmr
+
+# Use claude-3-5-sonnet as judge for consistency with host model
+providers:
+  - id: anthropic:claude-3-5-sonnet
+    config:
+      temperature: 0.0
+
+# ---------------------------------------------------------------------------
+# Test corpus (5 consolidation scenarios + 1 FR-MR12 trace eval)
+# ---------------------------------------------------------------------------
+
+tests:
+  # --------------------------------------------------------------------------
+  # Scenario 1 — security finding consolidation (01-security-csrf.json)
+  # Verifies: dedup across native+external, security category exemption from
+  # minority-of-one demotion, severity reconciliation (max on 1-level diff),
+  # raised_by[] attribution.
+  # --------------------------------------------------------------------------
+  - description: "S-MMR-01: Security finding consolidation (CSRF, cross-reviewer dedup)"
+    vars:
+      scenario_file: tests/promptfoo/multi-model-review/corpus/01-security-csrf.json
+    prompt: |
+      You are an expert code review auditor. Evaluate whether the following multi-model
+      review consolidation output is correct and would be accepted by a senior engineer.
+
+      CONSOLIDATION SCENARIO:
+      {{scenario_file | load_json | json}}
+
+      Evaluate the consolidation quality against these criteria:
+      1. Are findings correctly attributed in raised_by[] across native-team and external sources?
+      2. Are duplicate findings (same finding_id) properly merged with ALL contributors in raised_by[]?
+      3. Is severity reconciliation correct? (1-level diff → max; 2+ level diff → judge with reasoning)
+      4. Are minority-of-one demotions correctly applied? (security category is EXEMPT from demotion)
+      5. Are finding descriptions accurate relative to the raw_findings input?
+
+      Return a JSON object with this exact structure:
+      {
+        "accept": true or false,
+        "score": a number from 0 to 10,
+        "reasoning": "detailed explanation of what is correct and what (if anything) is wrong"
+      }
+    assert:
+      - type: llm-rubric
+        provider: anthropic:claude-3-5-sonnet
+        value: |
+          The response must be a valid JSON object with keys "accept" (boolean), "score" (number 0-10),
+          and "reasoning" (non-empty string). The consolidation in corpus/01-security-csrf.json is correct:
+          CSRF finding is merged from security-reviewer + codex-review-prompter with raised_by[] populated;
+          severity reconciled to critical (max of high+critical, 1-level diff); the maintainability finding
+          is minority-of-one demoted medium→low (security exemption does NOT apply here as category is
+          maintainability). Score should be >= 7 and accept should be true for a correct consolidation.
+        threshold: 0.7
+
+  # --------------------------------------------------------------------------
+  # Scenario 2 — performance finding consolidation (02-performance-n-plus-one.json)
+  # Verifies: exact-id fingerprint dedup (Stage 1), minority-of-one demotion,
+  # raised_by[] for merged and singleton findings.
+  # --------------------------------------------------------------------------
+  - description: "S-MMR-02: Performance finding consolidation (N+1 query, Stage 1 dedup)"
+    vars:
+      scenario_file: tests/promptfoo/multi-model-review/corpus/02-performance-n-plus-one.json
+    prompt: |
+      You are an expert code review auditor. Evaluate whether the following multi-model
+      review consolidation output is correct and would be accepted by a senior engineer.
+
+      CONSOLIDATION SCENARIO:
+      {{scenario_file | load_json | json}}
+
+      Evaluate the consolidation quality against these criteria:
+      1. Are findings correctly attributed in raised_by[] across native-team and external sources?
+      2. Are duplicate findings (same finding_id) properly merged with ALL contributors in raised_by[]?
+      3. Is severity reconciliation correct? (1-level diff → max; 2+ level diff → judge with reasoning)
+      4. Are minority-of-one demotions correctly applied? (security category is EXEMPT from demotion)
+      5. Are finding descriptions accurate relative to the raw_findings input?
+
+      Return a JSON object with this exact structure:
+      {
+        "accept": true or false,
+        "score": a number from 0 to 10,
+        "reasoning": "detailed explanation of what is correct and what (if anything) is wrong"
+      }
+    assert:
+      - type: llm-rubric
+        provider: anthropic:claude-3-5-sonnet
+        value: |
+          The response must be a valid JSON object with keys "accept" (boolean), "score" (number 0-10),
+          and "reasoning" (non-empty string). The consolidation in corpus/02-performance-n-plus-one.json
+          is correct: N+1 query finding merged from code-reviewer + gemini-review-prompter (exact
+          finding_id match, Stage 1 dedup); severity unanimous high; pagination finding minority-of-one
+          demoted medium→low (not security, not high-confidence). Score should be >= 7 and accept true.
+        threshold: 0.7
+
+  # --------------------------------------------------------------------------
+  # Scenario 3 — correctness finding with contradiction (03-correctness-race-condition.json)
+  # Verifies: Stage 5b CoVe adjudication, superseded_by_verification marking,
+  # loser finding remains visible (not dropped).
+  # --------------------------------------------------------------------------
+  - description: "S-MMR-03: Correctness finding with contradiction (CoVe adjudication, Stage 5b)"
+    vars:
+      scenario_file: tests/promptfoo/multi-model-review/corpus/03-correctness-race-condition.json
+    prompt: |
+      You are an expert code review auditor. Evaluate whether the following multi-model
+      review consolidation output is correct and would be accepted by a senior engineer.
+
+      CONSOLIDATION SCENARIO:
+      {{scenario_file | load_json | json}}
+
+      Evaluate the consolidation quality against these criteria:
+      1. Are findings correctly attributed in raised_by[] across native-team and external sources?
+      2. Are contradictory findings at the same (file, symbol) location adjudicated via CoVe?
+      3. Is the losing finding marked with superseded_by_verification: true and verification_reasoning?
+      4. Does the losing finding REMAIN VISIBLE in the output (not dropped)?
+      5. Is the winning finding (race condition exists) the factually correct one?
+      6. Are minority-of-one demotions and floor rules correctly applied?
+
+      Return a JSON object with this exact structure:
+      {
+        "accept": true or false,
+        "score": a number from 0 to 10,
+        "reasoning": "detailed explanation of what is correct and what (if anything) is wrong"
+      }
+    assert:
+      - type: llm-rubric
+        provider: anthropic:claude-3-5-sonnet
+        value: |
+          The response must be a valid JSON object with keys "accept" (boolean), "score" (number 0-10),
+          and "reasoning" (non-empty string). The consolidation in corpus/03-correctness-race-condition.json
+          is correct: the contradictory counter-is-safe finding is marked superseded_by_verification with
+          reasoning; it remains visible; the race-condition finding wins; drain-event finding is at low
+          floor. Score should be >= 7 and accept true for a correctly adjudicated contradiction.
+        threshold: 0.7
+
+  # --------------------------------------------------------------------------
+  # Scenario 4 — design system tokens (04-design-tokens.json)
+  # Verifies: multi-native attribution (design-system-agent + code-reviewer),
+  # severity reconciliation (max on 1-level diff), cross-native+external dedup.
+  # --------------------------------------------------------------------------
+  - description: "S-MMR-04: Design system token findings (multi-native + external, Stage 1+2 dedup)"
+    vars:
+      scenario_file: tests/promptfoo/multi-model-review/corpus/04-design-tokens.json
+    prompt: |
+      You are an expert code review auditor. Evaluate whether the following multi-model
+      review consolidation output is correct and would be accepted by a senior engineer.
+
+      CONSOLIDATION SCENARIO:
+      {{scenario_file | load_json | json}}
+
+      Evaluate the consolidation quality against these criteria:
+      1. Are findings correctly attributed in raised_by[] across native-team and external sources?
+      2. Are duplicate findings (same finding_id) properly merged with ALL contributors in raised_by[]?
+      3. Is severity reconciliation correct — specifically the focus-ring finding's 1-level diff (medium+high → high)?
+      4. Are minority-of-one demotions correctly applied? Does the low-floor rule hold?
+      5. Is the path_and_reason_header accurate for a 2-native + 2-external configuration?
+
+      Return a JSON object with this exact structure:
+      {
+        "accept": true or false,
+        "score": a number from 0 to 10,
+        "reasoning": "detailed explanation of what is correct and what (if anything) is wrong"
+      }
+    assert:
+      - type: llm-rubric
+        provider: anthropic:claude-3-5-sonnet
+        value: |
+          The response must be a valid JSON object with keys "accept" (boolean), "score" (number 0-10),
+          and "reasoning" (non-empty string). The consolidation in corpus/04-design-tokens.json is correct:
+          focus-ring finding merged from design-system-agent + gemini with severity max(high, medium) = high;
+          hardcoded-color merged from design-system-agent + codex both at medium (unanimous); variant-prop
+          at low floor, not demoted further. Score should be >= 7 and accept true.
+        threshold: 0.7
+
+  # --------------------------------------------------------------------------
+  # Scenario 5 — implementation plan review (05-plan-review.json)
+  # Verifies: write-implementation-plan command path, 3-native + 1-external
+  # configuration, critical finding dedup, plan-specific finding categories.
+  # --------------------------------------------------------------------------
+  - description: "S-MMR-05: Plan review consolidation (write-implementation-plan, circular dependency)"
+    vars:
+      scenario_file: tests/promptfoo/multi-model-review/corpus/05-plan-review.json
+    prompt: |
+      You are an expert code review auditor. Evaluate whether the following multi-model
+      review consolidation output is correct and would be accepted by a senior engineer.
+
+      CONSOLIDATION SCENARIO:
+      {{scenario_file | load_json | json}}
+
+      Evaluate the consolidation quality against these criteria:
+      1. Are findings correctly attributed in raised_by[] across native-team and external sources?
+      2. Is the circular-dependency finding correctly merged (architect + codex, both critical)?
+      3. Is the milestone2-overloaded finding correctly minority-of-one demoted (medium → low)?
+      4. Is the path_and_reason_header accurate for 3 native + 1 external (write-implementation-plan)?
+      5. Does the consolidation correctly reflect a write-implementation-plan command invocation?
+
+      Return a JSON object with this exact structure:
+      {
+        "accept": true or false,
+        "score": a number from 0 to 10,
+        "reasoning": "detailed explanation of what is correct and what (if anything) is wrong"
+      }
+    assert:
+      - type: llm-rubric
+        provider: anthropic:claude-3-5-sonnet
+        value: |
+          The response must be a valid JSON object with keys "accept" (boolean), "score" (number 0-10),
+          and "reasoning" (non-empty string). The consolidation in corpus/05-plan-review.json is correct:
+          circular-dependency merged from architect + codex (both critical, unanimous); milestone2 demoted
+          medium→low (minority-of-one, not security); path_and_reason_header shows 3 native + 1 external;
+          command is write-implementation-plan. Score should be >= 7 and accept true.
+        threshold: 0.7
+
+  # --------------------------------------------------------------------------
+  # Scenario 6 — FR-MR12 Task-call sequencing eval (06-fanout-trace.json)
+  # Verifies: ALL proposers were dispatched in a single Task batch, NO proposer
+  # was issued AFTER another proposer's response was received.
+  # This is a structural/sequencing eval, not a content quality eval.
+  # Threshold is 0.9 (structural — failures indicate orchestrator regression).
+  # --------------------------------------------------------------------------
+  - description: "S-MMR-06: FR-MR12 single-batch Task-call sequencing eval"
+    vars:
+      trace_file: tests/promptfoo/multi-model-review/corpus/06-fanout-trace.json
+    prompt: |
+      You are an expert distributed-systems auditor. Verify the following orchestrator
+      Task-call dispatch trace for compliance with FR-MR12 (single-batch parallel fan-out).
+
+      DISPATCH TRACE:
+      {{trace_file | load_json | json}}
+
+      FR-MR12 requirement verbatim: "Native and external proposers run in a single parallel
+      Task batch." The MUST NOT rule: no proposer may be dispatched after another proposer's
+      response has been received.
+
+      Verify:
+      1. Were ALL proposers dispatched in a single batch (same batch_id)?
+      2. Were ALL dispatch_offset_ms values at 0ms (simultaneous dispatch)?
+      3. Was ANY proposer dispatched AFTER another proposer's response_received_offset_ms?
+         (This would be a FAIL — it indicates the orchestrator waited for one result before
+         dispatching the next, violating the single-batch property.)
+      4. Does the fr_mr12_assertions object in the trace confirm single-batch compliance?
+
+      Return a JSON object with this exact structure:
+      {
+        "accept": true or false,
+        "reasoning": "explanation of whether FR-MR12 is satisfied or violated, with specific
+                      reference to dispatch timestamps and response receipt times"
+      }
+    assert:
+      - type: llm-rubric
+        provider: anthropic:claude-3-5-sonnet
+        value: |
+          The response must be a valid JSON object with keys "accept" (boolean) and "reasoning"
+          (non-empty string). The trace in corpus/06-fanout-trace.json shows all 4 proposers
+          dispatched at offset 0ms in the same batch (batch-001), with responses arriving at
+          3420ms, 4105ms, 6830ms, and 8210ms respectively. No proposer was dispatched after
+          another's response was received (all dispatches at 0ms, first response at 3420ms).
+          FR-MR12 is satisfied. The response must return accept: true. Any response returning
+          accept: false for this trace is incorrect.
+        threshold: 0.9

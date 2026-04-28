@@ -1,0 +1,147 @@
+{
+  "scenario": "design-tokens",
+  "description": "Design system finding consolidation: hardcoded color values raised by code-reviewer (native) and design-system-agent (native). External reviewers (codex, gemini) also flag the token violations. Stage 1 and Stage 2 dedup merges near-identical findings. Tests correct raised_by[] attribution across native+external sources and severity reconciliation.",
+  "input": {
+    "command": "review-code",
+    "artifact_path": "src/components/Button/Button.tsx",
+    "native_reviewers": ["code-reviewer", "design-system-agent"],
+    "external_adapters": ["codex-review-prompter", "gemini-review-prompter"]
+  },
+  "raw_findings": [
+    {
+      "finding_id": "design.Button.hardcoded-color-primary",
+      "severity": "medium",
+      "category": "design",
+      "title": "Hardcoded primary color #3B82F6 instead of design token",
+      "description": "The Button component uses `color: '#3B82F6'` directly instead of `var(--color-primary)`. This bypasses the design token system and will not update when the theme changes.",
+      "file": "src/components/Button/Button.tsx",
+      "symbol": "Button",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "design-system-agent",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "design.Button.hardcoded-color-primary",
+      "severity": "medium",
+      "category": "design",
+      "title": "Hardcoded hex color in Button bypasses design token",
+      "description": "Button.tsx contains a hardcoded hex color value that should reference the design system token `--color-primary`. This pattern prevents consistent theming.",
+      "file": "src/components/Button/Button.tsx",
+      "symbol": "Button",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "design.Button.missing-focus-ring-token",
+      "severity": "high",
+      "category": "design",
+      "title": "Focus ring uses hardcoded width and color, not focus token",
+      "description": "The focus ring on Button uses `outline: '2px solid #2563EB'` instead of `var(--focus-ring)`. This violates WCAG 2.1 SC 2.4.11 (Focus Appearance) if token-based theming changes focus ring appearance for accessibility.",
+      "file": "src/components/Button/Button.tsx",
+      "symbol": "Button",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "design-system-agent",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    },
+    {
+      "finding_id": "design.Button.missing-focus-ring-token",
+      "severity": "medium",
+      "category": "design",
+      "title": "Button focus ring does not use focus token",
+      "description": "The focus outline is hardcoded; accessibility-related design tokens must be referenced for consistent focus visibility across themes.",
+      "file": "src/components/Button/Button.tsx",
+      "symbol": "Button",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "maintainability.Button.no-variant-prop",
+      "severity": "low",
+      "category": "maintainability",
+      "title": "Button lacks variant prop for primary/secondary/ghost styles",
+      "description": "The Button only implements a single visual style. A `variant` prop would let callers select primary, secondary, or ghost styles without duplicating the component.",
+      "file": "src/components/Button/Button.tsx",
+      "symbol": "Button",
+      "line_range": null,
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team"
+      }
+    }
+  ],
+  "consolidated_output": {
+    "findings": [
+      {
+        "finding_id": "design.Button.missing-focus-ring-token",
+        "severity": "high",
+        "category": "design",
+        "title": "Focus ring uses hardcoded width and color, not focus token",
+        "description": "The focus ring on Button uses `outline: '2px solid #2563EB'` instead of `var(--focus-ring)`. This violates WCAG 2.1 SC 2.4.11 (Focus Appearance) if token-based theming changes focus ring appearance for accessibility.",
+        "file": "src/components/Button/Button.tsx",
+        "symbol": "Button",
+        "line_range": null,
+        "confidence": "high",
+        "raised_by": [
+          { "reviewer_id": "design-system-agent", "family": "anthropic", "source_type": "native-team", "severity": "high" },
+          { "reviewer_id": "gemini-review-prompter", "family": "google", "source_type": "external", "severity": "medium" }
+        ],
+        "severity_range": { "min": "medium", "max": "high" }
+      },
+      {
+        "finding_id": "design.Button.hardcoded-color-primary",
+        "severity": "medium",
+        "category": "design",
+        "title": "Hardcoded primary color #3B82F6 instead of design token",
+        "description": "The Button component uses `color: '#3B82F6'` directly instead of `var(--color-primary)`. This bypasses the design token system and will not update when the theme changes.",
+        "file": "src/components/Button/Button.tsx",
+        "symbol": "Button",
+        "line_range": null,
+        "confidence": "high",
+        "raised_by": [
+          { "reviewer_id": "design-system-agent", "family": "anthropic", "source_type": "native-team", "severity": "medium" },
+          { "reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external", "severity": "medium" }
+        ]
+      },
+      {
+        "finding_id": "maintainability.Button.no-variant-prop",
+        "severity": "low",
+        "category": "maintainability",
+        "title": "Button lacks variant prop for primary/secondary/ghost styles",
+        "description": "The Button only implements a single visual style. A `variant` prop would let callers select primary, secondary, or ghost styles without duplicating the component.",
+        "file": "src/components/Button/Button.tsx",
+        "symbol": "Button",
+        "line_range": null,
+        "confidence": "medium",
+        "raised_by": [
+          { "reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team", "severity": "low" }
+        ],
+        "minority_of_one_demoted": false,
+        "_note": "already at low (floor); no further demotion possible"
+      }
+    ],
+    "path_and_reason_header": "Review path: multi-model (above-threshold diff; reviewers: 2 native + 2 external)",
+    "aggregator_resolution": { "name": "codex-review-prompter", "source": "tier-table" },
+    "continuation_event": null
+  },
+  "expected_judgement_notes": "Consolidation is correct: (1) focus-ring finding merged from 2 reviewers; severity reconciled to high (max, 1-level diff); description from the higher-severity reviewer preserved; (2) hardcoded-color merged from design-system-agent + codex; both medium, unanimous; (3) variant-prop from code-reviewer only, already at low floor; (4) raised_by[] correctly attributed with native-team and external distinctions. No findings dropped."
+}
