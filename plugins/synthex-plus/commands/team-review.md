@@ -108,6 +108,25 @@ Read the team template file determined in Step 1 (default: `plugins/synthex-plus
 - **Performance reviewer:** Include only when `review.include_performance` is enabled in the project config, or when explicitly requested via command flag
 - **Design reviewer:** Automatically include when the changeset contains frontend files (`.tsx`, `.jsx`, `.css`, `.scss`, `.vue`, `.svelte`)
 
+#### 5a-validation. Multi-model reviewer roster validation (when `multi_model_active` is `true`)
+
+When `Resolve multi-model state` resolves to `multi_model_active: true`, validate the active reviewer roster against the v1-supported set before composing spawn prompts:
+
+**v1-supported reviewers for multi-model mode:** `code-reviewer`, `security-reviewer`, `design-system-agent`, `performance-engineer`.
+
+For each active reviewer role resolved from the template (after applying auto-inclusion rules above):
+- If the reviewer's Synthex agent name is NOT in the v1-supported set, abort immediately with this error (verbatim):
+
+```
+Multi-model mode is not supported for reviewer '<name>' in v1. Supported reviewers for multi-model pools: code-reviewer, security-reviewer, design-system-agent, performance-engineer. Either remove this reviewer from the roster, or omit --multi-model.
+```
+
+Where `<name>` is replaced with the unsupported reviewer's agent name (e.g., `quality-engineer`).
+
+**Abort behavior:** No team is created (`Teammate` spawn is NOT called). The user is presented with the error and the command exits. No side effects (no `.synthex-plus/.active-team` file written, no tasks created).
+
+**When `multi_model_active: false`:** This validation is skipped entirely. Any reviewer supported by the template is valid.
+
 #### 5b. Compose the team creation prompt
 
 For each active role in the template, compose a spawn prompt with three layers:
@@ -322,7 +341,27 @@ The lead monitors reviewer progress by periodically checking `TaskList`:
 
 After all review tasks complete, the lead produces a consolidated review report.
 
+#### 9-pre. Multi-model consolidation bypass (when `multi_model_active` is `true`)
+
+When `Resolve multi-model state` resolves to `multi_model_active: true`:
+
+**The Lead does NOT run its natural consolidation pipeline.** The Lead's role shifts to "publish the orchestrator's report" (FR-MMT21 step 8 / FR-MMT4 Lead Suppression). Concretely:
+
+1. Wait for the orchestrator-report mailbox message. The orchestrator (spawned in Step 5g) posts its completed report to:
+   ```
+   ~/.claude/teams/<team-name>/inboxes/lead/orchestrator-report-<timestamp>.json
+   ```
+   The Lead's spawn prompt (composed with the Multi-Model Conditional Overlay per Step 5b-4) already contains the FR-MMT4 Lead-suppression instruction — the Lead will wait for this message automatically per that instruction.
+
+2. When the `orchestrator-report` message arrives, the Lead surfaces its `report` field as the team's review output. The Lead does NOT re-rank, edit, summarize, or consolidate the orchestrator's report.
+
+3. This produces **exactly one consolidated report** — the orchestrator's. No Lead-side consolidated-report file is produced under the multi-model branch.
+
+**Native-only branch (when `multi_model_active: false`):** The Consolidate step proceeds identically to today's `/team-review` (Steps 9a–9d below). Behavior is byte-identical to the Task 0 baseline.
+
 #### 9a. Gather findings
+
+**This step runs only when `multi_model_active: false`.** When `multi_model_active: true`, skip to Step 9-pre above — consolidation is performed by the orchestrator.
 
 Read the findings from each completed review task:
 - Check each reviewer's `SendMessage` output for their findings
