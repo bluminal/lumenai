@@ -1,0 +1,8 @@
+{
+  "outcome": "abort",
+  "abort_reason": "unsupported_reviewer",
+  "unsupported_reviewer": "quality-engineer",
+  "error_message": "Multi-model mode is not supported for reviewer 'quality-engineer' in v1. Supported reviewers for multi-model pools: code-reviewer, security-reviewer, design-system-agent, performance-engineer. Either remove this reviewer from the roster, or omit --multi-model.",
+  "team_spawned": false,
+  "active_team_file_written": false
+}

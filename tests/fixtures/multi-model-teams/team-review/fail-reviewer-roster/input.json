@@ -1,0 +1,16 @@
+{
+  "command": "team-review",
+  "target": "main..HEAD",
+  "multi_model": true,
+  "config": {
+    "multi_model_review": {
+      "enabled": false,
+      "per_command": {
+        "team_review": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "roster": ["code-reviewer", "security-reviewer", "quality-engineer"]
+}
