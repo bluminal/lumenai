@@ -607,7 +607,7 @@ Surface the feature to new users at init time; ship the user-facing docs.
 | 50 | Author `docs/specs/multi-model-review/adapter-recipes.md` documenting each v1 adapter: install one-liner, auth setup, recommended flagship model, sandbox flags, known gotchas. Include "writing a new adapter" section per NFR-MR5. **Schedule first in milestone batch** ([H] criteria). | M | Phase 2, Task 49 | done |
 | 51 | Author `docs/specs/multi-model-review/failure-modes.md` documenting graceful degradation, strict mode, all error_code values (FR-MR16), the FR-MR17 native-only continuation, the all-natives-fail critical-warning case (Task 23b), the cloud-surface remediation (Task 23c, NFR-MR2), and the OQ-6 aggregator-failure fallback (Q6 = (b) per PRD). | M | Phase 3, Task 49 | done |
 | 52 | Update `README.md` to add a "Multi-model review" section: (1) one sentence describing the feature, (2) one sentence on the primary benefit (correlated-error blind spots), (3) the off-by-default statement, (4) link to architecture doc and adapter recipes. | S | Task 49 | done |
-| 53 | Update `CLAUDE.md` agent table: add `multi-model-review-orchestrator` (Orchestration Layer) and the v1 adapters + `context-bundle-assembler` (Utility Layer). Add `init`, `review-code`, `write-implementation-plan` command-table updates noting multi-model integration. Use `design-system-agent` (not "Designer") consistently. | S | Phase 5 | in progress |
+| 53 | Update `CLAUDE.md` agent table: add `multi-model-review-orchestrator` (Orchestration Layer) and the v1 adapters + `context-bundle-assembler` (Utility Layer). Add `init`, `review-code`, `write-implementation-plan` command-table updates noting multi-model integration. Use `design-system-agent` (not "Designer") consistently. | S | Phase 5 | done |
 
 **Task 49 Acceptance Criteria:**
 - `[H]` Doc covers all FR-MR architectural concerns
@@ -642,6 +642,8 @@ Surface the feature to new users at init time; ship the user-facing docs.
 - `[T]` New agents appear in agent table
 - `[T]` Command table notes integration
 - `[T]` Uses `design-system-agent` consistently
+
+**Task 53 Completion Note:** Done. CLAUDE.md updated. Orchestration Layer: `multi-model-review-orchestrator` added. Utility Layer: 5 new rows (`context-bundle-assembler`, `audit-artifact-writer`, `codex-review-prompter`, `gemini-review-prompter`, `ollama-review-prompter`). Commands annotated: `init` (FR-MR19/27), `review-code` (FR-MR21/21a), `write-implementation-plan` (FR-MR22). `design-system-agent` naming consistency: 2 `designer` → `design-system-agent` replacements in configurable settings table. 15 tests in `claude-md.test.ts`. All 3 `[T]` criteria pass. Commit `d66db63`.
 
 **Parallelizable:** Tasks 49–53 all parallelize after their predecessors. Tasks 50 and 51 can run concurrently; 52 and 53 in parallel after 49.
 **Observational Outcomes:** `[O]` First-week post-merge: at least one external user successfully follows the docs to enable multi-model review without a support question (validates discoverability quality).
