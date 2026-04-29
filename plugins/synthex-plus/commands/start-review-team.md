@@ -151,6 +151,8 @@ Continue spawning the pool with sandbox-yolo CLI(s)? [y/N]
 
 Default is **N** (Enter without input = no). On `n` or empty input, abort cleanly without acquiring the lock or writing any pool metadata. On `y`, continue to Step 6.
 
+**When stdin is not a TTY** (CI, scripted invocation, stdin redirected from `/dev/null`), treat as default-N and abort cleanly without prompting. This mirrors the TTY guard documented for the waiting indicator and prevents unbounded CI hangs on the unanswerable prompt. Detect non-TTY stdin before reading the prompt; do NOT block waiting for input that will never arrive.
+
 **Skip this step entirely** when no CLI in the resolved roster has `sandbox-yolo` configured (i.e., all CLIs resolve to `read-only` or `parent-mediated`). The check is a no-op in the default safe configuration.
 
 The verbatim warning string above is locked by **D25 / NFR-MMT7** (user-visible string copy locked verbatim) and is reused identically by `/synthex:review-code` and `/synthex:performance-audit` per Task 83.
