@@ -1,0 +1,30 @@
+{
+  "scenario": "sandbox-yolo-confirmation",
+  "description": "User project overrides gemini to sandbox-yolo; command surfaces verbatim warning + y/N prompt; default N aborts cleanly.",
+  "project_config_override": {
+    "multi_model_review": {
+      "external_permission_mode": {
+        "gemini": "sandbox-yolo"
+      }
+    }
+  },
+  "resolved_permission_mode_per_cli": {
+    "codex": "parent-mediated",
+    "claude": "parent-mediated",
+    "gemini": "sandbox-yolo",
+    "bedrock": "read-only",
+    "llm": "read-only",
+    "ollama": "read-only"
+  },
+  "expected_warning_string": "⚠ gemini is configured in sandbox-yolo mode — CLI will run with full tool permissions inside an OS sandbox.",
+  "expected_prompts_per_command": {
+    "/synthex-plus:start-review-team": "Continue spawning the pool with sandbox-yolo CLI(s)? [y/N]",
+    "/synthex:review-code": "Continue review with sandbox-yolo CLI(s)? [y/N]",
+    "/synthex:performance-audit": "Continue audit with sandbox-yolo CLI(s)? [y/N]"
+  },
+  "expected_outcomes": {
+    "user_input_y": "continue to next workflow step",
+    "user_input_n": "abort cleanly; no reviewer invoked",
+    "user_input_empty_enter": "abort cleanly; default is N"
+  }
+}

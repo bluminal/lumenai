@@ -1,0 +1,29 @@
+{
+  "status": "success",
+  "error_code": null,
+  "error_message": null,
+  "findings": [
+    {
+      "finding_id": "performance.fetchOrders.unbatched-queries",
+      "severity": "medium",
+      "category": "performance",
+      "title": "Unbatched DB queries inside fetchOrders loop",
+      "description": "fetchOrders issues one DB query per order in a loop; batching the lookups would reduce latency and DB load.",
+      "file": "src/orders/fetchOrders.ts",
+      "symbol": "fetchOrders",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    }
+  ],
+  "usage": {
+    "input_tokens": 3120,
+    "output_tokens": 178,
+    "model": "gemini-2.5-pro"
+  },
+  "raw_output_path": "docs/reviews/raw/gemini-read-only-001.json"
+}

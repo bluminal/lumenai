@@ -1,0 +1,29 @@
+{
+  "scenario": "read-only",
+  "description": "Gemini invoked with --readonly (Pattern 1); review completes via the model alone — no tool-use; canonical findings returned.",
+  "permission_mode": "read-only",
+  "recorded_cli_invocation": "gemini -p \"<prompt>\" --output-format json --readonly",
+  "documented_flags": ["--readonly", "--output-format", "json"],
+  "tool_use_attempts": [],
+  "recorded_cli_stdout": {
+    "findings": [
+      {
+        "finding_id": "performance.fetchOrders.unbatched-queries",
+        "severity": "medium",
+        "category": "performance",
+        "title": "Unbatched DB queries inside fetchOrders loop",
+        "description": "fetchOrders issues one DB query per order in a loop; batching the lookups would reduce latency and DB load.",
+        "file": "src/orders/fetchOrders.ts",
+        "symbol": "fetchOrders",
+        "line_range": null,
+        "confidence": "high"
+      }
+    ],
+    "usage": {
+      "input_tokens": 3120,
+      "output_tokens": 178,
+      "model": "gemini-2.5-pro"
+    }
+  },
+  "raw_output_path": "docs/reviews/raw/gemini-read-only-001.json"
+}

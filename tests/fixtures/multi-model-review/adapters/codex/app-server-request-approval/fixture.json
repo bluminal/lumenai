@@ -1,0 +1,67 @@
+{
+  "scenario": "app-server-request-approval",
+  "description": "Codex invoked via app-server (Pattern 3); emits a requestApproval JSON-RPC message; adapter proxies it to the parent Claude session; parent approves; Codex completes the review.",
+  "permission_mode": "parent-mediated",
+  "recorded_cli_invocation": "codex app-server --json <prompt>",
+  "stdout_messages": [
+    {
+      "kind": "request-approval",
+      "envelope": {
+        "jsonrpc": "2.0",
+        "id": "req-001",
+        "method": "requestApproval",
+        "params": {
+          "tool": "read_file",
+          "arguments": {
+            "path": "src/secrets/keys.ts"
+          }
+        }
+      }
+    },
+    {
+      "kind": "final-result",
+      "envelope": {
+        "jsonrpc": "2.0",
+        "id": "final",
+        "result": {
+          "findings": [
+            {
+              "finding_id": "security.handleLogin.missing-csrf-check",
+              "severity": "high",
+              "category": "security",
+              "title": "Missing CSRF check in handleLogin",
+              "description": "The handleLogin function does not validate CSRF tokens, allowing cross-site request forgery attacks.",
+              "file": "src/auth/handleLogin.ts",
+              "symbol": "handleLogin",
+              "line_range": null,
+              "confidence": "high"
+            }
+          ],
+          "usage": {
+            "input_tokens": 4521,
+            "output_tokens": 312,
+            "model": "codex-1"
+          }
+        }
+      }
+    }
+  ],
+  "parent_decision_sent_to_stdin": {
+    "jsonrpc": "2.0",
+    "id": "req-001",
+    "result": {
+      "approved": true
+    }
+  },
+  "adapter_surface_to_parent": {
+    "fenced_block_tag": "codex-approval-request",
+    "fenced_block_payload": {
+      "id": "req-001",
+      "tool": "read_file",
+      "arguments": {
+        "path": "src/secrets/keys.ts"
+      }
+    }
+  },
+  "raw_output_path": "docs/reviews/raw/codex-app-server-001.json"
+}

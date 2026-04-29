@@ -1,0 +1,1 @@
+gemini -p "<prompt-with-canonical-finding-schema-embedded>" --output-format json --readonly

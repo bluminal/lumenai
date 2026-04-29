@@ -1,0 +1,29 @@
+{
+  "status": "success",
+  "error_code": null,
+  "error_message": null,
+  "findings": [
+    {
+      "finding_id": "security.handleLogin.missing-csrf-check",
+      "severity": "high",
+      "category": "security",
+      "title": "Missing CSRF check in handleLogin",
+      "description": "The handleLogin function does not validate CSRF tokens, allowing cross-site request forgery attacks.",
+      "file": "src/auth/handleLogin.ts",
+      "symbol": "handleLogin",
+      "line_range": null,
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    }
+  ],
+  "usage": {
+    "input_tokens": 4521,
+    "output_tokens": 312,
+    "model": "codex-1"
+  },
+  "raw_output_path": "docs/reviews/raw/codex-app-server-001.json"
+}
