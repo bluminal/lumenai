@@ -1,0 +1,69 @@
+;; Synthex Pattern 2 (sandbox-yolo) macOS sandbox-exec profile.
+;;
+;; Used by Pattern 2-capable adapters (codex, gemini) when
+;; `multi_model_review.external_permission_mode.<cli>: sandbox-yolo`
+;; is configured AND the user has confirmed at spawn time. Source:
+;; ADR-003 / D27 / FR-MMT21; Phase 11.2 Task 87 (Security MEDIUM #3
+;; from team-review).
+;;
+;; Trust-boundary intent:
+;;   - DENY all network egress (no API calls beyond the CLI's own
+;;     model-provider connections established before the sandbox starts)
+;;   - DENY filesystem writes anywhere except /tmp (subprocess scratch)
+;;   - ALLOW reads of the current working directory subtree (review
+;;     surface) and the CLI's own binary/config paths
+;;   - DENY reads of typical secret paths (~/.ssh, ~/.aws, ~/.config,
+;;     /etc/shadow) regardless of CWD subtree membership
+;;
+;; This profile is the default. Override via the
+;; `multi_model_review.sandbox_profile_path` config key in your
+;; project's .synthex/config.yaml. Reference:
+;; https://reverse.put.as/wp-content/uploads/2011/09/Apple-Sandbox-Guide-v1.0.pdf
+
+(version 1)
+(deny default)
+
+;; Allow reading the CLI's own binary, libraries, system frameworks.
+(allow process-exec)
+(allow process-fork)
+(allow file-read*
+  (subpath "/usr")
+  (subpath "/System")
+  (subpath "/Library")
+  (subpath "/opt/homebrew")
+  (subpath "/private/var/folders")
+  (subpath (param "HOME_PATH")))
+
+;; Allow reads of the review target (current working directory).
+;; The host shell sets CWD_PATH via `-D CWD_PATH=$PWD` when invoking
+;; sandbox-exec; adapters MUST pass that parameter.
+(allow file-read*
+  (subpath (param "CWD_PATH")))
+
+;; Explicitly DENY reads of common secret paths even within CWD.
+(deny file-read*
+  (subpath (string-append (param "HOME_PATH") "/.ssh"))
+  (subpath (string-append (param "HOME_PATH") "/.aws"))
+  (subpath (string-append (param "HOME_PATH") "/.config"))
+  (regex #"\\.env$")
+  (regex #"id_rsa$|id_ed25519$|id_ecdsa$"))
+
+;; Allow scratch writes only under /tmp and /private/tmp.
+(allow file-write*
+  (subpath "/tmp")
+  (subpath "/private/tmp")
+  (subpath "/var/folders"))
+
+;; DENY all network egress. The CLI's existing connection (e.g., to
+;; the model provider) is established before sandbox-exec begins;
+;; no new outbound connections are permitted from the sandboxed process.
+(deny network*)
+
+;; Allow basic IPC needed for stdio between the host and the sandboxed
+;; subprocess (mach lookups for dyld, etc.).
+(allow mach-lookup)
+(allow ipc-posix-shm-read*)
+(allow signal (target self))
+
+;; Allow sysctl reads (process info, hardware queries).
+(allow sysctl-read)

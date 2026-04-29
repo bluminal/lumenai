@@ -60,11 +60,46 @@ These flags are mandatory for Pattern 1. The Layer 2 fixture (Task 12) asserts t
 ### Pattern 2 — `sandbox-yolo` (opt-in)
 
 ```bash
-sandbox-exec -f <profile.sb> codex exec --json <prompt>          # macOS
-bwrap --ro-bind / / --bind /tmp /tmp codex exec --json <prompt>  # Linux
+# macOS — uses configured sandbox profile (see Step 0 below)
+sandbox-exec -D CWD_PATH=$PWD -D HOME_PATH=$HOME -f <sandbox_profile_path> codex exec --json <prompt>
+
+# Linux — uses configured bwrap flags (see Step 0 below)
+bwrap <sandbox_bwrap_flags> codex exec --json <prompt>
 ```
 
 Used only when `multi_model_review.external_permission_mode.codex: sandbox-yolo` is configured AND the user has confirmed at spawn time. The OS sandbox is the trust boundary; Codex itself runs without `--sandbox` / `--approval-mode` restrictions.
+
+#### Step 0 — Pattern 2 profile-existence check (Task 87 — Phase 11.2)
+
+Before invoking Codex under Pattern 2, the adapter MUST verify the configured trust boundary actually exists. **A missing or unreadable sandbox profile is NOT a sandbox; if the profile cannot be loaded, the OS sandbox falls back to permissive defaults — which would silently grant Codex full permissions despite the user's `sandbox-yolo` confirmation.** Step 0 makes the trust boundary observable.
+
+Resolve the configured paths/flags from `.synthex/config.yaml` (falling back to `plugins/synthex/config/defaults.yaml`):
+
+- `multi_model_review.sandbox_profile_path` — macOS sandbox-exec profile (default: `plugins/synthex/config/sandbox.sb`)
+- `multi_model_review.sandbox_bwrap_flags` — Linux bwrap flag set (default: `--ro-bind / / --bind /tmp /tmp --proc /proc --dev /dev`)
+
+Then, on macOS:
+
+```bash
+test -r "<sandbox_profile_path>"
+```
+
+If the test fails (file missing or unreadable), abort with:
+
+```json
+{
+  "status": "failed",
+  "error_code": "cli_failed",
+  "error_message": "Pattern 2 (sandbox-yolo) sandbox profile not found at <sandbox_profile_path>. The trust boundary cannot be enforced. Either install the default profile (plugins/synthex/config/sandbox.sb) or set multi_model_review.sandbox_profile_path to a readable .sb file.",
+  "findings": [],
+  "usage": null,
+  "raw_output_path": "<echoed>"
+}
+```
+
+On Linux, verify `bwrap` is on PATH (`which bwrap` exits 0); if missing, abort with `cli_failed` and a remediation message naming the bubblewrap install command for the host distro.
+
+This Step 0 check is mandatory for Pattern 2 invocations. Patterns 1 and 3 skip Step 0 entirely (they do not depend on an OS sandbox).
 
 ---
 

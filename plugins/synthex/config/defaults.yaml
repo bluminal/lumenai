@@ -423,3 +423,25 @@ multi_model_review:
     bedrock: read-only          # Pattern 1 — `aws bedrock-runtime invoke-model` has no tool-use surface
     llm: read-only              # Pattern 1 — `llm` CLI is a stateless provider-API wrapper
     ollama: read-only           # Pattern 1 — Ollama HTTP API has no tool-use surface
+
+  # Pattern 2 (sandbox-yolo) trust-boundary configuration.
+  # Defines the OS-sandbox wrappers used when a CLI is configured for
+  # sandbox-yolo. Without these, Pattern 2 has no real sandbox and
+  # effectively grants full permissions — Pattern 2-capable adapters
+  # MUST verify the configured profile/flags exist before spawning
+  # (Step 0 profile-existence check; Task 87 / Phase 11.2).
+
+  # macOS sandbox-exec profile path. Pattern 2 wraps the CLI as
+  # `sandbox-exec -f <path> <cli-invocation>`. The shipped default
+  # denies network egress, denies file-writes outside /tmp, and limits
+  # reads to the current working directory subtree. Override per
+  # project to relax or tighten as needed.
+  sandbox_profile_path: "plugins/synthex/config/sandbox.sb"
+
+  # Linux bwrap (bubblewrap) flag set. Pattern 2 wraps the CLI as
+  # `bwrap <flags> <cli-invocation>`. The shipped default creates a
+  # read-only root with a writable /tmp; processes inherit the host's
+  # network namespace (set `--unshare-net` to also block network).
+  # Override per project to harden or relax. Flags are applied in
+  # order; first match wins for overlapping mounts.
+  sandbox_bwrap_flags: "--ro-bind / / --bind /tmp /tmp --proc /proc --dev /dev"

@@ -30,8 +30,40 @@ Resolved per `multi_model_review.external_permission_mode.gemini` from the host 
 
 **Config-read step:** Before each invocation, the adapter reads the resolved value of `multi_model_review.external_permission_mode.gemini` and branches:
 - `read-only` (or absent) → invoke per Step 4 below with `--readonly`
-- `sandbox-yolo` → wrap the invocation in `sandbox-exec` (macOS) or `bwrap` (Linux); pre-flight requires user confirmation logged at spawn
+- `sandbox-yolo` → wrap the invocation in `sandbox-exec` (macOS) or `bwrap` (Linux); pre-flight requires user confirmation logged at spawn AND the Step 0 profile-existence check below
 - `parent-mediated` → return `error_code: cli_unsupported_mode` with the documented message
+
+### Step 0 — Pattern 2 profile-existence check (Task 87 — Phase 11.2)
+
+Before invoking Gemini under Pattern 2, the adapter MUST verify the configured trust boundary actually exists. **A missing or unreadable sandbox profile is NOT a sandbox; if the profile cannot be loaded, the OS sandbox falls back to permissive defaults — which would silently grant Gemini full permissions despite the user's `sandbox-yolo` confirmation.** Step 0 makes the trust boundary observable.
+
+Resolve the configured paths/flags from `.synthex/config.yaml` (falling back to `plugins/synthex/config/defaults.yaml`):
+
+- `multi_model_review.sandbox_profile_path` — macOS sandbox-exec profile (default: `plugins/synthex/config/sandbox.sb`)
+- `multi_model_review.sandbox_bwrap_flags` — Linux bwrap flag set (default: `--ro-bind / / --bind /tmp /tmp --proc /proc --dev /dev`)
+
+Then, on macOS:
+
+```bash
+test -r "<sandbox_profile_path>"
+```
+
+If the test fails (file missing or unreadable), abort with:
+
+```json
+{
+  "status": "failed",
+  "error_code": "cli_failed",
+  "error_message": "Pattern 2 (sandbox-yolo) sandbox profile not found at <sandbox_profile_path>. The trust boundary cannot be enforced. Either install the default profile (plugins/synthex/config/sandbox.sb) or set multi_model_review.sandbox_profile_path to a readable .sb file.",
+  "findings": [],
+  "usage": null,
+  "raw_output_path": "<config.raw_output_path>"
+}
+```
+
+On Linux, verify `bwrap` is on PATH (`which bwrap` exits 0); if missing, abort with `cli_failed` and a remediation message naming the bubblewrap install command for the host distro.
+
+This Step 0 check is mandatory for Pattern 2 invocations. Patterns 1 (default for gemini) and 3 (not supported by Gemini) skip Step 0 entirely.
 
 ---
 
