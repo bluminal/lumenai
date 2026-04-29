@@ -17,6 +17,7 @@
   ],
   "commands": [
     "./commands/init.md",
+    "./commands/configure-multi-model.md",
     "./commands/next-priority.md",
     "./commands/refine-requirements.md",
     "./commands/write-implementation-plan.md",
