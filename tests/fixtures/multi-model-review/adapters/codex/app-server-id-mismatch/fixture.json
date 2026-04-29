@@ -1,0 +1,67 @@
+{
+  "scenario": "app-server-id-mismatch",
+  "description": "Codex requestApproval id=req-001; orchestrator (mistakenly) sends decision with id=req-002; adapter MUST drop the mismatched response and continue waiting for the correctly-correlated id=req-001 response.",
+  "permission_mode": "parent-mediated",
+  "recorded_cli_invocation": "codex app-server --json <prompt>",
+  "stdout_messages": [
+    {
+      "kind": "request-approval",
+      "envelope": {
+        "jsonrpc": "2.0",
+        "id": "req-001",
+        "method": "requestApproval",
+        "params": {
+          "tool": "read_file",
+          "arguments": {
+            "path": "src/secrets/keys.ts"
+          }
+        }
+      }
+    }
+  ],
+  "parent_decisions_received": [
+    {
+      "kind": "mismatched-decision",
+      "id_correlation": "MISMATCH",
+      "envelope": {
+        "jsonrpc": "2.0",
+        "id": "req-002",
+        "result": {
+          "approved": true
+        }
+      },
+      "expected_adapter_action": "drop; log WARN; continue waiting"
+    },
+    {
+      "kind": "correlated-decision",
+      "id_correlation": "MATCH",
+      "envelope": {
+        "jsonrpc": "2.0",
+        "id": "req-001",
+        "result": {
+          "approved": true
+        }
+      },
+      "expected_adapter_action": "write to Codex stdin; proceed"
+    }
+  ],
+  "expected_adapter_behavior": {
+    "writes_to_codex_stdin": [
+      {
+        "jsonrpc": "2.0",
+        "id": "req-001",
+        "result": {
+          "approved": true
+        }
+      }
+    ],
+    "drops_mismatched_responses": [
+      {
+        "id": "req-002",
+        "reason": "id does not match any outstanding pending_request.id"
+      }
+    ],
+    "warns_emitted": 1
+  },
+  "raw_output_path": "docs/reviews/raw/codex-app-server-id-mismatch-001.json"
+}

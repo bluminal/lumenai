@@ -96,7 +96,7 @@ When a `requestApproval` message is detected, the adapter:
 
 2. **Waits for the parent's decision** via a follow-up `SendMessage` from the orchestrator carrying the decision payload.
 
-3. **Writes the JSON-RPC response back to Codex's stdin:**
+3. **Writes the JSON-RPC response back to Codex's stdin** — but ONLY after verifying id correlation. **The adapter MUST verify `response.id == pending_request.id` before writing the response to Codex's stdin.** On mismatch, log a WARN, drop the mismatched response, and continue waiting for the correctly-correlated response. This prevents TOCTOU-style confusion where a stale or misrouted decision could approve a different tool invocation than the one the parent thought it was approving.
 
    ```json
    {
@@ -106,11 +106,17 @@ When a `requestApproval` message is detected, the adapter:
    }
    ```
 
-   For deny: `{"result": {"approved": false}}`. The parent may also rewrite arguments (e.g., scope down a file path) before returning approval.
+   For deny: `{"result": {"approved": false}}`. The parent may also rewrite arguments (e.g., scope down a file path) before returning approval. The `id` in the response MUST echo the `id` from the original `requestApproval`; mismatches are dropped (see correlation rule above).
 
 4. **Continues reading stdout** for the next message (either another `requestApproval`, a partial-result update, or the final findings envelope).
 
 This round-trip means the parent Claude session is the policy decision point for every tool action Codex would take — the adapter and Codex never decide unilaterally. This is materially safer than Pattern 1 (where Codex can read any file the sandbox allows) for environments where read-set scope matters.
+
+### Performance characteristics
+
+Pattern 3 trades latency for policy granularity. Each `requestApproval` round-trip adds approximately **one round-trip per tool-use** attempt — Codex stdout → adapter fenced-block emission → orchestrator SendMessage → adapter stdin write. Each round-trip is estimated at **500ms–2s** depending on session latency and orchestrator scheduling. For a review with N tool-use attempts, total Pattern 3 overhead is approximately N × (500ms–2s) on top of base Codex inference time.
+
+Pattern 1 (`codex exec --sandbox read-only`) has O(1) latency: a single CLI invocation that completes whenever Codex finishes inference, with no per-tool-use round-trips. For latency-sensitive contexts where file-read scope matters less than wall-clock — e.g., interactive review on a dev machine, CI pipelines with strict time budgets — **prefer Pattern 1** by setting `multi_model_review.external_permission_mode.codex: read-only` in `.synthex/config.yaml`. Pattern 3 remains the safer default for environments where every tool-use action should pass through the parent session's policy.
 
 ---
 
@@ -167,7 +173,7 @@ Embed the `canonical-finding-schema.md` JSON Schema in the prompt so Codex emits
 
 Resolve the configured `external_permission_mode` for `codex` and branch:
 
-- **`parent-mediated`** (default): probe `codex app-server --help`. If exit 0, invoke Pattern 3 and run the requestApproval proxy loop. If non-zero, log a one-line WARN ("codex app-server unavailable; falling back to Pattern 1 read-only") and proceed as `read-only`.
+- **`parent-mediated`** (default): probe `codex app-server --help`. If exit 0, invoke Pattern 3 and run the requestApproval proxy loop. If non-zero, log a one-line WARN ("codex app-server unavailable; falling back to Pattern 1 read-only") and proceed as `read-only`. **Cache the `codex app-server --help` probe result for the lifetime of the adapter invocation (and across invocations within the same Claude session if persistent).** Re-probing on every invocation is wasteful — each subprocess fork costs ~50–150ms, and standing-pool fan-outs would otherwise run N redundant probes per review batch. Invalidate the cache on adapter cold-start (new Claude session) so a Codex CLI upgrade between sessions takes effect immediately.
 - **`read-only`**: invoke Pattern 1 per the FR-MR26 command line above.
 - **`sandbox-yolo`**: invoke Pattern 2 via the OS sandbox wrapper appropriate for the host.
 
