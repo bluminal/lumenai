@@ -65,4 +65,45 @@ describe('Task 9: codex-review-prompter.md', () => {
   it('known gotchas section present', () => {
     expect(content).toContain('Known Gotchas');
   });
+
+  describe('Task 80: ADR-003 Pattern 3 (parent-mediated) default', () => {
+    it('[T] uses app-server JSON-RPC mode (raw-string check for app-server invocation flag)', () => {
+      expect(content).toContain('codex app-server');
+    });
+
+    it('[T] documents app-server as the Pattern 3 default', () => {
+      expect(content).toMatch(/Pattern 3.*parent-mediated/);
+      expect(content).toMatch(/app-server.*parent-mediated|parent-mediated.*app-server/s);
+    });
+
+    it('[T] documents requestApproval JSON-RPC parsing (raw-string check)', () => {
+      expect(content).toContain('requestApproval');
+      expect(content).toContain('jsonrpc');
+    });
+
+    it('[T] documents the requestApproval proxy mechanism to parent session', () => {
+      expect(content).toContain('codex-approval-request');
+      expect(content).toMatch(/parent (Claude )?session/i);
+    });
+
+    it('[T] documents fallback to Pattern 1 when app-server unavailable (raw-string check)', () => {
+      expect(content).toMatch(/fall.?back.*Pattern 1|Pattern 1.*fall.?back/is);
+      expect(content).toContain('codex app-server --help');
+    });
+
+    it('[T] references ADR-003 and FR-MMT21', () => {
+      expect(content).toContain('ADR-003');
+      expect(content).toContain('FR-MMT21');
+    });
+
+    it('[T] references the external_permission_mode config key', () => {
+      expect(content).toContain('multi_model_review.external_permission_mode');
+    });
+
+    it('preserves Pattern 1 (FR-MR26) sandbox flags as fallback path', () => {
+      // Pattern 1 must remain documented (it's the fallback)
+      expect(content).toContain('--sandbox read-only');
+      expect(content).toContain('--approval-mode never');
+    });
+  });
 });
