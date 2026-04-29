@@ -133,6 +133,30 @@ When `multi_model: true`, run the multi-model-review preflight as defined in `mu
 
 ---
 
+### Step 5a. Sandbox-Yolo Spawn Confirmation (ADR-003 / D27 / FR-MMT21)
+
+For each external CLI in the resolved roster (codex, claude, gemini, bedrock, llm, ollama — anything routed through a `*-review-prompter` adapter), look up the resolved value of `multi_model_review.external_permission_mode.<cli-name>` from `.synthex/config.yaml` (falling back to `plugins/synthex/config/defaults.yaml`).
+
+**If any CLI in the roster resolves to `sandbox-yolo`**, display ONE warning line per such CLI, verbatim:
+
+```
+⚠ <cli-name> is configured in sandbox-yolo mode — CLI will run with full tool permissions inside an OS sandbox.
+```
+
+Then prompt the user, requiring explicit confirmation before continuing:
+
+```
+Continue spawning the pool with sandbox-yolo CLI(s)? [y/N]
+```
+
+Default is **N** (Enter without input = no). On `n` or empty input, abort cleanly without acquiring the lock or writing any pool metadata. On `y`, continue to Step 6.
+
+**Skip this step entirely** when no CLI in the resolved roster has `sandbox-yolo` configured (i.e., all CLIs resolve to `read-only` or `parent-mediated`). The check is a no-op in the default safe configuration.
+
+The verbatim warning string above is locked by **D25 / NFR-MMT7** (user-visible string copy locked verbatim) and is reused identically by `/synthex:review-code` and `/synthex:performance-audit` per Task 83.
+
+---
+
 ### Step 6. Cross-Session Lock Acquisition
 
 Acquire the cross-session index lock:

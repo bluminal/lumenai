@@ -155,6 +155,30 @@ Apply `standing_pools.routing_mode` from `.synthex-plus/config.yaml` (default: `
 
 ---
 
+### 1c. Sandbox-Yolo Spawn Confirmation (ADR-003 / D27 / FR-MMT21)
+
+After routing is resolved (and the multi-model decision below has been made), enumerate every external CLI that will participate in this review — either via fan-out to a routed standing pool's external reviewers (1b) OR via the orchestrator's external proposers when the multi-model branch fires (see "Multi-Model Review Decision Framework" below). For each such CLI, look up `multi_model_review.external_permission_mode.<cli-name>` from `.synthex/config.yaml` (falling back to `plugins/synthex/config/defaults.yaml`).
+
+**If any CLI in the resolved roster has `sandbox-yolo` configured**, display ONE warning line per such CLI, verbatim:
+
+```
+⚠ <cli-name> is configured in sandbox-yolo mode — CLI will run with full tool permissions inside an OS sandbox.
+```
+
+Then prompt the user, requiring explicit confirmation before continuing:
+
+```
+Continue review with sandbox-yolo CLI(s)? [y/N]
+```
+
+Default is **N** (Enter without input = no). On `n` or empty input, abort the review cleanly without invoking any reviewer. On `y`, continue.
+
+**Skip this step entirely** when no CLI in the resolved roster has `sandbox-yolo` configured (i.e., all CLIs resolve to `read-only` or `parent-mediated`). The check is a no-op in the default safe configuration. Native-only invocations (no externals at all) also skip this step.
+
+The verbatim warning string above is locked by **D25 / NFR-MMT7** (user-visible string copy locked verbatim) and is identical to the strings used by `/synthex-plus:start-review-team` and `/synthex:performance-audit`.
+
+---
+
 ## Multi-Model Review Decision Framework (FR-MR21)
 
 This section documents the 8-step decision order that determines whether a given `review-code` invocation takes the **native-only branch** (today's workflow) or the **multi-model branch** (orchestrator-based multi-family review). The gate decision is computed ONCE per invocation and cached for the loop's duration (D9).
