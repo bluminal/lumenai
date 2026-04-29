@@ -172,19 +172,71 @@ If no issues are found, return: { "findings": [], "usage": { ... } }
 
 ### 4. CLI Invocation
 
-Invoke the Gemini CLI with the constructed prompt:
+#### 4a. Read-only flag probe (Task 86 — ADR-003 hardening)
+
+Before invoking Gemini, probe `gemini --help` to determine which read-only flag the installed Gemini CLI version supports. The flag varies across CLI builds:
 
 ```bash
-gemini -p "<prompt>" --output-format json --readonly
+gemini --help
 ```
 
-**Sandbox flags (FR-MR26):** Use `--readonly` to restrict Gemini from executing tools that write to disk or make network calls. The `--readonly` flag is the Gemini CLI's read-only equivalent for restricting tool execution scope. If your Gemini CLI version uses `--no-tools` instead, substitute that flag.
+Parse the help output and select the flag using this priority order:
+
+1. If `--readonly` appears in the help text, use `--readonly` (preferred — current Gemini CLI default).
+2. Else if `--no-tools` appears in the help text, use `--no-tools` (older Gemini CLI builds).
+3. Else (neither flag is present), abort the invocation and return:
+
+   ```json
+   {
+     "status": "failed",
+     "error_code": "cli_failed",
+     "error_message": "Gemini CLI does not advertise --readonly or --no-tools in `gemini --help`. The installed Gemini CLI version may be too old or too new for the documented Pattern 1 (read-only) contract. Install a Gemini CLI version that supports one of these flags, or set multi_model_review.external_permission_mode.gemini: sandbox-yolo to opt into Pattern 2 with an OS sandbox.",
+     "findings": [],
+     "usage": null,
+     "raw_output_path": "<config.raw_output_path>"
+   }
+   ```
+
+This probe makes the read-only guarantee **observable** (the adapter detects when the safety contract cannot be honored) rather than **assumed** (silently invoking with a flag the CLI ignores). Mirrors the precedent established by `codex-review-prompter` probing `codex app-server --help` to verify Pattern 3 availability.
+
+The probe result MAY be cached for the lifetime of the adapter invocation; do NOT cache across invocations because a Gemini CLI upgrade between runs would invalidate the cached choice.
+
+#### 4b. Invocation
+
+Invoke the Gemini CLI with the constructed prompt and the flag selected by the probe:
+
+```bash
+gemini -p "<prompt>" --output-format json <selected-flag>
+```
+
+Where `<selected-flag>` is the result of Step 4a (`--readonly` or `--no-tools`).
+
+**Sandbox flags (FR-MR26):** The selected flag restricts Gemini from executing tools that write to disk or make network calls. `--readonly` is the canonical Gemini CLI read-only equivalent for restricting tool execution scope; `--no-tools` is its predecessor on older CLI builds.
+
+#### 4c. sandbox_violation detection
+
+If, during output parsing (Step 5), the adapter observes evidence in Gemini's output that a write-tool was invoked despite the read-only flag — for example, an `events` or `tool_calls` field describing a `write_file`, `shell_exec`, `web_fetch` (with side-effecting method), or any other state-mutating tool — treat this as a `sandbox_violation` and abort with:
+
+```json
+{
+  "status": "failed",
+  "error_code": "sandbox_violation",
+  "error_message": "Gemini emitted evidence of a write-tool invocation despite --readonly/--no-tools flag. The CLI may be ignoring the read-only flag. Inspect raw output at raw_output_path. Consider upgrading the Gemini CLI or escalating the issue.",
+  "findings": [],
+  "usage": null,
+  "raw_output_path": "<config.raw_output_path>"
+}
+```
+
+This detection is best-effort — it depends on Gemini emitting structured tool-call evidence in its output. Absence of such evidence does NOT prove the read-only flag was honored; it only proves no observable violation. The probe in Step 4a remains the primary verification mechanism.
 
 **Model selection:** If `config.model` is set, pass it as the `--model` flag:
 
 ```bash
-gemini -p "<prompt>" --output-format json --readonly --model gemini-2.5-pro
+gemini -p "<prompt>" --output-format json <selected-flag> --model gemini-2.5-pro
 ```
+
+Where `<selected-flag>` is the result of the Step 4a probe.
 
 Write the raw CLI stdout to `config.raw_output_path` immediately upon capture, before any parsing (FR-MR24 §6).
 
