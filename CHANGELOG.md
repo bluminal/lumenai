@@ -5,6 +5,48 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 0.5.2 / synthex-plus 0.2.1] - 2026-04-29
+
+Phase 11.2 — ADR-003 hardening from team-review findings. Sourced from the 2026-04-29 multi-model `/synthex-plus:team-review --multi-model` of Phase 11.1 (commit range `46c4597..c26feb9`). Code-reviewer returned PASS; security-reviewer returned WARN with 4 MEDIUM + 4 threat-model gaps; performance-engineer returned WARN with 2 MEDIUM + 3 LOW. No CRITICAL/HIGH — Phase 11.1 (synthex 0.5.1 / synthex-plus 0.2.0) ships unchanged in production behavior; this release tightens the documentation contract, observability, and config-validation defenses around ADR-003. Both plugins are touched, so both versions bump.
+
+### Added
+
+**Codex adapter (`plugins/synthex/agents/codex-review-prompter.md`)** — Pattern 3 hardening:
+- Probe-caching contract documented in Step 4: `codex app-server --help` result is cached for the lifetime of the adapter invocation (and across invocations within the same Claude session); eliminates ~50–150ms per redundant probe and prevents standing-pool fan-outs from accumulating N probes.
+- New `### Performance characteristics` subsection in requestApproval Proxying quantifying O(N) round-trips × ~500ms–2s vs Pattern 1's O(1); recommends Pattern 1 for latency-sensitive contexts (CI, dev iteration).
+- JSON-RPC `id` correlation rule made explicit: "the adapter MUST verify `response.id == pending_request.id` before writing the response to Codex's stdin"; on mismatch, log WARN and drop. Prevents TOCTOU-style approval-confusion (CWE-345) when multiple `requestApproval` messages queue on stdout.
+- New Layer 2 fixture `tests/fixtures/multi-model-review/adapters/codex/app-server-id-mismatch/` covers the drop-mismatched-then-write-correlated path.
+
+**Gemini adapter (`plugins/synthex/agents/gemini-review-prompter.md`)** — Pattern 1 hardening:
+- New Step 4a probes `gemini --help` to detect which read-only flag the installed CLI version supports (prefer `--readonly`, fall back to `--no-tools`); aborts with `cli_failed` and remediation message if neither is advertised.
+- New Step 4c documents best-effort `sandbox_violation` detection on observed write-tool evidence in adapter output.
+
+**All 6 adapter agents (codex/claude/gemini/bedrock/llm/ollama)** — defense-in-depth:
+- New "Safe-name assertion" paragraph between Step 1 and Step 2 documents that the binary name (`codex`, `claude`, `gemini`, `aws`, `llm`, `ollama` respectively) is HARDCODED in the `which` invocation and is NOT derived from any config key. Prevents path-traversal / shell-metacharacter injection via adversarial project config (CWE-20).
+
+**Three commands (`/synthex-plus:start-review-team`, `/synthex:review-code`, `/synthex:performance-audit`)** — sandbox-yolo confirmation hardening:
+- Verbatim non-TTY guard sentence inserted in each command's sandbox-yolo confirmation step: when stdin is not a TTY (CI, scripted invocation, stdin redirected from `/dev/null`), treat as default-N and abort cleanly without prompting. Prevents unbounded CI hangs on the unanswerable prompt; locked byte-identical across all three commands per D25/NFR-MMT7.
+
+**Pattern 2 (sandbox-yolo) trust boundary** — new shipped default + Step 0 enforcement:
+- `multi_model_review.sandbox_profile_path` config key (default `plugins/synthex/config/sandbox.sb`) and `sandbox_bwrap_flags` config key (default `--ro-bind / / --bind /tmp /tmp --proc /proc --dev /dev`) added to `plugins/synthex/config/defaults.yaml`.
+- New file `plugins/synthex/config/sandbox.sb` ships a deny-by-default macOS `sandbox-exec` profile: denies all network egress, denies file-writes outside `/tmp`, denies reads of `~/.ssh` / `~/.aws` / `~/.config` / id_rsa-style paths even within CWD; uses `CWD_PATH` and `HOME_PATH` parameters via `sandbox-exec -D`.
+- New Step 0 profile-existence check in codex and gemini Pattern 2 sections: macOS `test -r <sandbox_profile_path>`; Linux `which bwrap`. On failure returns `cli_failed` with a remediation message. Pattern 2 invocation lines updated to pass `-D CWD_PATH=$PWD -D HOME_PATH=$HOME -f <sandbox_profile_path>`.
+
+**Layer 1 schema validators** — new `external_permission_mode` allow-list enforcement:
+- New test `tests/schemas/external-permission-mode-key-validation.test.ts` enforces every key in `external_permission_mode` is in the safe set `{default, codex, claude, gemini, bedrock, llm, ollama}`; rejects path-traversal-style and shell-metacharacter-style keys.
+- defaults.yaml inline comment block on `external_permission_mode` documents the allow-list explicitly, states unknown keys are silently ignored and never propagated to shell, cross-references the Layer 1 validator test by file name.
+
+**Test-suite cleanup**:
+- New shared helper `tests/helpers/load-defaults.ts` provides `loadDefaultsYaml()` / `loadDefaultsYamlText()` / `getDefaultsYamlPath()` as a module-level singleton with `yaml`→`js-yaml` dynamic-import fallback. Refactored `mmt-defaults-yaml-task79.test.ts`, `mmt-defaults-yaml-task82.test.ts`, and `permission-model-fixtures.test.ts` to use it. Eliminates ~10ms/run from redundant YAML parses + the copy-paste fallback boilerplate.
+
+### Documentation
+
+- `docs/plans/multi-model-teams.md`: D27 row updated with cross-reference to new "ADR-003 Known Limitations" subsection. New `### ADR-003 Known Limitations (out of scope for v1)` subsection enumerates four threat-model gaps acknowledged but explicitly out of scope for v1, each with a "Mitigation deferred: post-v1" proposal: (1) supply-chain — no `codex`/`gemini`/`claude` binary integrity check; (2) file-read scope — Pattern 1 agentic adapters can read `.env`/`~/.aws/credentials`/SSH keys; (3) CI bypass of sandbox-yolo confirmation by scripted `y\n`; (4) no rate limiting on external API invocations. Closing note clarifies none represents a default-unsafe configuration.
+
+### Test counts
+
+Phase 11.2 ships ~163 new Layer 1 tests across 7 new test files, covering all `[T]` criteria for Tasks 85, 86, 87, 88, 89, 90, 91. All pass with no regressions across the existing ~3,500-test suite (modulo the pre-existing `release-v050.test.ts` stale-version assertions, which are unaffected).
+
 ## [synthex-plus 0.2.0] - 2026-04-26
 
 ### Added

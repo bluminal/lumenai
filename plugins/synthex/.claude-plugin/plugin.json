@@ -1,6 +1,6 @@
 {
   "name": "synthex",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "AI agents modeled after a software startup org chart — specialized roles that synthesize to discover, build, ship, operate, and learn from complete, production-quality software.",
   "author": {
     "name": "Bluminal Labs"
