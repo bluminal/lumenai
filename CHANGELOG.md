@@ -5,6 +5,19 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 0.5.3 / synthex-plus 0.2.2] - 2026-04-29
+
+Hotfix — `init` and `team-init` could trigger Claude Code's sensitive-file permission dialog when seeding the project config, because the agent implemented "read defaults / write to config_path" as a single `cp` invocation. The permission engine flags both source and destination of `cp` as files-being-touched, surfacing a misleading "edit defaults.yaml" prompt to the user. Worse, an argument-order bug could overwrite the plugin's defaults template.
+
+### Fixed
+
+- `plugins/synthex/commands/init.md` Step 2: explicit instruction to use the **Read** tool to load `defaults.yaml` and the **Write** tool to create `.synthex/config.yaml`. New "Implementation rules — strict" section forbids `cp`, `cat >`, `sed -i`, `tee`, or any shell command that takes the defaults path as an argument. States `defaults.yaml` is read-only and never a destination.
+- `plugins/synthex-plus/commands/team-init.md` Step 5: same fix, parameterized for `.synthex-plus/config.yaml`.
+
+### Migration
+
+No user-visible behavior change. Existing `.synthex/config.yaml` and `.synthex-plus/config.yaml` files are unaffected. Re-running `/synthex:init` or `/synthex-plus:team-init` no longer surfaces the misleading permission prompt.
+
 ## [synthex 0.5.2 / synthex-plus 0.2.1] - 2026-04-29
 
 Phase 11.2 — ADR-003 hardening from team-review findings. Sourced from the 2026-04-29 multi-model `/synthex-plus:team-review --multi-model` of Phase 11.1 (commit range `46c4597..c26feb9`). Code-reviewer returned PASS; security-reviewer returned WARN with 4 MEDIUM + 4 threat-model gaps; performance-engineer returned WARN with 2 MEDIUM + 3 LOW. No CRITICAL/HIGH — Phase 11.1 (synthex 0.5.1 / synthex-plus 0.2.0) ships unchanged in production behavior; this release tightens the documentation contract, observability, and config-validation defenses around ADR-003. Both plugins are touched, so both versions bump.
@@ -293,6 +306,8 @@ First public release of the LumenAI marketplace and the Synthex plugin.
 - Golden snapshot infrastructure for regression testing
 - Promptfoo integration for behavioral and semantic evaluation
 
+[synthex 0.5.3 / synthex-plus 0.2.2]: https://github.com/bluminal/lumenai/releases/tag/v0.5.3
+[synthex 0.5.2 / synthex-plus 0.2.1]: https://github.com/bluminal/lumenai/releases/tag/v0.5.2
 [synthex-plus 0.2.0]: https://github.com/bluminal/lumenai/releases/tag/synthex-plus-v0.2.0
 [0.5.1]: https://github.com/bluminal/lumenai/releases/tag/v0.5.1
 [0.5.0]: https://github.com/bluminal/lumenai/releases/tag/v0.5.0

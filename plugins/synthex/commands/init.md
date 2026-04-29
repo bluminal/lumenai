@@ -32,9 +32,13 @@ Check if `@{config_path}` already exists.
 
 ### 2. Create Configuration File
 
-Read the default configuration template from the plugin's `config/defaults.yaml` file (located relative to this command at `../config/defaults.yaml`).
+Read the default configuration template from the plugin's `config/defaults.yaml` file (located relative to this command at `../config/defaults.yaml`) using the **Read** tool. Then create the directory `.synthex/` in the project root if it doesn't exist, and write the template content to `@{config_path}` using the **Write** tool.
 
-Create the directory `.synthex/` in the project root if it doesn't exist, then write the defaults template to `@{config_path}`.
+**Implementation rules — strict:**
+
+- Use the **Read** tool to load `defaults.yaml`. Use the **Write** tool to create the project config. **Do NOT use `cp`, `cat >`, `sed -i`, `tee`, or any shell command that takes the defaults path as an argument.** Shell commands trigger Claude Code's sensitive-file permission prompt (which flags both source and destination of `cp`) and risk argument-order bugs that could overwrite the plugin's defaults.
+- The plugin's `defaults.yaml` is **read-only**. Never write to it, never pass it as a destination argument to any tool, never edit it. It is a template, not project state.
+- The destination `@{config_path}` (default `.synthex/config.yaml`) is the only file this step creates.
 
 ### 3. Configure Concurrent Tasks
 

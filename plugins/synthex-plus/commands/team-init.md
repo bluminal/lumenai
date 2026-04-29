@@ -101,11 +101,15 @@ If `~/.claude/teams/standing/index.json` does not exist or is empty, skip Pass 2
 
 ### 5. Create Configuration File
 
-Read the default configuration template from the plugin's `config/defaults.yaml` file (located relative to this command at `../config/defaults.yaml`).
-
-Create the directory `.synthex-plus/` in the project root if it doesn't exist, then write the defaults template to `@{config_path}`.
+Read the default configuration template from the plugin's `config/defaults.yaml` file (located relative to this command at `../config/defaults.yaml`) using the **Read** tool. Then create the directory `.synthex-plus/` in the project root if it doesn't exist, and write the template content to `@{config_path}` using the **Write** tool.
 
 The configuration file must retain all comments from the defaults template — these serve as inline documentation explaining each setting.
+
+**Implementation rules — strict:**
+
+- Use the **Read** tool to load `defaults.yaml`. Use the **Write** tool to create the project config. **Do NOT use `cp`, `cat >`, `sed -i`, `tee`, or any shell command that takes the defaults path as an argument.** Shell commands trigger Claude Code's sensitive-file permission prompt (which flags both source and destination of `cp`) and risk argument-order bugs that could overwrite the plugin's defaults.
+- The plugin's `defaults.yaml` is **read-only**. Never write to it, never pass it as a destination argument to any tool, never edit it. It is a template, not project state.
+- The destination `@{config_path}` (default `.synthex-plus/config.yaml`) is the only file this step creates.
 
 ### 6. Update .gitignore
 
