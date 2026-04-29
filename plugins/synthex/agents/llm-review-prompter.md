@@ -133,6 +133,8 @@ Run `which llm`. If the binary is not found, return:
 }
 ```
 
+**Safe-name assertion (Task 88 / Phase 11.2):** The binary name `llm` is HARDCODED in the `which llm` invocation above. The adapter does NOT derive the binary name from any config key (e.g., from `multi_model_review.external_permission_mode.<cli-name>`). This prevents an adversarial project config from injecting a path-traversal or shell-metacharacter binary name into the `which` lookup. The Layer 1 schema test `tests/schemas/external-permission-mode-key-validation.test.ts` enforces that only the known safe set `{codex, claude, gemini, bedrock, llm, ollama, default}` may appear as keys in `external_permission_mode`; unknown keys are silently ignored at config-read time. CWE-20 (Improper Input Validation) defense-in-depth.
+
 ### 2. Auth Check
 
 **N/A — `llm`'s plugin model handles auth per-provider (`llm keys set <provider>`). Auth is per-plugin; missing-key errors surface as `cli_failed` from `llm` itself.**

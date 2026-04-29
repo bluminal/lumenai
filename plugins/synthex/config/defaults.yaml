@@ -415,6 +415,19 @@ multi_model_review:
   external_permission_mode:
     # Universal default applied to any CLI not explicitly listed below.
     default: read-only
+    #
+    # Allowed keys: `default`, plus the bare adapter names listed below
+    # (`codex`, `claude`, `gemini`, `bedrock`, `llm`, `ollama`). Any other
+    # key in this block is **silently ignored** by the adapters and is
+    # never propagated to a shell invocation. The adapter binary names
+    # (`which codex`, `which gemini`, `which aws`, etc.) are HARDCODED
+    # in each `*-review-prompter` agent's Step 1 (CLI Presence Check) —
+    # they are NOT derived from these config-key names. This prevents
+    # an adversarial project config from injecting a path-traversal or
+    # shell-metacharacter binary name. The Layer 1 schema test
+    # `tests/schemas/external-permission-mode-key-validation.test.ts`
+    # enforces this allow-list (Task 88 / Phase 11.2 / Security MEDIUM #4).
+    #
     # Per-CLI defaults. CLI names are the bare adapter name (the
     # `<cli>-review-prompter` agent file's prefix).
     codex: parent-mediated      # Pattern 3 via `codex app-server` JSON-RPC requestApproval
