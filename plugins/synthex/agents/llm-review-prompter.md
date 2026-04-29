@@ -67,6 +67,24 @@ Per FR-MR26, sandbox flags are documented as not applicable for this adapter. Th
 
 ---
 
+## Permission Model (ADR-003 / D27)
+
+This adapter implements the **three-pattern permission model** defined in ADR-003 (FR-MMT21). The `llm` CLI is **not** one of the parent-mediated CLIs (only Codex and Claude Code are), so it defaults to **Pattern 1 (read-only)** — which for this adapter is enforced **by the CLI's stateless protocol**, not a flag.
+
+Resolved per `multi_model_review.external_permission_mode.llm` from the host project's `.synthex/config.yaml` (falling back to `plugins/synthex/config/defaults.yaml`):
+
+| Mode | Behavior |
+|------|----------|
+| `read-only` (default for llm) | Pattern 1 — invoke `llm -m <model> -s '<system prompt>' '<prompt>'`. **Read-only by virtue of the protocol: `llm` has no tool-use surface; the model receives a prompt and emits text. No filesystem access beyond the prompt input.** No flag needed. |
+| `sandbox-yolo` | Pattern 2 — **not meaningfully different from `read-only` for this adapter**, since `llm` has no tool-use surface. The adapter accepts `sandbox-yolo` as a no-op alias for `read-only` and emits a one-line WARN noting the equivalence. |
+| `parent-mediated` | **Not supported**; the adapter fails loudly with `error_code: cli_unsupported_mode` and a one-line message directing the user to `read-only`. |
+
+**Safety rationale:** The `llm` CLI (Simon Willison's tool) is a thin provider-API wrapper. The invocation is a single API call to the underlying provider; the model running there has no protocol surface for file reads, shell execution, or other tool-use. There is no sandbox flag to set because there is no sandbox to configure: the CLI literally cannot do anything beyond reading the prompt and emitting the model's response. This makes `llm` structurally safe by default.
+
+**Config-read step:** Before each invocation, the adapter reads the resolved value of `multi_model_review.external_permission_mode.llm` and branches per the table above. The literal config-key path `multi_model_review.external_permission_mode` and the literal mode name `sandbox-yolo` are both referenced here so consumers can grep for them.
+
+---
+
 ## CLI Invocation
 
 ```bash

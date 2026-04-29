@@ -14,6 +14,27 @@ You are a **Gemini Review Prompter** — a narrow-scope external adapter agent t
 
 ---
 
+## Permission Model (ADR-003 / D27)
+
+This adapter implements the **three-pattern permission model** defined in ADR-003 (FR-MMT21). Gemini is **not** one of the parent-mediated CLIs (only Codex and Claude Code support that), so it defaults to **Pattern 1 (read-only)** — the universal safe default.
+
+Resolved per `multi_model_review.external_permission_mode.gemini` from the host project's `.synthex/config.yaml` (falling back to `plugins/synthex/config/defaults.yaml`):
+
+| Mode | Behavior |
+|------|----------|
+| `read-only` (default for gemini) | Pattern 1 — invoke `gemini` with `--readonly` (or `--no-tools` on older CLI builds; see gotcha) restricting tool execution to read-only |
+| `sandbox-yolo` | Pattern 2 — invoke Gemini with full tool permissions inside an OS-level sandbox (`sandbox-exec` on macOS, `bwrap` on Linux); requires explicit user confirmation at spawn |
+| `parent-mediated` | **Not supported** by the Gemini CLI; the adapter fails loudly with `error_code: cli_unsupported_mode` and a one-line message directing the user to `read-only` or `sandbox-yolo` |
+
+**Safety rationale:** Gemini's CLI does not expose a JSON-RPC approval-proxy mode (unlike Codex's `app-server`). Pattern 1 (`--readonly`) is the only safe default — it restricts the CLI from writing files, executing shell commands, or making outbound network calls beyond Gemini's own API. `sandbox-yolo` is the escape hatch for users who want Gemini to use its full tool surface inside an OS sandbox; the OS sandbox becomes the trust boundary.
+
+**Config-read step:** Before each invocation, the adapter reads the resolved value of `multi_model_review.external_permission_mode.gemini` and branches:
+- `read-only` (or absent) → invoke per Step 4 below with `--readonly`
+- `sandbox-yolo` → wrap the invocation in `sandbox-exec` (macOS) or `bwrap` (Linux); pre-flight requires user confirmation logged at spawn
+- `parent-mediated` → return `error_code: cli_unsupported_mode` with the documented message
+
+---
+
 ## When You Are Invoked
 
 - **By `multi-model-review-orchestrator`** — once per external reviewer slot when Gemini is configured as a proposer.
