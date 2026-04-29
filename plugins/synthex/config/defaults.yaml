@@ -406,15 +406,20 @@ multi_model_review:
   #                     riskier. Requires explicit user confirmation at spawn.
   #                     Opt in only when you trust the CLI inside the sandbox.
   #
-  # Defaults applied per CLI in Task 82 (Codex + Claude Code default to
-  # parent-mediated; all others default to read-only). For now the key exists
-  # with read-only as the universal default.
+  # Defaults applied per CLI: Codex and Claude Code default to parent-mediated
+  # (Pattern 3) because their CLIs natively support approval proxying. All
+  # other CLIs default to read-only (Pattern 1) — the universal safe default.
+  # Override any entry here per project to opt into sandbox-yolo (Pattern 2)
+  # for a specific CLI; the spawning command will require explicit y/N
+  # confirmation when sandbox-yolo is configured.
   external_permission_mode:
     # Universal default applied to any CLI not explicitly listed below.
-    # Override per CLI by adding `<cli-name>: <mode>` entries.
     default: read-only
-    # Per-CLI overrides (Task 82 will populate Codex + Claude Code).
-    # codex-review-prompter: parent-mediated
-    # claude-review-prompter: parent-mediated
-    # gemini-review-prompter: read-only
-    # ollama-review-prompter: read-only
+    # Per-CLI defaults. CLI names are the bare adapter name (the
+    # `<cli>-review-prompter` agent file's prefix).
+    codex: parent-mediated      # Pattern 3 via `codex app-server` JSON-RPC requestApproval
+    claude: parent-mediated     # Pattern 3 via Claude Code `canUseTool` over --output-format stream-json
+    gemini: read-only           # Pattern 1 via `--readonly` flag
+    bedrock: read-only          # Pattern 1 — `aws bedrock-runtime invoke-model` has no tool-use surface
+    llm: read-only              # Pattern 1 — `llm` CLI is a stateless provider-API wrapper
+    ollama: read-only           # Pattern 1 — Ollama HTTP API has no tool-use surface
