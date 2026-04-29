@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-
-const DEFAULTS_PATH = join(__dirname, '..', '..', 'plugins', 'synthex', 'config', 'defaults.yaml');
+import { loadDefaultsYaml, loadDefaultsYamlText } from '../helpers/load-defaults';
 
 describe('Task 82 (MMT): per-CLI external_permission_mode defaults', () => {
   let content: string;
@@ -10,14 +7,8 @@ describe('Task 82 (MMT): per-CLI external_permission_mode defaults', () => {
   let block: any;
 
   beforeAll(async () => {
-    content = readFileSync(DEFAULTS_PATH, 'utf8');
-    try {
-      const yaml = await import('yaml');
-      parsed = yaml.parse(content);
-    } catch {
-      const yaml = await import('js-yaml');
-      parsed = (yaml as any).load(content);
-    }
+    content = loadDefaultsYamlText();
+    parsed = await loadDefaultsYaml();
     block = parsed?.multi_model_review?.external_permission_mode ?? {};
   });
 

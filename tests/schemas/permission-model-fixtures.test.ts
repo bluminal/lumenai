@@ -15,9 +15,9 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { loadDefaultsYaml } from '../helpers/load-defaults';
 
 const REPO_ROOT = join(__dirname, '..', '..');
-const DEFAULTS_PATH = join(REPO_ROOT, 'plugins', 'synthex', 'config', 'defaults.yaml');
 const FIXTURES = join(REPO_ROOT, 'tests', 'fixtures');
 
 const VALID_MODES = new Set(['read-only', 'parent-mediated', 'sandbox-yolo']);
@@ -32,15 +32,7 @@ describe('Task 84 [T] (1): Layer 1 schema — external_permission_mode enum per 
   let block: any;
 
   beforeAll(async () => {
-    const content = readFileSync(DEFAULTS_PATH, 'utf8');
-    let parsed: any;
-    try {
-      const yaml = await import('yaml');
-      parsed = yaml.parse(content);
-    } catch {
-      const yaml = await import('js-yaml');
-      parsed = (yaml as any).load(content);
-    }
+    const parsed = await loadDefaultsYaml();
     block = parsed?.multi_model_review?.external_permission_mode ?? {};
   });
 

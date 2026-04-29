@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { loadDefaultsYaml, loadDefaultsYamlText } from '../helpers/load-defaults';
 
-const DEFAULTS_PATH = join(__dirname, '..', '..', 'plugins', 'synthex', 'config', 'defaults.yaml');
 const PLAN_PATH = join(__dirname, '..', '..', 'docs', 'plans', 'multi-model-teams.md');
 
 describe('Task 79 (MMT): ADR-003 in plan Decisions table', () => {
@@ -43,14 +43,8 @@ describe('Task 79 (MMT): multi_model_review.external_permission_mode config key'
   let parsed: any;
 
   beforeAll(async () => {
-    content = readFileSync(DEFAULTS_PATH, 'utf8');
-    try {
-      const yaml = await import('yaml');
-      parsed = yaml.parse(content);
-    } catch {
-      const yaml = await import('js-yaml');
-      parsed = (yaml as any).load(content);
-    }
+    content = loadDefaultsYamlText();
+    parsed = await loadDefaultsYaml();
   });
 
   it('defaults.yaml parses as valid YAML (regression)', () => {
