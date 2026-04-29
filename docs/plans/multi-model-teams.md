@@ -998,6 +998,71 @@ Implements the three-pattern permission model for external CLI adapter agents. E
 **Parallelizable:** Task 79 first. Tasks 80 and 81 in parallel after 79. Task 82 follows. Tasks 83 and 84 in parallel after 82.
 **Milestone Value:** External CLI invocations are safe by default. Users can enable more permissive modes with explicit acknowledgment. Codex and Claude Code benefit from native approval proxying without interrupting review flow.
 
+### Milestone 11.2: ADR-003 hardening from team-review findings (2026-04-29)
+
+Sourced from the emulated `/synthex-plus:team-review --multi-model` against `46c4597..HEAD` (2026-04-29). Code-reviewer returned PASS; security-reviewer returned WARN with 4 MEDIUM + 4 threat-model gaps; performance-engineer returned WARN with 2 MEDIUM + 3 LOW. No CRITICAL/HIGH — does not gate v1, but tightens the contract before broader adoption. All tasks are S complexity; bundle ships as a single follow-up release.
+
+| # | Task | Complexity | Dependencies | Status |
+|---|------|-----------|--------------|--------|
+| 85 | Codex adapter doc hardening (`plugins/synthex/agents/codex-review-prompter.md`): (a) Add probe caching contract sentence to Step 4 — "Cache the `codex app-server --help` probe result for the lifetime of the adapter invocation (and across invocations within the same Claude session if persistent)." (b) Add a "Performance characteristics" note to the requestApproval Proxying section quantifying O(N) round-trip overhead (~500ms–2s each) vs Pattern 1's O(1), with guidance on when to prefer Pattern 1 for latency-sensitive contexts. (c) Add explicit JSON-RPC `id` correlation rule: "The adapter MUST verify `response.id == pending_request.id` before writing the response to Codex's stdin; on mismatch, log a WARN, drop the mismatched response, and continue waiting." Add Layer 2 fixture `tests/fixtures/multi-model-review/adapters/codex/app-server-id-mismatch/` covering the mismatch-drop path. Sources: Performance MEDIUM #1, MEDIUM #2; Security MEDIUM #2. | S | None | pending |
+| 86 | Gemini adapter doc hardening (`plugins/synthex/agents/gemini-review-prompter.md`): (a) Add a pre-invocation probe step that runs `gemini --help` and selects `--readonly` (preferred) or `--no-tools` (older builds) based on which flag the help output advertises; if neither is present, return `error_code: cli_failed` with a remediation message. (b) Document what behavior constitutes a `sandbox_violation` for Gemini (e.g., unexpected write-tool invocation in adapter output) and what the adapter does when it detects one. Mirrors the codex `app-server --help` probe precedent. Source: Security MEDIUM #1. | S | None | pending |
+| 87 | Pattern 2 sandbox profile hardening: (a) Add `multi_model_review.sandbox_profile_path` config key to `plugins/synthex/config/defaults.yaml` (default `plugins/synthex/config/sandbox.sb`). (b) Ship a restrictive default macOS `sandbox-exec` profile at that path (deny network egress, deny writes outside `/tmp`, allow read of CWD subtree only). (c) Add a Step 0 check to all Pattern-2-capable adapters (`codex`, `gemini`) that verifies the profile file exists before spawning; on missing profile, return `error_code: cli_failed` with a remediation message. (d) Document the Linux `bwrap` flag set in defaults.yaml under a `sandbox_bwrap_flags` config key (default the existing `--ro-bind / / --bind /tmp /tmp`) so it is configurable. Source: Security MEDIUM #3. | S | None | pending |
+| 88 | CLI-name key validation in Layer 1 schema: extend `tests/schemas/permission-model-fixtures.test.ts` (or add `tests/schemas/external-permission-mode-key-validation.test.ts`) with a test asserting every key in `multi_model_review.external_permission_mode` (other than `default`) is a member of the known safe CLI set `{codex, claude, gemini, bedrock, llm, ollama}`. Document in `defaults.yaml` that unknown keys are silently ignored and never passed to any shell invocation. Add a documented assertion to each adapter's Step 1 (CLI Presence Check) that the binary name is one of the known safe names before invoking `which`. Source: Security MEDIUM #4. | S | None | pending |
+| 89 | Non-TTY/CI guard for the sandbox-yolo confirmation prompt across the three commands updated in Task 83 (`plugins/synthex-plus/commands/start-review-team.md`, `plugins/synthex/commands/review-code.md`, `plugins/synthex/commands/performance-audit.md`). Add a uniform clause to the confirmation step: "When stdin is not a TTY (CI, scripted invocation), treat as default-N and abort cleanly without prompting. This mirrors the TTY guard documented for the waiting indicator." Sources: Performance LOW #5; Security Threat-Model Gap #3 (cross-domain finding). | S | None | pending |
+| 90 | ADR-003 / D27 "Known Limitations" addendum: extend the D27 row in the plan Decisions table (or add a paragraph immediately following) that explicitly enumerates the four threat-model gaps acknowledged but **out of scope for v1**: (1) supply-chain — no `codex`/`gemini`/`claude` binary integrity check (signature, checksum, version pinning); (2) file-read scope — Pattern 1 agentic adapters can read any file the sandbox permits, including `.env`, `~/.aws/credentials`, SSH keys; no documented scope restriction; (3) CI bypass — sandbox-yolo confirmation is bypassable by a script piping `y`; partially mitigated by Task 89's non-TTY guard but not fully; (4) rate limiting — no per-session/per-hour cap on external API invocations (cost + DoS concern). Each listed as a known limitation with a tracking note for post-v1 hardening. Source: Security Threat Model Gaps #1–4. | S | None | pending |
+| 91 | Test-suite cleanup: extract a `loadDefaultsYaml()` helper into `tests/schemas/helpers.ts` (or a new `tests/helpers/load-defaults.ts`) that reads and parses `plugins/synthex/config/defaults.yaml` once per process (module-level singleton with the existing `import('yaml')` → `import('js-yaml')` fallback). Refactor `mmt-defaults-yaml-task79.test.ts`, `mmt-defaults-yaml-task82.test.ts`, and `permission-model-fixtures.test.ts` to use the helper. Source: Performance LOW #3. | S | None | pending |
+| 92 | Release: bump `plugins/synthex/.claude-plugin/plugin.json` (0.5.1 → 0.5.2 — Tasks 85, 86, 87, 88, 89, 90, 91 modified `plugins/synthex/`). Bump `plugins/synthex-plus/.claude-plugin/plugin.json` (0.2.0 → 0.2.1 — Task 89 modified `plugins/synthex-plus/`). Bump `.claude-plugin/marketplace.json` top-level + both plugin entries to match. Add `CHANGELOG.md` entry covering Phase 11.2 hardening (ADR-003 follow-ups). | S | Tasks 85, 86, 87, 88, 89, 90, 91 | pending |
+
+**Task 85 Acceptance Criteria:**
+- `[T]` `codex-review-prompter.md` Step 4 contains the literal phrase "Cache the `codex app-server --help` probe result"
+- `[T]` "Performance characteristics" subsection or paragraph present in requestApproval Proxying section with the literal phrase "round-trip per tool-use" (raw-string check)
+- `[T]` JSON-RPC id correlation rule present with the literal phrase "MUST verify `response.id == pending_request.id`"
+- `[T]` Layer 2 fixture directory `tests/fixtures/multi-model-review/adapters/codex/app-server-id-mismatch/` exists with `fixture.json`, `expected-envelope.json`, and `scenario.md`
+- `[T]` Layer 2 fixture test asserts the adapter drops the mismatched response and continues waiting
+
+**Task 86 Acceptance Criteria:**
+- `[T]` `gemini-review-prompter.md` documents a pre-invocation `gemini --help` probe (raw-string check for `gemini --help`)
+- `[T]` Documents both `--readonly` and `--no-tools` flag selection logic
+- `[T]` Documents `sandbox_violation` detection behavior
+
+**Task 87 Acceptance Criteria:**
+- `[T]` `multi_model_review.sandbox_profile_path` config key present in `plugins/synthex/config/defaults.yaml`
+- `[T]` Default profile file exists at the path configured in the previous criterion
+- `[T]` `multi_model_review.sandbox_bwrap_flags` config key present with a documented default
+- `[T]` `codex-review-prompter.md` and `gemini-review-prompter.md` Pattern 2 sections document the Step 0 profile-existence check
+- `[T]` Layer 1 test validates the new config keys parse and the default profile file is readable
+
+**Task 88 Acceptance Criteria:**
+- `[T]` Layer 1 test asserts every non-`default` key in `external_permission_mode` is in `{codex, claude, gemini, bedrock, llm, ollama}`
+- `[T]` `defaults.yaml` inline comment documents that unknown keys are silently ignored and not passed to shell invocation
+- `[T]` Each adapter's Step 1 (CLI Presence Check) documents the safe-name assertion before `which`
+
+**Task 89 Acceptance Criteria:**
+- `[T]` All three commands (start-review-team, review-code, performance-audit) document the non-TTY guard with the literal phrase "When stdin is not a TTY"
+- `[T]` All three use identical wording (verbatim per D25/NFR-MMT7 convention)
+- `[T]` Layer 1 test asserts the guard is present in all three command files
+
+**Task 90 Acceptance Criteria:**
+- `[T]` D27 row (or immediately-following paragraph) in the plan Decisions table contains the literal phrase "Known Limitations"
+- `[T]` All four numbered gaps are present (raw-string check for the keywords "supply-chain", "file-read scope", "CI bypass", "rate limiting")
+- `[H]` Each gap is described accurately and with a clear "out of scope for v1" framing
+- `[T]` Layer 1 test extends `mmt-defaults-yaml-task79.test.ts` (or sibling) to assert "Known Limitations" presence in the D27 row context
+
+**Task 91 Acceptance Criteria:**
+- `[T]` Helper file exists and exports a `loadDefaultsYaml()` function
+- `[T]` All three referenced test files (`mmt-defaults-yaml-task79`, `mmt-defaults-yaml-task82`, `permission-model-fixtures`) import and use the helper instead of in-line YAML parsing
+- `[T]` All three test files still pass after the refactor (regression)
+
+**Task 92 Acceptance Criteria:**
+- `[T]` `plugins/synthex/.claude-plugin/plugin.json` version is `0.5.2`
+- `[T]` `plugins/synthex-plus/.claude-plugin/plugin.json` version is `0.2.1`
+- `[T]` `.claude-plugin/marketplace.json` top-level + both plugin entries match the per-plugin versions above
+- `[T]` `CHANGELOG.md` has a new top-level entry titled with both version numbers covering Phase 11.2 hardening
+- `[T]` All JSON files parse as valid JSON (regression)
+
+**Parallelizable:** Tasks 85, 86, 87, 88, 89, 90, 91 are all independent (touch different files or different sections of the plan/config). Run in parallel batches respecting `concurrent_tasks` (default 3). Task 92 sequences after all of them.
+**Milestone Value:** Hardens ADR-003 against the four MEDIUM security findings + two MEDIUM performance findings + cross-domain non-TTY guard surfaced by the team-review. Documents the four known threat-model limitations explicitly so consumers understand what v1 does and does not protect against. Ships as a synthex 0.5.2 + synthex-plus 0.2.1 patch release.
+
 ---
 
 ## Cross-Cutting Notes for Engineering
