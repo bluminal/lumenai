@@ -129,6 +129,8 @@ Check if `.gitignore` exists in the project root. If it does, check whether it a
 
 **Standing Review Pools (optional)**
 
+Already initialized? Re-run the wizard with `/synthex-plus:configure-teams` to reconsider the routing and matching modes without re-running full `team-init`.
+
 Standing review pools keep reviewers warm between reviews — useful when you run many code reviews per session and want to amortize the reviewer spawn cost.
 
 AskUserQuestion: "Would you like to enable standing review pools for this project? (Enable / Skip)"

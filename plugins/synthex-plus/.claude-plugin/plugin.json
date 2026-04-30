@@ -8,6 +8,7 @@
   "keywords": ["agents", "teams", "orchestration", "collaboration", "parallel"],
   "commands": [
     "./commands/team-init.md",
+    "./commands/configure-teams.md",
     "./commands/team-implement.md",
     "./commands/team-review.md",
     "./commands/team-plan.md",

@@ -174,9 +174,9 @@ New focused wizard. Does not refactor `team-init.md`.
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 5 | Author `plugins/synthex-plus/commands/configure-teams.md`. YAML frontmatter `model: haiku`. Three steps: (1) Read `.synthex-plus/config.yaml`; if `standing_pools.enabled: true` is present, surface re-entry options (Re-run / Reset / Leave) per FR-UO5. (2) `AskUserQuestion`: enable standing pools? (Enable / Skip). On Skip, exit. (3) On Enable: two follow-up `AskUserQuestion` blocks for `routing_mode` (`prefer-with-fallback` default vs `strict`) and `matching_mode` (`covers` default vs `exact`). Write only the chosen keys. Do NOT spawn a pool (preserves FR-MMT27 criterion 3). | M | None | pending |
-| 6 | Register `configure-teams.md` in `plugins/synthex-plus/.claude-plugin/plugin.json` `commands` array. | S | Task 5 | pending |
-| 7 | Update `team-init.md` Step 7 ("Standing Review Pools") to add a one-line cross-reference: "Already initialized? Re-run wizard with `/synthex-plus:configure-teams`." Do NOT remove the existing Step 7 logic. | S | Task 5 | pending |
+| 5 | Author `plugins/synthex-plus/commands/configure-teams.md`. YAML frontmatter `model: haiku`. Three steps: (1) Read `.synthex-plus/config.yaml`; if `standing_pools.enabled: true` is present, surface re-entry options (Re-run / Reset / Leave) per FR-UO5. (2) `AskUserQuestion`: enable standing pools? (Enable / Skip). On Skip, exit. (3) On Enable: two follow-up `AskUserQuestion` blocks for `routing_mode` (`prefer-with-fallback` default vs `strict`) and `matching_mode` (`covers` default vs `exact`). Write only the chosen keys. Do NOT spawn a pool (preserves FR-MMT27 criterion 3). | M | None | done |
+| 6 | Register `configure-teams.md` in `plugins/synthex-plus/.claude-plugin/plugin.json` `commands` array. | S | Task 5 | done |
+| 7 | Update `team-init.md` Step 7 ("Standing Review Pools") to add a one-line cross-reference: "Already initialized? Re-run wizard with `/synthex-plus:configure-teams`." Do NOT remove the existing Step 7 logic. | S | Task 5 | done |
 
 **Task 5 Acceptance Criteria:**
 - `[T]` File exists with `model: haiku` frontmatter.
@@ -200,7 +200,7 @@ New focused wizard. Does not refactor `team-init.md`.
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 8 | Create `plugins/synthex/scripts/upgrade-nudge.sh` per FR-UO7–FR-UO21. POSIX-sh compatible (D-UO11). Implements: resolve current version from `plugin.json` (jq if available, sed fallback); resolve project root (`$CLAUDE_PROJECT_DIR \|\| pwd`); read `.synthex/state.json` (handle missing/malformed per FR-UO17–FR-UO18); detect `multi_model_review:` block via `grep -E '^multi_model_review:' .synthex/config.yaml` (D-UO6); compare versions via `sort -V` (D-UO12); print FR-UO15 nudge text on threshold-cross + absent block + not-dismissed; always write state file at end of run; exit 0 on every branch. | L | None | pending |
+| 8 | Create `plugins/synthex/scripts/upgrade-nudge.sh` per FR-UO7–FR-UO21. POSIX-sh compatible (D-UO11). Implements: resolve current version from `plugin.json` (jq if available, sed fallback); resolve project root (`$CLAUDE_PROJECT_DIR \|\| pwd`); read `.synthex/state.json` (handle missing/malformed per FR-UO17–FR-UO18); detect `multi_model_review:` block via `grep -E '^multi_model_review:' .synthex/config.yaml` (D-UO6); compare versions via `sort -V` (D-UO12); print FR-UO15 nudge text on threshold-cross + absent block + not-dismissed; always write state file at end of run; exit 0 on every branch. | L | None | done |
 | 9 | Create `plugins/synthex/hooks/hooks.json` declaring a `SessionStart` array pointing at `./scripts/upgrade-nudge.sh`. Mirror the shape of `plugins/synthex-plus/hooks/hooks.json`. | S | Task 8 | pending |
 | 10 | Author `plugins/synthex/commands/dismiss-upgrade-nudge.md` (Haiku-backed) per FR-UO16. Reads `.synthex/state.json` (creates it with current version + `dismissed: true` if missing); sets `dismissed: true`; exits with a one-line confirmation. | S | None | pending |
 | 11 | Register `dismiss-upgrade-nudge.md` in `plugins/synthex/.claude-plugin/plugin.json` `commands` array. | S | Task 10 | pending |
