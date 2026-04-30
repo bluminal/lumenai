@@ -241,11 +241,11 @@ Mirrors Phase 3. Slight variation because `hooks.json` already exists (gains a `
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 13 | Create `plugins/synthex-plus/scripts/upgrade-nudge.sh`. Same logic as Task 8, but reads `.synthex-plus/state.json` and `.synthex-plus/config.yaml`; threshold is `0.2.0`; nudge text per FR-UO15 synthex-plus variant. | M | Task 8 (logic reuse) | pending |
-| 14 | Update `plugins/synthex-plus/hooks/hooks.json` to add a `SessionStart` array pointing at `./scripts/upgrade-nudge.sh`. Existing `TaskCompleted` and `TeammateIdle` entries unchanged. | S | Task 13 | pending |
-| 15 | Author `plugins/synthex-plus/commands/dismiss-upgrade-nudge.md` (Haiku-backed). Same logic as Task 10, scoped to `.synthex-plus/state.json`. | S | None | pending |
-| 16 | Register `dismiss-upgrade-nudge.md` in `plugins/synthex-plus/.claude-plugin/plugin.json` `commands` array. | S | Task 15 | pending |
-| 17 | Update `plugins/synthex-plus/commands/team-init.md` Step 6 (the `.gitignore` step) to also append `.synthex-plus/state.json` to `.gitignore` per FR-UO24, D-UO2. | S | None | pending |
+| 13 | Create `plugins/synthex-plus/scripts/upgrade-nudge.sh`. Same logic as Task 8, but reads `.synthex-plus/state.json` and `.synthex-plus/config.yaml`; threshold is `0.2.0`; nudge text per FR-UO15 synthex-plus variant. | M | Task 8 (logic reuse) | done |
+| 14 | Update `plugins/synthex-plus/hooks/hooks.json` to add a `SessionStart` array pointing at `./scripts/upgrade-nudge.sh`. Existing `TaskCompleted` and `TeammateIdle` entries unchanged. | S | Task 13 | done |
+| 15 | Author `plugins/synthex-plus/commands/dismiss-upgrade-nudge.md` (Haiku-backed). Same logic as Task 10, scoped to `.synthex-plus/state.json`. | S | None | done |
+| 16 | Register `dismiss-upgrade-nudge.md` in `plugins/synthex-plus/.claude-plugin/plugin.json` `commands` array. | S | Task 15 | done |
+| 17 | Update `plugins/synthex-plus/commands/team-init.md` Step 6 (the `.gitignore` step) to also append `.synthex-plus/state.json` to `.gitignore` per FR-UO24, D-UO2. | S | None | done |
 
 **Task 13 Acceptance Criteria:**
 - `[T]` All criteria from Task 8 apply, parameterized for synthex-plus paths and threshold.

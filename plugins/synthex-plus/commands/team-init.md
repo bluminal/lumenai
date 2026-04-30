@@ -113,17 +113,25 @@ The configuration file must retain all comments from the defaults template — t
 
 ### 6. Update .gitignore
 
-Check if `.gitignore` exists in the project root. If it does, check whether it already contains an entry for `.synthex-plus/`.
+Check if `.gitignore` exists in the project root. Ensure it contains entries for the synthex-plus configuration directory and the per-developer state file.
 
-- **If `.gitignore` exists and does NOT contain `.synthex-plus/`:** Append the following block to the end of the file:
+For each entry below:
+
+- **If `.gitignore` exists and does NOT contain the path:** Append it.
+- **If `.gitignore` exists and already contains the path:** Do nothing for that entry.
+- **If `.gitignore` does not exist:** Create it.
+
+The resulting block to append (omitting any lines already present) is:
 
 ```
 # Synthex+ configuration (project-specific overrides)
 .synthex-plus/
+
+# Synthex+ per-developer state (upgrade-nudge tracking)
+.synthex-plus/state.json
 ```
 
-- **If `.gitignore` exists and already contains `.synthex-plus/`:** Do nothing.
-- **If `.gitignore` does not exist:** Create it with the entry above.
+The `.synthex-plus/state.json` line is explicit per FR-UO24 / D-UO2 — even though the `.synthex-plus/` directory entry already covers it, the explicit state-file entry documents intent and survives any future narrowing of the directory-level ignore.
 
 ### 7. Standing Review Pools (optional)
 
