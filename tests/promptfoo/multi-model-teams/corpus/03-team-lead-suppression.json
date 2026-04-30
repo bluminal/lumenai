@@ -1,0 +1,76 @@
+{
+  "scenario": "team-lead-suppression",
+  "description": "Multi-model /team-review demonstrates Lead suppression (FR-MMT4 step 1, D4): when multi_model=true, Lead waits for orchestrator's consolidated report and publishes it verbatim instead of producing a competing summary. This scenario captures Lead's spawn-prompt blob excerpt and the suppressed-vs-published artifact contract.",
+  "input": {
+    "command": "team-review",
+    "team_name": "review-003",
+    "artifact_path": "src/payments/refund.ts",
+    "native_reviewers": ["code-reviewer", "security-reviewer"],
+    "external_adapters": ["codex-review-prompter", "gemini-review-prompter"],
+    "multi_model": true
+  },
+  "lead_spawn_prompt_excerpt": "### Multi-Model Conditional (apply when multi_model=true)\n\nLead suppression: When multi_model=true, you (Lead) MUST NOT produce your own summary report. Instead:\n  1. Wait for the orchestrator's consolidated report posted to your inbox by `multi-model-review-orchestrator`.\n  2. Publish that report verbatim as the team's final output.\n  3. Do NOT add commentary, reorder findings, or paraphrase. The orchestrator's output is canonical.\n\nIf the orchestrator's report has not arrived after the per-cycle timeout, mark the cycle as `parse_failed` and surface the orchestrator's last-known status. Do NOT fall back to producing a Lead-authored report.",
+  "raw_findings": [
+    {
+      "finding_id": "correctness.refund.idempotency-key-missing",
+      "severity": "high",
+      "category": "correctness",
+      "title": "Refund handler does not enforce idempotency key",
+      "description": "Without an idempotency key, network retries can issue duplicate refunds.",
+      "file": "src/payments/refund.ts",
+      "symbol": "issueRefund",
+      "line_range": [50, 70],
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team",
+        "team_name": "review-003"
+      }
+    },
+    {
+      "finding_id": "correctness.refund.idempotency-key-missing",
+      "severity": "high",
+      "category": "correctness",
+      "title": "Refund issuance lacks idempotency protection",
+      "description": "issueRefund() takes no idempotency key. Concurrent retries (e.g., webhook re-delivery) will issue multiple refunds for the same logical event.",
+      "file": "src/payments/refund.ts",
+      "symbol": "issueRefund",
+      "line_range": [50, 70],
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "gemini-review-prompter",
+        "family": "google",
+        "source_type": "external"
+      }
+    }
+  ],
+  "consolidated_output": {
+    "findings": [
+      {
+        "finding_id": "correctness.refund.idempotency-key-missing",
+        "severity": "high",
+        "category": "correctness",
+        "title": "Refund issuance lacks idempotency protection",
+        "description": "issueRefund() takes no idempotency key. Concurrent retries (e.g., webhook re-delivery) will issue multiple refunds for the same logical event.",
+        "file": "src/payments/refund.ts",
+        "symbol": "issueRefund",
+        "line_range": [50, 70],
+        "confidence": "high",
+        "raised_by": [
+          {"reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team"},
+          {"reviewer_id": "gemini-review-prompter", "family": "google", "source_type": "external"}
+        ],
+        "consolidation_notes": "Both sources agree on severity (high). 1 native-team + 1 external. Description from gemini selected (more specific)."
+      }
+    ],
+    "verdict": "fail",
+    "summary": "1 HIGH correctness finding raised cross-source. Lead suppressed — this report is the orchestrator's verbatim output."
+  },
+  "lead_published_artifact": "<orchestrator's consolidated_output verbatim — NO Lead commentary, reordering, or paraphrase>",
+  "verification_assertions": [
+    "Lead's published artifact is byte-identical to orchestrator's consolidated_output",
+    "Lead did not author a competing summary section",
+    "Lead's spawn-prompt blob included the FR-MMT4 multi-model overlay (suppression text)"
+  ]
+}

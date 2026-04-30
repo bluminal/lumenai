@@ -1,0 +1,33 @@
+{
+  "scenario": "team-roster-validation-abort",
+  "description": "Multi-model /team-review with an unsupported reviewer in roster. FR-MMT3 v1-supported set: {code-reviewer, security-reviewer, design-system-agent, performance-engineer}. Quality-engineer is NOT supported in v1. Roster validation aborts BEFORE team spawn — no native team, no external adapters, no orchestrator. Tests the abort path.",
+  "input": {
+    "command": "team-review",
+    "team_name": "review-005",
+    "artifact_path": "src/lib/parser.ts",
+    "native_reviewers": ["code-reviewer", "quality-engineer"],
+    "external_adapters": ["codex-review-prompter"],
+    "multi_model": true
+  },
+  "expected_abort": {
+    "stage": "pre-spawn-roster-validation",
+    "trigger": "quality-engineer is outside v1-supported set {code-reviewer, security-reviewer, design-system-agent, performance-engineer}",
+    "exit_code": 2,
+    "message": "Multi-model review aborted: roster contains unsupported reviewer 'quality-engineer'. Supported reviewers (v1): code-reviewer, security-reviewer, design-system-agent, performance-engineer. Either remove the reviewer or run /team-review without --multi-model.",
+    "side_effects_required": [
+      "No team spawned in ~/.claude/teams/",
+      "No orchestrator agent invoked",
+      "No external adapter invoked",
+      "No tokens consumed beyond the validation prompt itself"
+    ]
+  },
+  "raw_findings": [],
+  "consolidated_output": null,
+  "verification_assertions": [
+    "Validation fails fast: zero teammate spawns",
+    "Error message names the offending reviewer explicitly",
+    "Error message lists the v1-supported set",
+    "Exit code 2 (per CLAUDE.md hook conventions for blocking)",
+    "Re-running without --multi-model would succeed (single-model accepts any roster)"
+  ]
+}

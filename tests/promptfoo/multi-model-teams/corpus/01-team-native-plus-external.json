@@ -1,0 +1,101 @@
+{
+  "scenario": "team-native-plus-external",
+  "description": "Multi-model /team-review with 2 native teammates (code-reviewer, security-reviewer via mailbox bridge) and 2 external adapters (codex, gemini). Security finding raised by 1 native team source + 1 external. Verifies cross-source dedup with source_type attribution preserved (FR-MMT3, FR-MMT20).",
+  "input": {
+    "command": "team-review",
+    "team_name": "review-001",
+    "artifact_path": "src/auth/session.ts",
+    "native_reviewers": ["code-reviewer", "security-reviewer"],
+    "external_adapters": ["codex-review-prompter", "gemini-review-prompter"],
+    "multi_model": true
+  },
+  "raw_findings": [
+    {
+      "finding_id": "security.session.weak-token-entropy",
+      "severity": "high",
+      "category": "security",
+      "title": "Session token uses Math.random() — insufficient entropy",
+      "description": "Session token is generated via Math.random(). Predictable; allows session hijacking via token guessing.",
+      "file": "src/auth/session.ts",
+      "symbol": "createSession",
+      "line_range": [42, 48],
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team",
+        "team_name": "review-001"
+      }
+    },
+    {
+      "finding_id": "security.session.weak-token-entropy",
+      "severity": "critical",
+      "category": "security",
+      "title": "Session tokens generated with non-cryptographic RNG",
+      "description": "createSession uses Math.random() for token bytes. Must use crypto.randomBytes() or webcrypto.getRandomValues(). Critical — token predictability breaks the entire auth model.",
+      "file": "src/auth/session.ts",
+      "symbol": "createSession",
+      "line_range": [42, 48],
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "codex-review-prompter",
+        "family": "openai",
+        "source_type": "external"
+      }
+    },
+    {
+      "finding_id": "maintainability.session.no-rotation",
+      "severity": "medium",
+      "category": "maintainability",
+      "title": "No session token rotation on privilege change",
+      "description": "When a user's role escalates, the session token is reused. Best practice: rotate tokens on privilege boundary crossings.",
+      "file": "src/auth/session.ts",
+      "symbol": "promoteUser",
+      "line_range": [120, 135],
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team",
+        "team_name": "review-001"
+      }
+    }
+  ],
+  "consolidated_output": {
+    "findings": [
+      {
+        "finding_id": "security.session.weak-token-entropy",
+        "severity": "critical",
+        "category": "security",
+        "title": "Session tokens generated with non-cryptographic RNG",
+        "description": "createSession uses Math.random() for token bytes. Must use crypto.randomBytes() or webcrypto.getRandomValues(). Critical — token predictability breaks the entire auth model.",
+        "file": "src/auth/session.ts",
+        "symbol": "createSession",
+        "line_range": [42, 48],
+        "confidence": "high",
+        "raised_by": [
+          {"reviewer_id": "security-reviewer", "family": "anthropic", "source_type": "native-team"},
+          {"reviewer_id": "codex-review-prompter", "family": "openai", "source_type": "external"}
+        ],
+        "consolidation_notes": "Severity reconciled high → critical (1-level diff, max). Security category exempt from minority-of-one demotion. Cross-source attribution preserved: 1 native-team + 1 external."
+      },
+      {
+        "finding_id": "maintainability.session.no-rotation",
+        "severity": "low",
+        "category": "maintainability",
+        "title": "No session token rotation on privilege change",
+        "description": "When a user's role escalates, the session token is reused. Best practice: rotate tokens on privilege boundary crossings.",
+        "file": "src/auth/session.ts",
+        "symbol": "promoteUser",
+        "line_range": [120, 135],
+        "confidence": "medium",
+        "raised_by": [
+          {"reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team"}
+        ],
+        "consolidation_notes": "Minority-of-one demotion applied: medium → low (single source, non-security category, medium confidence)."
+      }
+    ],
+    "verdict": "fail",
+    "summary": "1 CRITICAL security finding (session token entropy) raised cross-source by native team + codex; 1 LOW maintainability finding (token rotation) raised by code-reviewer alone (demoted)."
+  }
+}

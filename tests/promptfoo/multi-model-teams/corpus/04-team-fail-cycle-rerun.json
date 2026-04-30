@@ -1,0 +1,103 @@
+{
+  "scenario": "team-fail-cycle-rerun",
+  "description": "Multi-model /team-review FAIL re-review cycle. Cycle 1 produces FAIL with 2 findings (1 fixed by author, 1 disputed). Cycle 2 re-runs orchestrator on patched diff: orchestrator re-fans-out to native team + external adapters; consolidation produces a new report. Verifies multi-model FAIL re-review behavior: orchestrator re-runs at each cycle (~2-3× per-cycle token cost vs native-only), Lead re-publishes verbatim each cycle.",
+  "input": {
+    "command": "team-review",
+    "team_name": "review-004",
+    "artifact_path": "src/db/transaction.ts",
+    "native_reviewers": ["code-reviewer", "security-reviewer"],
+    "external_adapters": ["codex-review-prompter"],
+    "multi_model": true,
+    "max_cycles": 2
+  },
+  "cycle_1": {
+    "raw_findings": [
+      {
+        "finding_id": "correctness.tx.no-rollback-on-error",
+        "severity": "high",
+        "category": "correctness",
+        "title": "Transaction does not rollback on partial failure",
+        "description": "If step 2 of the transaction fails, step 1's writes are not rolled back. Leaves DB in inconsistent state.",
+        "file": "src/db/transaction.ts",
+        "symbol": "executeBatch",
+        "line_range": [30, 65],
+        "confidence": "high",
+        "source": {
+          "reviewer_id": "code-reviewer",
+          "family": "anthropic",
+          "source_type": "native-team",
+          "team_name": "review-004"
+        }
+      },
+      {
+        "finding_id": "performance.tx.connection-leak",
+        "severity": "medium",
+        "category": "performance",
+        "title": "Transaction connection not released on early return",
+        "description": "Early-return paths skip the connection.release() call. Will exhaust the connection pool under load.",
+        "file": "src/db/transaction.ts",
+        "symbol": "executeBatch",
+        "line_range": [40, 50],
+        "confidence": "medium",
+        "source": {
+          "reviewer_id": "codex-review-prompter",
+          "family": "openai",
+          "source_type": "external"
+        }
+      }
+    ],
+    "consolidated_output": {
+      "findings": [
+        {
+          "finding_id": "correctness.tx.no-rollback-on-error",
+          "severity": "high",
+          "category": "correctness",
+          "raised_by": [{"reviewer_id": "code-reviewer", "source_type": "native-team"}]
+        },
+        {
+          "finding_id": "performance.tx.connection-leak",
+          "severity": "low",
+          "category": "performance",
+          "raised_by": [{"reviewer_id": "codex-review-prompter", "source_type": "external"}],
+          "consolidation_notes": "Minority-of-one demotion: medium → low (single source, non-security)."
+        }
+      ],
+      "verdict": "fail",
+      "cycle": 1
+    }
+  },
+  "cycle_2": {
+    "patched_diff": "executeBatch wrapped in try/catch with explicit rollback; connection.release() moved to finally block.",
+    "raw_findings": [
+      {
+        "finding_id": "correctness.tx.no-rollback-on-error",
+        "severity": "info",
+        "category": "correctness",
+        "title": "Transaction rollback now correctly applied",
+        "description": "Previously raised in cycle 1; verified fixed in cycle 2 by code-reviewer.",
+        "file": "src/db/transaction.ts",
+        "symbol": "executeBatch",
+        "line_range": [30, 70],
+        "confidence": "high",
+        "source": {
+          "reviewer_id": "code-reviewer",
+          "family": "anthropic",
+          "source_type": "native-team",
+          "team_name": "review-004"
+        }
+      }
+    ],
+    "consolidated_output": {
+      "findings": [],
+      "verdict": "pass",
+      "cycle": 2,
+      "consolidation_notes": "Cycle 1's HIGH finding verified-fixed in cycle 2 (info-level acknowledgment, no carry-over). Performance finding from cycle 1 also resolved."
+    }
+  },
+  "verification_assertions": [
+    "Orchestrator was re-invoked at cycle 2 (FR-MMT3 multi-model FAIL re-review)",
+    "Lead published cycle 2's consolidated_output verbatim, not an aggregate of cycle 1 + cycle 2",
+    "Per-cycle token cost ~2-3× native-only baseline (documented in plan task 15 acceptance)",
+    "Verdict transition fail → pass terminated the cycle"
+  ]
+}

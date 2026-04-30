@@ -1,0 +1,254 @@
+description: |
+  Layer 3 semantic eval (multi-model-teams Phase 10, Task 76):
+  would a human accept the orchestrator's consolidation when invoked
+  through `/synthex-plus:team-review --multi-model`?
+
+  Corpus of 5 multi-model team-review scenarios designed to exercise
+  team-specific behaviors that the parent MMR Phase 10 corpus does NOT
+  cover:
+    01 — native-team + external cross-source dedup (FR-MMT3, FR-MMT20)
+    02 — cross-domain enrichment from native team (FR-MMT4 protocol)
+    03 — Lead suppression (FR-MMT4 step 1, D4)
+    04 — multi-model FAIL re-review cycle (FR-MMT3 cycle behavior)
+    05 — roster validation pre-spawn abort (FR-MMT3 v1-supported set)
+
+  Manual-trigger only per CLAUDE.md testing pyramid. Excluded from
+  per-PR Layer 1+2 default suite. Run with:
+
+    npx promptfoo eval \
+      --config tests/promptfoo/multi-model-teams/team-review-consolidation-judge.yaml
+
+  Source authority:
+  - FR-MMT3 (multi-model on /team-review)
+  - FR-MMT4 (Lead suppression + cross-domain enrichment)
+  - FR-MMT20 (native team JSON findings emission)
+  - NFR-MMT6 (Layer 3 semantic eval requirement)
+  - CLAUDE.md testing pyramid (Layer 3 manual-trigger convention)
+
+# Manual-trigger flag — excluded from per-PR Layer 1+2 default suite
+tags:
+  - layer3
+  - manual-trigger-only
+  - mmt
+
+# Use claude-3-5-sonnet as judge for consistency with parent MMR judge
+providers:
+  - id: anthropic:claude-3-5-sonnet
+    config:
+      temperature: 0.0
+
+# ---------------------------------------------------------------------------
+# Test corpus (5 team-review consolidation scenarios)
+# ---------------------------------------------------------------------------
+
+tests:
+  # --------------------------------------------------------------------------
+  # Scenario 1 — native team + external cross-source dedup
+  # Verifies: native-team source_type vs external attribution preserved
+  # in raised_by[]; severity reconciliation across sources; security
+  # exemption from minority-of-one demotion.
+  # --------------------------------------------------------------------------
+  - description: "S-MMT-01: Native team + external cross-source dedup (session token entropy)"
+    vars:
+      scenario_file: tests/promptfoo/multi-model-teams/corpus/01-team-native-plus-external.json
+    prompt: |
+      You are an expert code-review auditor. Evaluate whether the following
+      multi-model `/team-review` consolidation output is correct and would
+      be accepted by a senior engineer.
+
+      CONSOLIDATION SCENARIO:
+      {{scenario_file | load_json | json}}
+
+      Evaluate the consolidation against these criteria:
+      1. Are findings correctly attributed in raised_by[] across native-team
+         and external source_types? (FR-MMT20 attribution contract)
+      2. Are duplicate findings (same finding_id) merged with ALL contributors
+         in raised_by[], preserving native-team vs external distinction?
+      3. Is severity reconciliation correct? (1-level diff → max; 2+ → judge)
+      4. Are minority-of-one demotions correctly applied? (security category
+         is EXEMPT from demotion; raised by single non-security source → demote)
+      5. Are finding descriptions accurate relative to raw_findings input?
+
+      Return a JSON object:
+      {
+        "accept": true|false,
+        "score": 0..10,
+        "reasoning": "detailed explanation"
+      }
+    assert:
+      - type: llm-rubric
+        provider: anthropic:claude-3-5-sonnet
+        value: |
+          The response must be a valid JSON object with keys "accept" (bool),
+          "score" (0-10), "reasoning" (non-empty string). The consolidation
+          in corpus/01-team-native-plus-external.json is correct: session-token
+          finding merged from security-reviewer (native-team) + codex
+          (external) with raised_by[] preserving both source_types; severity
+          reconciled high→critical (1-level diff, max); maintainability
+          finding minority-of-one demoted medium→low (single native-team
+          source, non-security category, medium confidence). Score >= 7
+          and accept = true for a correct consolidation.
+        threshold: 0.7
+
+  # --------------------------------------------------------------------------
+  # Scenario 2 — cross-domain enrichment from native team
+  # Verifies: code-reviewer (native team) raising security-category finding
+  # via FR-MMT4 cross-domain SendMessage protocol is preserved in
+  # consolidation with cross_domain=true flag retained.
+  # --------------------------------------------------------------------------
+  - description: "S-MMT-02: Cross-domain enrichment (code-reviewer raises security finding)"
+    vars:
+      scenario_file: tests/promptfoo/multi-model-teams/corpus/02-team-cross-domain-enrichment.json
+    prompt: |
+      You are an expert code-review auditor. Evaluate this multi-model
+      `/team-review` consolidation. The scenario tests cross-domain
+      enrichment per FR-MMT4: code-reviewer (native team, normally focused
+      on code-clarity) raises a security-category finding.
+
+      CONSOLIDATION SCENARIO:
+      {{scenario_file | load_json | json}}
+
+      Evaluate against these criteria:
+      1. Is the cross-domain finding (security raised by code-reviewer)
+         preserved in the consolidated output, NOT dropped?
+      2. Is the cross_domain=true flag retained in raised_by[]?
+      3. Is the cross-domain finding's category routing correct (security,
+         not maintainability — the original semantic domain wins, not the
+         reviewer's nominal domain)?
+      4. Is the security exemption applied (no minority-of-one demotion)?
+      5. Is the unrelated maintainability finding kept at low (already at
+         floor — no further demotion)?
+
+      Return: {"accept": bool, "score": 0..10, "reasoning": "..."}
+    assert:
+      - type: llm-rubric
+        provider: anthropic:claude-3-5-sonnet
+        value: |
+          Valid JSON {accept, score, reasoning}. The corpus/02 consolidation
+          is correct: cross-domain security finding from code-reviewer
+          retained at high severity with cross_domain=true; security category
+          routing correct (not re-categorized as code-clarity); security
+          exemption blocks minority-of-one demotion; rate-limit security
+          finding from security-reviewer kept at medium (security exemption);
+          maintainability finding stays at low. Accept = true, score >= 7.
+        threshold: 0.7
+
+  # --------------------------------------------------------------------------
+  # Scenario 3 — Lead suppression
+  # Verifies: when multi_model=true, Lead does not author a competing
+  # report; Lead publishes orchestrator's output verbatim. This is the
+  # "spawn-prompt blob" inspection, not a runtime team observation.
+  # --------------------------------------------------------------------------
+  - description: "S-MMT-03: Lead suppression — published artifact is orchestrator's output verbatim"
+    vars:
+      scenario_file: tests/promptfoo/multi-model-teams/corpus/03-team-lead-suppression.json
+    prompt: |
+      You are an expert auditor of multi-model team-review behavior.
+      Evaluate whether Lead suppression (FR-MMT4 step 1, D4) is correctly
+      implemented in the spawn-prompt blob and consolidated artifact.
+
+      SCENARIO:
+      {{scenario_file | load_json | json}}
+
+      Evaluate:
+      1. Does the lead_spawn_prompt_excerpt explicitly forbid Lead from
+         producing a competing report?
+      2. Does the spawn prompt instruct Lead to publish the orchestrator's
+         report verbatim, with no commentary, reordering, or paraphrase?
+      3. Is the timeout fallback documented (parse_failed marker, NOT
+         Lead-authored fallback report)?
+      4. Does lead_published_artifact reference orchestrator's
+         consolidated_output verbatim (not a Lead-rewritten version)?
+      5. Are the verification_assertions sufficient to catch a regression
+         where Lead reverts to authoring?
+
+      Return: {"accept": bool, "score": 0..10, "reasoning": "..."}
+    assert:
+      - type: llm-rubric
+        provider: anthropic:claude-3-5-sonnet
+        value: |
+          Valid JSON. corpus/03 spawn prompt excerpt forbids Lead-authored
+          summary, requires verbatim publication, documents parse_failed
+          timeout fallback (NOT Lead-authored), and the verification
+          assertions cover the byte-identity check + spawn-prompt overlay
+          presence + zero competing summary. Accept = true, score >= 7.
+        threshold: 0.7
+
+  # --------------------------------------------------------------------------
+  # Scenario 4 — multi-model FAIL re-review cycle
+  # Verifies: orchestrator re-runs at each cycle (FR-MMT3 cycle behavior),
+  # Lead re-publishes verbatim each cycle, cycle 2 verdict reflects the
+  # patched diff (not aggregate of cycle 1 + 2), per-cycle token cost
+  # documented as ~2-3× native-only baseline.
+  # --------------------------------------------------------------------------
+  - description: "S-MMT-04: Multi-model FAIL re-review cycle (rollback fix verified)"
+    vars:
+      scenario_file: tests/promptfoo/multi-model-teams/corpus/04-team-fail-cycle-rerun.json
+    prompt: |
+      You are an expert auditor of multi-model `/team-review` cycle
+      behavior. Evaluate the FAIL re-review cycle correctness.
+
+      SCENARIO:
+      {{scenario_file | load_json | json}}
+
+      Evaluate:
+      1. Did the orchestrator re-run at cycle 2 (re-fan-out to native team
+         + external adapters), per FR-MMT3 multi-model FAIL cycle?
+      2. Does cycle 2's consolidated_output reflect ONLY the patched diff,
+         not aggregate cycle 1 + cycle 2 findings?
+      3. Did Lead re-publish cycle 2's output verbatim (FR-MMT4 step 1
+         applies per cycle, not just cycle 1)?
+      4. Is the cycle transition fail → pass correctly terminating? (verdict
+         = pass should not trigger another cycle)
+      5. Is the per-cycle ~2-3× token cost documented somewhere reasonable?
+
+      Return: {"accept": bool, "score": 0..10, "reasoning": "..."}
+    assert:
+      - type: llm-rubric
+        provider: anthropic:claude-3-5-sonnet
+        value: |
+          Valid JSON. corpus/04 shows orchestrator re-invoked at cycle 2;
+          cycle 2 consolidated_output empty findings + verdict pass (NOT
+          aggregate); Lead's verbatim-publish contract maintained per cycle;
+          fail → pass transition correctly terminates; token-cost note
+          present in verification_assertions. Accept = true, score >= 7.
+        threshold: 0.7
+
+  # --------------------------------------------------------------------------
+  # Scenario 5 — roster validation abort
+  # Verifies: pre-spawn roster validation rejects unsupported reviewers
+  # (v1 set: code-reviewer, security-reviewer, design-system-agent,
+  # performance-engineer) before any team is spawned or token spent.
+  # --------------------------------------------------------------------------
+  - description: "S-MMT-05: Roster validation abort (quality-engineer rejected pre-spawn)"
+    vars:
+      scenario_file: tests/promptfoo/multi-model-teams/corpus/05-team-roster-validation-abort.json
+    prompt: |
+      You are an expert auditor. Evaluate roster-validation behavior for
+      `/team-review --multi-model` when an unsupported reviewer is in the
+      roster.
+
+      SCENARIO:
+      {{scenario_file | load_json | json}}
+
+      Evaluate:
+      1. Does validation abort BEFORE spawning the native team?
+      2. Does the error message name the offending reviewer explicitly?
+      3. Does the error message list the v1-supported set?
+      4. Are zero side-effects observed (no team in ~/.claude/teams/, no
+         orchestrator invoked, no external adapter invoked, no tokens
+         consumed beyond the validation prompt)?
+      5. Is the remediation hint actionable (run without --multi-model OR
+         remove the offender)?
+
+      Return: {"accept": bool, "score": 0..10, "reasoning": "..."}
+    assert:
+      - type: llm-rubric
+        provider: anthropic:claude-3-5-sonnet
+        value: |
+          Valid JSON. corpus/05 expected_abort: stage=pre-spawn-roster-validation;
+          message names quality-engineer + lists v1-supported set; exit_code=2;
+          side-effects required cover team/orchestrator/adapter/token=zero.
+          Accept = true, score >= 7. (This is an abort scenario — passing
+          consolidation is N/A; the eval asserts the abort path is well-formed.)
+        threshold: 0.7

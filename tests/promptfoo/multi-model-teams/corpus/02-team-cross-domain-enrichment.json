@@ -1,0 +1,117 @@
+{
+  "scenario": "team-cross-domain-enrichment",
+  "description": "Multi-model /team-review where code-reviewer (native team) raises a security-category finding (cross-domain enrichment per FR-MMT4 cross-domain SendMessage protocol). Consolidation must preserve the finding with code-reviewer attribution and original-domain category routing.",
+  "input": {
+    "command": "team-review",
+    "team_name": "review-002",
+    "artifact_path": "src/api/handlers/upload.ts",
+    "native_reviewers": ["code-reviewer", "security-reviewer"],
+    "external_adapters": ["codex-review-prompter"],
+    "multi_model": true
+  },
+  "raw_findings": [
+    {
+      "finding_id": "security.upload.unrestricted-mime-type",
+      "severity": "high",
+      "category": "security",
+      "title": "Upload handler accepts any MIME type — unrestricted file upload",
+      "description": "code-reviewer flagged this during code-clarity review: the upload handler does not validate MIME type or file extension, enabling arbitrary file uploads. Cross-domain finding (security raised by code-reviewer per FR-MMT4 enrichment protocol).",
+      "file": "src/api/handlers/upload.ts",
+      "symbol": "handleUpload",
+      "line_range": [22, 30],
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team",
+        "team_name": "review-002",
+        "cross_domain": true
+      }
+    },
+    {
+      "finding_id": "security.upload.no-rate-limit",
+      "severity": "medium",
+      "category": "security",
+      "title": "Upload endpoint has no rate limiting",
+      "description": "Upload endpoint accepts unbounded request volume. Combined with unrestricted MIME types, an attacker can exhaust storage.",
+      "file": "src/api/handlers/upload.ts",
+      "symbol": "handleUpload",
+      "line_range": [10, 35],
+      "confidence": "high",
+      "source": {
+        "reviewer_id": "security-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team",
+        "team_name": "review-002"
+      }
+    },
+    {
+      "finding_id": "maintainability.upload.deep-nested-callbacks",
+      "severity": "low",
+      "category": "maintainability",
+      "title": "Upload handler has 4-level callback nesting",
+      "description": "Nested callbacks reduce readability. Consider promise chains or async/await.",
+      "file": "src/api/handlers/upload.ts",
+      "symbol": "handleUpload",
+      "line_range": [22, 80],
+      "confidence": "medium",
+      "source": {
+        "reviewer_id": "code-reviewer",
+        "family": "anthropic",
+        "source_type": "native-team",
+        "team_name": "review-002"
+      }
+    }
+  ],
+  "consolidated_output": {
+    "findings": [
+      {
+        "finding_id": "security.upload.unrestricted-mime-type",
+        "severity": "high",
+        "category": "security",
+        "title": "Upload handler accepts any MIME type — unrestricted file upload",
+        "description": "code-reviewer flagged this during code-clarity review: the upload handler does not validate MIME type or file extension, enabling arbitrary file uploads. Cross-domain finding (security raised by code-reviewer per FR-MMT4 enrichment protocol).",
+        "file": "src/api/handlers/upload.ts",
+        "symbol": "handleUpload",
+        "line_range": [22, 30],
+        "confidence": "high",
+        "raised_by": [
+          {"reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team", "cross_domain": true}
+        ],
+        "consolidation_notes": "Cross-domain finding (security raised by code-reviewer) preserved at original severity. Security exemption blocks minority-of-one demotion. cross_domain=true flag retained."
+      },
+      {
+        "finding_id": "security.upload.no-rate-limit",
+        "severity": "medium",
+        "category": "security",
+        "title": "Upload endpoint has no rate limiting",
+        "description": "Upload endpoint accepts unbounded request volume. Combined with unrestricted MIME types, an attacker can exhaust storage.",
+        "file": "src/api/handlers/upload.ts",
+        "symbol": "handleUpload",
+        "line_range": [10, 35],
+        "confidence": "high",
+        "raised_by": [
+          {"reviewer_id": "security-reviewer", "family": "anthropic", "source_type": "native-team"}
+        ],
+        "consolidation_notes": "Singleton finding from security-reviewer. Security category exempt from minority-of-one demotion."
+      },
+      {
+        "finding_id": "maintainability.upload.deep-nested-callbacks",
+        "severity": "low",
+        "category": "maintainability",
+        "title": "Upload handler has 4-level callback nesting",
+        "description": "Nested callbacks reduce readability. Consider promise chains or async/await.",
+        "file": "src/api/handlers/upload.ts",
+        "symbol": "handleUpload",
+        "line_range": [22, 80],
+        "confidence": "medium",
+        "raised_by": [
+          {"reviewer_id": "code-reviewer", "family": "anthropic", "source_type": "native-team"}
+        ],
+        "consolidation_notes": "No demotion applied — already at low severity."
+      }
+    ],
+    "verdict": "fail",
+    "summary": "2 security findings (1 cross-domain from code-reviewer, 1 native security-reviewer) + 1 maintainability finding. Cross-domain attribution preserved."
+  }
+}

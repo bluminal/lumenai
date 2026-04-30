@@ -1,0 +1,167 @@
+description: |
+  Layer 3 LIVE invocation (multi-model-teams Phase 10, Task 77):
+  wall-clock parallelism verification for `/synthex-plus:team-review --multi-model`.
+
+  Verifies NFR-MMT5: end-to-end wall-clock for a 4-proposer multi-model
+  team-review (2 native teammates via mailbox bridge + 2 external CLI
+  adapters) MUST be ≤ 1.2 × max(slowest native, slowest external) +
+  orchestrator overhead. If proposers run sequentially, wall-clock ≈ sum
+  of all latencies (>> 1.2×); if parallel, wall-clock ≈ max(group
+  slowest) + overhead.
+
+  This is tighter than the parent MMR Phase 10 wall-clock test
+  (1.5× single-proposer bound) because team-review parallelism is
+  measured per-group: native team latency floor is bounded by the
+  slowest mailbox-poll cycle; external latency floor is bounded by the
+  slowest CLI invocation. Sequential execution shows up as the SUM
+  rather than the MAX.
+
+  REQUIRES LIVE CLI access (codex + gemini) and a live Synthex+ team
+  spawn. Bypasses cache by definition. Do NOT run in CI.
+
+  Run manually when validating a release candidate or investigating a
+  parallelism regression:
+
+    npx promptfoo eval \
+      --config tests/promptfoo/multi-model-teams/wall-clock-parallelism.yaml
+
+  Source authority:
+  - NFR-MMT5 (parallel execution wall-clock bound; deferred per D24)
+  - FR-MMT3 (multi-model on /team-review)
+  - FR-MMT20 (native team JSON findings emission)
+  - CLAUDE.md testing pyramid (Layer 3 manual-trigger convention)
+  - Mirrors parent MMR Phase 10 Task 61a (orchestrator-runtime-checks.yaml)
+
+# Manual-trigger flag — excluded from per-PR Layer 1+2 default suite
+# live: requires real CLI access (codex, gemini) and live Synthex+ team spawn
+tags:
+  - layer3
+  - manual-trigger-only
+  - mmt
+  - live
+  - requires-clis
+  - requires-teams-flag
+
+providers:
+  - id: anthropic:claude-3-5-sonnet
+    config:
+      temperature: 0.0
+
+# ---------------------------------------------------------------------------
+# Test
+# ---------------------------------------------------------------------------
+
+tests:
+  # --------------------------------------------------------------------------
+  # Test 1: Wall-clock parallel team-review (NFR-MMT5)
+  #
+  # Issue a real 4-proposer multi-model team-review (2 native teammates
+  # via mailbox bridge + 2 external CLI adapters with real codex/gemini).
+  # Assert that the measured wall-clock is ≤ 1.2 × max(slowest native,
+  # slowest external) + orchestrator_overhead_ms.
+  #
+  # Test harness is expected to populate result.metadata with:
+  #   per_reviewer_latencies_ms:
+  #     {
+  #       native: [n1, n2, ...],          // per-native-teammate wall-clock latencies
+  #       external: [e1, e2, ...]          // per-external-adapter wall-clock latencies
+  #     }
+  #   fan_out_wall_clock_ms                // total wall-clock from spawn to consolidated report
+  #   orchestrator_overhead_ms             // bridge + consolidation pipeline overhead (excl. proposer time)
+  #
+  # NFR-MMT5 verbatim (D24 deferral aside): "End-to-end wall-clock of a
+  # multi-model /team-review approximates max(slowest native, slowest
+  # external) + orchestrator pipeline, not the sum."
+  # --------------------------------------------------------------------------
+  - description: "S-MMT-RT-01: Wall-clock parallel team-review ≤ 1.2× max(group slowest) + overhead (NFR-MMT5, live)"
+    vars:
+      reviewers:
+        - id: code-reviewer
+          source_type: native-team
+          family: anthropic
+        - id: security-reviewer
+          source_type: native-team
+          family: anthropic
+        - id: codex-review-prompter
+          source_type: external
+          family: openai
+        - id: gemini-review-prompter
+          source_type: external
+          family: google
+    assert:
+      - type: javascript
+        value: |
+          // NFR-MMT5: wall-clock for 4-proposer multi-model team-review must be
+          // ≤ 1.2 × max(slowest native, slowest external) + orchestrator_overhead_ms.
+
+          if (!result.metadata) {
+            return {
+              pass: false,
+              score: 0,
+              reason: 'SETUP ERROR: result.metadata is undefined. This test requires a live multi-model /team-review invocation. Harness must populate per_reviewer_latencies_ms{native[],external[]}, fan_out_wall_clock_ms, and orchestrator_overhead_ms.',
+            };
+          }
+
+          const lat = result.metadata.per_reviewer_latencies_ms;
+          const wallClock = result.metadata.fan_out_wall_clock_ms;
+          const overhead = result.metadata.orchestrator_overhead_ms;
+
+          if (!lat || !Array.isArray(lat.native) || !Array.isArray(lat.external)) {
+            return {
+              pass: false,
+              score: 0,
+              reason: 'SETUP ERROR: per_reviewer_latencies_ms must be {native: number[], external: number[]} with at least one entry in each group.',
+            };
+          }
+
+          if (lat.native.length === 0 || lat.external.length === 0) {
+            return {
+              pass: false,
+              score: 0,
+              reason: 'SETUP ERROR: both native[] and external[] must be non-empty (this test verifies cross-group parallelism).',
+            };
+          }
+
+          if (typeof wallClock !== 'number' || wallClock <= 0) {
+            return {
+              pass: false,
+              score: 0,
+              reason: 'SETUP ERROR: fan_out_wall_clock_ms must be a positive number.',
+            };
+          }
+
+          if (typeof overhead !== 'number' || overhead < 0) {
+            return {
+              pass: false,
+              score: 0,
+              reason: 'SETUP ERROR: orchestrator_overhead_ms must be a non-negative number.',
+            };
+          }
+
+          const slowestNative = Math.max(...lat.native);
+          const slowestExternal = Math.max(...lat.external);
+          const slowestGroup = Math.max(slowestNative, slowestExternal);
+          const sumAll = [...lat.native, ...lat.external].reduce((a, b) => a + b, 0);
+
+          // NFR-MMT5 budget: 1.2× slowestGroup + overhead.
+          const limit = 1.2 * slowestGroup + overhead;
+          const ratio = wallClock / slowestGroup;
+          const pass = wallClock <= limit;
+
+          return {
+            pass,
+            score: pass ? Math.max(0, 1.0 - (ratio - 1.0) / 0.2) : 0,
+            reason: [
+              `fan_out_wall_clock=${wallClock}ms`,
+              `slowest_native=${slowestNative}ms`,
+              `slowest_external=${slowestExternal}ms`,
+              `slowest_group=${slowestGroup}ms`,
+              `orchestrator_overhead=${overhead}ms`,
+              `budget=1.2×slowest_group + overhead = ${limit.toFixed(0)}ms`,
+              `sum_all_proposers=${sumAll}ms (sequential lower bound)`,
+              `ratio_vs_slowest_group=${ratio.toFixed(2)}×`,
+              pass
+                ? `PASS (≤ budget — native team and external adapters ran in parallel per NFR-MMT5)`
+                : `FAIL (> budget — likely sequential execution; native and external groups not running in parallel)`,
+            ].join(', '),
+          };

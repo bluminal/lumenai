@@ -931,9 +931,9 @@ Lower-priority post-v1 work. Ships alongside parent's Milestone 7.3. **NFR-MMT5 
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 76 | Author Layer 3 LLM-as-judge promptfoo entries for `/team-review --multi-model` consolidated reports per NFR-MMT6 Layer 3. Corpus of 5–10 real multi-model team reviews; judge prompt asks "would a human accept this consolidation?" and "are findings correctly attributed across native team and external sources?". | L | Phase 9 | pending |
-| 77 | Author Layer 3 wall-clock parallelism eval (NFR-MMT5 — deferred per D24) — live invocation of multi-model `/team-review` with 2 native + 2 external; assert wall-clock ≤ 1.2× max(slowest native, slowest external) + orchestrator overhead. Tagged manual-trigger-only per CLAUDE.md (mirrors parent Task 61a precedent). | M | Task 76 | pending |
-| 78 | Establish quality baseline; document expected pass rate; gate future PRs on regression. | M | Tasks 76, 77 | pending |
+| 76 | Author Layer 3 LLM-as-judge promptfoo entries for `/team-review --multi-model` consolidated reports per NFR-MMT6 Layer 3. Corpus of 5–10 real multi-model team reviews; judge prompt asks "would a human accept this consolidation?" and "are findings correctly attributed across native team and external sources?". | L | Phase 9 | done |
+| 77 | Author Layer 3 wall-clock parallelism eval (NFR-MMT5 — deferred per D24) — live invocation of multi-model `/team-review` with 2 native + 2 external; assert wall-clock ≤ 1.2× max(slowest native, slowest external) + orchestrator overhead. Tagged manual-trigger-only per CLAUDE.md (mirrors parent Task 61a precedent). | M | Task 76 | done |
+| 78 | Establish quality baseline; document expected pass rate; gate future PRs on regression. | M | Tasks 76, 77 | done |
 
 **Task 76 Acceptance Criteria:**
 - `[H]` 5+ scenarios in corpus
