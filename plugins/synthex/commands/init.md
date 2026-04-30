@@ -108,17 +108,26 @@ Delegate to the `/synthex:configure-multi-model` wizard at `plugins/synthex/comm
 
 ### 5. Update .gitignore
 
-Check if `.gitignore` exists in the project root. If it does, check whether it already contains an entry for the worktrees base path (`.claude/worktrees` by default, or the value from the config file).
+Check if `.gitignore` exists in the project root. Ensure it contains entries for **two** synthex-managed paths:
 
-- **If `.gitignore` exists and does NOT contain the worktrees path:** Append the following block to the end of the file:
+1. The worktrees base path (`.claude/worktrees` by default, or the value from `worktrees.base_path` in the config file).
+2. The synthex upgrade-nudge state file (`.synthex/state.json`) — per FR-UO24, this file is per-developer/per-clone and must not be committed.
+
+For each entry:
+
+- **If `.gitignore` exists and does NOT contain the path:** Append it.
+- **If `.gitignore` exists and already contains the path:** Do nothing for that entry.
+- **If `.gitignore` does not exist:** Create it.
+
+Concretely, the resulting block to append (omitting any lines already present) is:
 
 ```
 # Synthex worktrees (parallel task execution)
 .claude/worktrees/
-```
 
-- **If `.gitignore` exists and already contains the path:** Do nothing.
-- **If `.gitignore` does not exist:** Create it with the worktrees entry above.
+# Synthex per-developer state (upgrade-nudge tracking)
+.synthex/state.json
+```
 
 ### 6. Create Document Directories
 

@@ -201,10 +201,10 @@ New focused wizard. Does not refactor `team-init.md`.
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
 | 8 | Create `plugins/synthex/scripts/upgrade-nudge.sh` per FR-UO7–FR-UO21. POSIX-sh compatible (D-UO11). Implements: resolve current version from `plugin.json` (jq if available, sed fallback); resolve project root (`$CLAUDE_PROJECT_DIR \|\| pwd`); read `.synthex/state.json` (handle missing/malformed per FR-UO17–FR-UO18); detect `multi_model_review:` block via `grep -E '^multi_model_review:' .synthex/config.yaml` (D-UO6); compare versions via `sort -V` (D-UO12); print FR-UO15 nudge text on threshold-cross + absent block + not-dismissed; always write state file at end of run; exit 0 on every branch. | L | None | done |
-| 9 | Create `plugins/synthex/hooks/hooks.json` declaring a `SessionStart` array pointing at `./scripts/upgrade-nudge.sh`. Mirror the shape of `plugins/synthex-plus/hooks/hooks.json`. | S | Task 8 | pending |
-| 10 | Author `plugins/synthex/commands/dismiss-upgrade-nudge.md` (Haiku-backed) per FR-UO16. Reads `.synthex/state.json` (creates it with current version + `dismissed: true` if missing); sets `dismissed: true`; exits with a one-line confirmation. | S | None | pending |
-| 11 | Register `dismiss-upgrade-nudge.md` in `plugins/synthex/.claude-plugin/plugin.json` `commands` array. | S | Task 10 | pending |
-| 12 | Update `plugins/synthex/commands/init.md` Step 5 (the `.gitignore` step) to also append `.synthex/state.json` to `.gitignore` per FR-UO24, D-UO2. | S | None | pending |
+| 9 | Create `plugins/synthex/hooks/hooks.json` declaring a `SessionStart` array pointing at `./scripts/upgrade-nudge.sh`. Mirror the shape of `plugins/synthex-plus/hooks/hooks.json`. | S | Task 8 | done |
+| 10 | Author `plugins/synthex/commands/dismiss-upgrade-nudge.md` (Haiku-backed) per FR-UO16. Reads `.synthex/state.json` (creates it with current version + `dismissed: true` if missing); sets `dismissed: true`; exits with a one-line confirmation. | S | None | done |
+| 11 | Register `dismiss-upgrade-nudge.md` in `plugins/synthex/.claude-plugin/plugin.json` `commands` array. | S | Task 10 | done |
+| 12 | Update `plugins/synthex/commands/init.md` Step 5 (the `.gitignore` step) to also append `.synthex/state.json` to `.gitignore` per FR-UO24, D-UO2. | S | None | done |
 
 **Task 8 Acceptance Criteria:**
 - `[T]` Script is executable (`chmod +x`) and `#!/usr/bin/env sh` shebang.
