@@ -5,6 +5,30 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 0.5.4 / synthex-plus 0.2.3] - 2026-04-30
+
+Closes the multi-model-teams (MMT) implementation plan. Phase 10 (Layer 3 semantic eval) shipped, plan archived. No user-visible behavior changes — this release is test infrastructure plus repository hygiene. Both plugins bump because the marketplace top-level version drives upgrade detection and the test-baseline document is shared across both plugins' CI gates.
+
+### Added
+
+**Phase 10 — Layer 3 semantic eval for multi-model `/team-review`** (Tasks 76–78):
+- `tests/promptfoo/multi-model-teams/team-review-consolidation-judge.yaml` — 5 LLM-as-judge scenarios (S-MMT-01..05) covering native+external cross-source dedup, cross-domain enrichment from native team, Lead suppression, FAIL re-review cycle, and roster-validation pre-spawn abort. Tagged `manual-trigger-only`; excluded from per-PR Layer 1+2 default suite. Source corpus at `tests/promptfoo/multi-model-teams/corpus/01..05-*.json`.
+- `tests/promptfoo/multi-model-teams/wall-clock-parallelism.yaml` — single-test live eval (S-MMT-RT-01) asserting wall-clock ≤ 1.2 × max(slowest_native, slowest_external) + orchestrator_overhead per NFR-MMT5 (deferred from Phase 2 per D24). Tagged `manual-trigger-only` + `live` + `requires-clis` + `requires-teams-flag`.
+- `docs/specs/multi-model-teams/test-baseline.md` — quality baseline doc establishing expected pass rates (5/5 PASS for consolidation judge with `claude-3-5-sonnet` at temperature 0.0; 1.05× ideal / 1.15× soft / 1.20× hard floors for wall-clock parallelism), regression gating policy (Layer 3 not in per-PR default gate; PR-level gating triggered by file-touch policy), and operating procedures.
+
+### Fixed
+
+- `tests/schemas/init-multimodel-md.test.ts` was reading from `init.md` after Phase 1 of upgrade-onboarding extracted the wizard into `configure-multi-model.md`. Test now reads from the wizard file (with anchors renumbered 4a→1a, 4b→1b, etc.); 4 structural-ordering tests retained against `init.md` via a separate path constant. All 36 tests in the file pass.
+
+### Removed
+
+- `docs/plans/multi-model-teams.md` — implementation plan archived after 100% completion (97 tasks across 11 phases). Work lives in the codebase, tests, and prior CHANGELOG entries.
+- `tests/schemas/release-v050.test.ts`, `release-v051.test.ts`, `release-task92.test.ts` — historical-gravestone tests pinned to specific past versions (0.5.0/0.1.2, 0.5.1/0.2.0, 0.5.2/0.2.1). They fired their regression-guard role at their respective releases. The "modulo stale assertions" convention is hereby retired — going forward, release-snapshot tests should be removed in the same release that supersedes them.
+
+### Test counts
+
+This release ships 0 new Layer 1 tests (all Phase 10 work is Layer 3 manual-trigger). Net test count: 3852 → 3808 (44 stale tests removed). All 3808 tests pass; 23 manual-trigger tests skipped from default suite by tag.
+
 ## [synthex 0.5.3 / synthex-plus 0.2.2] - 2026-04-29
 
 Hotfix — `init` and `team-init` could trigger Claude Code's sensitive-file permission dialog when seeding the project config, because the agent implemented "read defaults / write to config_path" as a single `cp` invocation. The permission engine flags both source and destination of `cp` as files-being-touched, surfacing a misleading "edit defaults.yaml" prompt to the user. Worse, an argument-order bug could overwrite the plugin's defaults template.
@@ -306,6 +330,7 @@ First public release of the LumenAI marketplace and the Synthex plugin.
 - Golden snapshot infrastructure for regression testing
 - Promptfoo integration for behavioral and semantic evaluation
 
+[synthex 0.5.4 / synthex-plus 0.2.3]: https://github.com/bluminal/lumenai/releases/tag/v0.5.4
 [synthex 0.5.3 / synthex-plus 0.2.2]: https://github.com/bluminal/lumenai/releases/tag/v0.5.3
 [synthex 0.5.2 / synthex-plus 0.2.1]: https://github.com/bluminal/lumenai/releases/tag/v0.5.2
 [synthex-plus 0.2.0]: https://github.com/bluminal/lumenai/releases/tag/synthex-plus-v0.2.0
