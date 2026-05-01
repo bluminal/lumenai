@@ -595,7 +595,9 @@ describe('Hooks Schema — Real Plugin Validation', () => {
       expect(typeof parsed.hooks).toBe('object');
       expect(Array.isArray(parsed.hooks)).toBe(false);
       for (const [eventName, matcherBlocks] of Object.entries(parsed.hooks)) {
-        expect(['TaskCompleted', 'TeammateIdle']).toContain(eventName);
+        // SessionStart added by upgrade-onboarding plan Task 14 alongside the
+        // pre-existing TaskCompleted + TeammateIdle entries.
+        expect(['TaskCompleted', 'TeammateIdle', 'SessionStart']).toContain(eventName);
         expect(Array.isArray(matcherBlocks)).toBe(true);
         for (const block of matcherBlocks as Array<{ hooks: Array<{ type: string; command: string }> }>) {
           expect(Array.isArray(block.hooks)).toBe(true);
@@ -608,11 +610,11 @@ describe('Hooks Schema — Real Plugin Validation', () => {
       }
     });
 
-    it('contains exactly 2 hooks (TaskCompleted and TeammateIdle)', () => {
+    it('contains TaskCompleted, TeammateIdle, and SessionStart hooks', () => {
       const text = readFileSync(HOOKS_JSON_PATH, 'utf-8');
       const parsed = JSON.parse(text);
       const events = Object.keys(parsed.hooks).sort();
-      expect(events).toEqual(['TaskCompleted', 'TeammateIdle']);
+      expect(events).toEqual(['SessionStart', 'TaskCompleted', 'TeammateIdle']);
     });
 
     it('references scripts that exist on disk', () => {

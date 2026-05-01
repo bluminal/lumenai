@@ -266,11 +266,11 @@ Mirrors Phase 3. Slight variation because `hooks.json` already exists (gains a `
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 18 | Author `tests/schemas/configure-multi-model.ts` and `.test.ts`. Validates `configure-multi-model.md` structure: frontmatter, three or four `AskUserQuestion` blocks, FR-MR27 warning text presence, three-option labels, idempotency Step 0 present. | M | Task 2 | pending |
-| 19 | Author `tests/schemas/configure-teams.ts` and `.test.ts`. Validates `configure-teams.md` structure: frontmatter, idempotency Step 0, enable/skip block, follow-up blocks for `routing_mode` and `matching_mode`. | M | Task 5 | pending |
-| 20 | Author `tests/schemas/dismiss-upgrade-nudge.ts` and `.test.ts`. Validates both dismiss commands' structure (frontmatter, no parameters, sets `dismissed: true`, idempotent re-creation logic documented). | S | Task 10, Task 15 | pending |
-| 21 | Author `tests/schemas/upgrade-nudge-hook.ts` and `.test.ts`. Validates that both `hooks.json` files declare `SessionStart` and that the referenced scripts exist and are executable. | S | Task 9, Task 14 | pending |
-| 22 | Capture pre-refactor `init.md` baseline snapshot at `tests/__snapshots__/upgrade-onboarding/init-pre-refactor/`. Used by Task 3's byte-identical assertion. | S | None | pending |
+| 18 | Author `tests/schemas/configure-multi-model.ts` and `.test.ts`. Validates `configure-multi-model.md` structure: frontmatter, three or four `AskUserQuestion` blocks, FR-MR27 warning text presence, three-option labels, idempotency Step 0 present. | M | Task 2 | done |
+| 19 | Author `tests/schemas/configure-teams.ts` and `.test.ts`. Validates `configure-teams.md` structure: frontmatter, idempotency Step 0, enable/skip block, follow-up blocks for `routing_mode` and `matching_mode`. | M | Task 5 | done |
+| 20 | Author `tests/schemas/dismiss-upgrade-nudge.ts` and `.test.ts`. Validates both dismiss commands' structure (frontmatter, no parameters, sets `dismissed: true`, idempotent re-creation logic documented). | S | Task 10, Task 15 | done |
+| 21 | Author `tests/schemas/upgrade-nudge-hook.ts` and `.test.ts`. Validates that both `hooks.json` files declare `SessionStart` and that the referenced scripts exist and are executable. | S | Task 9, Task 14 | done |
+| 22 | Capture pre-refactor `init.md` baseline snapshot at `tests/__snapshots__/upgrade-onboarding/init-pre-refactor/`. Used by Task 3's byte-identical assertion. | S | None | done |
 
 **Acceptance Criteria pattern (each):**
 - `[T]` Validator catches structural defects (missing frontmatter, missing required blocks, etc.).
