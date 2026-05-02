@@ -293,9 +293,9 @@ Mirrors Phase 3. Slight variation because `hooks.json` already exists (gains a `
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 27 | Add behavioral assertions to `tests/promptfoo.config.yaml` for `/synthex:configure-multi-model` covering: detection scan output structure, three-option `AskUserQuestion` invocation, FR-MR27 warning fires before option-1 write. Reuse fixtures from existing `tests/fixtures/commands/init/` where possible. | M | Task 1, Task 18 | pending |
-| 28 | Add behavioral assertions for `/synthex-plus:configure-teams`: enable/skip block fires, follow-ups appear only on Enable, no pool-spawn invoked. | M | Task 5, Task 19 | pending |
-| 29 | Add behavioral assertions for re-entry idempotency: running the wizard twice does not corrupt config; "Reset to disabled" path produces `enabled: false` (not block deletion, per D-UO5). | S | Task 27, Task 28 | pending |
+| 27 | Add behavioral assertions to `tests/promptfoo.config.yaml` for `/synthex:configure-multi-model` covering: detection scan output structure, three-option `AskUserQuestion` invocation, FR-MR27 warning fires before option-1 write. Reuse fixtures from existing `tests/fixtures/commands/init/` where possible. **Resolution:** UO-B1 + UO-B2 added; provider extended to search `synthex/commands/`. Cache population deferred to first manual `npx promptfoo eval --filter-pattern "UO-B"` run by user. | M | Task 1, Task 18 | done |
+| 28 | Add behavioral assertions for `/synthex-plus:configure-teams`: enable/skip block fires, follow-ups appear only on Enable, no pool-spawn invoked. **Resolution:** UO-B3 + UO-B4 added. | M | Task 5, Task 19 | done |
+| 29 | Add behavioral assertions for re-entry idempotency: running the wizard twice does not corrupt config; "Reset to disabled" path produces `enabled: false` (not block deletion, per D-UO5). **Resolution:** UO-B5 + UO-B6 added. | S | Task 27, Task 28 | done |
 
 **Acceptance Criteria:**
 - `[T]` All assertions pass against cached agent outputs.

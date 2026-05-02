@@ -635,3 +635,104 @@ tests:
 
           Score 1.0 for excellent questions. Score 0.5 for adequate. Score 0.0 for poor.
         threshold: 0.6
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # UPGRADE-ONBOARDING WIZARDS (Layer 2)
+  # Tasks 27, 28, 29 of upgrade-onboarding plan.
+  # 
+  # Note on cache state: these are interactive wizards that halt on
+  # AskUserQuestion. Single-turn promptfoo invocation captures the
+  # agent's output up to (and including) the question prompt. Cache
+  # population requires one initial `npx promptfoo eval --filter-pattern
+  # "UO-B"` against the live `claude` CLI; subsequent runs hit the cache.
+  # Layer 2 manual-trigger; not part of the per-PR Layer 1 default suite.
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "UO-B1: configure-multi-model runs detection scan and surfaces three options on fresh project"
+    vars:
+      agent: configure-multi-model
+      input: "Run the multi-model review configuration wizard. The project has no .synthex/config.yaml yet (fresh configuration). Detect installed CLIs and surface the three options."
+    assert:
+      - type: icontains
+        value: "Detecting installed CLIs"
+      - type: icontains
+        value: "Enable with detected CLIs"
+      - type: icontains
+        value: "Enable later"
+      - type: icontains
+        value: "Skip"
+
+  - description: "UO-B2: configure-multi-model includes FR-MR27 data-transmission warning text"
+    vars:
+      agent: configure-multi-model
+      input: "Run the multi-model review configuration wizard for a fresh project. Walk me through what would happen if I picked Option 1 (Enable with detected CLIs), including any warnings shown before the config write."
+    assert:
+      - type: icontains
+        value: "Heads up"
+      - type: icontains
+        value: "data transmission"
+      - type: icontains
+        value: "do not store, log, or modify"
+
+  - description: "UO-B3: configure-teams enable/skip block surfaces, no pool-spawn"
+    vars:
+      agent: configure-teams
+      input: "Run the standing review pool configuration wizard. The project has no standing_pools block in .synthex-plus/config.yaml yet. Surface the enable/skip question."
+    assert:
+      - type: icontains
+        value: "Enable"
+      - type: icontains
+        value: "Skip"
+      - type: not-icontains
+        value: "start-review-team"
+
+  - description: "UO-B4: configure-teams routing_mode and matching_mode follow-ups appear after Enable"
+    vars:
+      agent: configure-teams
+      input: "Walk me through the configuration wizard for a fresh project. Assume I would choose to Enable standing review pools — describe the follow-up questions you would ask after that."
+    assert:
+      - type: icontains
+        value: "routing_mode"
+      - type: icontains
+        value: "matching_mode"
+      - type: icontains
+        value: "prefer-with-fallback"
+      - type: icontains
+        value: "covers"
+
+  - description: "UO-B5: configure-multi-model re-entry surfaces three options when block already enabled (Task 29)"
+    vars:
+      agent: configure-multi-model
+      input: |
+        Run the multi-model review configuration wizard. The project's .synthex/config.yaml already contains:
+        
+            multi_model_review:
+              enabled: true
+              reviewers:
+                - codex-review-prompter
+              aggregator:
+                command: auto
+        
+        Surface the re-entry options.
+    assert:
+      - type: icontains
+        value: "already enabled"
+      - type: icontains
+        value: "Re-run"
+      - type: icontains
+        value: "Reset to disabled"
+      - type: icontains
+        value: "Leave as-is"
+
+  - description: "UO-B6: 'Reset to disabled' sets enabled: false, does NOT delete the multi_model_review block (D-UO5)"
+    vars:
+      agent: configure-multi-model
+      input: |
+        The user is re-running the multi-model review wizard. Their .synthex/config.yaml has multi_model_review.enabled: true. They select 'Reset to disabled'. Describe exactly what changes would be written to the config file.
+    assert:
+      - type: icontains
+        value: "enabled: false"
+      - type: not-icontains
+        value: "delete the block"
+      - type: not-icontains
+        value: "remove the block"
