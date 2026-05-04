@@ -53,6 +53,15 @@ For a detailed comparison with concrete thresholds, see [`docs/decision-guide.md
 
 `team-init` creates `.synthex-plus/config.yaml` with default settings and adds it to `.gitignore`. From there, team commands work out of the box with sensible defaults.
 
+## Re-running configuration wizards
+
+Already initialized? Configuration changes don't require re-running full `/team-init`:
+
+- `/configure-teams` — reconfigure the `standing_pools` block. Surfaces enable/skip + routing_mode + matching_mode questions. Does NOT spawn a pool — pool spawning is the user's separate decision via `/start-review-team`. If standing pools are already enabled, the wizard offers Re-run / Reset to disabled / Leave as-is.
+- `/dismiss-upgrade-nudge` — permanently silence the synthex-plus SessionStart upgrade nudge for this project. To un-dismiss, delete `.synthex-plus/state.json`.
+
+A `SessionStart` hook prints a one-line nudge once per project when synthex-plus is upgraded across the `0.2.0` threshold (where standing review pools were introduced) and the `standing_pools` block is absent from the project's config. The nudge fires at most once per threshold crossing and is dismissible. The hook does NOT depend on `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` — it runs regardless of whether the teams beta flag is set.
+
 ## Commands
 
 ### team-implement

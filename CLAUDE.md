@@ -134,7 +134,9 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 
 | Command | Purpose | Agents Orchestrated |
 |---------|---------|-------------------|
-| `init` | Initialize project configuration and directories. Includes a "Configure Multi-Model Review (optional)" prompt section per FR-MR19: detects installed CLIs, runs auth checks, surfaces 3 options (Enable with detected / Enable later / Skip), and surfaces FR-MR27 data-transmission warning before writing `enabled: true`. | — |
+| `init` | Initialize project configuration and directories. During first-run, delegates the "Configure Multi-Model Review (optional)" sub-step to `/synthex:configure-multi-model` per FR-UO3. | — |
+| `configure-multi-model` | Re-runnable wizard for the `multi_model_review` config block. Detects installed CLIs, runs auth checks, surfaces 3 options (Enable with detected / Enable later / Skip), and shows FR-MR27 data-transmission warning. Idempotent — re-entering when already enabled offers Re-run / Reset to disabled / Leave as-is. | — |
+| `dismiss-upgrade-nudge` | Silence the SessionStart upgrade nudge for this project by writing `dismissed: true` to `.synthex/state.json`. Idempotent; no arguments. | — |
 | `next-priority` | Execute next highest-priority tasks | Tech Lead |
 | `refine-requirements` | Improve PRD clarity through multi-agent review | PM + Tech Lead + Lead Frontend Engineer |
 | `write-implementation-plan` | Transform PRD into implementation plan. Supports multi-model plan-review via the orchestrator (FR-MR22); no complexity gate applied. Use `--multi-model` / `--no-multi-model` to override config. | PM + Architect + design-system-agent + Tech Lead |
@@ -167,8 +169,10 @@ Synthex Plus extends Synthex with multi-model team orchestration, standing revie
 | `team-plan` | Collaborative implementation planning | Multi-model plan review and refinement |
 | `team-refine` | Team-based requirements refinement | Fan-out PRD review across agents |
 | `team-init` | Initialize a multi-model team project | Sets up `.synthex-plus/config.yaml` and pool configuration |
+| `configure-teams` | Re-runnable wizard for the `standing_pools` config block. Surfaces enable/skip + routing_mode + matching_mode questions. Does NOT spawn a pool (FR-MMT27 #3). Idempotent. | — |
+| `dismiss-upgrade-nudge` | Silence the synthex-plus SessionStart upgrade nudge for this project by writing `dismissed: true` to `.synthex-plus/state.json`. Idempotent; no arguments. | — |
 
-See `docs/specs/multi-model-teams/` for pool specifications and `docs/plans/multi-model-teams.md` for the implementation plan.
+See `docs/specs/multi-model-teams/` for pool specifications.
 
 ## Project Configuration Framework
 

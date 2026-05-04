@@ -316,11 +316,11 @@ Mirrors Phase 3. Slight variation because `hooks.json` already exists (gains a `
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 31 | Update `CLAUDE.md` "Commands" tables. Add `configure-multi-model` and `dismiss-upgrade-nudge` to the synthex commands table. Add `configure-teams` and `dismiss-upgrade-nudge` to the synthex-plus commands table. | S | Phases 1–4 done | pending |
-| 32 | Update `plugins/synthex/README.md` with a brief "Re-running configuration wizards" section pointing at `/synthex:configure-multi-model` and `/synthex:dismiss-upgrade-nudge`. | S | Phases 1–3 done | pending |
-| 33 | Update `plugins/synthex-plus/README.md` with the analogous section for `configure-teams` and `dismiss-upgrade-nudge`. | S | Phases 2, 4 done | pending |
-| 34 | Author `CHANGELOG.md` entry for the synthex `0.6.0` release (per D-UO release strategy below). Document FR-UO1, FR-UO3, FR-UO7–FR-UO16, NFR-UO1. | S | Phases 1, 3 done | pending |
-| 35 | Author `CHANGELOG.md` entry for synthex-plus `0.3.0` release. Document FR-UO4, FR-UO7, FR-UO13 (synthex-plus), FR-UO15 (synthex-plus), FR-UO16. | S | Phases 2, 4 done | pending |
+| 31 | Update `CLAUDE.md` "Commands" tables. Add `configure-multi-model` and `dismiss-upgrade-nudge` to the synthex commands table. Add `configure-teams` and `dismiss-upgrade-nudge` to the synthex-plus commands table. | S | Phases 1–4 done | done |
+| 32 | Update `plugins/synthex/README.md` with a brief "Re-running configuration wizards" section pointing at `/synthex:configure-multi-model` and `/synthex:dismiss-upgrade-nudge`. | S | Phases 1–3 done | done |
+| 33 | Update `plugins/synthex-plus/README.md` with the analogous section for `configure-teams` and `dismiss-upgrade-nudge`. | S | Phases 2, 4 done | done |
+| 34 | Author `CHANGELOG.md` entry for the synthex `0.6.0` release (per D-UO release strategy below). Document FR-UO1, FR-UO3, FR-UO7–FR-UO16, NFR-UO1. | S | Phases 1, 3 done | done |
+| 35 | Author `CHANGELOG.md` entry for synthex-plus `0.3.0` release. Document FR-UO4, FR-UO7, FR-UO13 (synthex-plus), FR-UO15 (synthex-plus), FR-UO16. **Resolution:** Combined into a single `[synthex 0.6.0 / synthex-plus 0.3.0]` entry per the existing CHANGELOG convention. | S | Phases 2, 4 done | done |
 
 **Acceptance Criteria pattern (each):**
 - `[T]` Cross-references to FR-UO numbers are accurate.
@@ -330,10 +330,10 @@ Mirrors Phase 3. Slight variation because `hooks.json` already exists (gains a `
 
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 36 | Bump `plugins/synthex/.claude-plugin/plugin.json` `version` from `0.5.2` to `0.6.0`. | S | Phase 1, 3 done | pending |
-| 37 | Bump `plugins/synthex-plus/.claude-plugin/plugin.json` `version` from `0.2.1` to `0.3.0`. | S | Phase 2, 4 done | pending |
-| 38 | Bump `.claude-plugin/marketplace.json` top-level `version` to `0.6.0` (matches the synthex bump per existing convention). Bump per-plugin `version` entries: synthex `0.5.2 → 0.6.0`, synthex-plus `0.2.1 → 0.3.0`. | S | Tasks 36, 37 | pending |
-| 39 | Add CHANGELOG link references at file bottom: `[synthex 0.6.0]` and `[synthex-plus 0.3.0]` GitHub release tag links. | S | Tasks 34, 35 | pending |
+| 36 | Bump `plugins/synthex/.claude-plugin/plugin.json` `version` from `0.5.2` to `0.6.0`. **Note:** intermediate releases shipped after the plan was authored (0.5.3 cp hotfix, 0.5.4 MMT release); actual bump 0.5.4 → 0.6.0. | S | Phase 1, 3 done | done |
+| 37 | Bump `plugins/synthex-plus/.claude-plugin/plugin.json` `version` from `0.2.1` to `0.3.0`. **Note:** actual bump 0.2.3 → 0.3.0 (intermediate 0.2.2 + 0.2.3 shipped). | S | Phase 2, 4 done | done |
+| 38 | Bump `.claude-plugin/marketplace.json` top-level `version` to `0.6.0` (matches the synthex bump per existing convention). Bump per-plugin `version` entries: synthex `0.5.2 → 0.6.0`, synthex-plus `0.2.1 → 0.3.0`. | S | Tasks 36, 37 | done |
+| 39 | Add CHANGELOG link references at file bottom: `[synthex 0.6.0]` and `[synthex-plus 0.3.0]` GitHub release tag links. **Resolution:** Single combined `[synthex 0.6.0 / synthex-plus 0.3.0]` link ref matching the combined CHANGELOG entry. | S | Tasks 34, 35 | done |
 
 **Acceptance Criteria pattern:**
 - `[T]` All four version fields (`marketplace.json` top-level, two per-plugin entries in `marketplace.json`, two `plugin.json` files) are mutually consistent.

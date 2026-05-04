@@ -57,10 +57,15 @@ describe('Task 53: CLAUDE.md agent table + command table updates', () => {
         expect(initRowMatch![0].toLowerCase()).toContain('multi-model');
       });
 
-      it('init command row mentions FR-MR19', () => {
+      it('configure-multi-model command row is present (FR-MR19 logic moved here in upgrade-onboarding Phase 1)', () => {
+        // The FR-MR19 detection-scan logic now lives in /synthex:configure-multi-model;
+        // init delegates to it via FR-UO3. Verify both rows are present.
+        const cmmRowMatch = content.match(/\|\s*`configure-multi-model`[^|]*\|[^|]*\|[^|]*\|/);
+        expect(cmmRowMatch).toBeTruthy();
         const initRowMatch = content.match(/\|\s*`init`[^|]*\|[^|]*\|[^|]*\|/);
         expect(initRowMatch).toBeTruthy();
-        expect(initRowMatch![0]).toContain('FR-MR19');
+        // init row references the configure-multi-model command (delegation pattern).
+        expect(initRowMatch![0]).toMatch(/configure-multi-model/);
       });
     });
 

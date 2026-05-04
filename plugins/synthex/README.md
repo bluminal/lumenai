@@ -72,11 +72,13 @@ Agents focused on understanding users, measuring outcomes, and driving improveme
 | **Metrics Analyst** | DORA metrics, HEART/AARRR frameworks, OKR tracking | Advisory |
 | **Retrospective Facilitator** | Structured retrospectives, improvement item tracking | Planning + Advisory |
 
-## Commands (11)
+## Commands (13)
 
 | Command | Purpose | Agents Orchestrated |
 |---------|---------|-------------------|
-| `/init` | Initialize project configuration and directories | -- |
+| `/init` | Initialize project configuration and directories. Delegates the multi-model review sub-step to `/configure-multi-model`. | -- |
+| `/configure-multi-model` | Re-runnable wizard for the `multi_model_review` config block. Detects CLIs, runs auth checks, surfaces three options, shows FR-MR27 data-transmission warning. Idempotent. | -- |
+| `/dismiss-upgrade-nudge` | Silence the SessionStart upgrade nudge for this project. No arguments; idempotent. | -- |
 | `/next-priority` | Execute next highest-priority tasks | Tech Lead |
 | `/write-implementation-plan` | Transform PRD into implementation plan | PM + Architect + Design System Agent + Tech Lead |
 | `/review-code` | Multi-perspective code review | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
@@ -87,6 +89,15 @@ Agents focused on understanding users, measuring outcomes, and driving improveme
 | `/retrospective` | Structured cycle retrospective | Metrics Analyst + Retrospective Facilitator |
 | `/reliability-review` | Operational readiness assessment | SRE Agent + Terraform Plan Reviewer (opt.) |
 | `/performance-audit` | Full-stack performance analysis | Performance Engineer |
+
+## Re-running configuration wizards
+
+Already initialized? Configuration changes don't require re-running full `/init`:
+
+- `/configure-multi-model` — reconfigure the `multi_model_review` block. If multi-model review is already enabled, the wizard offers Re-run / Reset to disabled / Leave as-is.
+- `/dismiss-upgrade-nudge` — permanently silence the SessionStart upgrade nudge for this project. To un-dismiss, delete `.synthex/state.json`.
+
+A `SessionStart` hook prints a one-line nudge once per project when synthex is upgraded across the `0.5.0` threshold (where multi-model review was introduced) and the `multi_model_review` block is absent from the project's config. The nudge fires at most once per threshold crossing and is dismissible.
 
 ## Configuration
 

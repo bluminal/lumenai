@@ -5,6 +5,48 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 0.6.0 / synthex-plus 0.3.0] - 2026-05-04
+
+Closes the upgrade-onboarding implementation plan. Two onboarding gaps closed: (1) the multi-model review wizard is now reachable for *existing* users on upgrade, not just fresh installs; (2) plugins now nudge users at most once per project when they upgrade across a feature-introducing version threshold. Both plugins ship together; the marketplace top-level version bumps to drive upgrade detection.
+
+### Added
+
+**Standalone configuration wizards (FR-UO1–FR-UO6):**
+- `/synthex:configure-multi-model` — re-runnable wizard for the `multi_model_review` config block. Detects installed CLIs, runs auth checks, surfaces three options (Enable with detected CLIs / Enable later / Skip), shows the FR-MR27 data-transmission warning before any write. Step 0 idempotency: if the block is already enabled, surfaces Re-run / Reset to disabled / Leave as-is. "Reset to disabled" sets `enabled: false` (D-UO5) — does NOT delete the block.
+- `/synthex-plus:configure-teams` — focused first-run wizard for the `standing_pools` config block (D-UO10 — does not duplicate `/team-init` scope). Surfaces enable/skip plus follow-up `routing_mode` and `matching_mode` questions on Enable. Never spawns a pool (FR-MMT27 #3) — pool spawning remains a deliberate user action via `/start-review-team`.
+
+**SessionStart upgrade-nudge hooks (FR-UO7–FR-UO21):**
+- `plugins/synthex/hooks/hooks.json` (new) and `plugins/synthex-plus/hooks/hooks.json` (extended; existing TaskCompleted + TeammateIdle preserved byte-identical) declare a `SessionStart` event pointing at `./scripts/upgrade-nudge.sh`.
+- `plugins/synthex/scripts/upgrade-nudge.sh` and `plugins/synthex-plus/scripts/upgrade-nudge.sh` — POSIX-sh hook scripts (D-UO11). Threshold crossing (synthex `< 0.5.0 → ≥ 0.5.0`; synthex-plus `< 0.2.0 → ≥ 0.2.0`) + relevant config block absent + not dismissed → print one-line nudge per FR-UO15. Always update `last_seen_version` to ensure the nudge fires at most once per threshold crossing. Steady-state target ≤ 50 ms (NFR-UO1; measured ~13 ms on macOS); cold path ≤ 200 ms (NFR-UO2).
+- Six exit paths covered: steady-state, fresh-install, re-init, upgrade+nudge, upgrade+config-present (suppresses), upgrade+dismissed (suppresses). All paths exit 0; never blocks the session (FR-UO21). Error paths (missing `plugin.json`, malformed state, read-only filesystem) exit 0 silently.
+- Hook script uses `sort -V` for version comparison (D-UO12), grep-only YAML detection (D-UO6 — no jq/yq dependency), atomic state writes (tmp-file + rename), and per-project state at `.synthex/state.json` / `.synthex-plus/state.json` (D-UO1).
+
+**Dismiss commands (FR-UO16):**
+- `/synthex:dismiss-upgrade-nudge` and `/synthex-plus:dismiss-upgrade-nudge` — Haiku-backed, no-args, idempotent. Set `dismissed: true` in the corresponding state file, preserving `last_seen_version`. To un-dismiss, delete the state file.
+
+**Tests (Phase 5):**
+- 77 new Layer 1 schema-validation tests across 4 files: `configure-multi-model.test.ts`, `configure-teams.test.ts`, `dismiss-upgrade-nudge.test.ts` (parameterized over both plugins), `upgrade-nudge-hook.test.ts` (parameterized over both `hooks.json` files + script artifacts).
+- 22 new Layer 2 behavioral tests in `upgrade-nudge-hook-behavioral.test.ts` (parameterized over both hooks). Six FR-UO9–FR-UO12 paths × 2 plugins, plus edge cases (downgrade, malformed state, no plugin dir) and timing budgets (NFR-UO1 / NFR-UO2).
+- 6 new Layer 2 promptfoo entries (`UO-B1..UO-B6`) covering both wizards and re-entry idempotency. Manual-trigger; cache populated on first `npx promptfoo eval --filter-pattern "UO-B"`.
+- `tests/__snapshots__/upgrade-onboarding/init-pre-refactor/` — pre-Phase-1 `init.md` snapshot from commit `5505e48` for retrospective verification of the byte-identical observable-behavior promise (Task 22).
+- `tests/helpers/claude-provider.js` extended to resolve `plugins/synthex/commands/` (the existing provider only searched `agents/` and `synthex-plus/commands/`).
+
+### Changed
+
+- `plugins/synthex/commands/init.md` Step 4 reduced to a one-paragraph stub delegating to `/synthex:configure-multi-model` (Q-UO4 resolution: inline reference). Step 5 (.gitignore) extended to also ignore `.synthex/state.json` per FR-UO24 / D-UO2.
+- `plugins/synthex-plus/commands/team-init.md` Step 6 (.gitignore) extended to explicitly ignore `.synthex-plus/state.json` per FR-UO24 (redundant under the existing wholesale `.synthex-plus/` ignore but documents intent and survives any future narrowing). Step 7 (Standing Review Pools) gains a one-line cross-reference to `/synthex-plus:configure-teams` for re-runners.
+- `tests/schemas/init-multimodel-md.test.ts` retargeted at `configure-multi-model.md` after Phase 1 extracted the wizard content; 4 structural-ordering tests retain their target on `init.md` via a separate path constant.
+
+### Deferred
+
+- Task 30 (Layer 3 LLM-as-judge eval that the nudge text "reads as a nudge, not a warning") — deferred per Q-UO5. Skip in v1; revisit if user feedback requests.
+
+### Migration notes
+
+Existing users on synthex 0.5.x / synthex-plus 0.2.x see one nudge per plugin per project on next session start after upgrading. State files write silently on first session of 0.6.0 / 0.3.0. Users on synthex 0.4.x who skipped 0.5.x entirely still cross the threshold (`< 0.5.0 → 0.6.0` satisfies FR-UO13). Downgrades silently update `last_seen_version` without nudging (D-UO7).
+
+The `multi_model_review` and `standing_pools` config blocks remain optional — running the wizards is an opt-in surface. Existing config files are unaffected by this release; `enabled: false` continues to count as "present" (D-UO5) so explicit opt-outs are respected and the nudge does not re-fire.
+
 ## [synthex 0.5.4 / synthex-plus 0.2.3] - 2026-04-30
 
 Closes the multi-model-teams (MMT) implementation plan. Phase 10 (Layer 3 semantic eval) shipped, plan archived. No user-visible behavior changes — this release is test infrastructure plus repository hygiene. Both plugins bump because the marketplace top-level version drives upgrade detection and the test-baseline document is shared across both plugins' CI gates.
@@ -330,6 +372,7 @@ First public release of the LumenAI marketplace and the Synthex plugin.
 - Golden snapshot infrastructure for regression testing
 - Promptfoo integration for behavioral and semantic evaluation
 
+[synthex 0.6.0 / synthex-plus 0.3.0]: https://github.com/bluminal/lumenai/releases/tag/v0.6.0
 [synthex 0.5.4 / synthex-plus 0.2.3]: https://github.com/bluminal/lumenai/releases/tag/v0.5.4
 [synthex 0.5.3 / synthex-plus 0.2.2]: https://github.com/bluminal/lumenai/releases/tag/v0.5.3
 [synthex 0.5.2 / synthex-plus 0.2.1]: https://github.com/bluminal/lumenai/releases/tag/v0.5.2
