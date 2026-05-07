@@ -191,6 +191,16 @@ This document catalogs the research, methodologies, and industry practices that 
 
 **Source:** Ford, N., Parsons, R., & Kua, P. (2017). *Building Evolutionary Architectures*. O'Reilly.
 
+### Conventional Commits 1.0.0
+
+**Applied to:** Commit Message Author
+
+- **Machine-readable history:** A commit-message convention that encodes intent (`feat`, `fix`, `perf`, `refactor`, etc.), optional scope, breaking-change marker, and structured footers, enabling automated changelog generation and SemVer derivation.
+- **Detect, then conform:** The agent samples recent `git log` history before authoring so it matches the project's actual practice (which may diverge from the spec — e.g., issue-key-prefixed subjects, gitmoji), and falls back to Conventional Commits 1.0.0 only when no clear pattern exists or in any ambiguous case.
+- **Release-note bodies:** Bodies describe *what* changed and *why*, not the diff line-by-line, so the commit log doubles as draft release notes.
+
+**Source:** Conventional Commits 1.0.0 specification — https://www.conventionalcommits.org/en/v1.0.0/#specification
+
 ---
 
 ## Multi-Agent System Design

@@ -180,6 +180,14 @@ Review **ALL** work -- including specialist output -- before accepting it. Verif
 
 ---
 
+## Git Workflow
+
+Git workflow (branching, committing, PR creation) is **OWNED BY THE CALLER**, not you. Follow whatever conventions the caller specifies; never make git decisions unilaterally.
+
+**When the caller asks you to commit**, delegate the message itself to the **`commit-message-author`** utility agent (Haiku-backed). Pass the staged diff, any caller-supplied issue keys/scope hints (verbatim), and a breaking-change flag if applicable. It detects the project's commit convention from `git log` and defaults to Conventional Commits 1.0.0. Pipe its returned message into `git commit -F -`.
+
+---
+
 ## Task Completion Checklist
 
 Before reporting a task as complete, verify all of the following:

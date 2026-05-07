@@ -121,6 +121,7 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 
 | Agent | Role | Type |
 |-------|------|------|
+| `commit-message-author` | Authors a single commit message from a change set; detects project convention from `git log`, defaults to Conventional Commits 1.0.0 | Utility |
 | `findings-consolidator` | Dedup, group, and sort findings from multiple reviewers (preserves attribution) | Utility |
 | `plan-linter` | Structural audit of implementation plan drafts against the template rubric | Utility |
 | `plan-scribe` | Applies Product Manager's decided edits to the plan document mechanically | Utility |
