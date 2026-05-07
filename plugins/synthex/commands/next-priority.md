@@ -73,6 +73,7 @@ git worktree add {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short
 - Git workflow instructions:
   - Work in the assigned worktree
   - Commit changes with descriptive messages using `git commit --no-gpg-sign`
+  - **Author the commit message via the `commit-message-author` utility agent** (Haiku) rather than writing it inline. Pass the staged diff, any task-level issue key (only if known with certainty — e.g., a Jira key embedded in the worktree branch name or supplied to you), and a breaking-change flag if applicable. The agent detects the project's commit convention from `git log` and defaults to Conventional Commits 1.0.0. Pipe its returned message into `git commit -F -`.
   - Do NOT merge — merging is handled by this command after completion
   - Respect pre-commit hooks and address all failures
 
