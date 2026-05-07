@@ -5,6 +5,36 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 0.7.0 / synthex-plus 0.3.1] - 2026-05-07
+
+Adds a new Haiku-backed utility agent, `commit-message-author`, that authors a single commit message from a staged or supplied change set. Detects the project's existing commit convention from `git log` history (Conventional Commits, issue-key-prefixed, gitmoji, plain imperative, hybrid) and conforms to it, defaulting to [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/#specification) when no clear pattern exists. Bodies are authored as release-note-quality prose — *what* changed and *why*, not a diff narration. Issue keys (Jira, GitHub, Linear) are included only when unambiguously known: caller-supplied, present in the branch name, or already referenced in directly-related context — never fabricated. Read-only on git: returns the message as text for the caller to commit, and never runs `git commit`/`git push`/`git add` itself.
+
+The agent is wired into the orchestrators that produce commits today (`tech-lead`, `lead-frontend-engineer`, and the `/synthex:next-priority` command), so expensive Sonnet/Opus agents stop spending output tokens on commit-message prose.
+
+The synthex-plus version bump is patch-only — no functional changes — to keep the marketplace top-level and upgrade-detection coherent across both plugins.
+
+### Added
+
+- **`commit-message-author` agent** (`plugins/synthex/agents/commit-message-author.md`) — Haiku-backed utility agent. In-built expert on Conventional Commits 1.0.0 (full type catalogue: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `style`, `revert`; subject `!` + `BREAKING CHANGE:` footer rules; git trailer footer format). Process: inspects the change set, samples up to 50 recent commits to detect convention, picks type/scope from the diff, conservatively detects issue keys (caller-supplied or branch-name match only), detects breaking changes, composes subject + release-note body + footers, validates mechanically, and emits a commit message + author report. Registered in `plugins/synthex/.claude-plugin/plugin.json` and documented under the Utility Layer in `CLAUDE.md`.
+
+### Changed
+
+- `plugins/synthex/agents/tech-lead.md` Git Workflow section: when the caller asks for a commit, Tech Lead delegates the message itself to `commit-message-author` (passing through caller-supplied issue keys / convention / breaking-change context verbatim), then runs `git commit -F -` with the returned message.
+- `plugins/synthex/agents/lead-frontend-engineer.md` gains a parallel Git Workflow section (previously absent) with the same delegation pattern, since LFE is the other primary committer.
+- `plugins/synthex/commands/next-priority.md` Step 5 commit instruction now explicitly tells Tech Lead instances to author messages via `commit-message-author` rather than inline. Issue keys are only passed when known with certainty.
+- `docs/agent-interactions.md`: topology diagram gains a Utility Layer card for the new agent; "Who Invokes Whom" matrix adds Tech Lead → and Lead FE → rows; `next-priority` flow diagram surfaces the per-commit delegation; Agent Type Classification "Utility (Haiku-backed)" row updated; agent count bumped 18 → 19.
+- `docs/research-sources.md` adds a "Conventional Commits 1.0.0" entry under Architecture & Technical Design, naming the spec the agent treats as built-in expertise and the detect-then-conform rule that lets project history override the default.
+
+### Fixed
+
+- `tests/package-lock.json` regenerated to fix `npm ci` lockfile drift that was breaking the Layer 1 Schema Validation CI job. A transitive `gcp-metadata@^5.2.0` peer requirement (pulled in via promptfoo → mongodb → `@aws-sdk/credential-providers`) was unresolved in the prior lockfile (last regenerated ~2 months ago in `4284d73`). No package.json changes; no agent or schema changes. All 3875 schema tests still pass.
+
+### Migration notes
+
+Existing users see one upgrade nudge per plugin per project on next session start after upgrading (synthex `0.6.0 → 0.7.0` and synthex-plus `0.3.0 → 0.3.1` both cross a feature-introducing threshold per the SessionStart hook policy).
+
+There is no required configuration change. Tech Lead and Lead FE will automatically delegate commit-message authoring to the new agent on their next commit; users who don't want this delegation can override by passing an explicit message in the caller prompt (the existing "Git workflow is OWNED BY THE CALLER" rule still applies).
+
 ## [synthex 0.6.0 / synthex-plus 0.3.0] - 2026-05-04
 
 Closes the upgrade-onboarding implementation plan. Two onboarding gaps closed: (1) the multi-model review wizard is now reachable for *existing* users on upgrade, not just fresh installs; (2) plugins now nudge users at most once per project when they upgrade across a feature-introducing version threshold. Both plugins ship together; the marketplace top-level version bumps to drive upgrade detection.
@@ -372,6 +402,7 @@ First public release of the LumenAI marketplace and the Synthex plugin.
 - Golden snapshot infrastructure for regression testing
 - Promptfoo integration for behavioral and semantic evaluation
 
+[synthex 0.7.0 / synthex-plus 0.3.1]: https://github.com/bluminal/lumenai/releases/tag/v0.7.0
 [synthex 0.6.0 / synthex-plus 0.3.0]: https://github.com/bluminal/lumenai/releases/tag/v0.6.0
 [synthex 0.5.4 / synthex-plus 0.2.3]: https://github.com/bluminal/lumenai/releases/tag/v0.5.4
 [synthex 0.5.3 / synthex-plus 0.2.2]: https://github.com/bluminal/lumenai/releases/tag/v0.5.3
