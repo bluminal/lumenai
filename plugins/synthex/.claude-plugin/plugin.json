@@ -9,6 +9,7 @@
     "./agents/bedrock-review-prompter.md",
     "./agents/claude-review-prompter.md",
     "./agents/codex-review-prompter.md",
+    "./agents/commit-message-author.md",
     "./agents/context-bundle-assembler.md",
     "./agents/gemini-review-prompter.md",
     "./agents/llm-review-prompter.md",
