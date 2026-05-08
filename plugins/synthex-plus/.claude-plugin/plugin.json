@@ -1,11 +1,17 @@
 {
   "name": "synthex-plus",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "[BETA] Teams-optimized orchestration for Synthex — sustained multi-agent collaboration via Claude Code Agent Teams. Requires the beta Agent Teams feature flag (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1). Depends on the Synthex plugin for agent definitions.",
   "author": {
     "name": "Bluminal Labs"
   },
-  "keywords": ["agents", "teams", "orchestration", "collaboration", "parallel"],
+  "keywords": [
+    "agents",
+    "teams",
+    "orchestration",
+    "collaboration",
+    "parallel"
+  ],
   "commands": [
     "./commands/team-init.md",
     "./commands/configure-teams.md",
