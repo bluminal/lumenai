@@ -1,0 +1,306 @@
+# LumenAI — Release Pipeline
+#
+# Triggered on every push to `main` (i.e. PR merge). Gates on Layer 1 schema
+# tests, then parses Conventional Commits since the previous `vX.Y.Z` tag to
+# pick a semver bump (major / minor / patch). Lockstep-bumps both plugins +
+# the marketplace top-level version, regenerates a CHANGELOG entry from the
+# same commit range, commits, tags, pushes, and creates a GitHub release.
+#
+# If no commits since the last tag match a Conventional Commit type, the
+# release is skipped (tests still run).
+#
+# Pushes use the default GITHUB_TOKEN, which by GitHub policy does NOT
+# trigger downstream workflow runs — so the release commit and tag created
+# here will not loop back into this workflow.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+# Serialize releases — never run two release jobs concurrently against main.
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # Layer 1: Schema Validation — gates the release
+  # ─────────────────────────────────────────────────────────────────
+  schema-validation:
+    name: "Layer 1: Schema Validation"
+    runs-on: ubuntu-latest
+    # Defensive guard — release commits made by this workflow won't trigger
+    # a re-run anyway (GITHUB_TOKEN-pushed events are excluded), but skip
+    # them explicitly in case someone hand-pushes a release commit.
+    if: "!startsWith(github.event.head_commit.message, 'release:')"
+    defaults:
+      run:
+        working-directory: tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run schema tests
+        run: npx vitest run schemas/
+
+  # ─────────────────────────────────────────────────────────────────
+  # Release: bump versions, update CHANGELOG, tag, publish
+  # ─────────────────────────────────────────────────────────────────
+  release:
+    name: Release
+    needs: schema-validation
+    runs-on: ubuntu-latest
+    if: "!startsWith(github.event.head_commit.message, 'release:')"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history is required to find the previous tag and to walk
+          # commits since that tag.
+          fetch-depth: 0
+
+      - name: Determine version bump from Conventional Commits
+        id: bump
+        run: |
+          set -euo pipefail
+
+          LAST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n1 || true)
+          echo "Last tag: ${LAST_TAG:-<none>}"
+
+          if [ -z "$LAST_TAG" ]; then
+            RANGE_ARGS=()
+          else
+            RANGE_ARGS=("${LAST_TAG}..HEAD")
+          fi
+
+          SUBJECTS=$(git log --no-merges --pretty=format:'%s' "${RANGE_ARGS[@]}" || true)
+          BODIES=$(git log --no-merges --pretty=format:'%b' "${RANGE_ARGS[@]}" || true)
+
+          BUMP="none"
+
+          # Major: subject like `feat!:` / `fix(scope)!:`, or `BREAKING CHANGE:` footer
+          if printf '%s\n' "$SUBJECTS" | grep -qE '^[a-z]+(\([^)]+\))?!:'; then
+            BUMP="major"
+          fi
+          if [ "$BUMP" != "major" ] && printf '%s\n' "$BODIES" | grep -qE '^BREAKING CHANGE:'; then
+            BUMP="major"
+          fi
+
+          # Minor: any feat
+          if [ "$BUMP" = "none" ] && printf '%s\n' "$SUBJECTS" | grep -qE '^feat(\([^)]+\))?:'; then
+            BUMP="minor"
+          fi
+
+          # Patch: fix / perf / refactor / revert / build / ci / chore / docs / style / test
+          if [ "$BUMP" = "none" ] && printf '%s\n' "$SUBJECTS" | grep -qE '^(fix|perf|refactor|revert|build|ci|chore|docs|style|test)(\([^)]+\))?:'; then
+            BUMP="patch"
+          fi
+
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
+          echo "Bump level: $BUMP"
+
+          if [ "$BUMP" = "none" ]; then
+            echo "::notice::No Conventional Commits since ${LAST_TAG:-<repo start>} — skipping release."
+          fi
+
+      - name: Compute new versions
+        if: steps.bump.outputs.bump != 'none'
+        id: versions
+        run: |
+          set -euo pipefail
+
+          BUMP="${{ steps.bump.outputs.bump }}"
+
+          bump_semver() {
+            local current=$1
+            local level=$2
+            IFS='.' read -r major minor patch <<< "$current"
+            case "$level" in
+              major) printf '%d.0.0' "$((major + 1))" ;;
+              minor) printf '%d.%d.0' "$major" "$((minor + 1))" ;;
+              patch) printf '%d.%d.%d' "$major" "$minor" "$((patch + 1))" ;;
+            esac
+          }
+
+          MARKET_OLD=$(jq -r .version .claude-plugin/marketplace.json)
+          SYNTHEX_OLD=$(jq -r .version plugins/synthex/.claude-plugin/plugin.json)
+          PLUS_OLD=$(jq -r .version plugins/synthex-plus/.claude-plugin/plugin.json)
+
+          MARKET_NEW=$(bump_semver "$MARKET_OLD" "$BUMP")
+          SYNTHEX_NEW=$(bump_semver "$SYNTHEX_OLD" "$BUMP")
+          PLUS_NEW=$(bump_semver "$PLUS_OLD" "$BUMP")
+
+          {
+            echo "market_old=$MARKET_OLD"
+            echo "market_new=$MARKET_NEW"
+            echo "synthex_old=$SYNTHEX_OLD"
+            echo "synthex_new=$SYNTHEX_NEW"
+            echo "plus_old=$PLUS_OLD"
+            echo "plus_new=$PLUS_NEW"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "marketplace: $MARKET_OLD -> $MARKET_NEW"
+          echo "synthex:     $SYNTHEX_OLD -> $SYNTHEX_NEW"
+          echo "synthex+:    $PLUS_OLD -> $PLUS_NEW"
+
+      - name: Update version manifests
+        if: steps.bump.outputs.bump != 'none'
+        env:
+          MARKET_NEW: ${{ steps.versions.outputs.market_new }}
+          SYNTHEX_NEW: ${{ steps.versions.outputs.synthex_new }}
+          PLUS_NEW: ${{ steps.versions.outputs.plus_new }}
+        run: |
+          set -euo pipefail
+
+          tmp=$(mktemp)
+          jq --indent 2 \
+             --arg m "$MARKET_NEW" \
+             --arg s "$SYNTHEX_NEW" \
+             --arg p "$PLUS_NEW" '
+            .version = $m
+            | (.plugins[] | select(.name == "synthex").version) = $s
+            | (.plugins[] | select(.name == "synthex-plus").version) = $p
+          ' .claude-plugin/marketplace.json > "$tmp"
+          mv "$tmp" .claude-plugin/marketplace.json
+
+          tmp=$(mktemp)
+          jq --indent 2 --arg v "$SYNTHEX_NEW" '.version = $v' \
+            plugins/synthex/.claude-plugin/plugin.json > "$tmp"
+          mv "$tmp" plugins/synthex/.claude-plugin/plugin.json
+
+          tmp=$(mktemp)
+          jq --indent 2 --arg v "$PLUS_NEW" '.version = $v' \
+            plugins/synthex-plus/.claude-plugin/plugin.json > "$tmp"
+          mv "$tmp" plugins/synthex-plus/.claude-plugin/plugin.json
+
+      - name: Generate CHANGELOG entry
+        if: steps.bump.outputs.bump != 'none'
+        id: changelog
+        env:
+          LAST_TAG: ${{ steps.bump.outputs.last_tag }}
+          SYNTHEX_NEW: ${{ steps.versions.outputs.synthex_new }}
+          PLUS_NEW: ${{ steps.versions.outputs.plus_new }}
+        run: |
+          set -euo pipefail
+
+          DATE=$(date -u +%Y-%m-%d)
+
+          if [ -z "$LAST_TAG" ]; then
+            RANGE_ARGS=()
+          else
+            RANGE_ARGS=("${LAST_TAG}..HEAD")
+          fi
+
+          ALL_SUBJECTS=$(git log --no-merges --pretty=format:'%s' "${RANGE_ARGS[@]}" || true)
+
+          # Strip the leading Conventional Commit type prefix (e.g. `feat: `,
+          # `fix(scope): `, `feat(scope)!: `) — the section header already
+          # conveys the type. A leading scope, when present, becomes a
+          # parenthetical: `feat(synthex): foo` -> `(synthex) foo`.
+          strip_cc_prefix() {
+            sed -E 's/^[a-z]+(\(([^)]+)\))?!?:[[:space:]]+/(\2) /; s/^\(\) //'
+          }
+
+          ADDED=$(printf   '%s\n' "$ALL_SUBJECTS" | grep -E '^feat(\([^)]+\))?!?:'                                                            | strip_cc_prefix || true)
+          FIXED=$(printf   '%s\n' "$ALL_SUBJECTS" | grep -E '^fix(\([^)]+\))?!?:'                                                             | strip_cc_prefix || true)
+          CHANGED=$(printf '%s\n' "$ALL_SUBJECTS" | grep -E '^(refactor|perf|build|ci|chore|docs|style|test|revert)(\([^)]+\))?!?:'           | strip_cc_prefix || true)
+          OTHER=$(printf   '%s\n' "$ALL_SUBJECTS" | grep -vE '^(feat|fix|refactor|perf|build|ci|chore|docs|style|test|revert)(\([^)]+\))?!?:' || true)
+
+          ENTRY_FILE="$RUNNER_TEMP/entry.md"
+          {
+            printf '## [synthex %s / synthex-plus %s] - %s\n\n' "$SYNTHEX_NEW" "$PLUS_NEW" "$DATE"
+            if [ -n "$ADDED" ]; then
+              printf '### Added\n\n'
+              printf '%s\n' "$ADDED" | sed 's/^/- /'
+              printf '\n'
+            fi
+            if [ -n "$FIXED" ]; then
+              printf '### Fixed\n\n'
+              printf '%s\n' "$FIXED" | sed 's/^/- /'
+              printf '\n'
+            fi
+            if [ -n "$CHANGED" ]; then
+              printf '### Changed\n\n'
+              printf '%s\n' "$CHANGED" | sed 's/^/- /'
+              printf '\n'
+            fi
+            if [ -n "$OTHER" ]; then
+              printf '### Other\n\n'
+              printf '%s\n' "$OTHER" | sed 's/^/- /'
+              printf '\n'
+            fi
+          } > "$ENTRY_FILE"
+
+          echo "entry_file=$ENTRY_FILE" >> "$GITHUB_OUTPUT"
+
+          # Insert the new entry above the first existing `## [` heading.
+          NEW_CHANGELOG="$RUNNER_TEMP/CHANGELOG.md"
+          awk -v entry_file="$ENTRY_FILE" '
+            /^## \[/ && !inserted {
+              while ((getline line < entry_file) > 0) print line
+              close(entry_file)
+              inserted = 1
+            }
+            { print }
+            END {
+              if (!inserted) {
+                while ((getline line < entry_file) > 0) print line
+              }
+            }
+          ' CHANGELOG.md > "$NEW_CHANGELOG"
+          mv "$NEW_CHANGELOG" CHANGELOG.md
+
+          echo "----- generated entry -----"
+          cat "$ENTRY_FILE"
+
+      - name: Commit, tag, and push
+        if: steps.bump.outputs.bump != 'none'
+        env:
+          MARKET_NEW: ${{ steps.versions.outputs.market_new }}
+          SYNTHEX_NEW: ${{ steps.versions.outputs.synthex_new }}
+          PLUS_NEW: ${{ steps.versions.outputs.plus_new }}
+        run: |
+          set -euo pipefail
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          git add \
+            .claude-plugin/marketplace.json \
+            plugins/synthex/.claude-plugin/plugin.json \
+            plugins/synthex-plus/.claude-plugin/plugin.json \
+            CHANGELOG.md
+
+          git commit -m "release: synthex ${SYNTHEX_NEW} + synthex-plus ${PLUS_NEW}"
+          git tag "v${MARKET_NEW}"
+
+          git push origin HEAD:main
+          git push origin "v${MARKET_NEW}"
+
+      - name: Create GitHub release
+        if: steps.bump.outputs.bump != 'none'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MARKET_NEW: ${{ steps.versions.outputs.market_new }}
+          SYNTHEX_NEW: ${{ steps.versions.outputs.synthex_new }}
+          PLUS_NEW: ${{ steps.versions.outputs.plus_new }}
+          ENTRY_FILE: ${{ steps.changelog.outputs.entry_file }}
+        run: |
+          set -euo pipefail
+
+          gh release create "v${MARKET_NEW}" \
+            --title "v${MARKET_NEW} — synthex ${SYNTHEX_NEW} + synthex-plus ${PLUS_NEW}" \
+            --notes-file "$ENTRY_FILE"
