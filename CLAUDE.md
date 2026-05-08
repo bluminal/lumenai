@@ -66,12 +66,23 @@ lumenai/
 
 ## Releasing
 
-When creating a release (tagging a version, updating `CHANGELOG.md`), you **must** also bump the version in these manifests:
+Releases are **automated** by `.github/workflows/release.yml` on every merge to `main`. Do **not** hand-edit `marketplace.json`, `plugins/*/.claude-plugin/plugin.json` versions, or `CHANGELOG.md` in feature PRs — the workflow owns all of those.
 
-- `.claude-plugin/marketplace.json` — top-level `"version"` **and** each entry in the `"plugins"` array that changed
-- `CHANGELOG.md` — new entry with the version number and link reference at the bottom
+How it works:
 
-The plugin system uses the `"version"` field in `marketplace.json` to detect upgrades. If you forget to bump it, users will see "already at the latest version" even after new changes are pushed.
+1. The workflow runs Layer 1 schema tests as the gate.
+2. It walks commits since the previous `v*` tag and picks a semver bump from [Conventional Commits](https://www.conventionalcommits.org/):
+   - `BREAKING CHANGE:` footer or `<type>!:` subject → **major**
+   - `feat:` → **minor**
+   - `fix:` / `perf:` / `refactor:` / `revert:` / `build:` / `ci:` / `chore:` / `docs:` / `style:` / `test:` → **patch**
+   - No Conventional Commits since the last tag → **no release** (skipped silently)
+3. Both plugins and the marketplace top-level version are lockstep-bumped, a CHANGELOG entry is generated from the same commit range, the release commit is tagged `v<marketplace-version>`, and a GitHub release is published.
+
+Implications for contributors:
+
+- Use Conventional Commit subjects on every commit that lands on `main` (the `commit-message-author` agent does this by default).
+- Mark breaking changes with `<type>!:` or a `BREAKING CHANGE:` footer — getting this wrong means a major change ships as a minor.
+- The bot pushes the release commit and tag using `GITHUB_TOKEN`, which by GitHub policy does not re-trigger workflows, so there's no release loop.
 
 ## Conventions
 
