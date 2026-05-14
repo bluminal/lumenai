@@ -427,17 +427,17 @@ Same shape as Phase 4 but applied to four teams commands. Note that `team-implem
 
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 22 | Extend `plugins/synthex-plus/commands/team-implement.md` Parameters table with the five new `--loop` rows. | S | Phase 2 | FR-NL1, FR-NL2 | pending |
-| 23 | Add a "Native Looping" section to `team-implement.md` after the existing "Ralph Loop Integration" section. Emission point: same as the existing Ralph integration's emission point — when the team has completed all assigned tasks across the implementation plan. Document the lead-output-only promise-scan rule (E7). Document team-lifecycle interaction (FR-NL35): each iteration MAY reuse or tear down the team per the command's existing logic — `--loop` does not change team lifecycle. | L | Task 22 | FR-NL14, FR-NL34, FR-NL35, FR-NL36, E7 | pending |
-| 24 | Append the `--loop` precedence paragraph (D-NL11) to the existing "Ralph Loop Integration" section. Rest stays byte-identical. | S | Task 23 | FR-NL44, D-NL11 | pending |
+| 22 | Extend `plugins/synthex-plus/commands/team-implement.md` Parameters table with the five new `--loop` rows. | S | Phase 2 | FR-NL1, FR-NL2 | done |
+| 23 | Add a "Native Looping" section to `team-implement.md` after the existing "Ralph Loop Integration" section. Emission point: same as the existing Ralph integration's emission point — when the team has completed all assigned tasks across the implementation plan. Document the lead-output-only promise-scan rule (E7). Document team-lifecycle interaction (FR-NL35): each iteration MAY reuse or tear down the team per the command's existing logic — `--loop` does not change team lifecycle. | L | Task 22 | FR-NL14, FR-NL34, FR-NL35, FR-NL36, E7 | done |
+| 24 | Append the `--loop` precedence paragraph (D-NL11) to the existing "Ralph Loop Integration" section. Rest stays byte-identical. | S | Task 23 | FR-NL44, D-NL11 | done |
 
 ### Milestone 5.2: team-review, team-plan, team-refine `--loop`
 
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 25 | Extend `plugins/synthex-plus/commands/team-review.md` Parameters table with the five new `--loop` rows. Add a "Native Looping" section (no existing Ralph integration to merge with — new top-level section). Emission point: when the review team's consolidated report has no remaining open critiques. | M | Phase 2 | FR-NL1, FR-NL2, FR-NL14, FR-NL34 | pending |
-| 26 | Extend `plugins/synthex-plus/commands/team-plan.md`. Same shape. Emission point: when the team's collaborative plan covers the PRD without TBDs. | M | Phase 2 | FR-NL1, FR-NL2, FR-NL14, FR-NL34 | pending |
-| 27 | Extend `plugins/synthex-plus/commands/team-refine.md`. Same shape. Emission point: when the team's refined requirements have resolved all open questions. | M | Phase 2 | FR-NL1, FR-NL2, FR-NL14, FR-NL34 | pending |
+| 25 | Extend `plugins/synthex-plus/commands/team-review.md` Parameters table with the five new `--loop` rows. Add a "Native Looping" section (no existing Ralph integration to merge with — new top-level section). Emission point: when the review team's consolidated report has no remaining open critiques. | M | Phase 2 | FR-NL1, FR-NL2, FR-NL14, FR-NL34 | done |
+| 26 | Extend `plugins/synthex-plus/commands/team-plan.md`. Same shape. Emission point: when the team's collaborative plan covers the PRD without TBDs. | M | Phase 2 | FR-NL1, FR-NL2, FR-NL14, FR-NL34 | done |
+| 27 | Extend `plugins/synthex-plus/commands/team-refine.md`. Same shape. Emission point: when the team's refined requirements have resolved all open questions. | M | Phase 2 | FR-NL1, FR-NL2, FR-NL14, FR-NL34 | done |
 
 **Acceptance Criteria pattern:**
 - `[T]` Parameters table contains five new rows.

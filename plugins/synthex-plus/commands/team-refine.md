@@ -11,6 +11,11 @@ Teams provide concurrent, multi-perspective PRD review where reviewers share con
 | `requirements_path` | Path to the PRD | Value from config `documents.requirements`, falling back to `docs/reqs/main.md` | No |
 | `template` | Team composition template | Value from config `teams.default_refine_template`, falling back to `refine` | No |
 | `config_path` | Path to Synthex+ configuration | `.synthex-plus/config.yaml` | No |
+| `--loop` | Enable native looping (FR-NL1/FR-NL2). When set, the command iterates per the "Native Looping" section below until the completion promise is emitted or `--max-iterations` is reached. | off | No |
+| `--completion-promise <string>` | Promise text the agent emits as `<promise>X</promise>` to terminate the loop. | — | Required with `--loop` (unless `--resume*`) |
+| `--max-iterations <int>` | Iteration cap (FR-NL13). Hard ceiling 200. | `20` | No |
+| `--loop-isolated` | Fresh-subagent isolation mode per iteration (FR-NL18). | off (shared-context default) | No |
+| `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
 
 **Config resolution order:** command parameter > project config (`{config_path}`) > plugin defaults (`config/defaults.yaml`) > hardcoded fallback.
 
@@ -324,3 +329,45 @@ Same mechanism as `team-implement`. The `.synthex-plus/.active-team` tracking fi
 | Finding triage | Orchestrator triages findings | Same -- PM triages findings (answerable from context vs. user input) |
 | User questions | AskUserQuestion for unknowns | Same -- AskUserQuestion for unknowns |
 | Output | Updated PRD (in-place) | Same -- updated PRD (in-place) |
+
+## Native Looping
+
+This command supports the native Synthex looping primitive (introduced by `docs/plans/native-looping.md`). Pass `--loop` to iterate the entire team-command workflow until the completion promise is emitted or `--max-iterations` is reached. The mechanical iteration framework — state file schema, loop-id rules, shared-context vs. fresh-subagent iteration, auto-compaction guarantees, promise emission, iteration markers — lives once in [`plugins/synthex/docs/native-looping.md`](../../synthex/docs/native-looping.md). Only the command-specific bits are inlined below.
+
+### Emission Point
+
+Emit `<promise>{completion_promise}</promise>` (literal text from `--completion-promise`) in the refinement team's consolidated artifact when ALL of the following hold:
+
+- The PRD's `Open Questions` section is empty (or every question is annotated `Resolved` with the resolution recorded).
+- No ambiguity markers (`?`, `TBD`, `unclear`, `to-be-decided`) remain in any PRD section.
+- The PRD is structurally complete and the team agrees no additional clarifying questions remain.
+- A follow-up iteration would surface no new questions.
+
+Do NOT emit the promise while teammates are still asking clarifying questions or while user answers are pending. Native looping does NOT bypass `[H]` user-input gates — the loop re-runs `team-refine` until the PRD stabilizes.
+
+**Lead-output-only promise scan (E7).** The outer loop scans **only the Pool Lead's consolidated output** (the same emission point as the existing Ralph Loop Integration where applicable). Transient teammate outputs — individual reviewer findings, intermediate worker reports, mid-cycle status updates — are **not** promise sources. A teammate emitting `<promise>X</promise>` in their own report does NOT terminate the loop; only the lead's final consolidated artifact carries the canonical termination signal.
+
+### Iteration Body
+
+When `--loop` is set, this team command's existing workflow (above) runs once per iteration: spawn → assign tasks → wait for completion → write report → exit-condition-check. The agent follows the iteration loop body documented at [`shared-iter`](../../synthex/docs/native-looping.md#shared-iter) by default (D-NL1 shared-context), or [`subagent-iter`](../../synthex/docs/native-looping.md#subagent-iter) when `--loop-isolated` is passed: boundary check → increment counter → print marker → execute the team workflow → scan the lead's output for promise → cancellation check → loop. State lives in `.synthex/loops/<loop-id>.json` per [FR-NL8](../../synthex/docs/native-looping.md#state). Auto-compaction is safe because iteration state and work output both live on disk (FR-NL16, FR-NL17, FR-NL24).
+
+**Team lifecycle independence (FR-NL35).** `--loop` does NOT change this command's team lifecycle. Each iteration MAY reuse or tear down the team per the command's existing semantics — the outer loop simply re-invokes the workflow at the boundary; team-spawn / team-shutdown behavior is governed by the workflow itself, not by the loop. Pool reuse across iterations is the default for performance; an isolated iteration via `--loop-isolated` still uses the same on-disk team artifacts (filesystem-level state is shared even when the conversation is not — see [E14](../../../docs/plans/native-looping.md#edge-cases)).
+
+The iteration marker (`[loop <loop-id> iteration <N>/<max>]`) prints to stdout before each iteration's workflow runs. See [`markers`](../../synthex/docs/native-looping.md#markers).
+
+### Precedence with Ralph Loop
+
+If `--loop` is passed AND `.claude/ralph-loop.local.md` exists with `active: true`, native looping takes precedence per FR-NL44. The command prints a one-line advisory:
+
+```
+Note: --loop overrides Ralph Loop. The ralph-loop plugin's state file is unchanged; cancel the ralph loop separately if you want it gone.
+```
+
+`.claude/ralph-loop.local.md` is NOT mutated by this command. See [`precedence`](../../synthex/docs/native-looping.md#precedence).
+
+### See Also
+
+- [`plugins/synthex/docs/native-looping.md`](../../synthex/docs/native-looping.md) — full iteration-framework spec.
+- `/synthex:loop` — generic prompt loop (no command body).
+- `/synthex:list-loops`, `/synthex:cancel-loop` — loop management.
+- Plan: `docs/plans/native-looping.md` (Tasks 22–27, FR-NL34–FR-NL36, E7).
