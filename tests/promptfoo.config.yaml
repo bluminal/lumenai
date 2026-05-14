@@ -736,3 +736,92 @@ tests:
         value: "delete the block"
       - type: not-icontains
         value: "remove the block"
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # NATIVE LOOPING (Layer 2)
+  # Tasks 38, 39 of native-looping plan.
+  #
+  # Manual-trigger only. Cache population requires one initial
+  # `npx promptfoo eval --filter-pattern "NL-B"` against the live
+  # `claude` CLI; subsequent runs hit the cache. Pattern matches the
+  # UO-B convention from upgrade-onboarding Phase 5.3.
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "NL-B1: /synthex:loop refuses without --completion-promise (FR-NL37)"
+    vars:
+      agent: loop
+      input: |
+        Run /synthex:loop with --prompt "test prompt" but NO --completion-promise.
+        Describe what would happen — the refusal path per FR-NL37.
+    assert:
+      - type: icontains
+        value: "--completion-promise"
+      - type: icontains
+        value: "required"
+
+  - description: "NL-B2: /synthex:loop refuses --prompt AND --prompt-file together (FR-NL38)"
+    vars:
+      agent: loop
+      input: |
+        Run /synthex:loop with BOTH --prompt "inline" AND --prompt-file my.md.
+        Describe the refusal per FR-NL38.
+    assert:
+      - type: icontains
+        value: "mutually exclusive"
+      - type: icontains
+        value: "--prompt"
+      - type: icontains
+        value: "--prompt-file"
+
+  - description: "NL-B3: /synthex:loop refuses missing --prompt-file (FR-NL39)"
+    vars:
+      agent: loop
+      input: |
+        Run /synthex:loop with --prompt-file /tmp/does-not-exist.md --completion-promise OK.
+        Describe the refusal per FR-NL39.
+    assert:
+      - type: icontains
+        value: "not found"
+      - type: icontains
+        value: "/tmp/does-not-exist.md"
+
+  - description: "NL-B4: /synthex:loop refuses --max-iterations > 200 (FR-NL42)"
+    vars:
+      agent: loop
+      input: |
+        Run /synthex:loop with --prompt "test" --completion-promise DONE --max-iterations 500.
+        Describe the refusal per FR-NL42 (hard ceiling 200).
+    assert:
+      - type: icontains
+        value: "max-iterations"
+      - type: icontains
+        value: "200"
+
+  - description: "NL-B5: /synthex:loop refuses --resume for unknown loop-id (FR-NL40)"
+    vars:
+      agent: loop
+      input: |
+        Run /synthex:loop --resume nonexistent-loop-12ab in a project where
+        .synthex/loops/nonexistent-loop-12ab.json does NOT exist. Describe
+        the refusal per FR-NL40.
+    assert:
+      - type: icontains
+        value: "No loop found"
+      - type: icontains
+        value: "list-loops"
+
+  - description: "NL-B6: Ralph Loop precedence advisory fires when both are active (FR-NL44)"
+    vars:
+      agent: next-priority
+      input: |
+        Run /synthex:next-priority --loop --completion-promise ALLDONE for a
+        project where .claude/ralph-loop.local.md exists with active: true.
+        Describe what happens — specifically the advisory the command prints
+        and the non-mutation of Ralph's state file per FR-NL44.
+    assert:
+      - type: icontains
+        value: "overrides Ralph Loop"
+      - type: icontains
+        value: "state file is unchanged"
+      - type: not-icontains
+        value: "active: false"
