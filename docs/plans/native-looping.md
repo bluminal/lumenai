@@ -315,10 +315,10 @@ Proves out the iteration framework on a standalone surface BEFORE adding `--loop
 
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 4 | Author `plugins/synthex/commands/loop.md`. YAML frontmatter `model: sonnet` (D-NL16). Parameters table per FR-NL4. Iteration body cross-references `plugins/synthex/docs/native-looping.md` for the framework, and inlines the generic-loop-specific instructions: read `--prompt` or `--prompt-file`, validate `--completion-promise` is present (FR-NL37), validate file existence (FR-NL39), generate or accept loop-id (FR-NL11), persist state file, enter iteration loop (FR-NL14), print iteration markers (D-NL9), handle resume (FR-NL26, FR-NL27), handle isolation mode (FR-NL18). | L | Task 1 | FR-NL4, FR-NL5, FR-NL14 | pending |
-| 5 | Register `loop.md` in `plugins/synthex/.claude-plugin/plugin.json` `commands` array (alphabetical insertion after `init.md`). | S | Task 4 | FR-NL5 | pending |
-| 6 | Update `plugins/synthex/commands/init.md` Step 5 (the `.gitignore` step) to append `.synthex/loops/` to `.gitignore`. Matches D-NL14, FR-NL10. | S | None | FR-NL10 | pending |
-| 7 | Update `plugins/synthex-plus/commands/team-init.md` Step 6 (the `.gitignore` step) to append `.synthex/loops/` to `.gitignore`. Same rationale. | S | None | FR-NL10 | pending |
+| 4 | Author `plugins/synthex/commands/loop.md`. YAML frontmatter `model: sonnet` (D-NL16). Parameters table per FR-NL4. Iteration body cross-references `plugins/synthex/docs/native-looping.md` for the framework, and inlines the generic-loop-specific instructions: read `--prompt` or `--prompt-file`, validate `--completion-promise` is present (FR-NL37), validate file existence (FR-NL39), generate or accept loop-id (FR-NL11), persist state file, enter iteration loop (FR-NL14), print iteration markers (D-NL9), handle resume (FR-NL26, FR-NL27), handle isolation mode (FR-NL18). | L | Task 1 | FR-NL4, FR-NL5, FR-NL14 | done |
+| 5 | Register `loop.md` in `plugins/synthex/.claude-plugin/plugin.json` `commands` array (alphabetical insertion after `init.md`). | S | Task 4 | FR-NL5 | done |
+| 6 | Update `plugins/synthex/commands/init.md` Step 5 (the `.gitignore` step) to append `.synthex/loops/` to `.gitignore`. Matches D-NL14, FR-NL10. | S | None | FR-NL10 | done |
+| 7 | Update `plugins/synthex-plus/commands/team-init.md` Step 6 (the `.gitignore` step) to append `.synthex/loops/` to `.gitignore`. Same rationale. | S | None | FR-NL10 | done |
 
 **Task 4 Acceptance Criteria:**
 - `[T]` Command file exists with `model: sonnet` frontmatter.

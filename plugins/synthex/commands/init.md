@@ -108,10 +108,11 @@ Delegate to the `/synthex:configure-multi-model` wizard at `plugins/synthex/comm
 
 ### 5. Update .gitignore
 
-Check if `.gitignore` exists in the project root. Ensure it contains entries for **two** synthex-managed paths:
+Check if `.gitignore` exists in the project root. Ensure it contains entries for **three** synthex-managed paths:
 
 1. The worktrees base path (`.claude/worktrees` by default, or the value from `worktrees.base_path` in the config file).
 2. The synthex upgrade-nudge state file (`.synthex/state.json`) — per FR-UO24, this file is per-developer/per-clone and must not be committed.
+3. The synthex native-looping state directory (`.synthex/loops/`) — per FR-NL10 / D-NL14, loop state is per-developer/per-clone (each loop is per-session and includes a `session_id`).
 
 For each entry:
 
@@ -127,6 +128,9 @@ Concretely, the resulting block to append (omitting any lines already present) i
 
 # Synthex per-developer state (upgrade-nudge tracking)
 .synthex/state.json
+
+# Synthex native-looping state (per-session, per-developer)
+.synthex/loops/
 ```
 
 ### 6. Create Document Directories

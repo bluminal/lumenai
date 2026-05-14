@@ -129,9 +129,14 @@ The resulting block to append (omitting any lines already present) is:
 
 # Synthex+ per-developer state (upgrade-nudge tracking)
 .synthex-plus/state.json
+
+# Synthex native-looping state (per-session, per-developer)
+.synthex/loops/
 ```
 
 The `.synthex-plus/state.json` line is explicit per FR-UO24 / D-UO2 — even though the `.synthex-plus/` directory entry already covers it, the explicit state-file entry documents intent and survives any future narrowing of the directory-level ignore.
+
+The `.synthex/loops/` line covers native-looping state (per FR-NL10 / D-NL14) for synthex-plus users who use `/synthex:loop`, `/synthex-plus:team-implement --loop`, etc. Loop state lives under `.synthex/loops/` regardless of which plugin invoked the loop.
 
 ### 7. Standing Review Pools (optional)
 
