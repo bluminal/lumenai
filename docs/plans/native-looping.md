@@ -455,12 +455,12 @@ Same shape as Phase 4 but applied to four teams commands. Note that `team-implem
 
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 28 | Author `tests/schemas/loop-command.ts` and `.test.ts`. Validates `plugins/synthex/commands/loop.md` structure: frontmatter, eight Parameters rows, refusal-case anchors, resume-logic anchors. | M | Task 4 | FR-NL4 | pending |
-| 29 | Author `tests/schemas/list-loops.ts` and `.test.ts`. Validates `list-loops.md`: frontmatter, output-format anchors. | S | Task 8 | FR-NL32 | pending |
-| 30 | Author `tests/schemas/cancel-loop.ts` and `.test.ts`. Validates `cancel-loop.md`: frontmatter, `--all` path, idempotent re-cancel path. | S | Task 10 | FR-NL29, FR-NL30 | pending |
-| 31 | Extend existing schema tests for `next-priority`, `write-implementation-plan`, `refine-requirements`, `review-code`, `team-implement`, `team-review`, `team-plan`, `team-refine` to assert presence of `--loop`-related Parameters rows AND a "Native Looping" section. Existing schema tests for these commands stay green. | M | Tasks 13–27 | FR-NL1, FR-NL2 | pending |
-| 32 | Author `tests/schemas/native-looping-doc.ts` and `.test.ts`. Validates `plugins/synthex/docs/native-looping.md` structure: eight cross-reference anchor IDs (FR-NL group anchors). | S | Task 1 | FR-NL15 | pending |
-| 33 | Reuse / extend `tests/schemas/loop-state-file.test.ts` from Task 2 to cover edge cases: missing required fields, unknown `status` enum, unknown `schema_version`. | S | Task 2 | FR-NL8, FR-NL9 | pending |
+| 28 | Author `tests/schemas/loop-command.ts` and `.test.ts`. Validates `plugins/synthex/commands/loop.md` structure: frontmatter, eight Parameters rows, refusal-case anchors, resume-logic anchors. | M | Task 4 | FR-NL4 | done |
+| 29 | Author `tests/schemas/list-loops.ts` and `.test.ts`. Validates `list-loops.md`: frontmatter, output-format anchors. | S | Task 8 | FR-NL32 | done |
+| 30 | Author `tests/schemas/cancel-loop.ts` and `.test.ts`. Validates `cancel-loop.md`: frontmatter, `--all` path, idempotent re-cancel path. | S | Task 10 | FR-NL29, FR-NL30 | done |
+| 31 | Extend existing schema tests for `next-priority`, `write-implementation-plan`, `refine-requirements`, `review-code`, `team-implement`, `team-review`, `team-plan`, `team-refine` to assert presence of `--loop`-related Parameters rows AND a "Native Looping" section. Existing schema tests for these commands stay green. **Resolution:** Authored `tests/schemas/native-looping-wiring.test.ts` (parameterized `describe.each` across all 8 FR-NL1 commands) instead of editing 8 separate test files. Asserts 5 new parameter rows, 4 Native Looping sub-anchors, Ralph precedence advisory line, and team-specific clauses (E7 lead-output-only + FR-NL35 lifecycle independence) for the 4 team commands. | M | Tasks 13–27 | FR-NL1, FR-NL2 | done |
+| 32 | Author `tests/schemas/native-looping-doc.ts` and `.test.ts`. Validates `plugins/synthex/docs/native-looping.md` structure: eight cross-reference anchor IDs (FR-NL group anchors). | S | Task 1 | FR-NL15 | done |
+| 33 | Reuse / extend `tests/schemas/loop-state-file.test.ts` from Task 2 to cover edge cases: missing required fields, unknown `status` enum, unknown `schema_version`. **Resolution:** Already covered by Phase 1 Task 2's 47-test suite (missing-field per-row, unknown enums, schema_version, pattern, bounds, ISO-8601, cross-field consistency). No additional tests needed. | S | Task 2 | FR-NL8, FR-NL9 | done |
 
 **Acceptance Criteria pattern:**
 - `[T]` Validator catches structural defects (missing frontmatter, missing required blocks, missing rows).
