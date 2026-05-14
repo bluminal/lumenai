@@ -72,13 +72,16 @@ Agents focused on understanding users, measuring outcomes, and driving improveme
 | **Metrics Analyst** | DORA metrics, HEART/AARRR frameworks, OKR tracking | Advisory |
 | **Retrospective Facilitator** | Structured retrospectives, improvement item tracking | Planning + Advisory |
 
-## Commands (13)
+## Commands (16)
 
 | Command | Purpose | Agents Orchestrated |
 |---------|---------|-------------------|
 | `/init` | Initialize project configuration and directories. Delegates the multi-model review sub-step to `/configure-multi-model`. | -- |
 | `/configure-multi-model` | Re-runnable wizard for the `multi_model_review` config block. Detects CLIs, runs auth checks, surfaces three options, shows FR-MR27 data-transmission warning. Idempotent. | -- |
 | `/dismiss-upgrade-nudge` | Silence the SessionStart upgrade nudge for this project. No arguments; idempotent. | -- |
+| `/loop` | Generic looping primitive — loops a prompt (literal or file) until a completion promise is emitted or `--max-iterations` is reached. See "Native Looping" below. | -- |
+| `/list-loops` | Enumerate running and recently-terminal loops in the project. Read-only. | -- |
+| `/cancel-loop` | Cancel a loop by id, or `--all` running loops. Idempotent on terminal-status loops. | -- |
 | `/next-priority` | Execute next highest-priority tasks | Tech Lead |
 | `/write-implementation-plan` | Transform PRD into implementation plan | PM + Architect + Design System Agent + Tech Lead |
 | `/review-code` | Multi-perspective code review | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
@@ -169,6 +172,27 @@ By default, the loop continues across milestone boundaries. To stop at each mile
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `exit_on_milestone_complete` | Output the completion signal after finishing a milestone, even if later milestones remain | `false` |
+
+## Native Looping
+
+Synthex 0.8+ ships a **native looping primitive** that iterates a command until a completion promise is emitted or a max-iteration cap is reached — no external plugin required. By default each iteration runs in the same agent thread (shared context, auto-compaction handles the context window); pass `--loop-isolated` to spawn a fresh sub-agent per iteration. Loop state lives in `<project>/.synthex/loops/<loop-id>.json` so two Claude Code sessions on the same project can run independent loops, and a loop can be resumed across sessions via `/synthex:loop --resume <loop-id>` or `--resume-last`.
+
+```bash
+# Loop a built-in command until the plan is fully delivered
+/synthex:next-priority --loop --completion-promise "ALLDONE" --max-iterations 30
+
+# Loop an arbitrary prompt (file or inline)
+/synthex:loop --prompt-file my-task.md --completion-promise "DONE"
+
+# Resume a crashed loop from where it left off
+/synthex:loop --resume-last
+
+# Enumerate or cancel running loops
+/synthex:list-loops
+/synthex:cancel-loop my-loop-name
+```
+
+`--loop` is supported on `next-priority`, `write-implementation-plan`, `refine-requirements`, and `review-code` (plus the four Synthex+ team commands). The flag is opt-in — when absent, every command behaves identically to today. Native looping coexists with the official `ralph-loop` plugin: when both are configured, `--loop` takes precedence and prints a one-line advisory. See [`plugins/synthex/docs/native-looping.md`](./docs/native-looping.md) for the full framework spec, state-file schema, and emission-point details per command.
 
 ## Standing Review Pools (via Synthex+)
 

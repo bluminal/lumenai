@@ -253,6 +253,30 @@ Key configuration sections:
 
 The full reference with inline documentation is at [`config/defaults.yaml`](config/defaults.yaml).
 
+## Native Looping
+
+Synthex's native looping primitive (synthex 0.8+) wraps **every team command** with a `--loop` flag — same surface as the generic `/synthex:loop` and the synthex commands. Each iteration runs the full team-command workflow (spawn → assign tasks → wait for completion → write report) and terminates when the Pool Lead's consolidated output emits the completion promise, or when `--max-iterations` is reached.
+
+```bash
+# Loop team-implement until every task in the plan is done
+/synthex-plus:team-implement --loop --completion-promise "TEAM_DONE" --max-iterations 30
+
+# Loop team-review until reviewers have no open critiques
+/synthex-plus:team-review --loop --completion-promise "REVIEW_CLEAN"
+
+# Loop team-plan / team-refine similarly
+/synthex-plus:team-plan --loop --completion-promise "PLAN_STABLE"
+/synthex-plus:team-refine --loop --completion-promise "PRD_STABLE"
+```
+
+**Team-specific rules** (per the spec):
+
+- **Lead-output-only promise scan (E7).** The loop reads ONLY the Pool Lead's consolidated output. Transient teammate outputs are not promise sources — a teammate emitting `<promise>X</promise>` in their own report does NOT terminate the loop.
+- **Team-lifecycle independence (FR-NL35).** `--loop` does NOT change team lifecycle. Each iteration MAY reuse or tear down the team per the command's existing semantics; pool reuse is the default for performance.
+- **Coexists with the existing Ralph Loop Integration on `team-implement`.** When `--loop` is passed alongside an active Ralph loop, native looping takes precedence and prints a one-line advisory; Ralph's state file is untouched.
+
+The full iteration framework — state-file schema, shared-context vs. fresh-subagent modes, auto-compaction guarantees, resume mechanics — is documented once in [`plugins/synthex/docs/native-looping.md`](../synthex/docs/native-looping.md). See `/synthex:list-loops` and `/synthex:cancel-loop` (provided by synthex) for managing running loops across both plugins.
+
 ## Context Management
 
 Teams operate in independent context windows that may be compacted during long sessions. Synthex+ addresses this through:
