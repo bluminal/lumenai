@@ -1,0 +1,30 @@
+{
+  "plugin": "synthex",
+  "command": "next-priority",
+  "source_path": "plugins/synthex/commands/next-priority.md",
+  "frontmatter": "model: opus",
+  "parameters_table": "## Parameters\n\n| Parameter | Description | Default | Required |\n|-----------|-------------|---------|----------|\n| `implementation_plan_path` | Path to the implementation plan markdown file | `docs/plans/main.md` | No |\n| `concurrent_tasks` | Number of parallel tasks to work on simultaneously | Value from `next_priority.concurrent_tasks` config, or `3` | No |\n| `exit_on_milestone_complete` | When running in a Ralph Loop, output the completion signal after finishing a milestone even if later milestones remain. Useful for inserting a checkpoint between milestones. | `false` | No |",
+  "headings": [
+    "# Next Priority",
+    "## Parameters",
+    "## Core Responsibilities",
+    "## Workflow",
+    "### 1. Analyze the Implementation Plan",
+    "### 2. Pre-work Search",
+    "### 3. Mark Tasks In Progress",
+    "### 4. Set Up Work Environments",
+    "### 5. Delegate to Tech Lead",
+    "### 6. Monitor Progress",
+    "### 7. Validate Completion",
+    "### 8. Merge Results",
+    "### 9. Update the Plan",
+    "## Ralph Loop Integration",
+    "### Detection",
+    "### Completion Signal",
+    "### When to Signal",
+    "### When NOT inside a Ralph Loop",
+    "## Critical Requirements",
+    "## Error Handling"
+  ],
+  "note": "Pre-native-looping baseline captured before Phase 4/5 added --loop. Body text intentionally omitted; only deterministic envelope (frontmatter + Parameters + heading structure) is preserved."
+}

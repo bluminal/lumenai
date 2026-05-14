@@ -1,0 +1,62 @@
+{
+  "description": "Pre-native-looping baseline snapshots of FR-NL1 commands. Captured at the start of Phase 1 (Task 3) before any --loop integration. Used by later phases to assert the new Native Looping additions do not disrupt existing structure.",
+  "captured_at_commit": "f8e6f82126f518e6853ac93ab227d6c15d8d9293",
+  "snapshots": [
+    {
+      "plugin": "synthex",
+      "command": "next-priority",
+      "snapshot": "tests/__snapshots__/native-looping/baseline/synthex__next-priority.json",
+      "heading_count": 20,
+      "has_params_table": true
+    },
+    {
+      "plugin": "synthex",
+      "command": "write-implementation-plan",
+      "snapshot": "tests/__snapshots__/native-looping/baseline/synthex__write-implementation-plan.json",
+      "heading_count": 39,
+      "has_params_table": true
+    },
+    {
+      "plugin": "synthex",
+      "command": "refine-requirements",
+      "snapshot": "tests/__snapshots__/native-looping/baseline/synthex__refine-requirements.json",
+      "heading_count": 21,
+      "has_params_table": true
+    },
+    {
+      "plugin": "synthex",
+      "command": "review-code",
+      "snapshot": "tests/__snapshots__/native-looping/baseline/synthex__review-code.json",
+      "heading_count": 31,
+      "has_params_table": true
+    },
+    {
+      "plugin": "synthex-plus",
+      "command": "team-implement",
+      "snapshot": "tests/__snapshots__/native-looping/baseline/synthex-plus__team-implement.json",
+      "heading_count": 27,
+      "has_params_table": true
+    },
+    {
+      "plugin": "synthex-plus",
+      "command": "team-review",
+      "snapshot": "tests/__snapshots__/native-looping/baseline/synthex-plus__team-review.json",
+      "heading_count": 31,
+      "has_params_table": true
+    },
+    {
+      "plugin": "synthex-plus",
+      "command": "team-plan",
+      "snapshot": "tests/__snapshots__/native-looping/baseline/synthex-plus__team-plan.json",
+      "heading_count": 34,
+      "has_params_table": true
+    },
+    {
+      "plugin": "synthex-plus",
+      "command": "team-refine",
+      "snapshot": "tests/__snapshots__/native-looping/baseline/synthex-plus__team-refine.json",
+      "heading_count": 27,
+      "has_params_table": true
+    }
+  ]
+}

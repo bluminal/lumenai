@@ -1,0 +1,31 @@
+{
+  "plugin": "synthex",
+  "command": "refine-requirements",
+  "source_path": "plugins/synthex/commands/refine-requirements.md",
+  "frontmatter": "model: opus",
+  "parameters_table": "## Parameters\n\n| Parameter | Description | Default | Required |\n|-----------|-------------|---------|----------|\n| `requirements_path` | Path to the PRD markdown file | `docs/reqs/main.md` | No |\n| `specs_path` | Path to technical specifications directory | `docs/specs` | No |\n| `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |",
+  "headings": [
+    "# Refine Requirements",
+    "## Parameters",
+    "## Core Responsibilities",
+    "## Workflow",
+    "### 1. Load Configuration",
+    "### 2. Read and Understand Requirements",
+    "### 3. Gather Technical Context",
+    "### 4. PRD Review Loop",
+    "## PRD Review \u2014 [Reviewer Role]",
+    "### Findings",
+    "### Summary",
+    "### 5. Write the Updated PRD",
+    "### 6. Summary",
+    "## Reviewer Focus Areas",
+    "### Product Manager",
+    "### Tech Lead",
+    "### Lead Frontend Engineer (Designer)",
+    "## Project Configuration",
+    "### Configuration Schema",
+    "### Adding a Custom Reviewer",
+    "## Critical Requirements"
+  ],
+  "note": "Pre-native-looping baseline captured before Phase 4/5 added --loop. Body text intentionally omitted; only deterministic envelope (frontmatter + Parameters + heading structure) is preserved."
+}
