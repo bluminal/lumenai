@@ -13,6 +13,11 @@ Automatically identify and execute the next highest-priority tasks from the impl
 | `implementation_plan_path` | Path to the implementation plan markdown file | `docs/plans/main.md` | No |
 | `concurrent_tasks` | Number of parallel tasks to work on simultaneously | Value from `next_priority.concurrent_tasks` config, or `3` | No |
 | `exit_on_milestone_complete` | When running in a Ralph Loop, output the completion signal after finishing a milestone even if later milestones remain. Useful for inserting a checkpoint between milestones. | `false` | No |
+| `--loop` | Enable native looping (FR-NL1/FR-NL2). When set, the command iterates per the "Native Looping" section below until the completion promise is emitted or `--max-iterations` is reached. | off | No |
+| `--completion-promise <string>` | Promise text the agent emits as `<promise>X</promise>` to terminate the loop. | — | Required with `--loop` (unless `--resume*`) |
+| `--max-iterations <int>` | Iteration cap (FR-NL13). Hard ceiling 200. | `20` | No |
+| `--loop-isolated` | Fresh-subagent isolation mode per iteration (FR-NL18). | off (shared-context default) | No |
+| `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
 
 ## Core Responsibilities
 
@@ -203,6 +208,47 @@ The completion signal is output **only** under these conditions:
 ### When NOT inside a Ralph Loop
 
 If `.claude/ralph-loop.local.md` does not exist, or `active` is `false`, or `completion_promise` is `null`, skip the promise tag entirely. The command behaves identically to its non-loop behavior.
+
+### `--loop` precedence (FR-NL44)
+
+Synthex 0.7+ adds a native `--loop` flag that takes precedence over Ralph Loop Integration when both are configured. If `--loop` is passed AND `.claude/ralph-loop.local.md` is `active: true`, the command iterates natively (per the "Native Looping" section below) and prints a one-line advisory noting Ralph's state file is unchanged. See [`precedence`](../docs/native-looping.md#precedence) and the Native Looping section below for the full rule. Users on Ralph Loop only (no `--loop`) see no behavior change.
+
+
+## Native Looping
+
+This command supports the native Synthex looping primitive (introduced by `docs/plans/native-looping.md`). Pass `--loop` to iterate until the completion promise is emitted or `--max-iterations` is reached. The mechanical iteration framework — state file schema, loop-id rules, shared-context vs. fresh-subagent iteration, auto-compaction guarantees, promise emission, iteration markers — lives once in [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md). Only the command-specific bits are inlined below.
+
+### Emission Point
+
+Emit `<promise>{completion_promise}</promise>` (literal text from `--completion-promise`) in the iteration's final response when ANY of the following hold:
+
+- Every task across all milestones and phases of the implementation plan has status `done` (matches the existing Ralph Loop Integration's primary exit condition).
+- `exit_on_milestone_complete` is `true` AND every task in the current milestone is `done` (matches the existing Ralph Loop Integration's milestone-boundary exit).
+
+Do NOT emit the promise when no actionable tasks were picked up THIS iteration but unfinished work remains (e.g., `[H]` reviews pending, blocked tasks). The next iteration will pick up newly-unblocked work — emitting the promise would falsely terminate the loop. This rule is identical to the existing Ralph Loop Integration's "No actionable tasks this iteration" guard.
+
+### Iteration Body
+
+When `--loop` is set, this command's existing workflow runs once per iteration. The agent follows the iteration loop body documented at [`shared-iter`](../docs/native-looping.md#shared-iter) by default (D-NL1 shared-context), or [`subagent-iter`](../docs/native-looping.md#subagent-iter) when `--loop-isolated` is passed: boundary check → increment counter → print marker → execute workflow → scan for promise → cancellation check → loop. State lives in `.synthex/loops/<loop-id>.json` per [FR-NL8](../docs/native-looping.md#state). Auto-compaction is safe because iteration state and work output both live on disk (FR-NL16, FR-NL17, FR-NL24).
+
+The iteration marker (`[loop <loop-id> iteration <N>/<max>]`) prints to stdout before each iteration's workflow runs. See [`markers`](../docs/native-looping.md#markers).
+
+### Precedence with Ralph Loop
+
+If `--loop` is passed AND `.claude/ralph-loop.local.md` exists with `active: true`, native looping takes precedence per FR-NL44. The command prints a one-line advisory:
+
+```
+Note: --loop overrides Ralph Loop. The ralph-loop plugin's state file is unchanged; cancel the ralph loop separately if you want it gone.
+```
+
+`.claude/ralph-loop.local.md` is NOT mutated by this command. See [`precedence`](../docs/native-looping.md#precedence).
+
+### See Also
+
+- [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md) — full iteration-framework spec.
+- `/synthex:loop` — generic prompt loop (no command body).
+- `/synthex:list-loops`, `/synthex:cancel-loop` — loop management.
+- Plan: `docs/plans/native-looping.md` (Tasks 13–21, FR-NL1–FR-NL45).
 
 ## Critical Requirements
 

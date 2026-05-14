@@ -15,6 +15,11 @@ Transform a Product Requirements Document (PRD) into a prioritized, value-driven
 | `specs_path` | Path to technical specifications directory | `docs/specs` | No |
 | `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
 | `concurrent_tasks` | Max tasks to recommend for parallel execution per milestone | `3` (from config) | No |
+| `--loop` | Enable native looping (FR-NL1/FR-NL2). When set, the command iterates per the "Native Looping" section below until the completion promise is emitted or `--max-iterations` is reached. | off | No |
+| `--completion-promise <string>` | Promise text the agent emits as `<promise>X</promise>` to terminate the loop. | — | Required with `--loop` (unless `--resume*`) |
+| `--max-iterations <int>` | Iteration cap (FR-NL13). Hard ceiling 200. | `20` | No |
+| `--loop-isolated` | Fresh-subagent isolation mode per iteration (FR-NL18). | off (shared-context default) | No |
+| `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
 
 ## Core Responsibilities
 
@@ -453,6 +458,44 @@ implementation_plan:
 ```
 
 ---
+
+## Native Looping
+
+This command supports the native Synthex looping primitive (introduced by `docs/plans/native-looping.md`). Pass `--loop` to iterate until the completion promise is emitted or `--max-iterations` is reached. The mechanical iteration framework — state file schema, loop-id rules, shared-context vs. fresh-subagent iteration, auto-compaction guarantees, promise emission, iteration markers — lives once in [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md). Only the command-specific bits are inlined below.
+
+### Emission Point
+
+Emit `<promise>{completion_promise}</promise>` (literal text from `--completion-promise`) in the iteration's final response when ALL of the following hold:
+
+- The implementation plan file has been written to disk.
+- Every PRD requirement is reflected in at least one task in the plan.
+- The plan contains no `TBD`, `<placeholder>`, `???`, or open-question markers in task descriptions or acceptance criteria.
+- A follow-up iteration would not add new tasks or refine existing ones (the agent's judgment — typically when reviewers' suggested edits have been incorporated and no further drafts are pending).
+
+Do NOT emit the promise while the plan still contains unresolved questions or TBD markers, or while a review-loop cycle is in flight. Subsequent iterations should consolidate review feedback into the plan; the loop terminates when the plan stabilizes.
+
+### Iteration Body
+
+When `--loop` is set, this command's existing workflow runs once per iteration. The agent follows the iteration loop body documented at [`shared-iter`](../docs/native-looping.md#shared-iter) by default (D-NL1 shared-context), or [`subagent-iter`](../docs/native-looping.md#subagent-iter) when `--loop-isolated` is passed: boundary check → increment counter → print marker → execute workflow → scan for promise → cancellation check → loop. State lives in `.synthex/loops/<loop-id>.json` per [FR-NL8](../docs/native-looping.md#state). Auto-compaction is safe because iteration state and work output both live on disk (FR-NL16, FR-NL17, FR-NL24).
+
+The iteration marker (`[loop <loop-id> iteration <N>/<max>]`) prints to stdout before each iteration's workflow runs. See [`markers`](../docs/native-looping.md#markers).
+
+### Precedence with Ralph Loop
+
+If `--loop` is passed AND `.claude/ralph-loop.local.md` exists with `active: true`, native looping takes precedence per FR-NL44. The command prints a one-line advisory:
+
+```
+Note: --loop overrides Ralph Loop. The ralph-loop plugin's state file is unchanged; cancel the ralph loop separately if you want it gone.
+```
+
+`.claude/ralph-loop.local.md` is NOT mutated by this command. See [`precedence`](../docs/native-looping.md#precedence).
+
+### See Also
+
+- [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md) — full iteration-framework spec.
+- `/synthex:loop` — generic prompt loop (no command body).
+- `/synthex:list-loops`, `/synthex:cancel-loop` — loop management.
+- Plan: `docs/plans/native-looping.md` (Tasks 13–21, FR-NL1–FR-NL45).
 
 ## Critical Requirements
 

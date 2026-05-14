@@ -13,6 +13,11 @@ Improve a Product Requirements Document (PRD) by running it through a multi-agen
 | `requirements_path` | Path to the PRD markdown file | `docs/reqs/main.md` | No |
 | `specs_path` | Path to technical specifications directory | `docs/specs` | No |
 | `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
+| `--loop` | Enable native looping (FR-NL1/FR-NL2). When set, the command iterates per the "Native Looping" section below until the completion promise is emitted or `--max-iterations` is reached. | off | No |
+| `--completion-promise <string>` | Promise text the agent emits as `<promise>X</promise>` to terminate the loop. | — | Required with `--loop` (unless `--resume*`) |
+| `--max-iterations <int>` | Iteration cap (FR-NL13). Hard ceiling 200. | `20` | No |
+| `--loop-isolated` | Fresh-subagent isolation mode per iteration (FR-NL18). | off (shared-context default) | No |
+| `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
 
 ## Core Responsibilities
 
@@ -278,6 +283,44 @@ refine_requirements:
 ```
 
 ---
+
+## Native Looping
+
+This command supports the native Synthex looping primitive (introduced by `docs/plans/native-looping.md`). Pass `--loop` to iterate until the completion promise is emitted or `--max-iterations` is reached. The mechanical iteration framework — state file schema, loop-id rules, shared-context vs. fresh-subagent iteration, auto-compaction guarantees, promise emission, iteration markers — lives once in [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md). Only the command-specific bits are inlined below.
+
+### Emission Point
+
+Emit `<promise>{completion_promise}</promise>` (literal text from `--completion-promise`) in the iteration's final response when ALL of the following hold:
+
+- The PRD's `Open Questions` section is empty (or every question is annotated `Resolved` with the resolution recorded).
+- No ambiguity markers (`?`, `TBD`, `unclear`, `to-be-decided`) remain in the Vision, Users, Scope, Success Criteria, or Constraints sections.
+- The PRD is structurally complete: every required section is populated; section summaries are coherent.
+- A follow-up iteration would not add new clarifying questions (the agent's judgment — typically when the previous iteration's questions have all been answered and no new ambiguities surfaced).
+
+Do NOT emit the promise while the agent is still asking the user clarifying questions or while answers are pending. Native looping does NOT bypass `[H]` user-input gates — the loop simply re-runs `refine-requirements` until the PRD stabilizes.
+
+### Iteration Body
+
+When `--loop` is set, this command's existing workflow runs once per iteration. The agent follows the iteration loop body documented at [`shared-iter`](../docs/native-looping.md#shared-iter) by default (D-NL1 shared-context), or [`subagent-iter`](../docs/native-looping.md#subagent-iter) when `--loop-isolated` is passed: boundary check → increment counter → print marker → execute workflow → scan for promise → cancellation check → loop. State lives in `.synthex/loops/<loop-id>.json` per [FR-NL8](../docs/native-looping.md#state). Auto-compaction is safe because iteration state and work output both live on disk (FR-NL16, FR-NL17, FR-NL24).
+
+The iteration marker (`[loop <loop-id> iteration <N>/<max>]`) prints to stdout before each iteration's workflow runs. See [`markers`](../docs/native-looping.md#markers).
+
+### Precedence with Ralph Loop
+
+If `--loop` is passed AND `.claude/ralph-loop.local.md` exists with `active: true`, native looping takes precedence per FR-NL44. The command prints a one-line advisory:
+
+```
+Note: --loop overrides Ralph Loop. The ralph-loop plugin's state file is unchanged; cancel the ralph loop separately if you want it gone.
+```
+
+`.claude/ralph-loop.local.md` is NOT mutated by this command. See [`precedence`](../docs/native-looping.md#precedence).
+
+### See Also
+
+- [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md) — full iteration-framework spec.
+- `/synthex:loop` — generic prompt loop (no command body).
+- `/synthex:list-loops`, `/synthex:cancel-loop` — loop management.
+- Plan: `docs/plans/native-looping.md` (Tasks 13–21, FR-NL1–FR-NL45).
 
 ## Critical Requirements
 

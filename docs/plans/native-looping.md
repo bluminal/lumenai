@@ -377,30 +377,30 @@ Adds the flag to `next-priority`, `write-implementation-plan`, `refine-requireme
 
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 13 | Extend `plugins/synthex/commands/next-priority.md` Parameters table with the five new `--loop` rows (FR-NL2). Preserve the existing `exit_on_milestone_complete` row. | S | Phase 2 | FR-NL1, FR-NL2 | pending |
-| 14 | Add a new "Native Looping" section to `next-priority.md`, positioned **immediately after** the existing "Ralph Loop Integration" section. Cross-references `docs/native-looping.md`. Inlines: completion-promise emission point (same as Ralph integration's emission point — `<promise>{completion_promise}</promise>` when plan is done or milestone-boundary exit fires), iteration body wrapper, precedence note (FR-NL44, FR-NL45). | M | Task 13 | FR-NL14, FR-NL44, FR-NL45 | pending |
-| 15 | Update the **existing** "Ralph Loop Integration" section in `next-priority.md` to append one paragraph (D-NL11) noting that `--loop` overrides Ralph Loop with documented precedence (FR-NL44). The rest of the section stays byte-identical. | S | Task 14 | FR-NL44, D-NL11 | pending |
+| 13 | Extend `plugins/synthex/commands/next-priority.md` Parameters table with the five new `--loop` rows (FR-NL2). Preserve the existing `exit_on_milestone_complete` row. | S | Phase 2 | FR-NL1, FR-NL2 | done |
+| 14 | Add a new "Native Looping" section to `next-priority.md`, positioned **immediately after** the existing "Ralph Loop Integration" section. Cross-references `docs/native-looping.md`. Inlines: completion-promise emission point (same as Ralph integration's emission point — `<promise>{completion_promise}</promise>` when plan is done or milestone-boundary exit fires), iteration body wrapper, precedence note (FR-NL44, FR-NL45). | M | Task 13 | FR-NL14, FR-NL44, FR-NL45 | done |
+| 15 | Update the **existing** "Ralph Loop Integration" section in `next-priority.md` to append one paragraph (D-NL11) noting that `--loop` overrides Ralph Loop with documented precedence (FR-NL44). The rest of the section stays byte-identical. | S | Task 14 | FR-NL44, D-NL11 | done |
 
 ### Milestone 4.2: write-implementation-plan `--loop`
 
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 16 | Extend `plugins/synthex/commands/write-implementation-plan.md` Parameters table with the five new `--loop` rows. | S | Phase 2 | FR-NL1, FR-NL2 | pending |
-| 17 | Add a "Native Looping" section to `write-implementation-plan.md`. Define the completion-promise emission point: emit `<promise>{completion_promise}</promise>` when the plan has been written AND a follow-up iteration has nothing new to add (the agent's judgment — typically when the plan covers all PRD requirements without TBDs). | M | Task 16 | FR-NL14 | pending |
+| 16 | Extend `plugins/synthex/commands/write-implementation-plan.md` Parameters table with the five new `--loop` rows. | S | Phase 2 | FR-NL1, FR-NL2 | done |
+| 17 | Add a "Native Looping" section to `write-implementation-plan.md`. Define the completion-promise emission point: emit `<promise>{completion_promise}</promise>` when the plan has been written AND a follow-up iteration has nothing new to add (the agent's judgment — typically when the plan covers all PRD requirements without TBDs). | M | Task 16 | FR-NL14 | done |
 
 ### Milestone 4.3: refine-requirements `--loop`
 
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 18 | Extend `plugins/synthex/commands/refine-requirements.md` Parameters table with the five new `--loop` rows. | S | Phase 2 | FR-NL1, FR-NL2 | pending |
-| 19 | Add a "Native Looping" section to `refine-requirements.md`. Emission point: when the PRD's open questions and ambiguities are resolved enough to start implementation planning. | M | Task 18 | FR-NL14 | pending |
+| 18 | Extend `plugins/synthex/commands/refine-requirements.md` Parameters table with the five new `--loop` rows. | S | Phase 2 | FR-NL1, FR-NL2 | done |
+| 19 | Add a "Native Looping" section to `refine-requirements.md`. Emission point: when the PRD's open questions and ambiguities are resolved enough to start implementation planning. | M | Task 18 | FR-NL14 | done |
 
 ### Milestone 4.4: review-code `--loop`
 
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 20 | Extend `plugins/synthex/commands/review-code.md` Parameters table with the five new `--loop` rows. | S | Phase 2 | FR-NL1, FR-NL2 | pending |
-| 21 | Add a "Native Looping" section to `review-code.md`. Emission point: when a review cycle ends with zero blocking findings AND zero recommended changes the reviewer would still pursue. (Distinct from the existing multi-model-review consolidation flow — `--loop` wraps the entire review-code invocation, not the per-cycle consolidation.) | M | Task 20 | FR-NL14 | pending |
+| 20 | Extend `plugins/synthex/commands/review-code.md` Parameters table with the five new `--loop` rows. | S | Phase 2 | FR-NL1, FR-NL2 | done |
+| 21 | Add a "Native Looping" section to `review-code.md`. Emission point: when a review cycle ends with zero blocking findings AND zero recommended changes the reviewer would still pursue. (Distinct from the existing multi-model-review consolidation flow — `--loop` wraps the entire review-code invocation, not the per-cycle consolidation.) | M | Task 20 | FR-NL14 | done |
 
 **Acceptance Criteria pattern (Tasks 13, 16, 18, 20):**
 - `[T]` Parameters table contains five new rows; raw-string anchor checks for each parameter name.
