@@ -18,8 +18,10 @@
   ],
   "commands": [
     "./commands/init.md",
+    "./commands/cancel-loop.md",
     "./commands/configure-multi-model.md",
     "./commands/dismiss-upgrade-nudge.md",
+    "./commands/list-loops.md",
     "./commands/loop.md",
     "./commands/next-priority.md",
     "./commands/refine-requirements.md",

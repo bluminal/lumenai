@@ -347,11 +347,11 @@ Proves out the iteration framework on a standalone surface BEFORE adding `--loop
 
 | # | Task | Complexity | Dependencies | Req | Status |
 |---|------|-----------|--------------|-----|--------|
-| 8 | Author `plugins/synthex/commands/list-loops.md`. YAML frontmatter `model: haiku` (D-NL16). Enumerates `.synthex/loops/*.json` (excluding `.archive/`), parses each, formats per FR-NL32. Sorted per FR-NL33. Handles missing directory (FR-NL32 + E15). | M | Task 1 | FR-NL32, FR-NL33 | pending |
-| 9 | Register `list-loops.md` in `plugins/synthex/.claude-plugin/plugin.json`. | S | Task 8 | FR-NL5 | pending |
-| 10 | Author `plugins/synthex/commands/cancel-loop.md`. YAML frontmatter `model: haiku`. Parameters: `loop_id` (positional, required unless `--all`), `--all` (flag). Mutates state file `status: "cancelled"`, `exited_at`, prints confirmation. Idempotent (FR-NL29 already-terminal handling). | M | Task 1 | FR-NL29, FR-NL30, FR-NL31 | pending |
-| 11 | Register `cancel-loop.md` in `plugins/synthex/.claude-plugin/plugin.json`. | S | Task 10 | FR-NL5 | pending |
-| 12 | Author the archive logic as a documented step in `docs/native-looping.md` (D-NL10): when any loop command touches `.synthex/loops/`, it scans for terminal-status files older than the current invocation and moves them to `.synthex/loops/.archive/<loop-id>-<timestamp>.json`. Document the .archive directory creation. | S | Task 1 | D-NL10 | pending |
+| 8 | Author `plugins/synthex/commands/list-loops.md`. YAML frontmatter `model: haiku` (D-NL16). Enumerates `.synthex/loops/*.json` (excluding `.archive/`), parses each, formats per FR-NL32. Sorted per FR-NL33. Handles missing directory (FR-NL32 + E15). | M | Task 1 | FR-NL32, FR-NL33 | done |
+| 9 | Register `list-loops.md` in `plugins/synthex/.claude-plugin/plugin.json`. | S | Task 8 | FR-NL5 | done |
+| 10 | Author `plugins/synthex/commands/cancel-loop.md`. YAML frontmatter `model: haiku`. Parameters: `loop_id` (positional, required unless `--all`), `--all` (flag). Mutates state file `status: "cancelled"`, `exited_at`, prints confirmation. Idempotent (FR-NL29 already-terminal handling). | M | Task 1 | FR-NL29, FR-NL30, FR-NL31 | done |
+| 11 | Register `cancel-loop.md` in `plugins/synthex/.claude-plugin/plugin.json`. | S | Task 10 | FR-NL5 | done |
+| 12 | Author the archive logic as a documented step in `docs/native-looping.md` (D-NL10): when any loop command touches `.synthex/loops/`, it scans for terminal-status files older than the current invocation and moves them to `.synthex/loops/.archive/<loop-id>-<timestamp>.json`. Document the .archive directory creation. | S | Task 1 | D-NL10 | done |
 
 **Task 8 Acceptance Criteria:**
 - `[T]` Command file exists with `model: haiku` frontmatter.

@@ -67,7 +67,62 @@ Every mutation MUST be atomic: write to `<state-file>.tmp.<pid>`, then `mv -f` o
 
 ### Archive
 
-When any loop command touches `.synthex/loops/`, it scans for terminal-status state files and moves them to `.synthex/loops/.archive/<loop-id>-<ISO-timestamp>.json` (D-NL10). The archive directory is gitignored. v1 has no automatic time-based purge; retention policy is tracked in Q-NL1.
+When any loop command touches `.synthex/loops/`, it MUST scan the directory once for terminal-status state files and move each to `.synthex/loops/.archive/<loop-id>-<ISO-timestamp>.json`. This implements D-NL10 and is documented in detail here (Task 12) so every command's iteration instructions reference a single source.
+
+#### Which commands run the archive scan
+
+The archive scan fires at the **start** of every invocation of:
+
+- `/synthex:loop` — fresh start, resume, or `--resume-last`.
+- `/synthex:list-loops` — enumeration. (Archive runs even though the list excludes archived loops; this keeps the active directory tight.)
+- `/synthex:cancel-loop` — single-loop cancel only. `--all` runs the scan **after** mutating running loops to cancelled, so newly-cancelled state files are NOT immediately archived in the same invocation (they'll archive on the next touch).
+- Any `--loop`-bearing command on its first iteration when it lazily creates `.synthex/loops/`.
+
+The scan is best-effort: it does not block on filesystem errors, and individual archive failures are logged as warnings but never abort the calling command.
+
+#### Scan algorithm
+
+1. List `.synthex/loops/*.json` (skip `.archive/`).
+2. For each file:
+   - Parse the JSON. Skip silently if corrupt or unreadable.
+   - Read `status`. If it is one of `{"completed", "cancelled", "max-iterations-reached", "crashed"}`, it's a candidate for archival.
+   - Read `exited_at`. If it's `null` (anomaly — terminal status without a timestamp), use `last_updated` as a fallback for the archive filename.
+3. For each candidate:
+   - Compute the archive path: `.synthex/loops/.archive/<loop_id>-<exited_at-in-filename-safe-form>.json`. The filename-safe form replaces `:` with `-` so the file is portable across filesystems (e.g., `2026-05-13T18-48-11Z`).
+   - `mkdir -p .synthex/loops/.archive/` (lazy creation; the directory may not exist yet).
+   - Move atomically: `mv -f <source> <archive-path>`. If the destination already exists (the same loop archived twice — should not happen, but possible if someone manually copied a file), append `-1`, `-2`, ... to the basename until a free name is found.
+   - Log the move at debug level (not user-visible by default).
+4. If any archive move fails (filesystem error, permission denied), do NOT abort the calling command. Skip the file and continue.
+
+#### Archive directory layout
+
+```
+.synthex/loops/
+├── next-priority-3f2a.json         # running
+├── team-implement-7e1d.json        # running
+└── .archive/
+    ├── refine-requirements-9b22-2026-05-13T18-22-04Z.json   # completed
+    ├── loop-write-rfc-1a08-2026-05-13T16-44-31Z.json        # max-iterations-reached
+    └── team-plan-4c66-2026-05-13T15-10-22Z.json             # cancelled
+```
+
+The `.archive/` directory is gitignored (covered by the `.synthex/loops/` entry that `init.md` Step 5 / `team-init.md` Step 6 add).
+
+#### Retention
+
+v1 has no automatic time-based or count-based purge. Archived files accumulate until the user manually cleans them up. Retention policy is tracked as Q-NL1; v2 will likely cap at the 20 most-recent archived loops or apply a 30-day TTL.
+
+For now, users who want to clean up old archives can run:
+
+```sh
+rm -rf .synthex/loops/.archive
+```
+
+This is safe at any time — the active directory is unaffected, and loop-id collisions with previously-archived loops are not a concern (active loops never reuse archived ids by definition).
+
+#### Anti-pattern: do NOT delete terminal-status files directly
+
+`/synthex:cancel-loop` and other commands mutate `status: "cancelled"` in place and let the next archive scan move the file. They do NOT `rm` the file. This preserves the loop's history (iteration count, exit_reason, started_at) for the user to inspect via `ls .synthex/loops/` or by reading the JSON directly between cancel and the next archive scan.
 
 ## <a id="loop-id"></a>Loop-id assignment rules
 
