@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./scripts/upgrade-nudge.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/upgrade-nudge.sh"
           }
         ]
       }
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./scripts/task-completed-gate.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/task-completed-gate.sh"
           }
         ]
       }
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./scripts/teammate-idle-gate.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/teammate-idle-gate.sh"
           }
         ]
       }

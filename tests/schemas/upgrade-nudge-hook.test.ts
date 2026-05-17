@@ -23,13 +23,13 @@ const variants = [
     label: 'synthex',
     pluginDir: join(REPO_ROOT, 'plugins', 'synthex'),
     hookEvent: 'SessionStart',
-    scriptRelPath: './scripts/upgrade-nudge.sh',
+    scriptRelPath: '${CLAUDE_PLUGIN_ROOT}/scripts/upgrade-nudge.sh',
   },
   {
     label: 'synthex-plus',
     pluginDir: join(REPO_ROOT, 'plugins', 'synthex-plus'),
     hookEvent: 'SessionStart',
-    scriptRelPath: './scripts/upgrade-nudge.sh',
+    scriptRelPath: '${CLAUDE_PLUGIN_ROOT}/scripts/upgrade-nudge.sh',
   },
 ] as const;
 
@@ -115,10 +115,10 @@ describe('synthex-plus hooks.json — TaskCompleted + TeammateIdle preserved', (
     expect(json.hooks.SessionStart).toBeTruthy();
     // Ensure existing TaskCompleted/TeammateIdle commands haven't drifted.
     expect(json.hooks.TaskCompleted[0].hooks[0].command).toBe(
-      './scripts/task-completed-gate.sh'
+      '${CLAUDE_PLUGIN_ROOT}/scripts/task-completed-gate.sh'
     );
     expect(json.hooks.TeammateIdle[0].hooks[0].command).toBe(
-      './scripts/teammate-idle-gate.sh'
+      '${CLAUDE_PLUGIN_ROOT}/scripts/teammate-idle-gate.sh'
     );
   });
 });

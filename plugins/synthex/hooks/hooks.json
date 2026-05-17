@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./scripts/upgrade-nudge.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/upgrade-nudge.sh"
           }
         ]
       }

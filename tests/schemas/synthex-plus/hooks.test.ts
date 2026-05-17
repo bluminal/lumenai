@@ -625,7 +625,8 @@ describe('Hooks Schema — Real Plugin Validation', () => {
       >) {
         for (const block of matcherBlocks) {
           for (const entry of block.hooks) {
-            const scriptPath = join(PLUGIN_ROOT, entry.command);
+            const relCommand = entry.command.replace(/^\$\{CLAUDE_PLUGIN_ROOT\}\//, '');
+            const scriptPath = join(PLUGIN_ROOT, relCommand);
             expect(existsSync(scriptPath), `Script not found: ${scriptPath}`).toBe(true);
           }
         }
@@ -640,7 +641,11 @@ describe('Hooks Schema — Real Plugin Validation', () => {
       >) {
         for (const block of matcherBlocks) {
           for (const entry of block.hooks) {
-            const scriptBasename = entry.command.replace('./scripts/', '').replace('.sh', '');
+            const scriptBasename = entry.command
+              .replace(/^\$\{CLAUDE_PLUGIN_ROOT\}\//, '')
+              .replace(/^\.\//, '')
+              .replace(/^scripts\//, '')
+              .replace(/\.sh$/, '');
             const docPath = join(HOOKS_DIR, `${scriptBasename}.md`);
             expect(existsSync(docPath), `Companion doc not found: ${docPath}`).toBe(true);
           }
