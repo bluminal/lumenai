@@ -315,7 +315,7 @@ describe('init.md — Multi-Model Review section (Task 47)', () => {
     // The confirmation block lives in init.md, not the wizard file.
     const hostContent = loadInitMdHost();
     expect(hostContent).toMatch(/docs\/reviews\//);
-    const confirmSection = extractSection(hostContent, 8, 'Confirm and Guide');
+    const confirmSection = extractSection(hostContent, 9, 'Confirm and Guide');
     expect(confirmSection).not.toBeNull();
     expect(confirmSection!).toContain('docs/reviews/');
   });
@@ -338,12 +338,13 @@ describe('init.md — Multi-Model Review section (Task 47)', () => {
     expect(gitignorePos).toBeGreaterThan(mmrPos);
   });
 
-  it('sections renumbered correctly: 5=.gitignore, 6=star-repo, 7=create-dirs, 8=confirm', () => {
+  it('sections renumbered correctly: 5=.gitignore, 6=.worktreeinclude, 7=star-repo, 8=create-dirs, 9=confirm', () => {
     const hostContent = loadInitMdHost();
     expect(hostContent).toContain('### 5. Update .gitignore');
-    expect(hostContent).toContain('### 6. Ask About Starring the Repo');
-    expect(hostContent).toContain('### 7. Create Document Directories');
-    expect(hostContent).toContain('### 8. Confirm and Guide');
+    expect(hostContent).toContain('### 6. Create `.worktreeinclude`');
+    expect(hostContent).toContain('### 7. Ask About Starring the Repo');
+    expect(hostContent).toContain('### 8. Create Document Directories');
+    expect(hostContent).toContain('### 9. Confirm and Guide');
   });
 
   // ── Anti-pattern: no API keys ────────────────────────────────────
