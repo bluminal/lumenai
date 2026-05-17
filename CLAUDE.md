@@ -77,6 +77,19 @@ How it works:
    - `fix:` / `perf:` / `refactor:` / `revert:` / `build:` / `ci:` / `chore:` / `docs:` / `style:` / `test:` → **patch**
    - No Conventional Commits since the last tag → **no release** (skipped silently)
 3. Both plugins and the marketplace top-level version are lockstep-bumped, a CHANGELOG entry is generated from the same commit range, the release commit is tagged `v<marketplace-version>`, and a GitHub release is published.
+4. After the GitHub release is created, a Claude Code agent step opens a **draft pull request** in `bluminal/slashsynthex.com` with proposed docs updates (release notes entry, command/agent reference updates, version bumps). The step is best-effort (`continue-on-error: true`) and never blocks the release. It runs only when all three required secrets are present (`ANTHROPIC_API_KEY`, `DOCS_PR_APP_ID`, `DOCS_PR_APP_PRIVATE_KEY`); otherwise it is skipped silently.
+
+### Required secrets
+
+Configure on `bluminal/lumenai` for the cross-repo docs-PR step to run:
+
+| Secret | Source | Scope |
+|--------|--------|-------|
+| `ANTHROPIC_API_KEY` | console.anthropic.com | Pay-per-use; per release runs roughly $1–3 at the 30-turn cap |
+| `DOCS_PR_APP_ID` | GitHub App ID | App must be installed on both `bluminal/lumenai` and `bluminal/slashsynthex.com` |
+| `DOCS_PR_APP_PRIVATE_KEY` | GitHub App private key (PEM) | Permissions: contents:write, pull-requests:write on `slashsynthex.com` only |
+
+The agent always opens a **draft** PR — a human reviews and merges. If the agent can't find a sensible docs home for a code change, it flags it in the PR body under "Could not auto-document" rather than fabricating.
 
 Implications for contributors:
 

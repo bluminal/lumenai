@@ -304,3 +304,119 @@ jobs:
           gh release create "v${MARKET_NEW}" \
             --title "v${MARKET_NEW} — synthex ${SYNTHEX_NEW} + synthex-plus ${PLUS_NEW}" \
             --notes-file "$ENTRY_FILE"
+
+      # ───────────────────────────────────────────────────────────────
+      # Cross-repo docs PR — proposes slashsynthex.com docs updates.
+      # Best-effort; never blocks the release. Requires three secrets:
+      #   DOCS_PR_APP_ID         — GitHub App ID (App installed on
+      #                            both lumenai and slashsynthex.com
+      #                            with contents:write + pull-requests:write)
+      #   DOCS_PR_APP_PRIVATE_KEY — Corresponding private key (PEM)
+      #   ANTHROPIC_API_KEY      — Anthropic API key for the agent
+      # ───────────────────────────────────────────────────────────────
+      - name: Mint docs-repo App token
+        if: steps.bump.outputs.bump != 'none' && env.HAVE_APP_CREDS == 'true'
+        id: docs_app_token
+        env:
+          HAVE_APP_CREDS: ${{ secrets.DOCS_PR_APP_ID != '' && secrets.DOCS_PR_APP_PRIVATE_KEY != '' }}
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.DOCS_PR_APP_ID }}
+          private-key: ${{ secrets.DOCS_PR_APP_PRIVATE_KEY }}
+          owner: bluminal
+          repositories: slashsynthex.com
+
+      - name: Propose slashsynthex docs updates via Claude agent
+        if: steps.bump.outputs.bump != 'none' && env.HAVE_AGENT_SECRETS == 'true'
+        continue-on-error: true
+        env:
+          HAVE_AGENT_SECRETS: ${{ secrets.ANTHROPIC_API_KEY != '' && steps.docs_app_token.outputs.token != '' }}
+          GH_TOKEN: ${{ steps.docs_app_token.outputs.token }}
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ steps.docs_app_token.outputs.token }}
+          prompt: |
+            You are proposing documentation updates to the slashsynthex.com
+            docs site for a new lumenai release. Open a DRAFT pull request — a
+            human will review and merge.
+
+            Context
+            -------
+            New release tag:       v${{ steps.versions.outputs.market_new }}
+            synthex new version:   ${{ steps.versions.outputs.synthex_new }}
+            synthex-plus new ver:  ${{ steps.versions.outputs.plus_new }}
+            Previous release tag:  ${{ steps.bump.outputs.last_tag }}
+            Changelog entry file:  ${{ steps.changelog.outputs.entry_file }}
+            Source repo:           ${{ github.repository }} (current checkout, full history)
+            Docs repo:             bluminal/slashsynthex.com
+            Docs site stack:       Next.js + MDX. Content lives in content/ and docs/.
+            Release URL:           https://github.com/${{ github.repository }}/releases/tag/v${{ steps.versions.outputs.market_new }}
+
+            Workflow
+            --------
+            1. Read the changelog entry file (path above) — it summarizes Added /
+               Fixed / Changed / Other for this release. This is your starting
+               point for what changed semantically.
+
+            2. Walk the actual diff in this checkout to ground the changelog in
+               concrete changes:
+                 git log --no-merges ${{ steps.bump.outputs.last_tag }}..HEAD^
+                 git diff --stat ${{ steps.bump.outputs.last_tag }}..HEAD^
+               (HEAD^ excludes the release commit itself, which only bumps
+               version files + CHANGELOG.) Inspect commits that touched
+               plugins/synthex/agents/, plugins/synthex/commands/,
+               plugins/synthex-plus/agents/, plugins/synthex-plus/commands/,
+               or plugin manifests — those are the user-visible changes most
+               likely to need docs updates.
+
+            3. Clone the docs repo (use a temp dir, NOT inside this checkout):
+                 git clone https://x-access-token:$GH_TOKEN@github.com/bluminal/slashsynthex.com.git /tmp/docs
+                 cd /tmp/docs
+               Explore the structure. Find the release notes / changelog page
+               (likely under content/ or docs/) and any command/agent reference
+               pages that cover what changed in this release. Read a recent
+               release notes entry to match prose style before writing.
+
+            4. On a new branch (release-v${{ steps.versions.outputs.market_new }}-docs):
+                 - Add an entry on the release notes / changelog page covering
+                   this release. Mirror the structure of the most recent
+                   prior entry.
+                 - Update any agent / command reference page that documents an
+                   added or changed agent or command in this release.
+                 - Update version numbers wherever they appear hardcoded in
+                   docs to reference the synthex / synthex-plus versions.
+                 - Skip frontend-only or test-only commits — those don't need
+                   docs updates.
+
+            5. Commit, push the branch, and open a DRAFT pull request via gh:
+                 gh pr create --repo bluminal/slashsynthex.com --draft \
+                   --base main --head release-v${{ steps.versions.outputs.market_new }}-docs \
+                   --title "docs: v${{ steps.versions.outputs.market_new }} — synthex ${{ steps.versions.outputs.synthex_new }} + synthex-plus ${{ steps.versions.outputs.plus_new }}" \
+                   --body "<your body here>"
+
+               PR body must include:
+                 - Link to the lumenai release URL (above).
+                 - The changelog entry quoted verbatim.
+                 - Bullet list of docs files you updated and the one-line
+                   rationale for each.
+                 - A "Could not auto-document" section listing any code
+                   changes you saw but did not know where to document.
+                   Better to flag honestly than fabricate.
+
+            6. Report the PR URL in your final response so it shows up in
+               the workflow logs.
+
+            Hard rules
+            ----------
+            - Open the PR as DRAFT. Never merge.
+            - Never modify the lumenai checkout. All edits go in /tmp/docs.
+            - Match the docs site's existing prose style — read before writing.
+            - If you can't find a sensible docs home for something, flag it
+              in the PR body rather than inventing a page.
+            - $GH_TOKEN is already set in the environment for gh and git.
+              It is scoped to bluminal/slashsynthex.com with contents:write
+              and pull-requests:write. It has NO access to the lumenai repo.
+          claude_args: |
+            --max-turns 30
+            --allowedTools Bash,Edit,Read,Write,Grep,Glob
