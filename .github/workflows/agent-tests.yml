@@ -47,9 +47,9 @@ jobs:
         working-directory: tests
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -76,9 +76,9 @@ jobs:
         working-directory: tests
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -89,7 +89,7 @@ jobs:
 
       # Restore LLM output cache from previous runs
       - name: Restore LLM cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: tests/.cache
           key: llm-cache-${{ hashFiles('plugins/synthex/agents/**', 'tests/fixtures/**') }}
@@ -116,9 +116,9 @@ jobs:
         working-directory: tests
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -129,7 +129,7 @@ jobs:
 
       # Restore LLM output cache
       - name: Restore LLM cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: tests/.cache
           key: llm-cache-${{ hashFiles('plugins/synthex/agents/**', 'tests/fixtures/**') }}
