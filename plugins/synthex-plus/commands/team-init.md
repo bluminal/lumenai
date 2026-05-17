@@ -18,7 +18,8 @@ Set up the Synthex+ teams plugin configuration for a project. This command scaff
 4. **Detects orphaned team resources** from previous sessions
 5. **Creates the project configuration file** at `.synthex-plus/config.yaml`
 6. **Updates `.gitignore`** to exclude `.synthex-plus/` if not already present
-7. **Provides guidance** on available team commands and configuration
+7. **Asks about starring the repo** — offers to open the Lumenai marketplace on GitHub so the user can star it
+8. **Provides guidance** on available team commands and configuration
 
 This command does NOT create document directories — those are managed by the Synthex `init` command.
 
@@ -179,7 +180,13 @@ On Skip:
 
 Record the user's choice (Enabled or Skipped) for use in Step 9's guidance output.
 
-### 9. Confirm and Guide
+### 9. Ask About Starring the Repo
+
+After the configuration scaffolding is in place, ask the user whether they'd like to star the Lumenai marketplace repository on GitHub. Stars help more developers find the project — which means more eyeballs for new features and bug fixes.
+
+Delegate to the `/synthex-plus:star` command at `plugins/synthex-plus/commands/star.md`. Read that file and follow Steps 2 and 3 (Ask the user → Apply the user's choice) inline as part of `team-init`. Skip Step 1 (the state-existence check) — `team-init` has already ensured `.synthex-plus/` exists. If the user picks "Maybe later", do nothing extra; the upgrade-nudge hook will surface the prompt again on the next version bump.
+
+### 10. Confirm and Guide
 
 Display a summary of what was created, any warnings collected from steps 2-4, and guidance on available commands and configuration.
 

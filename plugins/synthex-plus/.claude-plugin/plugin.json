@@ -22,7 +22,8 @@
     "./commands/team-refine.md",
     "./commands/start-review-team.md",
     "./commands/stop-review-team.md",
-    "./commands/list-teams.md"
+    "./commands/list-teams.md",
+    "./commands/star.md"
   ],
   "agents": [
     "./agents/team-orchestrator-bridge.md",

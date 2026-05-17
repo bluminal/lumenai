@@ -18,8 +18,9 @@ Set up the Synthex plugin configuration for a project. This command scaffolds th
 2. **Prompts for concurrent task parallelism** — detects CPU count and asks the user to choose a concurrency level (Yolo, Aggressive, Default, or custom)
 3. **Configures multi-model review (optional)** — scans for installed CLIs, runs auth checks, and offers opt-in options for multi-model review
 4. **Updates `.gitignore`** to exclude the worktrees directory (`.claude/worktrees/`) if not already present
-5. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`, `docs/specs/decisions/`, `docs/specs/rfcs/`, `docs/runbooks/`, `docs/retros/`) if they don't exist
-6. **Provides guidance** on customizing the configuration for your project
+5. **Asks about starring the repo** — offers to open the Lumenai marketplace on GitHub so the user can star it
+6. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`, `docs/specs/decisions/`, `docs/specs/rfcs/`, `docs/runbooks/`, `docs/retros/`) if they don't exist
+7. **Provides guidance** on customizing the configuration for your project
 
 ## Workflow
 
@@ -133,7 +134,13 @@ Concretely, the resulting block to append (omitting any lines already present) i
 .synthex/loops/
 ```
 
-### 6. Create Document Directories
+### 6. Ask About Starring the Repo
+
+After the configuration scaffolding is in place, ask the user whether they'd like to star the Lumenai marketplace repository on GitHub. Stars help more developers find the project — which means more eyeballs for new features and bug fixes.
+
+Delegate to the `/synthex:star` command at `plugins/synthex/commands/star.md`. Read that file and follow Steps 2 and 3 (Ask the user → Apply the user's choice) inline as part of `init`. Skip Step 1 (the state-existence check) — `init` has already ensured `.synthex/` exists. If the user picks "Maybe later", do nothing extra; the upgrade-nudge hook will surface the prompt again on the next version bump.
+
+### 7. Create Document Directories
 
 Create the following directories if they don't already exist:
 - `docs/reqs/` — Product requirements documents
@@ -146,7 +153,7 @@ Create the following directories if they don't already exist:
 
 Do NOT create any files inside these directories — just the directories.
 
-### 7. Confirm and Guide
+### 8. Confirm and Guide
 
 Inform the user what was created and provide guidance:
 

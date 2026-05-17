@@ -33,6 +33,7 @@
     "./commands/design-system-audit.md",
     "./commands/retrospective.md",
     "./commands/reliability-review.md",
-    "./commands/performance-audit.md"
+    "./commands/performance-audit.md",
+    "./commands/star.md"
   ]
 }

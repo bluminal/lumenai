@@ -245,7 +245,7 @@ describe('Init Command — "What This Command Does" Summary', () => {
     expect(summaryMatch![1].toLowerCase()).toMatch(/concurrent|parallelism/);
   });
 
-  it('lists 5 numbered steps in the summary', () => {
+  it('lists 7 numbered steps in the summary', () => {
     const summaryMatch = markdown.match(
       /## What This Command Does\s*\n([\s\S]*?)(?=## Workflow)/
     );
@@ -253,7 +253,7 @@ describe('Init Command — "What This Command Does" Summary', () => {
     const numberedSteps = summaryMatch![1]
       .split('\n')
       .filter((l) => /^\d+\./.test(l.trim()));
-    expect(numberedSteps.length).toBe(6);
+    expect(numberedSteps.length).toBe(7);
   });
 });
 
@@ -282,12 +282,16 @@ describe('Init Command — Workflow Step Ordering', () => {
     expect(extractWorkflowStep(markdown, 5, 'Update')).not.toBeNull();
   });
 
-  it('step 6 is "Create Document Directories"', () => {
-    expect(extractWorkflowStep(markdown, 6, 'Create Document Directories')).not.toBeNull();
+  it('step 6 is "Ask About Starring the Repo"', () => {
+    expect(extractWorkflowStep(markdown, 6, 'Ask About Starring the Repo')).not.toBeNull();
   });
 
-  it('step 7 is "Confirm and Guide"', () => {
-    expect(extractWorkflowStep(markdown, 7, 'Confirm and Guide')).not.toBeNull();
+  it('step 7 is "Create Document Directories"', () => {
+    expect(extractWorkflowStep(markdown, 7, 'Create Document Directories')).not.toBeNull();
+  });
+
+  it('step 8 is "Confirm and Guide"', () => {
+    expect(extractWorkflowStep(markdown, 8, 'Confirm and Guide')).not.toBeNull();
   });
 
   it('concurrent tasks step comes after config creation', () => {

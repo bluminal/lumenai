@@ -80,7 +80,12 @@ function readCurrentVersion(pluginJsonPath: string): string {
 function writeStateJson(
   projectDir: string,
   stateDir: string,
-  state: { last_seen_version: string; dismissed: boolean }
+  state: {
+    last_seen_version: string;
+    dismissed: boolean;
+    starred?: boolean;
+    star_dismissed?: boolean;
+  }
 ): void {
   const stateFile = join(projectDir, stateDir, 'state.json');
   writeFileSync(
@@ -90,6 +95,8 @@ function writeStateJson(
         schema_version: 1,
         last_seen_version: state.last_seen_version,
         dismissed: state.dismissed,
+        starred: state.starred ?? false,
+        star_dismissed: state.star_dismissed ?? false,
         updated_at: '2026-04-01T00:00:00Z',
       },
       null,
@@ -211,9 +218,12 @@ describe.each(variants)(
     describe('FR-UO14 upgrade path — config-block-present suppresses', () => {
       it('does NOT print nudge when config block is present', () => {
         mkdirSync(join(projectDir, variant.stateDir), { recursive: true });
+        // star_dismissed suppresses the orthogonal star nudge so this test
+        // isolates feature-nudge suppression.
         writeStateJson(projectDir, variant.stateDir, {
           last_seen_version: variant.preThresholdVersion,
           dismissed: false,
+          star_dismissed: true,
         });
         writeFileSync(
           join(projectDir, variant.stateDir, 'config.yaml'),
@@ -233,9 +243,12 @@ describe.each(variants)(
     describe('FR-UO12 upgrade path — dismissed suppresses', () => {
       it('does NOT print nudge when dismissed: true', () => {
         mkdirSync(join(projectDir, variant.stateDir), { recursive: true });
+        // star_dismissed suppresses the orthogonal star nudge so this test
+        // isolates feature-nudge suppression.
         writeStateJson(projectDir, variant.stateDir, {
           last_seen_version: variant.preThresholdVersion,
           dismissed: true,
+          star_dismissed: true,
         });
 
         const { stdout, status } = runHook(variant.scriptPath, projectDir);
@@ -246,6 +259,60 @@ describe.each(variants)(
         const state = readStateJson(projectDir, variant.stateDir);
         expect(state.last_seen_version).toBe(currentVersion);
         expect(state.dismissed).toBe(true);
+      });
+    });
+
+    describe('Star nudge — fires on any upgrade', () => {
+      it('prints star nudge on upgrade when neither starred nor star_dismissed', () => {
+        mkdirSync(join(projectDir, variant.stateDir), { recursive: true });
+        writeStateJson(projectDir, variant.stateDir, {
+          last_seen_version: variant.preThresholdVersion,
+          dismissed: true, // suppress feature nudge so we isolate the star nudge
+          starred: false,
+          star_dismissed: false,
+        });
+
+        const { stdout, status } = runHook(variant.scriptPath, projectDir);
+
+        expect(status).toBe(0);
+        expect(stdout).toContain('starring the Lumenai marketplace');
+        // State updated; star flags preserved as still-false.
+        const state = readStateJson(projectDir, variant.stateDir);
+        expect(state.last_seen_version).toBe(currentVersion);
+        expect(state.starred).toBe(false);
+        expect(state.star_dismissed).toBe(false);
+      });
+
+      it('does NOT print star nudge when starred: true', () => {
+        mkdirSync(join(projectDir, variant.stateDir), { recursive: true });
+        writeStateJson(projectDir, variant.stateDir, {
+          last_seen_version: variant.preThresholdVersion,
+          dismissed: true,
+          starred: true,
+        });
+
+        const { stdout, status } = runHook(variant.scriptPath, projectDir);
+
+        expect(status).toBe(0);
+        expect(stdout).toBe('');
+        const state = readStateJson(projectDir, variant.stateDir);
+        expect(state.starred).toBe(true);
+      });
+
+      it('does NOT print star nudge when star_dismissed: true', () => {
+        mkdirSync(join(projectDir, variant.stateDir), { recursive: true });
+        writeStateJson(projectDir, variant.stateDir, {
+          last_seen_version: variant.preThresholdVersion,
+          dismissed: true,
+          star_dismissed: true,
+        });
+
+        const { stdout, status } = runHook(variant.scriptPath, projectDir);
+
+        expect(status).toBe(0);
+        expect(stdout).toBe('');
+        const state = readStateJson(projectDir, variant.stateDir);
+        expect(state.star_dismissed).toBe(true);
       });
     });
 
