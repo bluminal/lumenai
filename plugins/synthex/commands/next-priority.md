@@ -6,6 +6,8 @@ model: opus
 
 Automatically identify and execute the next highest-priority tasks from the implementation plan using the Tech Lead sub-agent for orchestrated execution.
 
+> **If `--loop` appears in your invocation arguments, STOP and jump to [`## Native Looping`](#native-looping) below before reading anything else.** The flag switches this command into a self-driven iterative loop; the rest of this file describes the **single iteration body**. Treating `--loop`, `--completion-promise`, or `--max-iterations` as `/loop`-skill wrapper flags or as unknown arguments silently breaks the loop after one pass.
+
 ## Parameters
 
 | Parameter | Description | Default | Required |
@@ -218,6 +220,55 @@ Synthex 0.7+ adds a native `--loop` flag that takes precedence over Ralph Loop I
 
 This command supports the native Synthex looping primitive (introduced by `docs/plans/native-looping.md`). Pass `--loop` to iterate until the completion promise is emitted or `--max-iterations` is reached. The mechanical iteration framework — state file schema, loop-id rules, shared-context vs. fresh-subagent iteration, auto-compaction guarantees, promise emission, iteration markers — lives once in [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md). Only the command-specific bits are inlined below.
 
+### Imperative Loop Protocol (read FIRST when `--loop` is set)
+
+If your invocation includes `--loop`, you are NOT running this command once. You are running it inside a **self-driven shared-context loop** (D-NL1). The harness does **not** re-invoke you between iterations — you re-enter the workflow yourself, in the same turn, until you emit the completion promise or hit `--max-iterations`. This subsection is the authoritative checklist; the prose in the rest of "Native Looping" describes the framework, this section tells you what to do.
+
+#### For every iteration, in order
+
+1. **Boundary check.** Read `.synthex/loops/<loop-id>.json`. If `status != "running"`, exit immediately with `Loop "<loop-id>" is <status> — nothing to do.`. If `iteration >= max_iterations`, set `status: "max-iterations-reached"`, `exit_reason: "Reached max_iterations=<N> without completion promise"`, `exited_at`, write atomically, print the resume hint, exit.
+2. **Increment + persist counter** **before** any iteration work. Atomic write to `.synthex/loops/<loop-id>.json.tmp.<pid>` then `mv -f` over the real path.
+3. **Print iteration marker** on its own line: `[loop <loop-id> iteration <N>/<max>]` (visibility for the user — survives auto-compaction).
+4. **Execute Workflow §1–§9 below in full.** Use the implementation plan, worktrees, Tech Lead delegation, validation gates — the entire body of this command runs **once per iteration**.
+5. **Decide the iteration's exit.** At the END of the iteration's final assistant message you MUST do exactly one of:
+   - **(A) Emit the promise** — `<promise>{completion_promise}</promise>` on its OWN line, only when the Emission Point conditions below hold. Set `status: "completed"`, `exit_reason: "completion-promise-emitted"`, `exited_at`, write state, exit.
+   - **(B) Re-enter step 1 above immediately in the same turn.** This is the default. Do NOT end your turn with text like "## Iteration N — Complete", "Next-iteration candidates", "re-fire this command to continue", or any other invitation to the user to manually re-trigger. Ending the turn ends the loop.
+6. **Cancellation check** before re-entering: re-read the state file. If another session set `status: "cancelled"` via `/synthex:cancel-loop`, exit immediately.
+
+#### State-file schema (v1) — inline reference
+
+Write the state file with exactly these fields. The `status` enum is closed — do NOT invent values like `"loop_exhausted_no_promise"` or `"in_flight"`.
+
+```json
+{
+  "schema_version": 1,
+  "loop_id": "next-priority-<4-char-hex>",
+  "session_id": "<Claude Code session id, or null>",
+  "command": "/synthex:next-priority",
+  "args": "<CLI args, verbatim>",
+  "prompt_file": null,
+  "completion_promise": "<value of --completion-promise>",
+  "max_iterations": <int, default 20, max 200>,
+  "iteration": <int, 0 on creation>,
+  "isolation": "shared-context",
+  "status": "running",
+  "started_at": "<UTC ISO 8601>",
+  "last_updated": "<UTC ISO 8601>",
+  "exited_at": null,
+  "exit_reason": null
+}
+```
+
+`status ∈ {"running","completed","cancelled","max-iterations-reached","crashed"}` — exactly these five values, lowercase, hyphenated. See [`state`](../docs/native-looping.md#state) for full field-by-field semantics.
+
+#### What ends the loop (only these)
+
+- You emit `<promise>{completion_promise}</promise>` on its own line in the iteration's final response (Emission Point conditions met).
+- `iteration >= max_iterations` after increment.
+- Another session sets `status: "cancelled"` via `/synthex:cancel-loop <loop-id>` or `/synthex:cancel-loop --all`.
+
+Nothing else ends the loop. In particular, **ending your assistant turn without doing one of the above silently breaks the loop and forces the user to re-fire manually.** That is the primary failure mode this section exists to prevent.
+
 ### Emission Point
 
 Emit `<promise>{completion_promise}</promise>` (literal text from `--completion-promise`) in the iteration's final response when ANY of the following hold:
@@ -226,6 +277,17 @@ Emit `<promise>{completion_promise}</promise>` (literal text from `--completion-
 - `exit_on_milestone_complete` is `true` AND every task in the current milestone is `done` (matches the existing Ralph Loop Integration's milestone-boundary exit).
 
 Do NOT emit the promise when no actionable tasks were picked up THIS iteration but unfinished work remains (e.g., `[H]` reviews pending, blocked tasks). The next iteration will pick up newly-unblocked work — emitting the promise would falsely terminate the loop. This rule is identical to the existing Ralph Loop Integration's "No actionable tasks this iteration" guard.
+
+#### Anti-pattern — never write the `<promise>` tag in prose
+
+The promise tag is a **control signal**, not a discussion topic. Never write the literal string `<promise>` in:
+
+- narrative text ("we should consider signalling `<promise>ALLDONE</promise>` next iteration"),
+- table cells, status summaries, or "what I might do next" suggestions,
+- thinking text or intermediate (non-final) responses,
+- code fences or quoted examples *unless* you replace the tag characters (e.g., `&lt;promise&gt;`) so the literal regex cannot match.
+
+The framework scans the iteration's final response with the literal regex `<promise>\s*<completion_promise_text>\s*</promise>` (see [`promise-emission`](../docs/native-looping.md#promise-emission)). Any in-prose reference is a landmine: depending on whitespace and quoting, the scan may or may not match, leading to **silent loop termination** mid-discussion or, worse, a contaminated state on the next iteration. If you need to refer to the tag conversationally, call it "the completion promise" — never the tag itself.
 
 ### Iteration Body
 

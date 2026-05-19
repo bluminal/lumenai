@@ -84,7 +84,7 @@ Follow [`shared-iter`](../docs/native-looping.md#shared-iter) (shared-context, d
    - **Fresh-subagent (`isolation == "subagent"`)**: spawn a sub-agent via the Agent (Task) tool with the prompt content plus the `[loop iteration N/M]` framing. Wait for its final response. The sub-agent's output becomes this iteration's output.
 5. **Promise detection.** Scan the iteration's final response for the literal regex `<promise>\s*<completion_promise_text>\s*</promise>` (where `<completion_promise_text>` is the persisted value). If matched: set `status: "completed"`, `exit_reason: "completion-promise-emitted"`, `exited_at` to now, write state, print `Loop "<loop-id>" completed at iteration <N>/<max>.`, exit. See [`promise-emission`](../docs/native-looping.md#promise-emission).
 6. **Cancellation check.** Re-read the state file. If another session set `status: "cancelled"` (via `/synthex:cancel-loop`), exit immediately with `Loop "<loop-id>" cancelled.`.
-7. **Loop back to step 1.**
+7. **Loop back to step 1 — in the SAME assistant turn.** This loop is self-driven; the harness does NOT re-invoke you between iterations. Do NOT end your turn with a "## Iteration N — Complete / ready for next iteration" summary and wait for the user to re-fire. Ending your turn ends the loop. Re-enter step 1 inline.
 
 ### 5. Compaction-loss recovery (FR-NL25)
 
@@ -105,6 +105,9 @@ See [`precedence`](../docs/native-looping.md#precedence) for the full rule.
 - **Do NOT accumulate iteration state in the conversation.** All state lives in `.synthex/loops/<loop-id>.json`. The conversation may be auto-compacted at any time.
 - **Do NOT cache the state-file path as a literal string in the conversation.** Always re-derive from the loop-id.
 - **Do NOT emit `<promise>...</promise>` in thinking text or intermediate responses.** Emit only in the iteration's final response, only when you intend to terminate the loop.
+- **Do NOT write the literal `<promise>` tag in prose, table cells, or "what I might do next" suggestions.** The promise is a control signal, not a discussion topic. The scan regex `<promise>\s*<completion_promise_text>\s*</promise>` does not distinguish narrative from intent — an in-prose mention can either terminate the loop accidentally or contaminate the next iteration. If you need to refer to it conversationally, call it "the completion promise"; if you must include the literal characters in a code fence or example, escape the angle brackets (`&lt;promise&gt;`) so the regex cannot match.
+- **Do NOT end your assistant turn between iterations.** Step 7 above re-enters step 1 in the SAME turn. Closing the turn with a per-iteration summary and waiting for the user to re-fire silently breaks the loop — this is the single most common loop-breakdown pattern.
+- **Do NOT invent state-file fields or status values.** The schema in §3 is authoritative; `status` is a closed enum (`running`, `completed`, `cancelled`, `max-iterations-reached`, `crashed`). New status values like `"loop_exhausted_no_promise"` will cause `--resume` to refuse and break observability tools.
 - **Do NOT modify `.claude/ralph-loop.local.md`.** It is owned by the external `ralph-loop` plugin.
 - **Do NOT pass `--prompt` or `--prompt-file` alongside `--resume*`.** Resume re-uses persisted args.
 
