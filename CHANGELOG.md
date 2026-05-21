@@ -5,6 +5,12 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 0.9.7 / synthex-plus 0.5.7] - 2026-05-21
+
+### Fixed
+
+- (synthex) register all role + utility agents in plugin.json
+
 ## [synthex 0.9.6 / synthex-plus 0.5.6] - 2026-05-19
 
 ### Fixed
