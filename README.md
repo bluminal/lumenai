@@ -116,7 +116,7 @@ See [`docs/specs/multi-model-review/architecture.md`](docs/specs/multi-model-rev
 
 ## Native Looping
 
-Synthex 0.8+ ships a native `--loop` flag on iteration-friendly commands (`next-priority`, `write-implementation-plan`, `refine-requirements`, `review-code`, and all four Synthex+ team commands), plus a generic `/synthex:loop` for arbitrary prompts. Loops iterate in the same agent thread by default (auto-compaction handles the context window) and persist per-session state at `.synthex/loops/<loop-id>.json` for resume across sessions. Coexists with the official `ralph-loop` plugin. See [`plugins/synthex/docs/native-looping.md`](plugins/synthex/docs/native-looping.md) for the full framework spec.
+Synthex 0.8+ ships a native `--loop` flag on iteration-friendly commands (`next-priority`, `write-implementation-plan`, `refine-requirements`, `review-code`, and all four Synthex+ team commands), plus a generic `/synthex:loop` for arbitrary prompts. Loops iterate in the same agent thread by default (auto-compaction handles the context window) and persist per-session state at `.synthex/loops/<loop-id>.json` for resume across sessions. See [`plugins/synthex/docs/native-looping.md`](plugins/synthex/docs/native-looping.md) for the full framework spec.
 
 ## Automated Testing
 

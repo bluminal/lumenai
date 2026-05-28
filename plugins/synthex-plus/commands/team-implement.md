@@ -12,7 +12,7 @@ Teams provide sustained multi-agent collaboration where teammates share a task l
 | `template` | Team composition template to use | Value from config `teams.default_implementation_template`, falling back to `implementation` | No |
 | `milestone` | Specific milestone to execute (e.g., "2.1") | Current incomplete milestone (first milestone with pending tasks) | No |
 | `config_path` | Path to Synthex+ configuration | `.synthex-plus/config.yaml` | No |
-| `exit_on_milestone_complete` | When running in a Ralph Loop, output the completion signal after finishing the target milestone even if later milestones remain. Useful for inserting a checkpoint between milestones. | `false` | No |
+| `exit_on_milestone_complete` | When running under `--loop`, emit the completion promise after finishing the target milestone even if later milestones remain. Useful for inserting a checkpoint between milestones. | `false` | No |
 | `--loop` | Enable native looping (FR-NL1/FR-NL2). When set, the command iterates per the "Native Looping" section below until the completion promise is emitted or `--max-iterations` is reached. | off | No |
 | `--completion-promise <string>` | Promise text the agent emits as `<promise>X</promise>` to terminate the loop. | — | Required with `--loop` (unless `--resume*`) |
 | `--max-iterations <int>` | Iteration cap (FR-NL13). Hard ceiling 200. | `20` | No |
@@ -53,8 +53,8 @@ Read the implementation plan at `@{implementation_plan_path}`.
 **Identify the target milestone:**
 - If the `milestone` parameter was provided, locate that specific milestone (e.g., "2.1" matches "Milestone 2.1")
 - If no milestone was specified, find the **current incomplete milestone** — the first milestone that has at least one task with status `pending` or `in progress`
-- If every task across all milestones has status `done`, check for an active Ralph Loop (see Ralph Loop Integration below). If inside a loop with a `completion_promise`, output `<promise>{completion_promise}</promise>` (literal XML tags — the stop hook requires them). Then inform the user: "All milestones in the implementation plan are complete. No work to execute."
-  - **Important:** If non-`done` tasks exist in any milestone (including tasks awaiting `[H]` user approval, blocked tasks, or tasks the command chose not to pick up), do **NOT** output the `<promise>` tag. The Ralph Loop will re-invoke the command on the next iteration — the user may be completing manual tasks or `[H]` reviews in a separate thread.
+- If every task across all milestones has status `done`, inform the user: "All milestones in the implementation plan are complete. No work to execute." When running under `--loop`, this is the primary emission condition — emit the completion promise per the Native Looping → Emission Point section below.
+  - **Important:** If non-`done` tasks exist in any milestone (including tasks awaiting `[H]` user approval, blocked tasks, or tasks the command chose not to pick up), do **NOT** emit the `<promise>` tag. Under `--loop`, the next iteration re-runs the workflow — the user may be completing manual tasks or `[H]` reviews in a separate thread.
 
 **Extract milestone tasks:**
 - Parse all tasks in the target milestone, capturing: task number, description, complexity, dependencies, status
@@ -553,10 +553,10 @@ Before initiating shutdown, the lead:
 
 The completion report is the final output of the entire `team-implement` invocation. It is displayed to the user before any shutdown actions begin.
 
-After producing the completion report, check the Ralph Loop exit conditions (see Ralph Loop Integration below). If inside an active loop with a `completion_promise`:
+After producing the completion report, if running under `--loop`, check the Native Looping → Emission Point conditions:
 
-1. If every task across all milestones now has status `done`, output `<promise>{completion_promise}</promise>` (literal XML tags required).
-2. Otherwise, if `exit_on_milestone_complete` is `true` and all tasks in the **target milestone** are now `done`, output `<promise>{completion_promise}</promise>`.
+1. If every task across all milestones now has status `done`, emit `<promise>{completion_promise}</promise>` (literal XML tags required).
+2. Otherwise, if `exit_on_milestone_complete` is `true` and all tasks in the **target milestone** are now `done`, emit `<promise>{completion_promise}</promise>`.
 
 If neither condition is met, the loop continues — the next iteration will pick up the next incomplete milestone.
 
@@ -669,74 +669,17 @@ A lightweight tracking file mechanism detects teams that were not cleaned up fro
 - If `.synthex-plus/.active-team` exists AND `~/.claude/teams/{recorded-team-name}/config.json` also exists — the previous session's team was not cleaned up. Report it as an orphan (handled by Step 3c's orphan detection).
 - If `.synthex-plus/.active-team` exists but the team metadata directory is gone — the team was cleaned up externally but the tracking file was not removed. Silently delete the stale tracking file and continue.
 
-## Ralph Loop Integration
-
-This command can run inside a [Ralph Loop](https://github.com/anthropics/claude-plugins-official/tree/main/ralph-loop) — an iterative execution loop that re-invokes the same prompt until work is done. Each iteration, the command sees the updated implementation plan from the previous iteration and picks up where it left off. This is the primary way to execute an entire multi-milestone plan autonomously — each iteration completes one milestone, the loop advances to the next.
-
-### Detection
-
-Check whether the file `.claude/ralph-loop.local.md` exists in the project root. If it exists, read its YAML frontmatter to extract:
-
-- `active` — whether a loop is currently running
-- `completion_promise` — the text to echo back when work is complete (may be `null`)
-
-The command is inside an active Ralph Loop when the file exists **and** `active` is `true`.
-
-### Completion Signal
-
-When running inside an active Ralph Loop with a non-null `completion_promise`, you **must** output the completion promise wrapped in literal `<promise>` and `</promise>` XML tags. The stop hook uses regex to detect these exact tags — outputting the promise text without the tags will NOT stop the loop.
-
-**Format — you must output this exactly:**
-
-```xml
-<promise>{completion_promise}</promise>
-```
-
-Where `{completion_promise}` is replaced with the value read from the state file.
-
-**Example:** If `completion_promise` is `PLAN COMPLETE`, you must output:
-
-```
-<promise>PLAN COMPLETE</promise>
-```
-
-**Wrong** (will not stop the loop):
-```
-PLAN COMPLETE
-```
-
-The `<promise>` tag must appear in your response text. Output it **before** the human-readable completion message so the hook detects it even if the response is truncated.
-
-### When to Signal
-
-The completion signal is output **only** under these conditions:
-
-1. **Entire plan complete:** Every task across all milestones has status `done`. This is the primary exit condition. Tasks with **any** non-done status — `pending`, `in progress`, `blocked`, or awaiting `[H]` user approval — prevent the signal. The loop continues so the user can finish manual tasks or `[H]` reviews in a separate thread; the next iteration will pick up the next incomplete milestone or newly-unblocked work.
-
-2. **Milestone boundary exit (opt-in):** If `exit_on_milestone_complete` is `true` and all tasks in the **target milestone** are `done`, the signal fires even if later milestones have remaining work. Use this when you want a checkpoint between milestones (e.g., to review progress, adjust the plan, or switch contexts).
-
-**Important:** The signal must never fire simply because the command found no actionable tasks or no incomplete milestones to target this iteration. A plan with pending `[H]` tasks, blocked tasks, or tasks the command chose not to pick up is **not complete** — it is waiting for external progress.
-
-### When NOT inside a Ralph Loop
-
-If `.claude/ralph-loop.local.md` does not exist, or `active` is `false`, or `completion_promise` is `null`, skip the promise tag entirely. The command behaves identically to its non-loop behavior.
-
-### `--loop` precedence (FR-NL44)
-
-Synthex 0.7+ adds a native `--loop` flag that takes precedence over Ralph Loop Integration when both are configured. If `--loop` is passed AND `.claude/ralph-loop.local.md` is `active: true`, the team command iterates natively (per the "Native Looping" section below) and prints a one-line advisory noting Ralph's state file is unchanged. See [`precedence`](../../synthex/docs/native-looping.md#precedence) and the Native Looping section below for the full rule. Users on Ralph Loop only (no `--loop`) see no behavior change.
-
-
 ## Native Looping
 
 This command supports the native Synthex looping primitive (introduced by `docs/plans/native-looping.md`). Pass `--loop` to iterate the entire team-command workflow until the completion promise is emitted or `--max-iterations` is reached. The mechanical iteration framework — state file schema, loop-id rules, shared-context vs. fresh-subagent iteration, auto-compaction guarantees, promise emission, iteration markers — lives once in [`plugins/synthex/docs/native-looping.md`](../../synthex/docs/native-looping.md). Only the command-specific bits are inlined below.
 
 ### Emission Point
 
-Emit `<promise>{completion_promise}</promise>` (literal text from `--completion-promise`) in the Pool Lead's consolidated final response when the team has completed all assigned tasks across the implementation plan (same emission point as the existing Ralph Loop Integration). Specifically: every task across all milestones and phases has status `done`, OR (when `exit_on_milestone_complete` is true) every task in the current milestone is `done`.
+Emit `<promise>{completion_promise}</promise>` (literal text from `--completion-promise`) in the Pool Lead's consolidated final response when the team has completed all assigned tasks across the implementation plan. Specifically: every task across all milestones and phases has status `done`, OR (when `exit_on_milestone_complete` is true) every task in the current milestone is `done`.
 
 Do NOT emit the promise while teammates have in-flight work, or when newly-unblocked work would surface in the next iteration. The lead's final report is the canonical termination signal.
 
-**Lead-output-only promise scan (E7).** The outer loop scans **only the Pool Lead's consolidated output** (the same emission point as the existing Ralph Loop Integration where applicable). Transient teammate outputs — individual reviewer findings, intermediate worker reports, mid-cycle status updates — are **not** promise sources. A teammate emitting `<promise>X</promise>` in their own report does NOT terminate the loop; only the lead's final consolidated artifact carries the canonical termination signal.
+**Lead-output-only promise scan (E7).** The outer loop scans **only the Pool Lead's consolidated output**. Transient teammate outputs — individual reviewer findings, intermediate worker reports, mid-cycle status updates — are **not** promise sources. A teammate emitting `<promise>X</promise>` in their own report does NOT terminate the loop; only the lead's final consolidated artifact carries the canonical termination signal.
 
 ### Iteration Body
 
@@ -745,16 +688,6 @@ When `--loop` is set, this team command's existing workflow (above) runs once pe
 **Team lifecycle independence (FR-NL35).** `--loop` does NOT change this command's team lifecycle. Each iteration MAY reuse or tear down the team per the command's existing semantics — the outer loop simply re-invokes the workflow at the boundary; team-spawn / team-shutdown behavior is governed by the workflow itself, not by the loop. Pool reuse across iterations is the default for performance; an isolated iteration via `--loop-isolated` still uses the same on-disk team artifacts (filesystem-level state is shared even when the conversation is not — see [E14](../../../docs/plans/native-looping.md#edge-cases)).
 
 The iteration marker (`[loop <loop-id> iteration <N>/<max>]`) prints to stdout before each iteration's workflow runs. See [`markers`](../../synthex/docs/native-looping.md#markers).
-
-### Precedence with Ralph Loop
-
-If `--loop` is passed AND `.claude/ralph-loop.local.md` exists with `active: true`, native looping takes precedence per FR-NL44. The command prints a one-line advisory:
-
-```
-Note: --loop overrides Ralph Loop. The ralph-loop plugin's state file is unchanged; cancel the ralph loop separately if you want it gone.
-```
-
-`.claude/ralph-loop.local.md` is NOT mutated by this command. See [`precedence`](../../synthex/docs/native-looping.md#precedence).
 
 ### See Also
 

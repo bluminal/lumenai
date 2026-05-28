@@ -2,11 +2,11 @@
 model: sonnet
 ---
 
-# Loop a prompt natively (no Ralph Loop dependency)
+# Loop a prompt natively
 
-Run an arbitrary prompt iteratively in the same agent thread until the completion promise is emitted or `max_iterations` is reached. State is per-project in `.synthex/loops/<loop-id>.json`. Resumable across sessions. Coexists with the external `ralph-loop` plugin (see Precedence below).
+Run an arbitrary prompt iteratively in the same agent thread until the completion promise is emitted or `max_iterations` is reached. State is per-project in `.synthex/loops/<loop-id>.json`. Resumable across sessions.
 
-The mechanical iteration framework — state-file schema, loop-id rules, shared-context vs. fresh-subagent iteration, auto-compaction guarantees, promise emission, iteration markers, Ralph precedence — is documented once in [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md). This command cross-references that document rather than duplicating the mechanics.
+The mechanical iteration framework — state-file schema, loop-id rules, shared-context vs. fresh-subagent iteration, auto-compaction guarantees, promise emission, iteration markers — is documented once in [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md). This command cross-references that document rather than duplicating the mechanics.
 
 ## Parameters
 
@@ -90,16 +90,6 @@ Follow [`shared-iter`](../docs/native-looping.md#shared-iter) (shared-context, d
 
 If during the loop you cannot recall the loop-id or the state-file path (e.g., the conversation was auto-compacted and the framing line is gone), recover by listing `.synthex/loops/` and choosing the file with `status: "running"` matching this command (`/synthex:loop`). If multiple match, exit with: `Multiple running /synthex:loop loops in this project. Resume explicitly with /synthex:loop --resume <loop-id>.` Do not guess. See [`compaction-safety`](../docs/native-looping.md#compaction-safety).
 
-### 6. Precedence with Ralph Loop (FR-NL44)
-
-If `.claude/ralph-loop.local.md` exists with `active: true` at loop start:
-
-- Honor `/synthex:loop` (this command's iteration framework takes precedence).
-- Print the one-line advisory verbatim: `Note: --loop overrides Ralph Loop. The ralph-loop plugin's state file is unchanged; cancel the ralph loop separately if you want it gone.`
-- Do **not** mutate `.claude/ralph-loop.local.md`.
-
-See [`precedence`](../docs/native-looping.md#precedence) for the full rule.
-
 ## Anti-patterns
 
 - **Do NOT accumulate iteration state in the conversation.** All state lives in `.synthex/loops/<loop-id>.json`. The conversation may be auto-compacted at any time.
@@ -108,12 +98,11 @@ See [`precedence`](../docs/native-looping.md#precedence) for the full rule.
 - **Do NOT write the literal `<promise>` tag in prose, table cells, or "what I might do next" suggestions.** The promise is a control signal, not a discussion topic. The scan regex `<promise>\s*<completion_promise_text>\s*</promise>` does not distinguish narrative from intent — an in-prose mention can either terminate the loop accidentally or contaminate the next iteration. If you need to refer to it conversationally, call it "the completion promise"; if you must include the literal characters in a code fence or example, escape the angle brackets (`&lt;promise&gt;`) so the regex cannot match.
 - **Do NOT end your assistant turn between iterations.** Step 7 above re-enters step 1 in the SAME turn. Closing the turn with a per-iteration summary and waiting for the user to re-fire silently breaks the loop — this is the single most common loop-breakdown pattern.
 - **Do NOT invent state-file fields or status values.** The schema in §3 is authoritative; `status` is a closed enum (`running`, `completed`, `cancelled`, `max-iterations-reached`, `crashed`). New status values like `"loop_exhausted_no_promise"` will cause `--resume` to refuse and break observability tools.
-- **Do NOT modify `.claude/ralph-loop.local.md`.** It is owned by the external `ralph-loop` plugin.
 - **Do NOT pass `--prompt` or `--prompt-file` alongside `--resume*`.** Resume re-uses persisted args.
 
 ## See also
 
-- [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md) — full iteration framework spec (state schema, loop-id rules, iteration mechanics, compaction safety, promise convention, markers, Ralph precedence).
+- [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md) — full iteration framework spec (state schema, loop-id rules, iteration mechanics, compaction safety, promise convention, markers).
 - `/synthex:list-loops` — enumerate running and recent loops in this project.
 - `/synthex:cancel-loop <loop-id>` / `--all` — cancel one or all running loops.
 - Plan: `docs/plans/native-looping.md` (Task 4, FR-NL4–FR-NL45).

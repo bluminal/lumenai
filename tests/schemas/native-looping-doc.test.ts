@@ -4,8 +4,8 @@
  *
  * Task 32 acceptance criteria:
  *   - file exists and renders as valid markdown
- *   - contains all 8 cross-reference anchor IDs (state, loop-id, shared-iter,
- *     subagent-iter, compaction-safety, promise-emission, markers, precedence)
+ *   - contains all 7 cross-reference anchor IDs (state, loop-id, shared-iter,
+ *     subagent-iter, compaction-safety, promise-emission, markers)
  *   - Archive section present (Task 12 spec)
  *
  * Plan: docs/plans/native-looping.md Tasks 1, 12, 32.
@@ -27,7 +27,7 @@ const DOC_PATH = join(
   'native-looping.md'
 );
 
-const EIGHT_ANCHORS = [
+const SEVEN_ANCHORS = [
   'state',
   'loop-id',
   'shared-iter',
@@ -35,7 +35,6 @@ const EIGHT_ANCHORS = [
   'compaction-safety',
   'promise-emission',
   'markers',
-  'precedence',
 ];
 
 describe('native-looping.md framework spec — Task 32 structural validation', () => {
@@ -50,17 +49,17 @@ describe('native-looping.md framework spec — Task 32 structural validation', (
       expect(content).toMatch(/^# Native Synthex Looping — Framework Specification/m);
     });
 
-    it('lists the eight cross-reference anchors in the table', () => {
-      // The "Eight cross-reference anchors" section is the canonical anchor table.
-      expect(content).toMatch(/## Eight cross-reference anchors/);
-      for (const anchor of EIGHT_ANCHORS) {
+    it('lists the seven cross-reference anchors in the table', () => {
+      // The "Seven cross-reference anchors" section is the canonical anchor table.
+      expect(content).toMatch(/## Seven cross-reference anchors/);
+      for (const anchor of SEVEN_ANCHORS) {
         expect(content).toContain(`\`${anchor}\``);
       }
     });
   });
 
   describe('Anchor IDs (HTML <a id> spans)', () => {
-    it.each(EIGHT_ANCHORS)('anchor "%s" exists as <a id="%s">', (anchor) => {
+    it.each(SEVEN_ANCHORS)('anchor "%s" exists as <a id="%s">', (anchor) => {
       expect(content).toContain(`<a id="${anchor}">`);
     });
   });
@@ -93,10 +92,6 @@ describe('native-looping.md framework spec — Task 32 structural validation', (
     it('markers section heading present', () => {
       expect(content).toMatch(/##\s*<a id="markers"><\/a>\s*Iteration markers/);
     });
-
-    it('precedence section heading present', () => {
-      expect(content).toMatch(/##\s*<a id="precedence"><\/a>\s*Precedence with the official Ralph Loop plugin/);
-    });
   });
 
   describe('Archive section (Task 12)', () => {
@@ -121,7 +116,7 @@ describe('native-looping.md framework spec — Task 32 structural validation', (
   describe('FR / D references', () => {
     it('references at least some FR-NL identifiers in cross-references', () => {
       // The framework doc references FR-NL identifiers in passing (e.g., FR-NL11 in
-      // the loop-id rationale, FR-NL44 in the precedence section). Assert the doc
+      // the loop-id rationale, FR-NL8 in the state section). Assert the doc
       // contains AT LEAST 3 FR-NL references — exact count varies as the doc evolves.
       const matches = content.match(/FR-NL\d+/g) || [];
       expect(matches.length).toBeGreaterThanOrEqual(3);

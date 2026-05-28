@@ -14,7 +14,7 @@ Automatically identify and execute the next highest-priority tasks from the impl
 |-----------|-------------|---------|----------|
 | `implementation_plan_path` | Path to the implementation plan markdown file | `docs/plans/main.md` | No |
 | `concurrent_tasks` | Number of parallel tasks to work on simultaneously | Value from `next_priority.concurrent_tasks` config, or `3` | No |
-| `exit_on_milestone_complete` | When running in a Ralph Loop, output the completion signal after finishing a milestone even if later milestones remain. Useful for inserting a checkpoint between milestones. | `false` | No |
+| `exit_on_milestone_complete` | When running under `--loop`, emit the completion promise after finishing a milestone even if later milestones remain. Useful for inserting a checkpoint between milestones. | `false` | No |
 | `--loop` | Enable native looping (FR-NL1/FR-NL2). When set, the command iterates per the "Native Looping" section below until the completion promise is emitted or `--max-iterations` is reached. | off | No |
 | `--completion-promise <string>` | Promise text the agent emits as `<promise>X</promise>` to terminate the loop. | — | Required with `--loop` (unless `--resume*`) |
 | `--max-iterations <int>` | Iteration cap (FR-NL13). Hard ceiling 200. | `20` | No |
@@ -40,9 +40,9 @@ Read `@{implementation_plan_path}` and identify the top `{concurrent_tasks}` mos
 - **Business value** — tasks that deliver the most user-facing value
 - **Current milestone** — stay within the current phase and milestone boundaries
 
-**Plan complete:** If every task in the plan has status `done`, check for an active Ralph Loop (see Ralph Loop Integration below). If inside a loop with a `completion_promise`, output `<promise>{completion_promise}</promise>` (literal XML tags — the stop hook requires them). Then inform the user: "All tasks in the implementation plan are complete. No work to execute."
+**Plan complete:** If every task in the plan has status `done`, inform the user: "All tasks in the implementation plan are complete. No work to execute." When running under `--loop`, this is the primary emission condition — emit the completion promise per [Emission Point](#emission-point) below.
 
-**No actionable tasks this iteration:** If non-`done` tasks exist but none are actionable right now (e.g., all remaining tasks are blocked, awaiting `[H]` user approval, or have unsatisfied dependencies), do **NOT** output the Ralph Loop completion signal. Instead, inform the user which tasks remain and why they are not actionable. The Ralph Loop will re-invoke the command on the next iteration — the user may be completing manual tasks or `[H]` reviews in a separate thread, which will unblock work for the next pass.
+**No actionable tasks this iteration:** If non-`done` tasks exist but none are actionable right now (e.g., all remaining tasks are blocked, awaiting `[H]` user approval, or have unsatisfied dependencies), do **NOT** emit the completion promise. Instead, inform the user which tasks remain and why they are not actionable. Under `--loop`, the next iteration re-runs the workflow — the user may be completing manual tasks or `[H]` reviews in a separate thread, which will unblock work for the next pass.
 
 **Critical Rule:** Only select tasks that are truly independent for parallel execution. Tasks with dependencies on each other MUST be sequenced — they cannot run in parallel.
 
@@ -152,69 +152,12 @@ Mark completed tasks as "done" in the implementation plan with:
 
 Update `@CLAUDE.md` with any build/test optimization insights discovered.
 
-After updating the plan, check the Ralph Loop exit conditions (see Ralph Loop Integration below). If inside an active loop with a `completion_promise`:
+After updating the plan, if running under `--loop`, check the [Emission Point](#emission-point) conditions:
 
-1. If every task across all milestones and phases now has status `done`, output `<promise>{completion_promise}</promise>` (literal XML tags required).
-2. Otherwise, if `exit_on_milestone_complete` is `true` and all tasks in the **current milestone** are now `done`, output `<promise>{completion_promise}</promise>`.
+1. If every task across all milestones and phases now has status `done`, emit `<promise>{completion_promise}</promise>` (literal XML tags required).
+2. Otherwise, if `exit_on_milestone_complete` is `true` and all tasks in the **current milestone** are now `done`, emit `<promise>{completion_promise}</promise>`.
 
 If neither condition is met, the loop continues on the next iteration.
-
-## Ralph Loop Integration
-
-This command can run inside a [Ralph Loop](https://github.com/anthropics/claude-plugins-official/tree/main/ralph-loop) — an iterative execution loop that re-invokes the same prompt until work is done. Each iteration, the command sees the updated implementation plan from the previous iteration and picks up where it left off.
-
-### Detection
-
-Check whether the file `.claude/ralph-loop.local.md` exists in the project root. If it exists, read its YAML frontmatter to extract:
-
-- `active` — whether a loop is currently running
-- `completion_promise` — the text to echo back when work is complete (may be `null`)
-
-The command is inside an active Ralph Loop when the file exists **and** `active` is `true`.
-
-### Completion Signal
-
-When running inside an active Ralph Loop with a non-null `completion_promise`, you **must** output the completion promise wrapped in literal `<promise>` and `</promise>` XML tags. The stop hook uses regex to detect these exact tags — outputting the promise text without the tags will NOT stop the loop.
-
-**Format — you must output this exactly:**
-
-```xml
-<promise>{completion_promise}</promise>
-```
-
-Where `{completion_promise}` is replaced with the value read from the state file.
-
-**Example:** If `completion_promise` is `PLAN COMPLETE`, you must output:
-
-```
-<promise>PLAN COMPLETE</promise>
-```
-
-**Wrong** (will not stop the loop):
-```
-PLAN COMPLETE
-```
-
-The `<promise>` tag must appear in your response text. Output it **before** the human-readable completion message so the hook detects it even if the response is truncated.
-
-### When to Signal
-
-The completion signal is output **only** under these conditions:
-
-1. **Entire plan complete:** Every task across all milestones has status `done`. This is the primary exit condition. Tasks with **any** non-done status — `pending`, `in progress`, `blocked`, or awaiting `[H]` user approval — prevent the signal. The loop continues so the user can finish manual tasks or `[H]` reviews in a separate thread; the next iteration will pick up newly-unblocked work.
-
-2. **Milestone boundary exit (opt-in):** If `exit_on_milestone_complete` is `true` and all tasks in the **current milestone** are `done`, the signal fires even if later milestones have remaining work. Use this when you want a checkpoint between milestones (e.g., to review progress, adjust the plan, or switch contexts).
-
-**Important:** The signal must never fire simply because the command found no actionable tasks this iteration. A plan with pending `[H]` tasks, blocked tasks, or tasks the command chose not to pick up is **not complete** — it is waiting for external progress.
-
-### When NOT inside a Ralph Loop
-
-If `.claude/ralph-loop.local.md` does not exist, or `active` is `false`, or `completion_promise` is `null`, skip the promise tag entirely. The command behaves identically to its non-loop behavior.
-
-### `--loop` precedence (FR-NL44)
-
-Synthex 0.7+ adds a native `--loop` flag that takes precedence over Ralph Loop Integration when both are configured. If `--loop` is passed AND `.claude/ralph-loop.local.md` is `active: true`, the command iterates natively (per the "Native Looping" section below) and prints a one-line advisory noting Ralph's state file is unchanged. See [`precedence`](../docs/native-looping.md#precedence) and the Native Looping section below for the full rule. Users on Ralph Loop only (no `--loop`) see no behavior change.
-
 
 ## Native Looping
 
@@ -273,10 +216,10 @@ Nothing else ends the loop. In particular, **ending your assistant turn without 
 
 Emit `<promise>{completion_promise}</promise>` (literal text from `--completion-promise`) in the iteration's final response when ANY of the following hold:
 
-- Every task across all milestones and phases of the implementation plan has status `done` (matches the existing Ralph Loop Integration's primary exit condition).
-- `exit_on_milestone_complete` is `true` AND every task in the current milestone is `done` (matches the existing Ralph Loop Integration's milestone-boundary exit).
+- Every task across all milestones and phases of the implementation plan has status `done`. This is the primary exit condition.
+- `exit_on_milestone_complete` is `true` AND every task in the current milestone is `done` (milestone-boundary exit).
 
-Do NOT emit the promise when no actionable tasks were picked up THIS iteration but unfinished work remains (e.g., `[H]` reviews pending, blocked tasks). The next iteration will pick up newly-unblocked work — emitting the promise would falsely terminate the loop. This rule is identical to the existing Ralph Loop Integration's "No actionable tasks this iteration" guard.
+Do NOT emit the promise when no actionable tasks were picked up THIS iteration but unfinished work remains (e.g., `[H]` reviews pending, blocked tasks). The next iteration will pick up newly-unblocked work — emitting the promise would falsely terminate the loop.
 
 #### Anti-pattern — never write the `<promise>` tag in prose
 
@@ -294,16 +237,6 @@ The framework scans the iteration's final response with the literal regex `<prom
 When `--loop` is set, this command's existing workflow runs once per iteration. The agent follows the iteration loop body documented at [`shared-iter`](../docs/native-looping.md#shared-iter) by default (D-NL1 shared-context), or [`subagent-iter`](../docs/native-looping.md#subagent-iter) when `--loop-isolated` is passed: boundary check → increment counter → print marker → execute workflow → scan for promise → cancellation check → loop. State lives in `.synthex/loops/<loop-id>.json` per [FR-NL8](../docs/native-looping.md#state). Auto-compaction is safe because iteration state and work output both live on disk (FR-NL16, FR-NL17, FR-NL24).
 
 The iteration marker (`[loop <loop-id> iteration <N>/<max>]`) prints to stdout before each iteration's workflow runs. See [`markers`](../docs/native-looping.md#markers).
-
-### Precedence with Ralph Loop
-
-If `--loop` is passed AND `.claude/ralph-loop.local.md` exists with `active: true`, native looping takes precedence per FR-NL44. The command prints a one-line advisory:
-
-```
-Note: --loop overrides Ralph Loop. The ralph-loop plugin's state file is unchanged; cancel the ralph loop separately if you want it gone.
-```
-
-`.claude/ralph-loop.local.md` is NOT mutated by this command. See [`precedence`](../docs/native-looping.md#precedence).
 
 ### See Also
 

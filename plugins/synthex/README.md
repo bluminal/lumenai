@@ -137,42 +137,6 @@ See [`config/defaults.yaml`](config/defaults.yaml) for the full reference. Key s
 | `documents.implementation_plan` | `docs/plans/main.md` | Default plan path |
 | `documents.specs` | `docs/specs` | Specs directory |
 
-## Ralph Loop Integration
-
-The `next-priority` command supports running inside a [Ralph Loop](https://github.com/anthropics/claude-plugins-official/tree/main/ralph-loop) for fully autonomous plan execution. Each loop iteration completes a batch of tasks within the current milestone, and the next iteration picks up where it left off — advancing through milestones until the entire plan is done.
-
-### Basic Usage
-
-```bash
-# Execute the full plan autonomously — loop stops when every task is done
-/ralph-loop:ralph-loop "/synthex:next-priority" --completion-promise "PLAN COMPLETE"
-
-# Target a specific plan
-/ralph-loop:ralph-loop "/synthex:next-priority implementation_plan_path='docs/plans/mobile-v2.md'" \
-  --completion-promise "PLAN COMPLETE"
-```
-
-### Milestone Checkpoints
-
-By default, the loop continues across milestone boundaries. To stop at each milestone for review:
-
-```bash
-/ralph-loop:ralph-loop "/synthex:next-priority exit_on_milestone_complete=true" \
-  --completion-promise "MILESTONE DONE"
-```
-
-### How It Works
-
-- The command checks `.claude/ralph-loop.local.md` to detect whether it's running inside a loop and reads the configured `completion_promise`.
-- The completion signal (`<promise>...</promise>`) is output **only** when every task in the plan has status `done` — or at milestone boundaries when `exit_on_milestone_complete` is `true`.
-- Tasks with any non-done status (pending, in-progress, blocked, awaiting `[H]` user approval) prevent the signal. This means the loop keeps running while you complete manual `[H]` tasks in a separate thread — the next iteration will pick up newly-unblocked work.
-
-### Parameters
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `exit_on_milestone_complete` | Output the completion signal after finishing a milestone, even if later milestones remain | `false` |
-
 ## Native Looping
 
 Synthex 0.8+ ships a **native looping primitive** that iterates a command until a completion promise is emitted or a max-iteration cap is reached — no external plugin required. By default each iteration runs in the same agent thread (shared context, auto-compaction handles the context window); pass `--loop-isolated` to spawn a fresh sub-agent per iteration. Loop state lives in `<project>/.synthex/loops/<loop-id>.json` so two Claude Code sessions on the same project can run independent loops, and a loop can be resumed across sessions via `/synthex:loop --resume <loop-id>` or `--resume-last`.
@@ -192,7 +156,7 @@ Synthex 0.8+ ships a **native looping primitive** that iterates a command until 
 /synthex:cancel-loop my-loop-name
 ```
 
-`--loop` is supported on `next-priority`, `write-implementation-plan`, `refine-requirements`, and `review-code` (plus the four Synthex+ team commands). The flag is opt-in — when absent, every command behaves identically to today. Native looping coexists with the official `ralph-loop` plugin: when both are configured, `--loop` takes precedence and prints a one-line advisory. See [`plugins/synthex/docs/native-looping.md`](./docs/native-looping.md) for the full framework spec, state-file schema, and emission-point details per command.
+`--loop` is supported on `next-priority`, `write-implementation-plan`, `refine-requirements`, and `review-code` (plus the four Synthex+ team commands). The flag is opt-in — when absent, every command behaves identically to today. See [`plugins/synthex/docs/native-looping.md`](./docs/native-looping.md) for the full framework spec, state-file schema, and emission-point details per command.
 
 ## Standing Review Pools (via Synthex+)
 

@@ -119,16 +119,6 @@ describe('/synthex:loop (loop.md) — Task 28 structural validation', () => {
     });
   });
 
-  describe('Ralph Loop precedence (FR-NL44)', () => {
-    it('includes the verbatim advisory line', () => {
-      expect(content).toContain('Note: --loop overrides Ralph Loop');
-    });
-
-    it('states that .claude/ralph-loop.local.md is NOT mutated', () => {
-      expect(content).toMatch(/Do \*\*not\*\* mutate `\.claude\/ralph-loop\.local\.md`/);
-    });
-  });
-
   describe('Anti-patterns documented', () => {
     it('do NOT accumulate iteration state in conversation', () => {
       expect(content).toMatch(/Do NOT accumulate iteration state in the conversation/);

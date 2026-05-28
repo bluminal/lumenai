@@ -499,16 +499,6 @@ When `--loop` is set, this command's existing workflow runs once per iteration. 
 
 The iteration marker (`[loop <loop-id> iteration <N>/<max>]`) prints to stdout before each iteration's workflow runs. See [`markers`](../docs/native-looping.md#markers).
 
-### Precedence with Ralph Loop
-
-If `--loop` is passed AND `.claude/ralph-loop.local.md` exists with `active: true`, native looping takes precedence per FR-NL44. The command prints a one-line advisory:
-
-```
-Note: --loop overrides Ralph Loop. The ralph-loop plugin's state file is unchanged; cancel the ralph loop separately if you want it gone.
-```
-
-`.claude/ralph-loop.local.md` is NOT mutated by this command. See [`precedence`](../docs/native-looping.md#precedence).
-
 ### See Also
 
 - [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md) — full iteration-framework spec.

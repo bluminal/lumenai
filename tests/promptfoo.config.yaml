@@ -809,19 +809,3 @@ tests:
         value: "No loop found"
       - type: icontains
         value: "list-loops"
-
-  - description: "NL-B6: Ralph Loop precedence advisory fires when both are active (FR-NL44)"
-    vars:
-      agent: next-priority
-      input: |
-        Run /synthex:next-priority --loop --completion-promise ALLDONE for a
-        project where .claude/ralph-loop.local.md exists with active: true.
-        Describe what happens — specifically the advisory the command prints
-        and the non-mutation of Ralph's state file per FR-NL44.
-    assert:
-      - type: icontains
-        value: "overrides Ralph Loop"
-      - type: icontains
-        value: "state file is unchanged"
-      - type: not-icontains
-        value: "active: false"

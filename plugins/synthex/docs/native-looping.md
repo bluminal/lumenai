@@ -1,8 +1,8 @@
 # Native Synthex Looping — Framework Specification
 
-This document is the canonical specification for Synthex's native looping primitive (introduced in synthex 0.7.0 / synthex-plus 0.4.0 per `docs/plans/native-looping.md`). Every command that accepts a `--loop` flag cross-references this doc rather than duplicating the iteration mechanics. Eight section anchors are defined below — keep their IDs stable, as schema tests and other commands link to them.
+This document is the canonical specification for Synthex's native looping primitive (introduced in synthex 0.7.0 / synthex-plus 0.4.0 per `docs/plans/native-looping.md`). Every command that accepts a `--loop` flag cross-references this doc rather than duplicating the iteration mechanics. Seven section anchors are defined below — keep their IDs stable, as schema tests and other commands link to them.
 
-## Eight cross-reference anchors
+## Seven cross-reference anchors
 
 | Anchor | Section |
 |--------|---------|
@@ -13,7 +13,6 @@ This document is the canonical specification for Synthex's native looping primit
 | `compaction-safety` | Auto-compaction guarantees |
 | `promise-emission` | Completion-promise convention |
 | `markers` | Iteration markers (stdout visibility) |
-| `precedence` | Precedence with the official Ralph Loop plugin |
 
 When linking from another command's `--loop` instructions, use `plugins/synthex/docs/native-looping.md#<anchor>`.
 
@@ -215,7 +214,7 @@ This handles the edge case where compaction summaries omit the loop-id from the 
 
 ## <a id="promise-emission"></a>Completion-promise convention
 
-The promise format is `<promise>X</promise>` XML tags, **identical to Ralph Loop's convention** (D-NL4). This means commands that already emit the tag for Ralph Loop integration do not need a separate emission point for native looping — the same tag works for both consumers.
+The promise format is `<promise>X</promise>` XML tags (D-NL4). A single emission point per command produces the tag; the loop framework scans for it to decide whether to terminate.
 
 ### Emission rules for the agent
 
@@ -255,35 +254,12 @@ Markers are short by design (D-NL9) so they survive auto-compaction summaries. T
 
 Markers print unconditionally — no `--quiet`, no `--verbose` (Q-NL2 resolved). The cost is one line per iteration; the benefit is visibility into long-running loops.
 
-## <a id="precedence"></a>Precedence with the official Ralph Loop plugin
-
-Synthex's native looping coexists with the official `ralph-loop` plugin. Users on `ralph-loop` continue to use it via the existing Ralph Loop Integration sections in commands. Users on native looping use `--loop` directly.
-
-### When both are active
-
-If `--loop` is passed AND `.claude/ralph-loop.local.md` exists with `active: true`:
-
-- `--loop` takes precedence. The command iterates natively.
-- The command prints a one-line advisory: `Note: --loop overrides Ralph Loop. The ralph-loop plugin's state file is unchanged; cancel the ralph loop separately if you want it gone.`
-- `.claude/ralph-loop.local.md` is **not mutated** by the synthex command.
-
-### When only Ralph is active
-
-If `--loop` is NOT passed AND `.claude/ralph-loop.local.md` exists with `active: true`: the existing Ralph Loop Integration section governs. No behavior change for Ralph users.
-
-### When neither is active
-
-The command runs once (no looping).
-
----
-
 ## Implementation note (for command authors)
 
-When adding `--loop` to a command, the command's "Native Looping" section must include four sub-anchors:
+When adding `--loop` to a command, the command's "Native Looping" section must include three sub-anchors:
 
 1. **Emission Point** — where in this command's workflow the promise tag is emitted. Reference the table above; do not invent a new emission rule.
 2. **Iteration Body** — a brief paragraph noting that the command's existing workflow runs once per iteration. Cross-reference `shared-iter` and `subagent-iter` anchors above.
-3. **Precedence with Ralph Loop** — link to `precedence` anchor above; quote the one-line advisory verbatim.
-4. **See Also** — cross-reference this document and the relevant FR-NL identifiers.
+3. **See Also** — cross-reference this document and the relevant FR-NL identifiers.
 
 Keep "Native Looping" sections concise. The mechanical heft lives in this document; the command body just specifies the per-command emission point.

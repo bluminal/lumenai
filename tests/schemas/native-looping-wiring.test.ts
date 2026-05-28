@@ -48,7 +48,6 @@ const NATIVE_LOOPING_SUB_ANCHORS = [
   '## Native Looping',
   '### Emission Point',
   '### Iteration Body',
-  '### Precedence with Ralph Loop',
   '### See Also',
 ];
 
@@ -68,7 +67,7 @@ describe.each(FR_NL1_COMMANDS)(
       });
     });
 
-    describe('Native Looping section — four sub-anchors', () => {
+    describe('Native Looping section — required headings', () => {
       it.each(NATIVE_LOOPING_SUB_ANCHORS)('contains "%s" heading', (heading) => {
         expect(content).toContain(heading);
       });
@@ -77,16 +76,6 @@ describe.each(FR_NL1_COMMANDS)(
     describe('Cross-reference to native-looping.md', () => {
       it('links to the shared framework spec', () => {
         expect(content).toMatch(/native-looping\.md/);
-      });
-    });
-
-    describe('Ralph Loop precedence (FR-NL44)', () => {
-      it('includes the verbatim advisory line', () => {
-        expect(content).toContain('Note: --loop overrides Ralph Loop');
-      });
-
-      it('explicitly states .claude/ralph-loop.local.md is NOT mutated', () => {
-        expect(content).toMatch(/`\.claude\/ralph-loop\.local\.md` is NOT mutated/);
       });
     });
 
@@ -103,33 +92,3 @@ describe.each(FR_NL1_COMMANDS)(
     }
   }
 );
-
-describe('Commands with existing Ralph Loop Integration — precedence paragraph (D-NL11)', () => {
-  // Only next-priority and team-implement have pre-existing Ralph Loop Integration sections.
-  const RALPH_COMMANDS: CommandSpec[] = [
-    { label: 'next-priority', plugin: 'synthex', filename: 'next-priority.md', isTeam: false },
-    { label: 'team-implement', plugin: 'synthex-plus', filename: 'team-implement.md', isTeam: true },
-  ];
-
-  describe.each(RALPH_COMMANDS)('$plugin/$label', ({ plugin, filename }) => {
-    const cmdPath = join(REPO_ROOT, 'plugins', plugin, 'commands', filename);
-    let content: string;
-
-    beforeAll(() => {
-      content = readFileSync(cmdPath, 'utf-8');
-    });
-
-    it('still has the original "Ralph Loop Integration" section', () => {
-      expect(content).toMatch(/## Ralph Loop Integration/);
-    });
-
-    it('Ralph Loop Integration section gains a precedence paragraph (FR-NL44)', () => {
-      // Specifically the appended subsection within Ralph Loop Integration.
-      expect(content).toMatch(/### `--loop` precedence \(FR-NL44\)/);
-    });
-
-    it('precedence paragraph mentions Synthex 0.7+', () => {
-      expect(content).toMatch(/Synthex 0\.7\+/);
-    });
-  });
-});
