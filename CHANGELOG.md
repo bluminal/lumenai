@@ -5,6 +5,18 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 0.9.8 / synthex-plus 0.5.8] - 2026-05-28
+
+### Fixed
+
+- (synthex) drive --loop via a progress-aware Stop hook (ADR-003)
+
+### Changed
+
+- ignore .synthex/ and .synthex-plus/ per-developer state dirs
+- add PRD for multi-model review on Synthex+ teams + standing pools
+- (synthex) remove Ralph Loop integration in favor of native looping
+
 ## [synthex 0.9.7 / synthex-plus 0.5.7] - 2026-05-21
 
 ### Fixed
