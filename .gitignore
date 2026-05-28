@@ -28,6 +28,10 @@ credentials.*
 # Claude Code local settings
 .claude/settings.local.json
 
+# Synthex per-developer state (config, loops, etc.)
+.synthex/
+.synthex-plus/
+
 # Test cache (LLM output cache for agent testing)
 tests/.cache/
 
