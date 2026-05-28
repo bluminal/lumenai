@@ -687,6 +687,8 @@ When `--loop` is set, this team command's existing workflow (above) runs once pe
 
 **Team lifecycle independence (FR-NL35).** `--loop` does NOT change this command's team lifecycle. Each iteration MAY reuse or tear down the team per the command's existing semantics — the outer loop simply re-invokes the workflow at the boundary; team-spawn / team-shutdown behavior is governed by the workflow itself, not by the loop. Pool reuse across iterations is the default for performance; an isolated iteration via `--loop-isolated` still uses the same on-disk team artifacts (filesystem-level state is shared even when the conversation is not — see [E14](../../../docs/plans/native-looping.md#edge-cases)).
 
+**Turn-per-iteration via the Stop hook (ADR-003).** You do not need to keep the whole loop in one turn. Synthex's [`loop-advance-gate`](../../synthex/scripts/loop-advance-gate.sh) Stop hook re-drives the next iteration whenever the lead session ends a turn while the loop is still `running` and has not emitted the promise — a mid-loop turn-end is recovered, not fatal. The gate scans the lead session's last assistant message (consistent with the E7 lead-output-only rule above), bounds runaway with a progress-aware counter capped below Claude Code's 8-consecutive-block override, and steps aside for a pending `AskUserQuestion`. The only self-inflicted early termination is emitting the promise before the team has finished.
+
 The iteration marker (`[loop <loop-id> iteration <N>/<max>]`) prints to stdout before each iteration's workflow runs. See [`markers`](../../synthex/docs/native-looping.md#markers).
 
 ### See Also

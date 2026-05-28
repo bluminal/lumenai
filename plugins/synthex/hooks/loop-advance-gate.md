@@ -1,20 +1,20 @@
 # Loop Advance Gate (Stop hook)
 
-> Behavioral spec for the Stop hook that prevents silent termination of Synthex `--loop` iterations. This is the runtime backstop for the prompt-side fixes in [`commands/loop.md`](../commands/loop.md) and [`commands/next-priority.md`](../commands/next-priority.md).
+> Behavioral spec for the Stop hook that drives Synthex `--loop` iterations. Synthex looping is **turn-per-iteration** (ADR-003): a `--loop` command does one iteration's work and may end its turn; this hook re-drives the next iteration by returning `decision: "block"`. The hook is the loop **engine**, not a one-shot backstop. It is the runtime counterpart to the prompt-side instructions in [`commands/loop.md`](../commands/loop.md) and [`commands/next-priority.md`](../commands/next-priority.md).
 
 - Shell entry point: `plugins/synthex/scripts/loop-advance-gate.sh`
 - Hook registration: `plugins/synthex/hooks/hooks.json` (event: `Stop`)
-- Config: none — the gate is always on. To disable for a single loop, run `/synthex:cancel-loop <loop-id>`.
+- Config: none — always on. Override the block cap with `SYNTHEX_LOOP_BLOCK_CAP` (default 7). To stop a loop intentionally, emit its completion promise or run `/synthex:cancel-loop <loop-id>`.
 
-The shell shim contains the full enforcement logic (jq + grep). There is no LLM-side review step on Stop — by the time the hook fires, the model has already produced its final message; the gate's job is to either let the turn end or rewind the model with a `decision: "block"` reason.
+The shell shim contains the full enforcement logic (jq + grep). There is no LLM-side review step on Stop — by the time the hook fires, the model has already produced its final message; the gate's job is to either let the turn end or re-invoke the model with a `decision: "block"` reason.
 
 ---
 
 ## Why this hook exists
 
-Without it, a session running `/synthex:next-priority --loop …` or `/synthex:loop …` can end mid-flight if the model finishes one iteration's workflow and ends the turn with text like "## Iteration 1 — Complete / re-fire to continue" rather than re-entering the iteration body inline. The framework is self-driven (the harness does NOT re-invoke between iterations), so any unguarded turn-end **silently breaks the loop** and forces the user to manually re-fire. Forensic analysis of session transcripts over April–May 2026 attributed ≥4 user re-fires across two projects to this single failure mode.
+Synthex's looping is self-paced: the harness does not re-invoke the model between iterations. Without this hook, a session running `/synthex:next-priority --loop …` or `/synthex:loop …` dies the moment the model ends its turn mid-loop — e.g. with a hand-off like "The loop is still running at iteration 15/20. Want me to resume it now?". That is the single most common loop-breakdown pattern, and it cannot be reliably prevented with prose alone because ending the turn to consult the user is one of the model's strongest priors.
 
-The prompt fixes in `commands/*.md` reduce the rate; this hook is the backstop for the residual cases where the model misreads the prompt or context-window pressure overrides the instructions.
+This hook makes the turn-end **recoverable**: it re-drives the next iteration instead of letting the loop silently stall. Per ADR-003, this mirrors how Claude Code's native `/goal` works (a prompt-based Stop hook that keeps the model working across turns), but uses a deterministic shell decision — Synthex already has a crisp completion signal (the `<promise>` tag and the state-file `status`), so no per-turn LLM evaluation is needed.
 
 ---
 
@@ -29,7 +29,7 @@ Input (Claude Code Stop hook contract — JSON on stdin):
 | `session_id` | string | Matching the active loop's `session_id` field |
 | `transcript_path` | string | Reading the last assistant message |
 | `cwd` | string | Locating `.synthex/loops/` |
-| `stop_hook_active` | boolean | Suppressing re-fire (the hook never blocks twice in a row) |
+| `stop_hook_active` | boolean | **Not used.** Reading it to early-exit (the old behavior) yields after one block and silently breaks the loop — the bug ADR-003 fixes. Runaway is bounded by the progress-aware counter below, not by `stop_hook_active`. |
 
 ---
 
@@ -37,50 +37,55 @@ Input (Claude Code Stop hook contract — JSON on stdin):
 
 1. **stdin empty** — caller is not Claude Code; exit 0.
 2. **`jq` not on PATH** — cannot parse safely; exit 0. (Never block on tooling absence.)
-3. **`stop_hook_active == true`** — the gate already fired this turn; exit 0 to avoid an infinite block loop.
+3. **`session_id` missing** — exit 0.
 4. **`.synthex/loops/` does not exist** — no loops in this project; exit 0.
-5. **No state file with `status: "running"` AND `session_id == <hook's session_id>`** — no live loop in this session; exit 0. (Loops from sibling sessions are ignored — they belong to a different process.)
-6. **Transcript file unreadable** — cannot determine the last assistant message; exit 0.
-7. **Last assistant message empty** — nothing to scan; exit 0.
+5. **No state file with `status: "running"` AND `session_id == <hook's session_id>`** — no live loop in this session; exit 0. (Loops from sibling sessions are ignored — they belong to a different process. Note: `--resume` refreshes the loop's `session_id` to the resuming session, so resumed loops stay protected — see [`state`](../docs/native-looping.md#state).)
+6. **Transcript file unreadable** — exit 0.
+7. **Last assistant message has no text and is not an AskUserQuestion** — nothing to evaluate; exit 0.
 
 If any skip condition matches, the gate is silent. No stdout, no warning.
 
 ---
 
-## Allow condition (after skips)
+## Allow conditions (after skips — each exits 0 = allow stop)
 
-Allow the stop (exit 0) if either:
+For the matched running loop, the gate ALLOWS the stop when any of:
 
-- **Iteration marker present:** the last assistant message contains the regex `\[loop <loop_id> iteration [0-9]+/[0-9]+\]` — the model advanced the iteration counter and printed the marker, which means the loop body ran at least once this turn. The next iteration (or terminal exit) will happen on the *next* Stop event, so this turn-end is fine.
-- **Completion promise emitted:** the last assistant message contains the regex `<promise>\s*<completion_promise>\s*</promise>` (literal text from the state file's `completion_promise` field, with regex metacharacters escaped). This is the framework's designed termination signal.
+- **Pending `AskUserQuestion`:** the last assistant turn contains an `AskUserQuestion` tool-use. The model is legitimately awaiting required input (e.g. an `[H]` acceptance criterion) and must not be force-continued. Checked **before** the counter so a human-approval pause never accrues no-progress blocks.
+- **Completion promise emitted:** the last assistant message contains the regex `<promise>\s*<completion_promise>\s*</promise>` (literal text from the state file's `completion_promise`, with regex metacharacters escaped). This is the loop's designed termination signal.
+- **Block cap reached:** the no-progress counter exceeds the Synthex cap (see below). Synthex relinquishes; the loop stays `running` for the user to resume or cancel.
 
-Both checks are done on the concatenated `message.content[*].text` of the most recent transcript entry with `type == "assistant"`.
+(A loop whose `status` is already terminal — `completed`, `cancelled`, `max-iterations-reached`, `crashed` — is never matched in skip condition 5, so the command flipping `status` to terminal at its emission point also releases the gate.)
 
 ---
 
-## Block condition
+## Block condition and the progress-aware counter
 
-If a running loop exists for this session AND neither the iteration marker nor the promise tag is in the last assistant message, the gate writes a `decision: "block"` JSON object to stdout:
+If a running loop exists for this session and none of the allow conditions hold, the gate **blocks** with `decision: "block"` and a `reason` instructing the model to run the next iteration (boundary check → increment + persist the iteration counter → print the marker → run the workflow once → emit the promise only when done). The `reason` explicitly tells the model that ending the turn is safe because the gate re-invokes it.
 
-```json
-{
-  "decision": "block",
-  "reason": "Synthex loop \"<loop_id>\" is status:running but this turn neither advanced the iteration counter (no `[loop <loop_id> iteration N/M]` marker in your last message) nor emitted `<promise><completion_promise></promise>`. The Synthex `--loop` framework is self-driven — re-enter the iteration body in the SAME turn (boundary check → increment + persist counter → print marker → execute workflow → emit promise OR loop back). Do NOT end your turn waiting for the user to re-fire; the harness does not re-invoke you. See plugins/synthex/commands/next-priority.md § \"Imperative Loop Protocol\" or plugins/synthex/commands/loop.md § 4 for the full per-iteration checklist. To stop the loop intentionally, either emit the completion promise on its own line or run `/synthex:cancel-loop <loop_id>`."
-}
-```
+To bound runaway when the model genuinely cannot advance, the gate keeps a **progress-aware counter** in the state file (ADR-003 §3):
 
-The model receives `reason` in its next decoding cycle and re-enters the loop body or emits the promise; the user is not interrupted.
+- `consecutive_stop_blocks` — number of consecutive no-progress stops.
+- `last_gate_iteration` — the loop's `iteration` the last time the gate fired.
 
-`stop_hook_active` is set to `true` by Claude Code after a block, so the gate cannot fire twice in a row on the same turn — if the model still doesn't advance the loop on the second try (e.g., because it deliberately wants to abandon the loop), the stop is allowed and the loop state file remains `running`. The user can clean it up via `/synthex:cancel-loop`.
+On each block decision:
+
+1. If the loop's current `iteration` is **greater** than `last_gate_iteration`, the model made progress since the last gate fire → reset `consecutive_stop_blocks` to `1`.
+2. Otherwise (no progress) → increment `consecutive_stop_blocks`.
+3. Persist `consecutive_stop_blocks`, `last_gate_iteration = iteration`, and `last_updated` via tmp-file + atomic `mv`.
+4. If `consecutive_stop_blocks` exceeds the cap (`SYNTHEX_LOOP_BLOCK_CAP`, default **7**), allow the stop instead of blocking.
+
+The cap is kept strictly **below Claude Code's hard 8-consecutive-block override** (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`, default 8). This means Synthex relinquishes deterministically — and keeps the `[H]` escape and resume protection — rather than being force-stopped by the harness with a warning. A loop whose iterations make real work never accumulates toward the cap, because progress resets the counter every iteration.
 
 ---
 
 ## Edge cases handled
 
-- **macOS lacks `tac`** — the script uses `awk '{a[NR]=$0} END {for (i=NR;i>0;i--) print a[i]}'` to reverse the JSONL file, so it works on both Linux and macOS.
+- **macOS lacks `tac`** — the script reverses the transcript JSONL with `awk '{a[NR]=$0} END {for (i=NR;i>0;i--) print a[i]}'`, so it works on Linux and macOS.
 - **Promise text contains regex metacharacters** — escaped via `sed 's/[.[\*^$()+?{}|\\]/\\&/g'` before grep.
-- **Multiple running loops in one session** — only the first one matched is enforced. If the model needs to advance loop A and emit the promise for loop B in the same turn, both signals can coexist; the gate just needs one of them in the last message for loop A to be satisfied. (Multi-loop per session is rare in practice.)
-- **Stop hook fires after a subagent finishes** — `transcript_path` is the parent transcript, so the subagent's iteration marker (if it printed one) shows up in the parent's tool result block, not in `type == "assistant"` text. This means subagent-isolation loops (`--loop-isolated`) cannot rely on the marker to pass the gate; they should emit the promise or rely on the outer iteration boundary. The gate falls back to its skip conditions in that case.
+- **Multiple running loops in one session** — only the first matched is driven. Rare in practice; if two loops need driving in the same turn, advance one per turn-end.
+- **State-file write failure** — the atomic write is best-effort; on failure the temp file is removed and the gate still emits its decision. A missed counter update at worst delays the cap by one stop.
+- **Stop fires after a subagent finishes** (`--loop-isolated`) — `transcript_path` is the parent transcript, so a subagent's iteration marker shows up in a tool-result block, not in `type == "assistant"` text. Isolated loops should rely on the promise or the iteration counter, not on marker text.
 
 ---
 
@@ -88,7 +93,7 @@ The model receives `reason` in its next decoding cycle and re-enters the loop bo
 
 | Exit code | Meaning | When |
 |-----------|---------|------|
-| 0 (with no stdout) | Allow stop | Any skip condition met, or iteration marker / promise found |
-| 0 (with `{"decision":"block"}` on stdout) | Block stop | Running loop exists, neither marker nor promise present in last assistant message |
+| 0 (no stdout) | Allow stop | Any skip condition; pending AskUserQuestion; promise present; cap exceeded; any internal error (fail-open) |
+| 0 (with `{"decision":"block"}` on stdout) | Block stop, re-invoke | Running loop for this session, unfinished, under the cap |
 
-Non-zero exit codes are reserved — the script always exits 0 even on internal errors, by design (so a buggy hook never wedges the user's session).
+Non-zero exit codes are reserved — the script always exits 0 even on internal errors, by design (a buggy hook must never wedge the user's session).

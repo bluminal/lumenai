@@ -173,9 +173,10 @@ If your invocation includes `--loop`, you are NOT running this command once. You
 2. **Increment + persist counter** **before** any iteration work. Atomic write to `.synthex/loops/<loop-id>.json.tmp.<pid>` then `mv -f` over the real path.
 3. **Print iteration marker** on its own line: `[loop <loop-id> iteration <N>/<max>]` (visibility for the user — survives auto-compaction).
 4. **Execute Workflow §1–§9 below in full.** Use the implementation plan, worktrees, Tech Lead delegation, validation gates — the entire body of this command runs **once per iteration**.
-5. **Decide the iteration's exit.** At the END of the iteration's final assistant message you MUST do exactly one of:
+5. **Decide the iteration's exit.** At the END of the iteration's work, do one of:
    - **(A) Emit the promise** — `<promise>{completion_promise}</promise>` on its OWN line, only when the Emission Point conditions below hold. Set `status: "completed"`, `exit_reason: "completion-promise-emitted"`, `exited_at`, write state, exit.
-   - **(B) Re-enter step 1 above immediately in the same turn.** This is the default. Do NOT end your turn with text like "## Iteration N — Complete", "Next-iteration candidates", "re-fire this command to continue", or any other invitation to the user to manually re-trigger. Ending the turn ends the loop.
+   - **(B) Continue to the next iteration.** Prefer to re-enter step 1 in the same turn. If you instead end the turn while the loop is still `running` and unfinished, the [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook re-invokes you for the next iteration — a turn-end is recovered (ADR-003), so a "## Iteration N — Complete" summary or a "want me to continue?" hand-off no longer breaks the loop. Do NOT emit the promise to escape; emit it only when the Emission Point conditions hold.
+   - **(C) Await required input.** If an `[H]` acceptance criterion needs user approval, ask via `AskUserQuestion`. That releases the gate for this turn — it will not force-continue past a pending question.
 6. **Cancellation check** before re-entering: re-read the state file. If another session set `status: "cancelled"` via `/synthex:cancel-loop`, exit immediately.
 
 #### State-file schema (v1) — inline reference
@@ -210,7 +211,7 @@ Write the state file with exactly these fields. The `status` enum is closed — 
 - `iteration >= max_iterations` after increment.
 - Another session sets `status: "cancelled"` via `/synthex:cancel-loop <loop-id>` or `/synthex:cancel-loop --all`.
 
-Nothing else ends the loop. In particular, **ending your assistant turn without doing one of the above silently breaks the loop and forces the user to re-fire manually.** That is the primary failure mode this section exists to prevent.
+The [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook re-invokes you on a turn-end while the loop is still `running`, so ending a turn no longer breaks the loop (ADR-003). The gate bounds runaway with a progress-aware counter capped below Claude Code's 8-consecutive-block override — it relinquishes after a few no-progress turns — and steps aside for a pending `AskUserQuestion`. The one self-inflicted failure mode that remains is **emitting the completion promise before the Emission Point conditions hold**, which terminates the loop early.
 
 ### Emission Point
 

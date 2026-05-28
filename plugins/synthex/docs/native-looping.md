@@ -33,6 +33,8 @@ Loop state lives at `<project>/.synthex/loops/<loop-id>.json`. One file per loop
   "completion_promise": "ALLDONE",
   "max_iterations": 20,
   "iteration": 5,
+  "consecutive_stop_blocks": 0,
+  "last_gate_iteration": 5,
   "isolation": "shared-context",
   "status": "running",
   "started_at": "2026-05-13T18:22:04Z",
@@ -59,6 +61,12 @@ Loop state lives at `<project>/.synthex/loops/<loop-id>.json`. One file per loop
 | `last_updated` | ISO 8601 UTC | Updated on every iteration boundary. |
 | `exited_at` | ISO 8601 UTC \| null | Set when status transitions to a terminal value. |
 | `exit_reason` | string \| null | Human-readable; null while running. |
+| `consecutive_stop_blocks` | integer | Optional; managed by the `loop-advance-gate` Stop hook. Count of consecutive no-progress turn-ends. Resets to 0 (well, to 1 on the counting block) when `iteration` advances. Defaults to 0 when absent. |
+| `last_gate_iteration` | integer | Optional; gate-managed. The `iteration` value the last time the Stop hook fired — used to detect progress between turn-ends. Defaults to -1 when absent. |
+
+### Resume refreshes `session_id` (gate ownership)
+
+When a loop is resumed — `/synthex:loop --resume` / `--resume-last`, or any `--loop` command resuming an existing loop — the resuming session MUST overwrite `session_id` with its **own** session id before iterating. The [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook only drives loops whose `session_id` matches the current session; a stale id carried over from the original session would leave the resumed loop undriven (it would silently stall on the first turn-end). This is part of the resume mutation alongside `last_updated` and any `isolation` override.
 
 ### Atomic writes
 
@@ -168,6 +176,10 @@ Each `--loop`-bearing command authors a concrete adaptation of this flow. The st
 6. **Promise detection.** After the workflow's final response, scan that response for the literal regex `<promise>\s*<completion_promise_text>\s*</promise>`. If matched, set `status: "completed"`, `exit_reason: "completion-promise-emitted"`, `exited_at`, write state, exit.
 7. **Cancellation check.** Re-read the state file. If `status == "cancelled"` (set by another session via `/synthex:cancel-loop`), exit immediately.
 8. **Loop back to step 2.**
+
+### Turn-per-iteration: the Stop hook re-invokes you
+
+You do NOT have to keep the entire loop inside one assistant turn. Synthex's [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook re-drives the next iteration whenever you end a turn while the loop is still `running` and you have not emitted the completion promise. Ending a turn mid-loop is **recovered, not fatal** (ADR-003). Continuing in the same turn is still fine and marginally cheaper, but it is no longer the thing that keeps the loop alive — the promise keeps it from over-running, and the gate keeps it advancing. The gate bounds runaway with a progress-aware counter (`consecutive_stop_blocks`) capped below Claude Code's 8-consecutive-block override: if you genuinely cannot advance, it relinquishes after a few no-progress turns rather than forcing you forever, and it steps aside for a pending `AskUserQuestion` (the `[H]`-approval escape).
 
 ### What the agent's instructions must NOT do
 
