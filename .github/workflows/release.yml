@@ -328,7 +328,6 @@ jobs:
 
       - name: Propose slashsynthex docs updates via Claude agent
         if: steps.bump.outputs.bump != 'none' && env.HAVE_AGENT_SECRETS == 'true'
-        continue-on-error: true
         env:
           HAVE_AGENT_SECRETS: ${{ secrets.ANTHROPIC_API_KEY != '' && steps.docs_app_token.outputs.token != '' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -360,7 +359,8 @@ jobs:
           # The action wrapper rejects `push` events (it's designed for PR /
           # issue / workflow_dispatch contexts), so we invoke the CLI directly.
           # Hard caps:
-          #   --max-turns 30        agentic loop ceiling
+          #   --max-turns 60        agentic loop ceiling (raised from 30 after
+          #                         v0.9.6 / v0.9.7 hit the cap before opening PRs)
           #   --max-budget-usd 5    hard dollar cap
           #   --dangerously-skip-permissions  CI runner is ephemeral; the only
           #                         cross-system writes go through $GH_TOKEN
@@ -369,7 +369,7 @@ jobs:
           # for a fast clean start.
           claude -p \
             --bare \
-            --max-turns 30 \
+            --max-turns 60 \
             --max-budget-usd 5.00 \
             --no-session-persistence \
             --dangerously-skip-permissions \
@@ -460,4 +460,7 @@ jobs:
             saying "No user-facing changes in this release" rather than
             fabricating content.
           PROMPT
-          )"
+          )" || {
+            echo "::warning title=Docs PR agent failed::The Claude agent did not open a docs PR for this release (likely hit --max-turns or crashed). Check the step log; release was NOT blocked. Open a docs PR manually or raise --max-turns and re-run on the next release."
+            exit 0
+          }
