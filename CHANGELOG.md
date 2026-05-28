@@ -5,6 +5,12 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 0.9.9 / synthex-plus 0.5.9] - 2026-05-28
+
+### Changed
+
+- (release) raise docs-PR agent --max-turns to 60 and surface failures
+
 ## [synthex 0.9.8 / synthex-plus 0.5.8] - 2026-05-28
 
 ### Fixed
