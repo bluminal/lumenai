@@ -181,13 +181,13 @@ If your invocation includes `--loop`, you are NOT running this command once. You
 
 #### State-file schema (v1) — inline reference
 
-Write the state file with exactly these fields. The `status` enum is closed — do NOT invent values like `"loop_exhausted_no_promise"` or `"in_flight"`.
+Write the state file with exactly these fields. The `status` enum is closed — do NOT invent values like `"loop_exhausted_no_promise"` or `"in_flight"`. Read `$CLAUDE_CODE_SESSION_ID` via Bash for `session_id` — the [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook only drives the loop when this matches the live session, so `null` leaves it permanently undriven (see [native-looping.md § Obtaining the session id](../docs/native-looping.md#obtaining-the-session-id)).
 
 ```json
 {
   "schema_version": 1,
   "loop_id": "next-priority-<4-char-hex>",
-  "session_id": "<Claude Code session id, or null>",
+  "session_id": "<value of $CLAUDE_CODE_SESSION_ID; null ONLY if empty>",
   "command": "/synthex:next-priority",
   "args": "<CLI args, verbatim>",
   "prompt_file": null,

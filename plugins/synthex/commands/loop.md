@@ -48,13 +48,13 @@ Once `.synthex/loops/` is opened, scan for files with terminal `status` values (
 
 ### 3. Initialize or restore state
 
-- **Fresh start**: `mkdir -p .synthex/loops`. Write the state file via tmp-file + atomic `mv`:
+- **Fresh start**: `mkdir -p .synthex/loops`. Read `$CLAUDE_CODE_SESSION_ID` via Bash and use it as `session_id` (the gate matches on it; `null` leaves the loop undriven — see [native-looping.md § Obtaining the session id](../docs/native-looping.md#obtaining-the-session-id)). Write the state file via tmp-file + atomic `mv`:
 
 ```json
 {
   "schema_version": 1,
   "loop_id": "<resolved>",
-  "session_id": "<Claude Code session id, or null if unavailable>",
+  "session_id": "<value of $CLAUDE_CODE_SESSION_ID; null ONLY if empty>",
   "command": "/synthex:loop",
   "args": "<canonicalized CLI args, redacted for prompt content if --prompt-file>",
   "prompt_file": "<--prompt-file path, or null>",
@@ -70,7 +70,7 @@ Once `.synthex/loops/` is opened, scan for files with terminal `status` values (
 }
 ```
 
-- **Resume**: read the existing state file. Validate per [`state`](../docs/native-looping.md#state) and FR-NL9. If `--loop-isolated` / `--loop-shared` override is supplied on the resume invocation, update `isolation` accordingly (FR-NL28). **Refresh `session_id` to the current Claude Code session id** so the [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook keeps driving this loop — it matches on `session_id`, so a stale id from the original session would leave the resumed loop undriven (see [`state`](../docs/native-looping.md#state) § Resume refreshes session_id). Update `last_updated` to now and persist.
+- **Resume**: read the existing state file. Validate per [`state`](../docs/native-looping.md#state) and FR-NL9. If `--loop-isolated` / `--loop-shared` override is supplied on the resume invocation, update `isolation` accordingly (FR-NL28). **Refresh `session_id` to the current Claude Code session id (read `$CLAUDE_CODE_SESSION_ID` via Bash)** so the [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook keeps driving this loop — it matches on `session_id`, so a stale id from the original session would leave the resumed loop undriven (see [`state`](../docs/native-looping.md#state) § Resume refreshes session_id). Update `last_updated` to now and persist.
 
 ### 4. Iteration loop
 
