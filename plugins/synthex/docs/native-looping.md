@@ -26,7 +26,7 @@ Loop state lives at `<project>/.synthex/loops/<loop-id>.json`. One file per loop
 {
   "schema_version": 1,
   "loop_id": "next-priority-3f2a",
-  "session_id": "<Claude Code session id, or null if unavailable>",
+  "session_id": "<value of the $CLAUDE_CODE_SESSION_ID env var; null ONLY if it is empty>",
   "command": "/synthex:next-priority",
   "args": "@docs/plans/main.md 3",
   "prompt_file": null,
@@ -48,7 +48,7 @@ Loop state lives at `<project>/.synthex/loops/<loop-id>.json`. One file per loop
 |-------|------|-------|
 | `schema_version` | integer | Always `1` in v1. Future bumps reserved. Unknown values cause `--resume` to refuse; never auto-mutate forward. |
 | `loop_id` | string | Per FR-NL11 rules (see `loop-id` anchor). |
-| `session_id` | string\|null | The Claude Code session id at loop start. May be null if unavailable. |
+| `session_id` | string\|null | The Claude Code session id at loop start, read from `$CLAUDE_CODE_SESSION_ID` (see [Obtaining the session id](#obtaining-the-session-id)). The [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook only drives loops whose `session_id` matches the live session, so this MUST be the real id — `null` leaves the loop permanently undriven and is a fallback only when the env var is genuinely empty. |
 | `command` | string | The slash-command path that owns the loop (e.g., `/synthex:next-priority`). |
 | `args` | string | The arguments the command was invoked with, preserved verbatim for resume. |
 | `prompt_file` | string\|null | Populated only for `/synthex:loop --prompt-file <path>` invocations. |
@@ -64,9 +64,15 @@ Loop state lives at `<project>/.synthex/loops/<loop-id>.json`. One file per loop
 | `consecutive_stop_blocks` | integer | Optional; managed by the `loop-advance-gate` Stop hook. Count of consecutive no-progress turn-ends. Resets to 0 (well, to 1 on the counting block) when `iteration` advances. Defaults to 0 when absent. |
 | `last_gate_iteration` | integer | Optional; gate-managed. The `iteration` value the last time the Stop hook fired — used to detect progress between turn-ends. Defaults to -1 when absent. |
 
+### Obtaining the session id
+
+The live Claude Code session id is exposed to the agent's shell as the **`$CLAUDE_CODE_SESSION_ID`** environment variable — the same 36-char UUID the [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook receives as `.session_id` on stdin. When writing or refreshing a loop's `session_id`, read it with a Bash call (e.g. `printf '%s' "$CLAUDE_CODE_SESSION_ID"`) and use that value verbatim. Write `null` **only** when the variable is genuinely empty.
+
+This is load-bearing: the gate's ownership match is `loop.session_id == live session_id`. A `null` (or any stale/guessed value) never matches, so the gate falls through to allow the stop and the loop is **never re-driven** — it dies at the first turn-end. Stamping the real id at creation is what makes hands-off looping work at all.
+
 ### Resume refreshes `session_id` (gate ownership)
 
-When a loop is resumed — `/synthex:loop --resume` / `--resume-last`, or any `--loop` command resuming an existing loop — the resuming session MUST overwrite `session_id` with its **own** session id before iterating. The [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook only drives loops whose `session_id` matches the current session; a stale id carried over from the original session would leave the resumed loop undriven (it would silently stall on the first turn-end). This is part of the resume mutation alongside `last_updated` and any `isolation` override.
+When a loop is resumed — `/synthex:loop --resume` / `--resume-last`, or any `--loop` command resuming an existing loop — the resuming session MUST overwrite `session_id` with its **own** session id (from `$CLAUDE_CODE_SESSION_ID`, see [Obtaining the session id](#obtaining-the-session-id)) before iterating. The [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook only drives loops whose `session_id` matches the current session; a stale id carried over from the original session would leave the resumed loop undriven (it would silently stall on the first turn-end). This is part of the resume mutation alongside `last_updated` and any `isolation` override.
 
 ### Atomic writes
 
