@@ -1,0 +1,55 @@
+name: Latest Harness Compatibility
+
+on:
+  schedule:
+    - cron: '43 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: latest-harness-compatibility-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  compatibility:
+    if: github.ref == 'refs/heads/main'
+    name: "Latest compatibility: ${{ matrix.harness }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        harness: [claude, codex, gemini, opencode]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - name: Run latest offline lifecycle
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_BUILD_CACHE: gha
+          SYNTHEX_COMPAT_CACHE_SCOPE: synthex-compat-latest-${{ matrix.harness }}
+        run: >-
+          node compat/scripts/run-suite.mjs
+          --version-lane latest
+          --harness ${{ matrix.harness }}
+          --report-dir "$RUNNER_TEMP/synthex-compat-report/offline"
+      - name: Run latest emulated activation
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_BUILD_CACHE: gha
+          SYNTHEX_COMPAT_CACHE_SCOPE: synthex-compat-latest-${{ matrix.harness }}
+        run: >-
+          node compat/scripts/run-suite.mjs
+          --version-lane latest
+          --profile activation
+          --harness ${{ matrix.harness }}
+          --report-dir "$RUNNER_TEMP/synthex-compat-report/activation"
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthex-latest-compat-${{ matrix.harness }}
+          path: ${{ runner.temp }}/synthex-compat-report/
+          if-no-files-found: warn

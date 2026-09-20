@@ -1,0 +1,20 @@
+{
+  "name": "lumenai",
+  "interface": {
+    "displayName": "LumenAI"
+  },
+  "plugins": [
+    {
+      "name": "synthex",
+      "source": {
+        "source": "local",
+        "path": "./plugins/synthex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

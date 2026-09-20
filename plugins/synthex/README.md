@@ -4,6 +4,8 @@ AI agents modeled after a software startup org chart — specialized roles that 
 
 ## Installation
 
+### Claude Code
+
 Install the LumenAI marketplace, then install Synthex:
 
 ```bash
@@ -11,12 +13,30 @@ Install the LumenAI marketplace, then install Synthex:
 /plugin install synthex
 ```
 
+### Codex
+
+Install the same marketplace and plugin with the Codex CLI:
+
+```bash
+codex plugin marketplace add bluminal/lumenai
+codex plugin add synthex@lumenai
+```
+
+Codex exposes the command and agent names as skills. Mention them with `$` (for example, `$review-code` or `$architect`) or select them from `/skills`. These are generated compatibility entrypoints; the Markdown in `commands/` and `agents/` remains the shared behavioral source of truth for every supported harness.
+
+### Gemini CLI and OpenCode
+
+Gemini CLI and OpenCode use the same generated Agent Skills bundle rather than a native marketplace plugin. Install `skills/` with the sibling `agents/`, `commands/`, `config/`, and `scripts/` directories under the harness's documented workspace or project skill root; preserving that layout lets each `SKILL.md` load the canonical workflow source.
+
+For copyable installation and update instructions, see [Agent compatibility](https://slashsynthex.com/docs/agent-compatibility).
+
 ### Project Setup
 
-After installing, run the **init** command in your project to scaffold configuration and document directories:
+After installing, run the **init** command in your project to scaffold configuration and document directories. In Claude Code use `/init`; in Codex invoke `$init`:
 
 ```bash
 /init
+# Codex: $init
 ```
 
 This creates:

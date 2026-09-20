@@ -62,6 +62,75 @@ jobs:
         run: npx vitest run schemas/
 
   # ─────────────────────────────────────────────────────────────────
+  # Layer 1b: Isolated Harness Compatibility (every PR, no model cost)
+  # ─────────────────────────────────────────────────────────────────
+  compatibility-offline:
+    name: "Compatibility: ${{ matrix.harness }} offline"
+    needs: schema-validation
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        harness: [claude, codex, gemini, opencode]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Run isolated offline compatibility test
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_BUILD_CACHE: gha
+          SYNTHEX_COMPAT_CACHE_SCOPE: synthex-compat-offline-${{ matrix.harness }}
+        run: >-
+          node compat/scripts/run-suite.mjs
+          --profile offline
+          --harness ${{ matrix.harness }}
+          --report-dir "$RUNNER_TEMP/synthex-compat-report"
+
+      - name: Upload compatibility report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthex-compat-offline-${{ matrix.harness }}
+          path: ${{ runner.temp }}/synthex-compat-report/
+          if-no-files-found: warn
+
+  compatibility-activation:
+    name: "Compatibility: ${{ matrix.harness }} activation"
+    needs: schema-validation
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        harness: [claude, codex, gemini, opencode]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Run isolated activation compatibility test
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_BUILD_CACHE: gha
+          SYNTHEX_COMPAT_CACHE_SCOPE: synthex-compat-activation-${{ matrix.harness }}
+        run: >-
+          node compat/scripts/run-suite.mjs
+          --profile activation
+          --harness ${{ matrix.harness }}
+          --report-dir "$RUNNER_TEMP/synthex-compat-report"
+
+      - name: Upload compatibility report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthex-compat-activation-${{ matrix.harness }}
+          path: ${{ runner.temp }}/synthex-compat-report/
+          if-no-files-found: warn
+
+  # ─────────────────────────────────────────────────────────────────
   # Layer 2: Behavioral Assertions (manual trigger only)
   # ─────────────────────────────────────────────────────────────────
   behavioral-assertions:

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "unsupportedCapabilityPolicy": "documented-gap",
+  "versionLanes": {
+    "stable": "The pinned version in versions.lock.json; required for every pull request.",
+    "oldest": "The oldest version Synthex formally supports. Until a prior version is explicitly adopted, this is the stable pin.",
+    "latest": "The package manager latest tag; scheduled drift detection only and never a lockfile update."
+  },
+  "harnesses": {
+    "claude": {
+      "oldestSupported": "2.1.277"
+    },
+    "codex": {
+      "oldestSupported": "0.154.0"
+    },
+    "gemini": {
+      "oldestSupported": "0.39.1"
+    },
+    "opencode": {
+      "oldestSupported": "1.18.15"
+    }
+  }
+}

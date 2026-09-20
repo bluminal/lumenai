@@ -22,4 +22,5 @@ What does this PR do? Keep it to 1-3 bullet points.
 
 - [ ] Agent/command follows existing conventions (see CONTRIBUTING.md)
 - [ ] `plugin.json` updated (if adding new agents or commands)
+- [ ] Codex skill wrappers regenerated (if adding or renaming agents or commands)
 - [ ] Documentation updated (if applicable)
