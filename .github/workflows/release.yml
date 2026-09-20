@@ -229,6 +229,15 @@ jobs:
             plugins/synthex-plus/.claude-plugin/plugin.json > "$tmp"
           mv "$tmp" plugins/synthex-plus/.claude-plugin/plugin.json
 
+          # mktemp creates files with mode 0600. The compatibility matrix runs
+          # as an unprivileged user and bind-mounts this staged release tree,
+          # so preserve public read access after each atomic replacement.
+          chmod 644 \
+            .claude-plugin/marketplace.json \
+            plugins/synthex/.claude-plugin/plugin.json \
+            plugins/synthex/.codex-plugin/plugin.json \
+            plugins/synthex-plus/.claude-plugin/plugin.json
+
       - name: Generate CHANGELOG entry
         if: steps.bump.outputs.bump != 'none'
         id: changelog
