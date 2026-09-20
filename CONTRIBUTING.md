@@ -34,15 +34,19 @@ npx vitest watch schemas/
 1. Create a new `.md` file in `plugins/synthex/agents/`
 2. Follow the structure of existing agents — define identity, responsibilities, workflow, output format, and behavioral rules
 3. Add the agent name to the `agents` array in `plugins/synthex/.claude-plugin/plugin.json`
-4. Create a schema validator in `tests/schemas/{agent-name}.ts`
-5. Create a test suite in `tests/schemas/{agent-name}.test.ts` with inline sample outputs
-6. Ensure all tests pass
+4. Regenerate the Codex skill entrypoints: `node plugins/synthex/scripts/generate-codex-skills.mjs`
+5. Create a schema validator in `tests/schemas/{agent-name}.ts`
+6. Create a test suite in `tests/schemas/{agent-name}.test.ts` with inline sample outputs
+7. Ensure all tests pass
 
 ### New Commands
 
 1. Create a new `.md` file in `plugins/synthex/commands/`
 2. Define parameters, workflow steps, and which agents to invoke
 3. Add the command filename to the `commands` array in `plugins/synthex/.claude-plugin/plugin.json`
+4. Regenerate the Codex skill entrypoints: `node plugins/synthex/scripts/generate-codex-skills.mjs`
+
+The generated `plugins/synthex/skills/*/SKILL.md` files are thin Agent Skills metadata wrappers. Do not edit them directly; command and agent Markdown files remain the shared behavioral source of truth for Claude Code, Codex, Gemini CLI, OpenCode, and future supported harnesses.
 
 ### Improving Existing Agents
 

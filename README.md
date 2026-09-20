@@ -1,14 +1,25 @@
 # LumenAI
 
-A Claude Code plugin marketplace by Bluminal Labs.
+A Claude-first plugin marketplace with a shared Agent Skills distribution by Bluminal Labs.
 
 ## What is this?
 
-LumenAI is a structured registry of Claude Code plugins — collections of AI agents and commands that work together to accomplish complex software delivery tasks.
+LumenAI is a structured registry of plugins and Agent Skills — collections of AI agents and commands that work together to accomplish complex software delivery tasks. Claude Code and Codex install Synthex as a native plugin; Gemini CLI and OpenCode use the portable Agent Skills bundle.
+
+Install the marketplace in Claude Code:
 
 ```bash
 /plugin marketplace add bluminal/lumenai
 ```
+
+Or install it in Codex:
+
+```bash
+codex plugin marketplace add bluminal/lumenai
+codex plugin add synthex@lumenai
+```
+
+Codex exposes the same Synthex names as skills (for example, `$review-code` and `$architect`). Gemini CLI and OpenCode consume that same generated Agent Skills layer through their workspace or project skill roots. Thin generated skill entrypoints load the existing files under `commands/` and `agents/`, so those Markdown definitions remain the single behavioral source of truth.
 
 ## Plugins
 
@@ -138,12 +149,15 @@ cd tests && npx vitest run schemas/   # Layer 1: instant, free
 
 ```
 lumenai/
+├── .agents/plugins/marketplace.json     # Codex marketplace registry
 ├── .claude-plugin/marketplace.json     # Marketplace registry
 ├── plugins/
 │   ├── synthex/                        # Synthex plugin
+│   │   ├── .codex-plugin/plugin.json   # Codex plugin manifest
 │   │   ├── .claude-plugin/plugin.json  # Plugin manifest (15 agents, 12 commands)
 │   │   ├── agents/                     # Agent definitions (.md files)
 │   │   ├── commands/                   # Command definitions (.md files)
+│   │   ├── skills/                     # Generated Agent Skills entrypoints
 │   │   └── config/defaults.yaml        # Default project configuration
 │   └── synthex-plus/                   # Synthex+ plugin (BETA)
 │       ├── .claude-plugin/plugin.json  # Plugin manifest (5 commands)

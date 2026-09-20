@@ -108,6 +108,44 @@ jobs:
             BUMP="patch"
           fi
 
+          # An explicit intent can raise (but never lower) the conventional
+          # commit result for this release range. The intent applies only when
+          # its file changed since the previous release tag, so it is safe to
+          # keep the consumed record in the repository for release history.
+          RELEASE_INTENT_FILE=".release-intent.json"
+          INTENT_COMMIT=$(git log --format=%H "${RANGE_ARGS[@]}" -- "$RELEASE_INTENT_FILE" | head -n1 || true)
+          if [ -n "$INTENT_COMMIT" ]; then
+            if [ ! -f "$RELEASE_INTENT_FILE" ]; then
+              echo "::error::Release intent changed in this range but is missing at HEAD."
+              exit 1
+            fi
+            INTENT_BUMP=$(jq -er '.bump' "$RELEASE_INTENT_FILE")
+            INTENT_REASON=$(jq -er '.reason' "$RELEASE_INTENT_FILE")
+            case "$INTENT_BUMP" in
+              major|minor|patch) ;;
+              *)
+                echo "::error::Release intent bump must be major, minor, or patch."
+                exit 1
+                ;;
+            esac
+
+            bump_rank() {
+              case "$1" in
+                none) echo 0 ;;
+                patch) echo 1 ;;
+                minor) echo 2 ;;
+                major) echo 3 ;;
+              esac
+            }
+
+            if [ "$(bump_rank "$INTENT_BUMP")" -gt "$(bump_rank "$BUMP")" ]; then
+              BUMP="$INTENT_BUMP"
+              echo "::notice::Release intent raised bump to $BUMP: $INTENT_REASON"
+            else
+              echo "::notice::Release intent $INTENT_BUMP did not lower conventional bump $BUMP: $INTENT_REASON"
+            fi
+          fi
+
           echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
           echo "last_tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
           echo "Bump level: $BUMP"
@@ -180,6 +218,11 @@ jobs:
           jq --indent 2 --arg v "$SYNTHEX_NEW" '.version = $v' \
             plugins/synthex/.claude-plugin/plugin.json > "$tmp"
           mv "$tmp" plugins/synthex/.claude-plugin/plugin.json
+
+          tmp=$(mktemp)
+          jq --indent 2 --arg v "$SYNTHEX_NEW" '.version = $v' \
+            plugins/synthex/.codex-plugin/plugin.json > "$tmp"
+          mv "$tmp" plugins/synthex/.codex-plugin/plugin.json
 
           tmp=$(mktemp)
           jq --indent 2 --arg v "$PLUS_NEW" '.version = $v' \
@@ -266,6 +309,37 @@ jobs:
           echo "----- generated entry -----"
           cat "$ENTRY_FILE"
 
+      # The version manifests and changelog above are the release artifact that
+      # will be committed and tagged below. Validate that exact staged artifact
+      # in isolated harness containers before publishing it.
+      - name: Set up Docker Buildx for release compatibility
+        if: steps.bump.outputs.bump != 'none'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate release artifact compatibility
+        if: steps.bump.outputs.bump != 'none'
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_BUILD_CACHE: gha
+          SYNTHEX_COMPAT_CACHE_SCOPE: synthex-release-stable
+        run: |
+          node compat/scripts/run-suite.mjs \
+            --profile offline \
+            --harness all \
+            --report-dir "$RUNNER_TEMP/synthex-release-compat/offline"
+          node compat/scripts/run-suite.mjs \
+            --profile activation \
+            --harness all \
+            --report-dir "$RUNNER_TEMP/synthex-release-compat/activation"
+
+      - name: Upload release compatibility reports
+        if: always() && steps.bump.outputs.bump != 'none'
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthex-release-compatibility
+          path: ${{ runner.temp }}/synthex-release-compat/
+          if-no-files-found: warn
+
       - name: Commit, tag, and push
         if: steps.bump.outputs.bump != 'none'
         env:
@@ -281,6 +355,7 @@ jobs:
           git add \
             .claude-plugin/marketplace.json \
             plugins/synthex/.claude-plugin/plugin.json \
+            plugins/synthex/.codex-plugin/plugin.json \
             plugins/synthex-plus/.claude-plugin/plugin.json \
             CHANGELOG.md
 

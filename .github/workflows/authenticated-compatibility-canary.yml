@@ -1,0 +1,171 @@
+name: Authenticated Compatibility Canary
+
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: authenticated-compatibility-canary-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - name: Verify offline lifecycle first
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_BUILD_CACHE: gha
+          SYNTHEX_COMPAT_CACHE_SCOPE: synthex-compat-canary-claude
+        run: node compat/scripts/run-suite.mjs --harness claude --report-dir "$RUNNER_TEMP/synthex-compat-report/offline"
+      - id: credential
+        name: Check dedicated Claude credential
+        env:
+          SYNTHEX_COMPAT_CLAUDE_API_KEY: ${{ secrets.SYNTHEX_COMPAT_CLAUDE_API_KEY }}
+        run: |
+          if [ -n "${SYNTHEX_COMPAT_CLAUDE_API_KEY:-}" ]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo '::warning::Claude canary skipped: SYNTHEX_COMPAT_CLAUDE_API_KEY is not configured.'
+          fi
+      - name: Run real-provider canary
+        if: steps.credential.outputs.available == 'true'
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_CLAUDE_API_KEY: ${{ secrets.SYNTHEX_COMPAT_CLAUDE_API_KEY }}
+          SYNTHEX_COMPAT_CLAUDE_MODEL: ${{ vars.SYNTHEX_COMPAT_CLAUDE_MODEL }}
+          SYNTHEX_COMPAT_CANARY_MAX_BUDGET_USD: ${{ vars.SYNTHEX_COMPAT_CANARY_MAX_BUDGET_USD }}
+        run: node compat/scripts/run-suite.mjs --profile canary --harness claude --report-dir "$RUNNER_TEMP/synthex-compat-report/canary"
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthex-authenticated-canary-claude
+          path: ${{ runner.temp }}/synthex-compat-report/
+          if-no-files-found: warn
+
+  codex:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - name: Verify offline lifecycle first
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_BUILD_CACHE: gha
+          SYNTHEX_COMPAT_CACHE_SCOPE: synthex-compat-canary-codex
+        run: node compat/scripts/run-suite.mjs --harness codex --report-dir "$RUNNER_TEMP/synthex-compat-report/offline"
+      - id: credential
+        name: Check dedicated Codex credential
+        env:
+          SYNTHEX_COMPAT_CODEX_API_KEY: ${{ secrets.SYNTHEX_COMPAT_CODEX_API_KEY }}
+        run: |
+          if [ -n "${SYNTHEX_COMPAT_CODEX_API_KEY:-}" ]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo '::warning::Codex canary skipped: SYNTHEX_COMPAT_CODEX_API_KEY is not configured.'
+          fi
+      - name: Run real-provider canary
+        if: steps.credential.outputs.available == 'true'
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_CODEX_API_KEY: ${{ secrets.SYNTHEX_COMPAT_CODEX_API_KEY }}
+          SYNTHEX_COMPAT_CODEX_MODEL: ${{ vars.SYNTHEX_COMPAT_CODEX_MODEL }}
+        run: node compat/scripts/run-suite.mjs --profile canary --harness codex --report-dir "$RUNNER_TEMP/synthex-compat-report/canary"
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthex-authenticated-canary-codex
+          path: ${{ runner.temp }}/synthex-compat-report/
+          if-no-files-found: warn
+
+  gemini:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - name: Verify offline lifecycle first
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_BUILD_CACHE: gha
+          SYNTHEX_COMPAT_CACHE_SCOPE: synthex-compat-canary-gemini
+        run: node compat/scripts/run-suite.mjs --harness gemini --report-dir "$RUNNER_TEMP/synthex-compat-report/offline"
+      - id: credential
+        name: Check dedicated Gemini credential
+        env:
+          SYNTHEX_COMPAT_GEMINI_API_KEY: ${{ secrets.SYNTHEX_COMPAT_GEMINI_API_KEY }}
+        run: |
+          if [ -n "${SYNTHEX_COMPAT_GEMINI_API_KEY:-}" ]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo '::warning::Gemini canary skipped: SYNTHEX_COMPAT_GEMINI_API_KEY is not configured.'
+          fi
+      - name: Run real-provider canary
+        if: steps.credential.outputs.available == 'true'
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_GEMINI_API_KEY: ${{ secrets.SYNTHEX_COMPAT_GEMINI_API_KEY }}
+          SYNTHEX_COMPAT_GEMINI_MODEL: ${{ vars.SYNTHEX_COMPAT_GEMINI_MODEL }}
+        run: node compat/scripts/run-suite.mjs --profile canary --harness gemini --report-dir "$RUNNER_TEMP/synthex-compat-report/canary"
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthex-authenticated-canary-gemini
+          path: ${{ runner.temp }}/synthex-compat-report/
+          if-no-files-found: warn
+
+  opencode:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - name: Verify offline lifecycle first
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_BUILD_CACHE: gha
+          SYNTHEX_COMPAT_CACHE_SCOPE: synthex-compat-canary-opencode
+        run: node compat/scripts/run-suite.mjs --harness opencode --report-dir "$RUNNER_TEMP/synthex-compat-report/offline"
+      - id: credential
+        name: Check dedicated OpenCode credential
+        env:
+          SYNTHEX_COMPAT_OPENCODE_API_KEY: ${{ secrets.SYNTHEX_COMPAT_OPENCODE_API_KEY }}
+        run: |
+          if [ -n "${SYNTHEX_COMPAT_OPENCODE_API_KEY:-}" ]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+            echo '::warning::OpenCode canary skipped: SYNTHEX_COMPAT_OPENCODE_API_KEY is not configured.'
+          fi
+      - name: Run real-provider canary
+        if: steps.credential.outputs.available == 'true'
+        working-directory: tests
+        env:
+          SYNTHEX_COMPAT_OPENCODE_API_KEY: ${{ secrets.SYNTHEX_COMPAT_OPENCODE_API_KEY }}
+          SYNTHEX_COMPAT_OPENCODE_MODEL: ${{ vars.SYNTHEX_COMPAT_OPENCODE_MODEL }}
+        run: node compat/scripts/run-suite.mjs --profile canary --harness opencode --report-dir "$RUNNER_TEMP/synthex-compat-report/canary"
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthex-authenticated-canary-opencode
+          path: ${{ runner.temp }}/synthex-compat-report/
+          if-no-files-found: warn
