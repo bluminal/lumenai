@@ -135,11 +135,15 @@ git merge --ff-only {worktrees.branch_prefix}[task-id]-[short-description]
 
 If fast-forward merge is not possible, attempt a merge commit. If conflicts arise, resolve them carefully.
 
-After merging, clean up the worktree:
+**Immediate cleanup invariant:** A task is not complete when its merge succeeds; the merge handoff is complete only when its task worktree has been removed. Immediately after each successful merge — **before** merging or selecting another task, updating the plan, starting another loop iteration, or reporting success to the user — remove that task's exact worktree:
 
 ```bash
 git worktree remove {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short-description]
 ```
+
+Then verify that `git worktree list` no longer includes that path. Do not defer this cleanup until the end of the batch, session, or release: stale ignored worktrees can consume substantial disk space.
+
+If removal fails, stop the task handoff, diagnose the issue, and retry cleanup before continuing. Never use `git worktree remove --force` to make the workflow proceed, and never remove a worktree that has uncommitted changes. Preserve such work for recovery and surface the exact path and blocker to the user; do not silently strand it or treat the task as complete.
 
 ### 9. Update the Plan
 
@@ -172,7 +176,7 @@ If your invocation includes `--loop`, you are NOT running this command once. You
 1. **Boundary check.** Read `.synthex/loops/<loop-id>.json`. If `status != "running"`, exit immediately with `Loop "<loop-id>" is <status> — nothing to do.`. If `iteration >= max_iterations`, set `status: "max-iterations-reached"`, `exit_reason: "Reached max_iterations=<N> without completion promise"`, `exited_at`, write atomically, print the resume hint, exit.
 2. **Increment + persist counter** **before** any iteration work. Atomic write to `.synthex/loops/<loop-id>.json.tmp.<pid>` then `mv -f` over the real path.
 3. **Print iteration marker** on its own line: `[loop <loop-id> iteration <N>/<max>]` (visibility for the user — survives auto-compaction).
-4. **Execute Workflow §1–§9 below in full.** Use the implementation plan, worktrees, Tech Lead delegation, validation gates — the entire body of this command runs **once per iteration**.
+4. **Execute Workflow §1–§9 below in full.** Use the implementation plan, worktrees, Tech Lead delegation, validation gates, and immediate merged-worktree cleanup — the entire body of this command runs **once per iteration**.
 5. **Decide the iteration's exit.** At the END of the iteration's work, do one of:
    - **(A) Emit the promise** — `<promise>{completion_promise}</promise>` on its OWN line, only when the Emission Point conditions below hold. Set `status: "completed"`, `exit_reason: "completion-promise-emitted"`, `exited_at`, write state, exit.
    - **(B) Continue to the next iteration.** Prefer to re-enter step 1 in the same turn. If you instead end the turn while the loop is still `running` and unfinished, the [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook re-invokes you for the next iteration — a turn-end is recovered (ADR-003), so a "## Iteration N — Complete" summary or a "want me to continue?" hand-off no longer breaks the loop. Do NOT emit the promise to escape; emit it only when the Emission Point conditions hold.
@@ -264,4 +268,4 @@ The iteration marker (`[loop <loop-id> iteration <N>/<max>]`) prints to stdout b
 - If a Tech Lead instance fails or gets blocked, capture the error/blocker details
 - Attempt to resolve simple issues (test failures, lint errors) by re-engaging the Tech Lead
 - For persistent blockers, mark the task as blocked in the plan with details and move on to other tasks
-- Never leave worktrees in an inconsistent state — clean up on failure
+- Never leave worktrees in an inconsistent state. Remove every successfully merged task worktree immediately as part of its merge handoff; for failed or unmerged work, preserve recoverable changes and report the exact path and blocker rather than silently leaving an abandoned worktree behind

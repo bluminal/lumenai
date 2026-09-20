@@ -193,6 +193,19 @@ describe('cross-harness compatibility contract', () => {
     expect(workflow).toContain('synthex-release-compatibility');
   });
 
+  it('keeps atomically regenerated manifests readable by the isolated compatibility user', () => {
+    const workflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/release.yml'),
+      'utf8',
+    );
+
+    expect(workflow).toContain('chmod 644');
+    expect(workflow).toContain('.claude-plugin/marketplace.json');
+    expect(workflow).toContain('plugins/synthex/.claude-plugin/plugin.json');
+    expect(workflow).toContain('plugins/synthex/.codex-plugin/plugin.json');
+    expect(workflow).toContain('plugins/synthex-plus/.claude-plugin/plugin.json');
+  });
+
   it('marks the cross-harness distribution release as a one-time major bump', () => {
     const intent = JSON.parse(
       readFileSync(resolve(repoRoot, '.release-intent.json'), 'utf8'),
