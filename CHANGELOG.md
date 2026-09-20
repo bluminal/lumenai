@@ -5,6 +5,20 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 1.0.0 / synthex-plus 1.0.0] - 2026-09-20
+
+### Added
+
+- (synthex) support shared Agent Skills harnesses
+
+### Fixed
+
+- (release) preserve staged manifest readability
+
+### Changed
+
+- allow CI filesystem jitter in loop timing check
+
 ## [synthex 0.9.10 / synthex-plus 0.5.10] - 2026-06-08
 
 ### Fixed
