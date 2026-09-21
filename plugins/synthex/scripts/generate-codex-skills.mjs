@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Generate the thin Codex skill entrypoints from Synthex's Claude manifest.
+ * Generate the thin Agent Skills entrypoints from Synthex's Claude manifest.
  *
+ * Codex, Gemini CLI, OpenCode, and Grok all load this same `skills/` tree.
  * The command and agent Markdown files remain the behavioral source of truth.
- * Generated skills contain only Codex metadata and instructions for loading the
- * corresponding canonical file, so the two integrations cannot drift.
+ * Generated skills contain only discovery metadata and instructions for loading
+ * the corresponding canonical file, so those harnesses cannot drift apart.
+ * The script filename is historical; it is still the one generator for the tree.
  */
 
 import {
@@ -69,7 +71,7 @@ function skillContents(entry) {
   const description = skillDescription(entry);
   const invocationRule =
     entry.kind === 'command'
-      ? `Execute the requested workflow. When it names a Synthex agent, delegate with a Codex subagent when the source calls for delegation, and tell that subagent to read the matching file under \`agents/\` completely before acting.`
+      ? "Execute the requested workflow. When it names a Synthex agent, delegate with the host harness's subagent mechanism when the source calls for delegation, and tell that subagent to read the matching file under `agents/` completely before acting."
       : 'Adopt the identity, responsibilities, review criteria, behavioral rules, and output contract in the source. If you are running as a delegated subagent, return the requested result to the caller.';
 
   return `---
@@ -81,12 +83,12 @@ ${GENERATED_MARKER}
 
 # Synthex ${entry.title}
 
-This is the Codex compatibility entrypoint for the canonical Synthex ${entry.kind} definition.
+This is the shared Agent Skills entrypoint for the canonical Synthex ${entry.kind} definition. Codex, Gemini CLI, OpenCode, and Grok load this file.
 
 1. Read [\`${entry.manifestPath}\`](${canonicalPath}) completely before acting.
 2. Treat that file, not this wrapper, as the behavioral source of truth. Resolve its relative paths from the canonical file's directory, and resolve repository-style paths beginning with \`plugins/synthex/\` from this installed plugin root.
 3. ${invocationRule}
-4. Translate Claude Code-specific tool names to the closest available Codex tools while preserving the workflow's intent and safety constraints.
+4. Translate Claude Code-specific tool names to the closest tools in the current host while preserving the workflow's intent and safety constraints.
 5. Keep provider-specific behavior only where the canonical workflow genuinely targets that provider. Do not edit the canonical definition merely to adapt it at runtime.
 `;
 }
@@ -133,14 +135,14 @@ if (existsSync(skillsRoot)) {
 }
 
 if (mismatches.length > 0) {
-  console.error('Codex skill wrappers are out of date:');
+  console.error('Agent Skills wrappers are out of date:');
   for (const mismatch of mismatches.sort()) console.error(`- ${mismatch}`);
   console.error('Run: node plugins/synthex/scripts/generate-codex-skills.mjs');
   process.exitCode = 1;
 } else {
   console.log(
     checkOnly
-      ? `Codex skill wrappers are current (${entries.length}).`
-      : `Generated ${entries.length} Codex skill wrappers.`
+      ? `Agent Skills wrappers are current (${entries.length}).`
+      : `Generated ${entries.length} Agent Skills wrappers.`
   );
 }

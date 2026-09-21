@@ -24,6 +24,17 @@ codex plugin add synthex@lumenai
 
 Codex exposes the command and agent names as skills. Mention them with `$` (for example, `$review-code` or `$architect`) or select them from `/skills`. These are generated compatibility entrypoints; the Markdown in `commands/` and `agents/` remains the shared behavioral source of truth for every supported harness.
 
+### Grok
+
+Install the LumenAI marketplace, then install Synthex:
+
+```bash
+grok plugin marketplace add bluminal/lumenai
+grok plugin install synthex --trust
+```
+
+Grok loads the same generated `skills/` entrypoints Codex uses. The Grok manifest registers that skills directory only, so the Claude command and agent files are not also published as a second set of slash commands or agents. Invoke a workflow as `/synthex:review-code` (or `/review-code` when the name is unambiguous). The installed plugin still includes `commands/`, `agents/`, `config/`, and `scripts/` so each skill can read its canonical source.
+
 ### Gemini CLI and OpenCode
 
 Gemini CLI and OpenCode use the same generated Agent Skills bundle rather than a native marketplace plugin. Install `skills/` with the sibling `agents/`, `commands/`, `config/`, and `scripts/` directories under the harness's documented workspace or project skill root; preserving that layout lets each `SKILL.md` load the canonical workflow source.
@@ -32,11 +43,12 @@ For copyable installation and update instructions, see [Agent compatibility](htt
 
 ### Project Setup
 
-After installing, run the **init** command in your project to scaffold configuration and document directories. In Claude Code use `/init`; in Codex invoke `$init`:
+After installing, run the **init** command in your project to scaffold configuration and document directories. In Claude Code use `/init`; in Codex invoke `$init`; in Grok invoke `/synthex:init`:
 
 ```bash
 /init
 # Codex: $init
+# Grok: /synthex:init
 ```
 
 This creates:

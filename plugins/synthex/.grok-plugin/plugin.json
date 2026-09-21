@@ -1,0 +1,23 @@
+{
+  "name": "synthex",
+  "version": "1.1.0",
+  "description": "AI agents modeled after a software startup org chart — specialized roles that synthesize to discover, build, ship, operate, and learn from complete, production-quality software.",
+  "author": {
+    "name": "Bluminal Labs",
+    "url": "https://github.com/bluminal"
+  },
+  "homepage": "https://github.com/bluminal/lumenai/tree/main/plugins/synthex",
+  "repository": "https://github.com/bluminal/lumenai",
+  "license": "Apache-2.0",
+  "keywords": [
+    "agents",
+    "organization",
+    "orchestration",
+    "delivery",
+    "autonomous",
+    "synthesis"
+  ],
+  "skills": "./skills/",
+  "commands": [],
+  "agents": []
+}

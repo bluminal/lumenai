@@ -4,7 +4,7 @@ A Claude-first plugin marketplace with a shared Agent Skills distribution by Blu
 
 ## What is this?
 
-LumenAI is a structured registry of plugins and Agent Skills — collections of AI agents and commands that work together to accomplish complex software delivery tasks. Claude Code and Codex install Synthex as a native plugin; Gemini CLI and OpenCode use the portable Agent Skills bundle.
+LumenAI is a structured registry of plugins and Agent Skills — collections of AI agents and commands that work together to accomplish complex software delivery tasks. Claude Code, Codex, and Grok install Synthex as a native plugin; Gemini CLI and OpenCode use the portable Agent Skills bundle.
 
 Install the marketplace in Claude Code:
 
@@ -19,7 +19,14 @@ codex plugin marketplace add bluminal/lumenai
 codex plugin add synthex@lumenai
 ```
 
-Codex exposes the same Synthex names as skills (for example, `$review-code` and `$architect`). Gemini CLI and OpenCode consume that same generated Agent Skills layer through their workspace or project skill roots. Thin generated skill entrypoints load the existing files under `commands/` and `agents/`, so those Markdown definitions remain the single behavioral source of truth.
+Or install it in Grok:
+
+```bash
+grok plugin marketplace add bluminal/lumenai
+grok plugin install synthex --trust
+```
+
+Codex and Grok expose the same Synthex names as skills (for example, `$review-code` / `/synthex:review-code` and `$architect`). Gemini CLI and OpenCode consume that same generated Agent Skills layer through their workspace or project skill roots. Thin generated skill entrypoints load the existing files under `commands/` and `agents/`, so those Markdown definitions remain the single behavioral source of truth.
 
 ## Plugins
 
@@ -150,10 +157,12 @@ cd tests && npx vitest run schemas/   # Layer 1: instant, free
 ```
 lumenai/
 ├── .agents/plugins/marketplace.json     # Codex marketplace registry
-├── .claude-plugin/marketplace.json     # Marketplace registry
+├── .claude-plugin/marketplace.json     # Claude Code marketplace registry
+├── .grok-plugin/marketplace.json       # Grok marketplace registry
 ├── plugins/
 │   ├── synthex/                        # Synthex plugin
 │   │   ├── .codex-plugin/plugin.json   # Codex plugin manifest
+│   │   ├── .grok-plugin/plugin.json    # Grok plugin manifest (shared skills only)
 │   │   ├── .claude-plugin/plugin.json  # Plugin manifest (15 agents, 12 commands)
 │   │   ├── agents/                     # Agent definitions (.md files)
 │   │   ├── commands/                   # Command definitions (.md files)

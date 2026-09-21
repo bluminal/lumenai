@@ -225,6 +225,20 @@ jobs:
           mv "$tmp" plugins/synthex/.codex-plugin/plugin.json
 
           tmp=$(mktemp)
+          jq --indent 2 --arg v "$SYNTHEX_NEW" '.version = $v' \
+            plugins/synthex/.grok-plugin/plugin.json > "$tmp"
+          mv "$tmp" plugins/synthex/.grok-plugin/plugin.json
+
+          tmp=$(mktemp)
+          jq --indent 2 \
+             --arg m "$MARKET_NEW" \
+             --arg s "$SYNTHEX_NEW" '
+            .version = $m
+            | (.plugins[] | select(.name == "synthex").version) = $s
+          ' .grok-plugin/marketplace.json > "$tmp"
+          mv "$tmp" .grok-plugin/marketplace.json
+
+          tmp=$(mktemp)
           jq --indent 2 --arg v "$PLUS_NEW" '.version = $v' \
             plugins/synthex-plus/.claude-plugin/plugin.json > "$tmp"
           mv "$tmp" plugins/synthex-plus/.claude-plugin/plugin.json
@@ -234,8 +248,10 @@ jobs:
           # so preserve public read access after each atomic replacement.
           chmod 644 \
             .claude-plugin/marketplace.json \
+            .grok-plugin/marketplace.json \
             plugins/synthex/.claude-plugin/plugin.json \
             plugins/synthex/.codex-plugin/plugin.json \
+            plugins/synthex/.grok-plugin/plugin.json \
             plugins/synthex-plus/.claude-plugin/plugin.json
 
       - name: Generate CHANGELOG entry
@@ -363,8 +379,10 @@ jobs:
 
           git add \
             .claude-plugin/marketplace.json \
+            .grok-plugin/marketplace.json \
             plugins/synthex/.claude-plugin/plugin.json \
             plugins/synthex/.codex-plugin/plugin.json \
+            plugins/synthex/.grok-plugin/plugin.json \
             plugins/synthex-plus/.claude-plugin/plugin.json \
             CHANGELOG.md
 

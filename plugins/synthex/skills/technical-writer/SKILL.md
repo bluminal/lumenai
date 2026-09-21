@@ -7,10 +7,10 @@ description: "Use the Synthex Technical Writer specialist. Trigger for direct te
 
 # Synthex Technical Writer
 
-This is the Codex compatibility entrypoint for the canonical Synthex agent definition.
+This is the shared Agent Skills entrypoint for the canonical Synthex agent definition. Codex, Gemini CLI, OpenCode, and Grok load this file.
 
 1. Read [`./agents/technical-writer.md`](../../agents/technical-writer.md) completely before acting.
 2. Treat that file, not this wrapper, as the behavioral source of truth. Resolve its relative paths from the canonical file's directory, and resolve repository-style paths beginning with `plugins/synthex/` from this installed plugin root.
 3. Adopt the identity, responsibilities, review criteria, behavioral rules, and output contract in the source. If you are running as a delegated subagent, return the requested result to the caller.
-4. Translate Claude Code-specific tool names to the closest available Codex tools while preserving the workflow's intent and safety constraints.
+4. Translate Claude Code-specific tool names to the closest tools in the current host while preserving the workflow's intent and safety constraints.
 5. Keep provider-specific behavior only where the canonical workflow genuinely targets that provider. Do not edit the canonical definition merely to adapt it at runtime.
