@@ -102,7 +102,7 @@ Agents focused on understanding users, measuring outcomes, and driving improveme
 | `/loop` | Generic looping primitive — loops a prompt (literal or file) until a completion promise is emitted or `--max-iterations` is reached. See "Native Looping" below. | -- |
 | `/list-loops` | Enumerate running and recently-terminal loops in the project. Read-only. | -- |
 | `/cancel-loop` | Cancel a loop by id, or `--all` running loops. Idempotent on terminal-status loops. | -- |
-| `/next-priority` | Execute next highest-priority tasks | Tech Lead |
+| `/next-priority` | Execute next highest-priority tasks. Supports `--auto-decide` for unattended runs (see "Autonomous Decisions" below). | Tech Lead |
 | `/write-implementation-plan` | Transform PRD into implementation plan | PM + Architect + Design System Agent + Tech Lead |
 | `/review-code` | Multi-perspective code review | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
 | `/write-adr` | Create Architecture Decision Record | Architect (interactive) |
@@ -177,6 +177,16 @@ Synthex 0.8+ ships a **native looping primitive** that iterates a command until 
 ```
 
 `--loop` is supported on `next-priority`, `write-implementation-plan`, `refine-requirements`, and `review-code` (plus the four Synthex+ team commands). The flag is opt-in — when absent, every command behaves identically to today. See [`plugins/synthex/docs/native-looping.md`](./docs/native-looping.md) for the full framework spec, state-file schema, and emission-point details per command.
+
+## Autonomous Decisions (`--auto-decide`)
+
+`/next-priority` accepts an opt-in `--auto-decide` flag for unattended `--loop` runs. Normally, when the Tech Lead sub-agent reaches a high-impact decision or an ambiguous requirement it already has a recommendation for, it stops and asks via `AskUserQuestion` — which halts an unattended loop. With `--auto-decide` set, the Tech Lead takes its own recommended option instead of asking, and records the decision, the alternatives it considered, and its reasoning in the implementation plan for later human review.
+
+This is scoped narrowly: `[H]` (human-validated) acceptance criteria are **never** affected. Those always require explicit user approval via `AskUserQuestion` before merge, with or without `--auto-decide` — the flag only removes discretionary escalations that already have a clear recommendation, not formal sign-off gates.
+
+```bash
+/synthex:next-priority --loop --completion-promise "ALLDONE" --auto-decide
+```
 
 ## Standing Review Pools (via Synthex+)
 

@@ -20,6 +20,7 @@ Automatically identify and execute the next highest-priority tasks from the impl
 | `--max-iterations <int>` | Iteration cap (FR-NL13). Hard ceiling 200. | `20` | No |
 | `--loop-isolated` | Fresh-subagent isolation mode per iteration (FR-NL18). | off (shared-context default) | No |
 | `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
+| `--auto-decide` | Opt-in autonomy directive. When set, the Tech Lead sub-agent takes its own recommended option instead of calling `AskUserQuestion` at decision points where it already has a clear recommendation (high-impact escalations, ambiguous-task clarification) — and records the decision, alternatives, and reasoning in the plan for later review (see Step 9). Does **not** affect `[H]` acceptance-criteria approval, which always requires explicit user sign-off (see Step 7). Propagated to any sub-agent the Tech Lead delegates to. | off | No |
 
 ## Core Responsibilities
 
@@ -83,6 +84,10 @@ git worktree add {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short
   - **Author the commit message via the `commit-message-author` utility agent** (Haiku) rather than writing it inline. Pass the staged diff, any task-level issue key (only if known with certainty — e.g., a Jira key embedded in the worktree branch name or supplied to you), and a breaking-change flag if applicable. The agent detects the project's commit convention from `git log` and defaults to Conventional Commits 1.0.0. Pipe its returned message into `git commit -F -`.
   - Do NOT merge — merging is handled by this command after completion
   - Respect pre-commit hooks and address all failures
+- **Autonomy directive — only when `--auto-decide` is set:**
+  - Tell the Tech Lead: for this task, when you reach a decision point where you already have a clear recommendation — a high-impact escalation per your Decision Authority table, or an ambiguous requirement under Behavioral Rule 7 — take the recommended option yourself instead of calling `AskUserQuestion`. Record the decision, the alternatives considered, and your reasoning so it can be reviewed later (see Step 9).
+  - This does **not** apply to `[H]` acceptance criteria: those always require explicit user approval via `AskUserQuestion` before merge, regardless of `--auto-decide` (see Step 7).
+  - Propagate this directive to any sub-agent you delegate to — an un-propagated directive just moves the blocking question one level down, where it still halts the loop.
 
 The Tech Lead will:
 - Analyze the task and determine which sub-agents are needed
@@ -112,6 +117,7 @@ For each completed task, validate acceptance criteria by type:
 - Show what was built, how it addresses the criterion, and any alternatives considered
 - The user must explicitly approve each `[H]` criterion before the task can proceed to merge
 - If the user rejects, send specific feedback back to the Tech Lead for iteration
+- **This gate is unconditional:** even when `--auto-decide` is set, `[H]` criteria are never auto-approved — always ask via `AskUserQuestion`
 
 **`[O]` criteria (observational):**
 - No validation at this stage — note them as post-deployment metrics in the completion record
@@ -151,6 +157,7 @@ Mark completed tasks as "done" in the implementation plan with:
 - Completion notes
 - **Test linkage:** For each `[T]` criterion, record the test file and test name that proves it (e.g., `[T] Email validation → src/auth/__tests__/login.test.ts: "validates email format"`)
 - **`[H]` approval record:** Note that human approval was obtained for `[H]` criteria
+- **Autonomous decision record (when `--auto-decide` was set):** For each decision the Tech Lead resolved on its own recommendation instead of asking, record the decision taken, the alternatives considered, and the reasoning — one line is enough — so it can be reviewed later
 - Any learnings or discoveries
 - Follow-up tasks identified during implementation
 
