@@ -7,10 +7,10 @@ description: "Run the Synthex List native-looping loops in this project workflow
 
 # Synthex List native-looping loops in this project
 
-This is the Codex compatibility entrypoint for the canonical Synthex command definition.
+This is the shared Agent Skills entrypoint for the canonical Synthex command definition. Codex, Gemini CLI, OpenCode, and Grok load this file.
 
 1. Read [`./commands/list-loops.md`](../../commands/list-loops.md) completely before acting.
 2. Treat that file, not this wrapper, as the behavioral source of truth. Resolve its relative paths from the canonical file's directory, and resolve repository-style paths beginning with `plugins/synthex/` from this installed plugin root.
-3. Execute the requested workflow. When it names a Synthex agent, delegate with a Codex subagent when the source calls for delegation, and tell that subagent to read the matching file under `agents/` completely before acting.
-4. Translate Claude Code-specific tool names to the closest available Codex tools while preserving the workflow's intent and safety constraints.
+3. Execute the requested workflow. When it names a Synthex agent, delegate with the host harness's subagent mechanism when the source calls for delegation, and tell that subagent to read the matching file under `agents/` completely before acting.
+4. Translate Claude Code-specific tool names to the closest tools in the current host while preserving the workflow's intent and safety constraints.
 5. Keep provider-specific behavior only where the canonical workflow genuinely targets that provider. Do not edit the canonical definition merely to adapt it at runtime.

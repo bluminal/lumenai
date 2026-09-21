@@ -1,0 +1,29 @@
+{
+  "name": "lumenai",
+  "owner": {
+    "name": "Bluminal Labs"
+  },
+  "version": "1.1.0",
+  "license": "Apache-2.0",
+  "description": "Bluminal Labs AI plugin marketplace — collections of AI agents, commands, and skills for autonomous software delivery.",
+  "plugins": [
+    {
+      "name": "synthex",
+      "source": {
+        "type": "local",
+        "path": "./plugins/synthex"
+      },
+      "version": "1.1.0",
+      "category": "productivity",
+      "keywords": [
+        "agents",
+        "organization",
+        "orchestration",
+        "delivery",
+        "autonomous",
+        "synthesis"
+      ],
+      "description": "AI agents modeled after a software startup org chart — specialized roles that synthesize to discover, build, ship, operate, and learn from production-quality software."
+    }
+  ]
+}

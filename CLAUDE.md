@@ -9,7 +9,9 @@ This is **LumenAI** — a Claude Code plugin marketplace by Bluminal Labs. The f
 ```
 lumenai/
 ├── .claude-plugin/
-│   └── marketplace.json        # Marketplace registry (lists all plugins)
+│   └── marketplace.json        # Claude Code marketplace registry
+├── .grok-plugin/
+│   └── marketplace.json        # Grok marketplace registry (Synthex only)
 ├── .github/
 │   └── workflows/
 │       └── agent-tests.yml     # CI pipeline (3-tier agent testing)
@@ -43,8 +45,9 @@ lumenai/
 
 - **Agents** are markdown files in `agents/` that define an AI role (identity, responsibilities, behavioral rules, output format)
 - **Commands** are markdown files in `commands/` that define orchestration workflows (parameters, workflow steps, which agents to invoke)
-- **plugin.json** registers agents and commands within a plugin
-- **marketplace.json** registers plugins within the marketplace
+- **plugin.json** registers agents and commands within a plugin. Claude Code reads `.claude-plugin/plugin.json`. Codex and Grok read their own manifests and load the generated `skills/` wrappers, which point back at those same files.
+- **marketplace.json** registers plugins within the marketplace. Claude Code, Codex, and Grok each have their own marketplace file (`.claude-plugin/`, `.agents/plugins/`, `.grok-plugin/`).
+- After adding or renaming a command or agent, regenerate the shared skill wrappers with `node plugins/synthex/scripts/generate-codex-skills.mjs`. Do not hand-edit `skills/*/SKILL.md`.
 
 ## Adding a New Agent
 
@@ -66,7 +69,7 @@ lumenai/
 
 ## Releasing
 
-Releases are **automated** by `.github/workflows/release.yml` on every merge to `main`. Do **not** hand-edit `marketplace.json`, `plugins/*/.claude-plugin/plugin.json` versions, or `CHANGELOG.md` in feature PRs — the workflow owns all of those.
+Releases are **automated** by `.github/workflows/release.yml` on every merge to `main`. Do **not** hand-edit marketplace versions, `plugins/*/.claude-plugin/plugin.json`, `plugins/synthex/.codex-plugin/plugin.json`, `plugins/synthex/.grok-plugin/plugin.json` versions, or `CHANGELOG.md` in feature PRs — the workflow owns all of those.
 
 How it works:
 
