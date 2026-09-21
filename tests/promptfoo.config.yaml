@@ -809,3 +809,62 @@ tests:
         value: "No loop found"
       - type: icontains
         value: "list-loops"
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # AUTO-DECIDE (Layer 2)
+  # docs/plans/next-priority-delegation-autonomy.md, Task T3.
+  #
+  # Manual-trigger only. Cache population requires one initial
+  # `npx promptfoo eval --filter-pattern "AD-B"` against the live
+  # `claude` CLI; subsequent runs hit the cache. Pattern matches the
+  # NL-B convention above.
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "AD-B1: next-priority --auto-decide instructs the Tech Lead to take its recommendation instead of asking"
+    vars:
+      agent: next-priority
+      input: |
+        Run /synthex:next-priority --auto-decide for a task where, during
+        implementation, the Tech Lead would normally hit a high-impact
+        architectural decision it already has a clear recommendation for
+        (per its Decision Authority table), or an ambiguous requirement it
+        could resolve with a sensible default. Describe exactly what Step
+        5's delegation instructions tell the Tech Lead sub-agent to do in
+        this situation, and what must be recorded as a result.
+    assert:
+      - type: icontains
+        value: "take the recommended option"
+      - type: icontains
+        value: "alternatives"
+      - type: icontains
+        value: "reasoning"
+
+  - description: "AD-B2: next-priority WITHOUT --auto-decide still escalates the same decision via AskUserQuestion"
+    vars:
+      agent: next-priority
+      input: |
+        Run /synthex:next-priority WITHOUT --auto-decide for a task where
+        the Tech Lead hits the same kind of high-impact decision it already
+        has a recommendation for. Describe what Step 5 instructs the Tech
+        Lead sub-agent to do in this situation.
+    assert:
+      - type: icontains
+        value: "AskUserQuestion"
+      - type: not-icontains
+        value: "take the recommended option"
+
+  - description: "AD-B3: [H] acceptance criteria stay a hard AskUserQuestion gate even under --auto-decide"
+    vars:
+      agent: next-priority
+      input: |
+        Run /synthex:next-priority --auto-decide for a task with an [H]
+        (human-validated) acceptance criterion. Per Step 7, can the [H]
+        criterion be auto-approved because --auto-decide is set? Describe
+        exactly what must happen instead.
+    assert:
+      - type: icontains
+        value: "AskUserQuestion"
+      - type: icontains
+        value: "regardless of"
+      - type: not-icontains
+        value: "can be auto-approved"
