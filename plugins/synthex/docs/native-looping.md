@@ -63,6 +63,8 @@ Loop state lives at `<project>/.synthex/loops/<loop-id>.json`. One file per loop
 | `exit_reason` | string \| null | Human-readable; null while running. |
 | `consecutive_stop_blocks` | integer | Optional; managed by the `loop-advance-gate` Stop hook. Count of consecutive no-progress turn-ends. Resets to 0 (well, to 1 on the counting block) when `iteration` advances. Defaults to 0 when absent. |
 | `last_gate_iteration` | integer | Optional; gate-managed. The `iteration` value the last time the Stop hook fired — used to detect progress between turn-ends. Defaults to -1 when absent. |
+| `idle_streak` | integer | Optional; managed only by `scripts/loop-idle-wait.sh`. Consecutive idle iterations; selects the idle-wait backoff limit. Defaults to 0 when absent. |
+| `last_idle_iteration` | integer | Optional; managed only by `scripts/loop-idle-wait.sh`. The `iteration` of the most recent idle wait — the streak continues only when the next idle wait is at `iteration + 1`. Defaults to -1 when absent. |
 
 ### Obtaining the session id
 
@@ -183,9 +185,13 @@ Each `--loop`-bearing command authors a concrete adaptation of this flow. The st
 7. **Cancellation check.** Re-read the state file. If `status == "cancelled"` (set by another session via `/synthex:cancel-loop`), exit immediately.
 8. **Loop back to step 2.**
 
-### Turn-per-iteration: the Stop hook re-invokes you
+### Stay in-turn; the Stop hook is the safety net
 
-You do NOT have to keep the entire loop inside one assistant turn. Synthex's [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook re-drives the next iteration whenever you end a turn while the loop is still `running` and you have not emitted the completion promise. Ending a turn mid-loop is **recovered, not fatal** (ADR-003). Continuing in the same turn is still fine and marginally cheaper, but it is no longer the thing that keeps the loop alive — the promise keeps it from over-running, and the gate keeps it advancing. The gate bounds runaway with a progress-aware counter (`consecutive_stop_blocks`) capped below Claude Code's 8-consecutive-block override: if you genuinely cannot advance, it relinquishes after a few no-progress turns rather than forcing you forever, and it steps aside for a pending `AskUserQuestion` (the `[H]`-approval escape).
+Keep iterating inside the same assistant turn. Synthex's [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook re-drives the next iteration whenever you end a turn while the loop is still `running` and you have not emitted the completion promise, so ending a turn mid-loop is **recovered, not fatal** (ADR-003). But every turn-end is visible: Claude Code prints the gate's block reason as a "Stop hook error" line, and other tools' Stop hooks (e.g. Orca's "agent finished" notification) fire on every Stop event. They run in parallel with the gate and cannot know it is about to block. So the gate is the recovery path, not the driver.
+
+**Idle iterations wait in-turn.** When an iteration finds nothing to do, run `scripts/loop-idle-wait.sh <loop-id> [watch-path …]` as one Bash call (`timeout: 600000`) instead of ending the turn or immediately re-running the workflow. It returns when a watch path changes, when the loop leaves `running`, or after a backoff limit (60s → 120s → 300s → 540s over consecutive idle iterations). See [loop-advance-gate § Idle iterations](../hooks/loop-advance-gate.md#idle-iterations).
+
+**Non-Claude hosts.** Codex, Grok, Gemini CLI, and OpenCode run these same instructions through the `skills/` wrappers, but they register no Stop hook. There, staying in-turn is what keeps the loop alive, not just a way to cut noise. Resolve the idle-wait script from the installed plugin root (`plugins/synthex/scripts/loop-idle-wait.sh`), and fit the wait to the host's shell timeout with `SYNTHEX_LOOP_IDLE_MAX`. The gate bounds runaway with a progress-aware counter (`consecutive_stop_blocks`) capped below Claude Code's 8-consecutive-block override: if you genuinely cannot advance, it relinquishes after a few no-progress turns rather than forcing you forever, and it steps aside for a pending `AskUserQuestion` (the `[H]`-approval escape).
 
 ### What the agent's instructions must NOT do
 

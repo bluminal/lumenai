@@ -124,8 +124,14 @@ if [ "$CONSEC" -gt "$SYNTHEX_BLOCK_CAP" ]; then
 fi
 
 # Loop is alive and unfinished — block and drive the next iteration.
-jq -n --arg loop_id "$LOOP_ID" --arg promise "$PROMISE" '{
+# Keep the reason SHORT: Claude Code renders every block reason in the
+# transcript as "Stop hook error: …", and other tools' Stop hooks (e.g. Orca)
+# notify on every Stop event. The reason steers the model back to the in-turn
+# path (continue in the same turn; idle → loop-idle-wait.sh) so Stops stay rare.
+# The absolute script path is included because it survives auto-compaction.
+IDLE_WAIT="$(cd "$(dirname "$0")" 2>/dev/null && pwd)/loop-idle-wait.sh"
+jq -n --arg loop_id "$LOOP_ID" --arg idle "$IDLE_WAIT" '{
   decision: "block",
-  reason: ("Synthex loop \"" + $loop_id + "\" is status:running and this turn did not emit `<promise>" + $promise + "</promise>`. Synthex looping is turn-per-iteration — run the NEXT iteration now: boundary check (read .synthex/loops/" + $loop_id + ".json; exit if status != running or iteration >= max_iterations) → increment + persist the iteration counter → print the `[loop " + $loop_id + " iteration N/M]` marker → execute the command workflow once → emit `<promise>" + $promise + "</promise>` on its own line ONLY when the completion conditions hold. You do not need to keep this all in one turn; if you end the turn this gate re-invokes you for the next iteration. To stop intentionally, emit the promise or run `/synthex:cancel-loop " + $loop_id + "`. If you are blocked awaiting required user input, ask via AskUserQuestion (that releases this gate).")
+  reason: ("Synthex loop " + $loop_id + " still running (turn-per-iteration) — run the next iteration in this same turn. If nothing is actionable, wait in-turn with `bash " + $idle + " " + $loop_id + " <plan-path>` (Bash timeout 600000) instead of ending the turn.")
 }'
 exit 0

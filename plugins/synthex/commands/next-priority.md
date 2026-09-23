@@ -43,7 +43,7 @@ Read `@{implementation_plan_path}` and identify the top `{concurrent_tasks}` mos
 
 **Plan complete:** If every task in the plan has status `done`, inform the user: "All tasks in the implementation plan are complete. No work to execute." When running under `--loop`, this is the primary emission condition — emit the completion promise per [Emission Point](#emission-point) below.
 
-**No actionable tasks this iteration:** If non-`done` tasks exist but none are actionable right now (e.g., all remaining tasks are blocked, awaiting `[H]` user approval, or have unsatisfied dependencies), do **NOT** emit the completion promise. Instead, inform the user which tasks remain and why they are not actionable. Under `--loop`, the next iteration re-runs the workflow — the user may be completing manual tasks or `[H]` reviews in a separate thread, which will unblock work for the next pass.
+**No actionable tasks this iteration:** If non-`done` tasks exist but none are actionable right now (e.g., all remaining tasks are blocked, awaiting `[H]` user approval, or have unsatisfied dependencies), do **NOT** emit the completion promise. Instead, inform the user which tasks remain and why they are not actionable. Under `--loop`, keep this report to one line and run the [idle wait](#idle-iterations-wait-in-turn) before the next iteration — the user may be completing manual tasks or `[H]` reviews in a separate thread, which will unblock work for the next pass.
 
 **Critical Rule:** Only select tasks that are truly independent for parallel execution. Tasks with dependencies on each other MUST be sequenced — they cannot run in parallel.
 
@@ -186,7 +186,8 @@ If your invocation includes `--loop`, you are NOT running this command once. You
 4. **Execute Workflow §1–§9 below in full.** Use the implementation plan, worktrees, Tech Lead delegation, validation gates, and immediate merged-worktree cleanup — the entire body of this command runs **once per iteration**.
 5. **Decide the iteration's exit.** At the END of the iteration's work, do one of:
    - **(A) Emit the promise** — `<promise>{completion_promise}</promise>` on its OWN line, only when the Emission Point conditions below hold. Set `status: "completed"`, `exit_reason: "completion-promise-emitted"`, `exited_at`, write state, exit.
-   - **(B) Continue to the next iteration.** Prefer to re-enter step 1 in the same turn. If you instead end the turn while the loop is still `running` and unfinished, the [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook re-invokes you for the next iteration — a turn-end is recovered (ADR-003), so a "## Iteration N — Complete" summary or a "want me to continue?" hand-off no longer breaks the loop. Do NOT emit the promise to escape; emit it only when the Emission Point conditions hold.
+   - **(B) Continue to the next iteration — in the SAME turn.** Re-enter step 1 without ending your turn and without an "## Iteration N — Complete" summary or a "want me to continue?" hand-off. Every turn-end fires Stop hooks: the [`loop-advance-gate`](../hooks/loop-advance-gate.md) recovers it (ADR-003), but each one prints a "Stop hook error" line and triggers "agent finished" notifications from other tools' Stop hooks (e.g. Orca). The gate is a safety net, not the loop driver. Do NOT emit the promise to escape; emit it only when the Emission Point conditions hold.
+   - **(B′) Idle — wait in-turn, then continue.** If this iteration found no actionable tasks (and the plan is not complete), run the [idle wait](#idle-iterations-wait-in-turn), then re-enter step 1 in the same turn.
    - **(C) Await required input.** If an `[H]` acceptance criterion needs user approval, ask via `AskUserQuestion`. That releases the gate for this turn — it will not force-continue past a pending question.
 6. **Cancellation check** before re-entering: re-read the state file. If another session set `status: "cancelled"` via `/synthex:cancel-loop`, exit immediately.
 
@@ -222,7 +223,20 @@ Write the state file with exactly these fields. The `status` enum is closed — 
 - `iteration >= max_iterations` after increment.
 - Another session sets `status: "cancelled"` via `/synthex:cancel-loop <loop-id>` or `/synthex:cancel-loop --all`.
 
-The [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook re-invokes you on a turn-end while the loop is still `running`, so ending a turn no longer breaks the loop (ADR-003). The gate bounds runaway with a progress-aware counter capped below Claude Code's 8-consecutive-block override — it relinquishes after a few no-progress turns — and steps aside for a pending `AskUserQuestion`. The one self-inflicted failure mode that remains is **emitting the completion promise before the Emission Point conditions hold**, which terminates the loop early.
+The [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook re-invokes you on a turn-end while the loop is still `running`, so ending a turn no longer breaks the loop (ADR-003) — but stay in-turn anyway (step 5B/B′); turn-ends are noisy. The gate bounds runaway with a progress-aware counter capped below Claude Code's 8-consecutive-block override — it relinquishes after a few no-progress turns — and steps aside for a pending `AskUserQuestion`. The one self-inflicted failure mode that remains is **emitting the completion promise before the Emission Point conditions hold**, which terminates the loop early.
+
+#### Idle iterations (wait in-turn)
+
+When an iteration finds nothing actionable, do NOT end the turn and do NOT re-run the workflow immediately. Print one line (e.g. `Idle: 3 tasks blocked on [H] review — waiting for plan changes.`), then run the idle-wait script `plugins/synthex/scripts/loop-idle-wait.sh` (resolved from the installed plugin root) as ONE foreground shell command with the tool's timeout set to at least 600 seconds (Claude Code: Bash with `timeout: 600000`):
+
+```bash
+# Claude Code
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/loop-idle-wait.sh" <loop-id> <implementation-plan-path>
+# Other hosts (Codex, Grok, Gemini CLI, OpenCode): use the installed plugin root
+bash <synthex-plugin-root>/scripts/loop-idle-wait.sh <loop-id> <implementation-plan-path>
+```
+
+It blocks until the plan file changes, the loop leaves `running` (e.g. `/synthex:cancel-loop`), or a backoff limit elapses (60s → 120s → 300s → 540s over consecutive idle iterations; it tracks `idle_streak` in the state file itself). It prints one `idle-wait <loop-id>: <reason> …` line and always exits 0. Then continue with step 1 of the next iteration in the same turn. If `${CLAUDE_PLUGIN_ROOT}` is not expanded, use the absolute path from the `loop-advance-gate` block reason (Claude Code only) or the installed plugin root. If your shell tool cannot allow 600s, prefix the command with `SYNTHEX_LOOP_IDLE_MAX=<your cap minus 30>`. If the script cannot be found or the host has no shell tool, continue to the next iteration without waiting — never end the turn instead. Hosts without the Stop hook (Codex, Grok, and others) have no gate to re-invoke you, so a turn-end there stops the loop.
 
 ### Emission Point
 

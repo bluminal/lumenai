@@ -119,6 +119,10 @@ describe.skipIf(!hasJq)('loop-advance-gate.sh — turn-per-iteration driver (ADR
     const decision = JSON.parse(stdout);
     expect(decision.decision).toBe('block');
     expect(decision.reason).toMatch(/turn-per-iteration/);
+    // One line, steers to in-turn continuation, and names the idle-wait script by absolute path.
+    expect(decision.reason).not.toMatch(/\n/);
+    expect(decision.reason).toMatch(/same turn/);
+    expect(decision.reason).toMatch(/\/plugins\/synthex\/scripts\/loop-idle-wait\.sh np-1 /);
     expect(readCounter().consecutive_stop_blocks).toBe(1);
     expect(readCounter().last_gate_iteration).toBe(3);
   });
