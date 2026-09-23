@@ -63,7 +63,7 @@ Rewrite `loop-advance-gate.sh` so that, for a `running` loop matching the curren
 - **Robust by construction, cheap to run.** The decision is mechanical (promise / status / counter) — no per-turn LLM evaluation cost, unlike `/goal`. The harness's "8 without progress" cap is the ultimate runaway guard; Synthex's own sub-8 counter relinquishes first, deterministically.
 - **Compaction-safety comes for free where it matters.** Loop state already lives in `.synthex/loops/<id>.json`; the gate re-derives everything from disk, so auto-compaction of the conversation cannot break re-invocation.
 - **`[H]` gates are safe.** The pending-`AskUserQuestion` escape prevents the gate from force-continuing past a required human approval.
-- **Less prose to lose.** The "never end your turn" imperative is downgraded from load-bearing to advisory, shrinking the most error-prone part of the looping docs.
+- **Less prose to lose.** The "never end your turn" imperative is downgraded from load-bearing to advisory, shrinking the most error-prone part of the looping docs. (See the 2026-09-22 amendment: staying in-turn is again the instructed path, for noise reasons, while the gate stays the recovery mechanism.)
 - **Retains every Synthex feature.** Multi-loop per project, named loops, `--resume`/`--resume-last`, `--loop-isolated`, `cancel`/`cancel-all`, archive — all preserved, unlike adopting `/goal` wholesale.
 
 ### Negative
@@ -78,6 +78,17 @@ Rewrite `loop-advance-gate.sh` so that, for a `running` loop matching the curren
 - **State schema gains optional fields** with no `schema_version` bump; resume and in-flight loops are unaffected.
 - **Hook remains a thin shell shim.** Consistent with the Synthex+ hook design principle (logic in the markdown spec, mechanics in the shim).
 - **Coexists with the in-flight Ralph Loop removal.** This decision is orthogonal to the concurrent removal of the external `ralph-loop` dependency and does not touch it.
+
+### Amendment (2026-09-22): stay in-turn; idle iterations wait in-turn
+
+Field use showed that turn-per-iteration is noisy even when it works. Every blocked Stop is printed as a multi-line "Stop hook error", and other tools' Stop hooks, which run in parallel with the gate (e.g. Orca's desktop notifier), treat each Stop as "agent finished". An idle `next-priority --loop` (all remaining tasks blocked on `[H]` review) spun through ~130 turn-ends, each producing both. The idle iterations also advanced `iteration`, so the progress-aware counter never tripped.
+
+Changes:
+- **In-turn continuation is the required path again; the gate is the safety net.** The model is told to re-enter the next iteration without ending the turn. This does not bring back the old failure mode: a turn-end is still recovered by the gate.
+- **Idle iterations wait in-turn** via `plugins/synthex/scripts/loop-idle-wait.sh`, a foreground Bash call that returns when watched files change, when the loop leaves `running`, or after a 60s → 540s backoff. No turn-end means no Stop event, no transcript noise, and no external notification.
+- **The block reason is one line** and names the idle-wait script's absolute path, which survives auto-compaction.
+
+Rejected: allowing the stop when idle (quiet, but nothing re-invokes the loop, so it becomes a de facto pause); pausing via `AskUserQuestion` (defeats hands-off looping); waiting inside the Stop hook (fewer Stops, but each one still notifies).
 
 ## Alternatives Considered
 

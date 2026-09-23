@@ -61,7 +61,7 @@ For the matched running loop, the gate ALLOWS the stop when any of:
 
 ## Block condition and the progress-aware counter
 
-If a running loop exists for this session and none of the allow conditions hold, the gate **blocks** with `decision: "block"` and a `reason` instructing the model to run the next iteration (boundary check → increment + persist the iteration counter → print the marker → run the workflow once → emit the promise only when done). The `reason` explicitly tells the model that ending the turn is safe because the gate re-invokes it.
+If a running loop exists for this session and none of the allow conditions hold, the gate **blocks** with `decision: "block"` and a one-line `reason` telling the model to run the next iteration in the same turn, and — if nothing is actionable — to wait in-turn with `loop-idle-wait.sh` (absolute path included) instead of ending the turn. The full iteration protocol lives in the command prompt; the reason is short because Claude Code prints it on every blocked Stop.
 
 To bound runaway when the model genuinely cannot advance, the gate keeps a **progress-aware counter** in the state file (ADR-003 §3):
 
@@ -76,6 +76,31 @@ On each block decision:
 4. If `consecutive_stop_blocks` exceeds the cap (`SYNTHEX_LOOP_BLOCK_CAP`, default **7**), allow the stop instead of blocking.
 
 The cap is kept strictly **below Claude Code's hard 8-consecutive-block override** (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP`, default 8). This means Synthex relinquishes deterministically — and keeps the `[H]` escape and resume protection — rather than being force-stopped by the harness with a warning. A loop whose iterations make real work never accumulates toward the cap, because progress resets the counter every iteration.
+
+---
+
+<a id="idle-iterations"></a>
+## Idle iterations (in-turn wait, not turn-ends)
+
+Every Stop event is user-visible even when the gate blocks it: Claude Code prints the block `reason` as "Stop hook error: …", and other Stop hooks registered by the user's tools (e.g. Orca's `~/.orca/agent-hooks/claude-hook.sh`) run **in parallel** with this gate and treat each Stop as "agent finished" — sending a desktop notification. A plugin hook cannot suppress or reorder other hooks. The only way to avoid that noise is to not end the turn.
+
+So an idle loop — remaining tasks blocked or awaiting `[H]` review — must not spin through turn-ends. The looping command instead calls [`scripts/loop-idle-wait.sh`](../scripts/loop-idle-wait.sh) as a single foreground Bash call (`timeout: 600000`) and continues in the same turn when it returns:
+
+```
+loop-idle-wait.sh <loop-id> [watch-path …]
+```
+
+| Returns when | Printed reason |
+|--------------|----------------|
+| Any watch path's content changes (POSIX `cksum`) | `changed` |
+| The loop's `status` leaves `running` (e.g. `/synthex:cancel-loop`) | `not-running` |
+| The backoff limit elapses | `timeout` |
+
+Backoff by consecutive idle iterations: 60s, 120s, 300s, then `SYNTHEX_LOOP_IDLE_MAX` (default 540s, below the Bash tool's 600s ceiling). The script tracks `idle_streak` / `last_idle_iteration` in the state file itself; the streak continues only when idle waits land on consecutive iterations, so any productive iteration resets it. Poll interval: `SYNTHEX_LOOP_IDLE_POLL` (default 5s). It always exits 0 and prints one line.
+
+**Other hosts.** Codex, Grok, Gemini CLI, and OpenCode load the shared `skills/` wrappers and run the same command prompts, but their manifests register no hooks, so this gate never runs there and a turn-end stops the loop. The commands tell them to stay in-turn, resolve the script as `plugins/synthex/scripts/loop-idle-wait.sh` from the installed plugin root (the wrappers already resolve `plugins/synthex/` paths that way), set their shell tool's timeout to ≥600s or lower `SYNTHEX_LOOP_IDLE_MAX` to fit, and if the script is unavailable, continue without waiting. The script needs only POSIX `sh` tools (`sleep`, `cksum`); without `jq` it still waits and detects cancellation, but cannot track the streak, so it uses the fixed 60s first-step limit.
+
+The gate's block reason names the script's absolute path, so a model that has lost `${CLAUDE_PLUGIN_ROOT}` after auto-compaction can still find it. The reason is kept to one line, since it is printed on every blocked Stop.
 
 ---
 
