@@ -26,6 +26,12 @@ import {
   profiles,
   supportsProfile,
 } from '../compat/lib/harnesses.mjs';
+import {
+  AGENT_COUNT,
+  COMMAND_COUNT,
+  diffInventoryAgainstManifest,
+  WRAPPER_COUNT,
+} from '../compat/lib/inventory.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const pluginRoot = resolve(repoRoot, 'plugins/synthex');
@@ -37,9 +43,13 @@ describe('cross-harness compatibility contract', () => {
   it('derives a unique portable skill for every command and agent', () => {
     const entries = readExpectedEntrypoints(pluginRoot);
 
-    expect(entries.filter(({ kind }) => kind === 'command')).toHaveLength(18);
-    expect(entries.filter(({ kind }) => kind === 'agent')).toHaveLength(28);
+    expect(entries.filter(({ kind }) => kind === 'command')).toHaveLength(COMMAND_COUNT);
+    expect(entries.filter(({ kind }) => kind === 'agent')).toHaveLength(AGENT_COUNT);
     expect(new Set(entries.map(({ id }) => id)).size).toBe(entries.length);
+  });
+
+  it('keeps tests/compat/lib/inventory.mjs in sync with the plugin manifest', () => {
+    expect(diffInventoryAgainstManifest(pluginRoot)).toEqual([]);
   });
 
   it('keeps the generated skill tree in sync with the canonical manifest', () => {
@@ -237,8 +247,8 @@ describe('cross-harness compatibility contract', () => {
       });
       const reviewProbe = probes.find(({ id }) => id === 'review-code');
 
-      expect(probes).toHaveLength(46);
-      expect(new Set(probes.map(({ token }) => token)).size).toBe(46);
+      expect(probes).toHaveLength(WRAPPER_COUNT);
+      expect(new Set(probes.map(({ token }) => token)).size).toBe(WRAPPER_COUNT);
       expect(reviewProbe?.token).toBe(
         'SYNTHEX_COMPAT_unit_COMMAND_REVIEW_CODE',
       );
