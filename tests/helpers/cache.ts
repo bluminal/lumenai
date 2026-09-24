@@ -1,9 +1,10 @@
 /**
  * File-based caching layer for LLM outputs.
  *
- * Cache key is a SHA-256 hash of (agent markdown + fixture content + model id).
- * Cached outputs are stored as plain text files in tests/.cache/ so they can
- * be inspected manually and excluded via .gitignore.
+ * Cache key is a SHA-256 hash of (agent markdown + fixture content + model id
+ * + effort tier). Cached outputs are stored as plain text files in
+ * tests/.cache/ so they can be inspected manually and excluded via
+ * .gitignore.
  */
 
 import { createHash } from 'crypto';
@@ -12,21 +13,34 @@ import { join } from 'path';
 
 const CACHE_DIR = join(import.meta.dirname, '..', '.cache');
 
+/** Sentinel used in the cache key when no effort tier is specified. */
+const DEFAULT_EFFORT = 'default';
+
 /**
  * Produce a deterministic 16-character hex key from the combination of
- * agent definition, fixture input, and model identifier. Any change to
- * the agent prompt, the input data, or the target model invalidates
- * the cached output.
+ * agent definition, fixture input, model identifier, and effort tier. Any
+ * change to the agent prompt, the input data, the target model, or the
+ * effort tier invalidates the cached output — this is what lets FR-HM14
+ * re-tiers (e.g. bumping an agent's `effort:` from `low` to `high`) be
+ * evaluated without accidentally reusing a stale, differently-tiered
+ * cached response.
+ *
+ * `effort` defaults to `DEFAULT_EFFORT` ("default") so existing callers
+ * that only pass (agentContent, fixtureContent, model) keep working; it is
+ * folded into the hash unconditionally so that an explicit effort tier
+ * always produces a different key than "no effort tier specified".
  */
 export function getCacheKey(
   agentContent: string,
   fixtureContent: string,
   model: string = 'default',
+  effort: string = DEFAULT_EFFORT,
 ): string {
   const hash = createHash('sha256');
   hash.update(agentContent);
   hash.update(fixtureContent);
   hash.update(model);
+  hash.update(effort || DEFAULT_EFFORT);
   return hash.digest('hex').substring(0, 16);
 }
 
