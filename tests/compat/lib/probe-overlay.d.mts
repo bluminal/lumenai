@@ -15,3 +15,9 @@ export const PROBE_MARKER: string;
 export function createProbeOverlay(
   options: ProbeOverlayOptions,
 ): ActivationProbe[];
+
+/**
+ * Offset right after a canonical file's YAML frontmatter closing fence, or
+ * -1 if `contents` does not open with a well-formed frontmatter fence.
+ */
+export function findFrontmatterEnd(contents: string): number;
