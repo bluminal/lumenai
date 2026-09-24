@@ -35,7 +35,7 @@ try {
   const representatives = selectRepresentativeProbes(probes);
   for (const entry of entries) {
     runCommand('gemini', [
-      'skills', 'install', join(overlayRoot, 'skills', entry.id), '--scope', 'workspace', '--consent',
+      'skills', 'install', join(overlayRoot, 'portable-skills', entry.id), '--scope', 'workspace', '--consent',
     ]);
   }
   mkdirSync(workspaceSupportRoot, { recursive: true });

@@ -70,7 +70,7 @@ try {
 
   const discovered = entries
     .filter(({ id }) => {
-      const path = `/workspace/.agents/skills/${id}/SKILL.md`;
+      const path = `/workspace/.agents/portable-skills/${id}/SKILL.md`;
       return debugResult.stdout.includes(path);
     })
     .map(({ id }) => id);
@@ -136,7 +136,7 @@ try {
     );
   }
   const remaining = entries.filter(({ id }) =>
-    uninstallResult.stdout.includes(`/workspace/.agents/skills/${id}/SKILL.md`),
+    uninstallResult.stdout.includes(`/workspace/.agents/portable-skills/${id}/SKILL.md`),
   );
   if (remaining.length > 0) {
     throw new Error(

@@ -33,11 +33,11 @@ grok plugin marketplace add bluminal/lumenai
 grok plugin install synthex --trust
 ```
 
-Grok loads the same generated `skills/` entrypoints Codex uses. The Grok manifest registers that skills directory only, so the Claude command and agent files are not also published as a second set of slash commands or agents. Invoke a workflow as `/synthex:review-code` (or `/review-code` when the name is unambiguous). The installed plugin still includes `commands/`, `agents/`, `config/`, and `scripts/` so each skill can read its canonical source.
+Grok loads the same generated `portable-skills/` entrypoints Codex uses. The Grok manifest registers that skills directory only, so the Claude command and agent files are not also published as a second set of slash commands or agents. Invoke a workflow as `/synthex:review-code` (or `/review-code` when the name is unambiguous). The installed plugin still includes `commands/`, `agents/`, `config/`, and `scripts/` so each skill can read its canonical source.
 
 ### Gemini CLI and OpenCode
 
-Gemini CLI and OpenCode use the same generated Agent Skills bundle rather than a native marketplace plugin. Install `skills/` with the sibling `agents/`, `commands/`, `config/`, and `scripts/` directories under the harness's documented workspace or project skill root; preserving that layout lets each `SKILL.md` load the canonical workflow source.
+Gemini CLI and OpenCode use the same generated Agent Skills bundle rather than a native marketplace plugin. Install `portable-skills/` with the sibling `agents/`, `commands/`, `config/`, and `scripts/` directories under the harness's documented workspace or project skill root; preserving that layout lets each `SKILL.md` load the canonical workflow source.
 
 For copyable installation and update instructions, see [Agent compatibility](https://slashsynthex.com/docs/agent-compatibility).
 

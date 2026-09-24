@@ -36,7 +36,7 @@ try {
     runCommand('gemini', [
       'skills',
       'install',
-      join(stagingRoot, 'skills', entry.id),
+      join(stagingRoot, 'portable-skills', entry.id),
       '--scope',
       'workspace',
       '--consent',
@@ -70,7 +70,10 @@ try {
       `Gemini skill inventory is incomplete: ${inventory.missing.join(', ')}\n${list.stdout.slice(0, 4_000)}`,
     );
   }
-  const installedValidation = validateSkillTree(workspaceSupportRoot, entries);
+  // Gemini CLI's native `skills install --scope workspace` always lands
+  // files at `.gemini/skills/<id>/SKILL.md`, a Gemini-owned convention
+  // independent of the source tree's directory name (`portable-skills/`).
+  const installedValidation = validateSkillTree(workspaceSupportRoot, entries, 'skills');
   if (Object.values(installedValidation).some((items) => items.length > 0)) {
     throw new Error(`Gemini installed tree is invalid: ${JSON.stringify(installedValidation)}`);
   }
