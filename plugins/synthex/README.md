@@ -206,6 +206,10 @@ When [Synthex+](../synthex-plus/README.md) is installed and a standing review po
 
 For setup and configuration, see the [Standing Pools guide](../synthex-plus/docs/standing-pools.md).
 
+## Cost
+
+Synthex never invokes usage-billed features such as `/code-review ultra`, the GitHub Code Review managed service, or Managed Agents — every command runs only on the plan-included or API-key token spend you already pay for.
+
 ## License
 
 Apache 2.0 — See [LICENSE](../../LICENSE) for details.
