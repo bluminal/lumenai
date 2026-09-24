@@ -5,6 +5,19 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 1.3.1 / synthex-plus 1.3.1] - 2026-09-24
+
+### Changed
+
+- (plans) record Task 4 done; Milestone 1.1 complete
+- (plans) record Tasks 1-3 done with test linkage; Task 4 in progress
+- add Layer 1 tests for H1 detection, frontmatter parsing, and host-matrix scaffold
+- add Layer 1 schema validators for tool-presence gates and usage-billing
+- introduce inventory constants for command/agent/wrapper counts
+- read agent model and effort from markdown frontmatter
+- (plans) add harness-modernization implementation plan
+- (reqs) add harness-modernization PRD with cross-harness impact analysis
+
 ## [synthex 1.3.0 / synthex-plus 1.3.0] - 2026-09-23
 
 ### Added
