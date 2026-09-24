@@ -1,6 +1,6 @@
 # Product Requirements Document: Harness-Native Synthex
 
-**Status:** Draft v1 (2026-09-24)
+**Status:** Draft v1.1 (2026-09-24; amendments A1 to A16 from `docs/plans/harness-modernization.md` applied)
 **Owner:** Bluminal Labs
 **Related:** `docs/reqs/main.md`, `docs/reqs/multi-model-review.md`, `docs/reqs/plus.md` (superseded in part by this document), `docs/reqs/multi-model-teams.md` (superseded in part by this document), `docs/specs/decisions/ADR-003` (native looping)
 
@@ -22,7 +22,7 @@ At the same time, Synthex now ships to more than one harness. Codex, Gemini CLI,
 2. **One plugin.** `synthex-plus` is phased out. Team and pool behavior lives in `synthex` and activates only when the host exposes the tools it needs.
 3. **The prose path stays canonical.** Every command remains a complete, executable markdown workflow on every host. Claude-only engines are opt-in accelerators layered on top, never replacements.
 4. **Capability detection by tool presence, never by host name.** A branch reads "if a `Workflow` tool is in your tool list", not "on Claude Code".
-5. **Portable scripts.** Anything moved out of prose into a script is POSIX `sh` with `jq` and `node` optional, and it degrades to a stated prose fallback when the host cannot run it.
+5. **Portable scripts.** Anything moved out of prose into a script is `bash` (present on every supported host and compat image) or `node`, with `jq` optional and no `python`, and it degrades to a stated prose fallback when the host cannot run it.
 
 ---
 
@@ -74,9 +74,10 @@ No command, agent, hook, or generated recipe may invoke a feature that bills aga
 
 **FR-HM2: One plugin**
 
-`synthex-plus` is retired. Its standing-pool and team capabilities are re-homed in `synthex` per FR-HM23 through FR-HM25. No new `synthex-plus` features are accepted after this PRD is approved.
+`synthex-plus` is retired. Its standing-pool and team capabilities are re-homed in `synthex` per FR-HM23 through FR-HM25. No new `synthex-plus` features are accepted after this PRD is approved. Because removing a plugin from the marketplace does not uninstall cached copies, a final tombstone release of `synthex-plus` (empty `hooks.json`, commands that print migration steps only) ships before the marketplace entry is removed.
 
 **Acceptance Criteria:**
+- A tombstone `synthex-plus` release is published before the marketplace entry is removed; stale installs run no hooks after upgrading to it.
 - `.claude-plugin/marketplace.json` lists one plugin.
 - `release.yml` bumps one plugin manifest set (Claude, Codex, Grok) and one CHANGELOG header.
 - `CLAUDE.md` has no "Commands (Synthex Plus)" table; pool routing is documented under `synthex`.
@@ -98,13 +99,13 @@ Every command is a complete, executable markdown workflow without any Claude-onl
 **Acceptance Criteria:**
 - `code_review.engine` defaults to `prose`.
 - The native-only review output remains byte-identical to the FR-MR23 baseline snapshot when `engine: prose`.
-- Each engine branch lives in `plugins/synthex/commands/<command>/<engine>.md` (or a sibling doc) and is referenced from the command in at most three lines.
+- Each engine branch lives in `plugins/synthex/docs/engines/<command>-<engine>.md` (never under `commands/`, which Claude Code would register as a slash command) and is referenced from the command in at most three lines.
 
 ### 4.2 Prompt Diet and Cold-Path Split
 
 **FR-HM5: Cold-path split**
 
-Blocks that execute only when a config key enables them move out of the hot path into `plugins/synthex/docs/<topic>.md`, mirroring the existing `docs/native-looping.md` precedent. The command keeps a two-line gate: "If `<key>` is true (or `--flag` was passed), Read `docs/<topic>.md` and follow it; otherwise continue to Step N."
+Blocks that execute only when a config key enables them move out of the hot path into `plugins/synthex/docs/<topic>.md`, mirroring the existing `docs/native-looping.md` precedent. The command keeps a two-line gate: "If `<key>` is true (or `--flag` was passed), Read `${CLAUDE_PLUGIN_ROOT}/docs/<topic>.md` and follow it; otherwise continue to Step N", followed by the FR-HM13 other-hosts line. A bare `docs/<topic>.md` path is forbidden because it would resolve against the user's own `docs/` directory and silently skip the branch.
 
 Targets and expected sizes:
 
@@ -141,7 +142,7 @@ Rationale: Claude Code injects `CLAUDE.md` automatically (so the inclusion is a 
 **Acceptance Criteria:**
 - No `@CLAUDE.md` remains in `commands/` or `agents/`.
 - A Layer 2 fixture on Claude Code shows the command output unchanged.
-- The compat activation probes for Codex, Gemini, and OpenCode confirm the `Read` of the project instruction file is issued when no host injection occurred.
+- The credential-gated canary profile for Codex, Gemini, and OpenCode confirms the `Read` of the project instruction file is issued when no host injection occurred (the activation loopback providers never emit tool calls, so they cannot verify this).
 
 **FR-HM8: Drop emphasis scaffolding written for older models**
 
@@ -199,14 +200,15 @@ Plus two rules: "If a named tool does not exist, skip that step once and continu
 **Acceptance Criteria:**
 - The table is emitted verbatim into every wrapper from a single constant in the generator; `--check` stays byte-exact.
 - The two rules appear in every wrapper.
-- Compat activation probes on OpenCode and Codex show no repeated calls to an unavailable tool.
+- Canary-profile probes on OpenCode and Codex show no repeated calls to an unavailable tool.
 
 **FR-HM13: Plugin root discovery for scripts on non-Claude hosts**
 
-`${CLAUDE_PLUGIN_ROOT}` is set only for Claude Code hooks (and Codex hooks). Every command that runs a script provides the two-line host split already used in `next-priority.md:233-236`, and every wrapper states the installed plugin root as the directory two levels above the wrapper.
+`${CLAUDE_PLUGIN_ROOT}` is set only for Claude Code hooks (and Codex hooks). Every command that runs a script provides the two-line host split already used in `next-priority.md:233-236`, and every wrapper states the installed plugin root as the directory two levels above the wrapper. As a fallback where the variable is not expanded in command prose, the SessionStart hook writes the resolved `plugin_root` into `.synthex/state.json` for prose to read.
 
 **Acceptance Criteria:**
 - Every `bash "${CLAUDE_PLUGIN_ROOT}/scripts/...` invocation in `commands/` and `agents/` is immediately followed by the "other hosts" line.
+- The SessionStart hook records `plugin_root` in `.synthex/state.json`, and the cold-path include test verifies both the primary and the fallback resolution.
 
 ### 4.4 Agent Re-Tiering and Effort Profiles
 
@@ -252,7 +254,8 @@ Config resolution, standing-pool discovery, the sandbox-yolo confirmation, and d
 **Acceptance Criteria:**
 - With `engine: prose`, output is byte-identical to the FR-MR23 baseline.
 - With `engine: workflow` on a host without the tool, the command takes the prose path and prints one line saying so.
-- The script lives in `plugins/synthex/commands/review-code/workflow-engine.js` with a sibling `.md` that documents it; `review-code.md` references it in at most three lines.
+- The engine is documented in `plugins/synthex/docs/engines/review-code-workflow.md`; the script lives wherever the Workflow-packaging spike shows Claude Code loads plugin workflows from; `review-code.md` references it in at most three lines.
+- If a committed config key does not count as the Workflow tool's opt-in, the command asks once per session; the engine is never selected in headless runs, and `/synthex:schedule` recipes force `prose`.
 - A spike confirms `agentType: 'synthex:code-reviewer'` resolves from a Workflow script before implementation proceeds; if it does not, the engine inlines reviewer prompts and the acceptance target for cache sharing is dropped.
 - The "Context Management" fresh-agent paragraphs that `review-loops.ts` mandates are untouched.
 - The multi-model path is unchanged: external proposers still run through the orchestrator; the engine consumes its envelope as a second `parallel()` group.
@@ -263,7 +266,7 @@ Config resolution, standing-pool discovery, the sandbox-yolo confirmation, and d
 
 On the workflow engine, each CRITICAL or HIGH finding is checked by three independent refuters (correctness, does-it-reproduce, security-impact), each seeing only the artifact and the single finding, at `effort: low` on Sonnet 5 (Haiku 4.5's support for `effort` is unverified). A finding survives with two of three non-refuted votes. Refuted findings remain in the audit artifact with a new `verification: {status, method, failure_scenario}` field; the existing `superseded_by_verification` value is not reused.
 
-On the prose path (all hosts), the three review agents gain a short "Verification pass (CRITICAL/HIGH only, top 5)" section: "If an LSP tool is available, use definition/references/diagnostics; otherwise grep for the symbol's references; never block the review on verification." The result renders as a `- **Verification:** CONFIRMED (lsp|grep) | PLAUSIBLE (none)` line inside the existing `#### [SEV] Title` block.
+On the prose path (all hosts), the three review agents gain a short "Verification pass (CRITICAL/HIGH only, top 5)" section: "If an LSP tool is available, use definition/references/diagnostics; otherwise grep for the symbol's references; never block the review on verification." The result renders as a `- **Verification:** CONFIRMED (lsp|grep) | PLAUSIBLE (none)` line inside the existing `#### [SEV] Title` block. The prose pass is opt-in via `code_review.verification: prose|off`, default `off`, because it changes zero-config output and adds tool calls on the default path (NFR-HM1, NFR-HM3); it may become the default once the FR-HM34 suite shows a recall gain.
 
 **Acceptance Criteria:**
 - `security-reviewer` rule 8 ("never approve code with CRITICAL findings") is unchanged; a PLAUSIBLE CRITICAL still fails the review.
@@ -274,7 +277,7 @@ On the prose path (all hosts), the three review agents gain a short "Verificatio
 
 **FR-HM18: Stage 1, portable loop bookkeeping script**
 
-`scripts/loop-step.sh` (POSIX `sh`, `jq` optional, same discipline as `loop-advance-gate.sh`) implements `begin <command> [--name] [--max]`, `advance <id>` (atomic increment, prints the `[loop <id> iteration N/M]` marker, exits non-zero on cancelled or max), `finish <id> <status>`, `archive`, `list`, `cancel [--all]`, and `check-writable`. The seven refusal paths, the archive algorithm, and the list and cancel output formats move into the script. Command prose shrinks to "run `loop-step.sh advance`; if exit 0 perform the iteration body, else stop." `list-loops` and `cancel-loop` become one Bash call each.
+`scripts/loop-step.sh` (`bash`, `jq` optional, same discipline as `loop-advance-gate.sh`) implements `begin <command> [--name] [--max]`, `advance <id>` (atomic increment, prints the `[loop <id> iteration N/M]` marker, exits non-zero on cancelled or max), `hold <id>` (a decision-wait re-entry that does not increment the counter), `finish <id> <status>`, `archive`, `list`, `cancel [--all]`, and `check-writable`. The Stop-hook gate allows a stop while a decision file is pending, the same way it allows a pending `AskUserQuestion`. The seven refusal paths, the archive algorithm, and the list and cancel output formats move into the script. Command prose shrinks to "run `loop-step.sh advance`; if exit 0 perform the iteration body, else stop." `list-loops` and `cancel-loop` become one Bash call each.
 
 The state-file contract (`.synthex/loops/<id>.json`, session ownership rule, promise sentinel, Stop-hook gate) is unchanged. `tests/helpers/loop-state-lifecycle.ts` becomes a thin wrapper that executes the script so the two cannot drift.
 
@@ -282,6 +285,7 @@ The state-file contract (`.synthex/loops/<id>.json`, session ownership rule, pro
 - Per iteration: one Bash call instead of four to six model-executed tool calls.
 - `check-writable` tests a write to `.synthex/loops/` first and prints a host-specific hint on failure (Codex: `--sandbox workspace-write`; Gemini: `--approval-mode yolo` or a policy file; OpenCode headless: `--auto`).
 - The script runs on the compat images without `jq` (none of the pinned images ship it).
+- Host detection for the writability hint reads a generated `config/hosts.env` (covered by the generator's `--check`) and a `SYNTHEX_HOST` variable the wrappers set; scripts never parse markdown to learn the host.
 - `loop-command.test.ts`, `list-loops.test.ts`, `cancel-loop.test.ts`, `loop-state-lifecycle.test.ts`, and `native-looping-doc.test.ts` are rewritten to assert script behavior plus the retained prose anchors (FR-NL and D-NL citations, Archive and Retention headings).
 - Shell-timeout envelopes are documented and enforced via `SYNTHEX_LOOP_IDLE_MAX`: Claude Code 600 s (current), Gemini CLI at most 240 s (5-minute hard cap), Grok Build and OpenCode at most 90 s (120 s default), Hermes no cap known.
 - Where the host offers background command execution with a poll tool (Grok Build's `background: true` plus `get_command_or_subagent_output`, up to one hour), the idle wait runs that way instead of a foreground sleep, and the wrapper's tool map says so.
@@ -293,6 +297,7 @@ When a `Workflow` tool is in the tool list, `--loop` runs the iteration body as 
 **Acceptance Criteria:**
 - Loop protocol prose on the Claude path drops by at least 8 KB.
 - Cancel is honored between resumes by re-reading the state file.
+- A stale `runId` (state file `last_updated` older than a documented threshold) is cleared so a crashed Workflow run does not make the Stop-hook gate skip forever.
 - Timestamps come from `loop-step.sh` calls or `args`, never from the script.
 - A spike confirms (a) a plugin can ship a Workflow script, (b) a workflow subagent running `tech-lead` can itself spawn Agent-tool subagents (next-priority fans out to `concurrent_tasks` Tech Leads), and (c) a resume can be triggered from `ScheduleWakeup` without a user turn. If (b) fails, the iteration body is orchestrated by the command and only the Tech Lead tasks run as workflow agents.
 - `Monitor` is not required; when absent (headless, Bedrock) the Stage 1 in-turn wait is used.
@@ -315,7 +320,7 @@ Loop identity survives compaction via a `SessionStart` hook with matcher `compac
 **Acceptance Criteria:**
 - Detection never keys on host names or on Grok's "Workflows" feature.
 - On depth-1 hosts, when the command is already running inside a subagent and a spawn is refused, the command performs the reviewer roles inline (FR-HM12 rule).
-- Level 3 is exercised by the Codex and OpenCode compat activation probes.
+- Level 3 is exercised by the Codex and OpenCode canary-profile probes (real models; the activation loopback emits no tool calls).
 
 **FR-HM22: Teammates spawned as plugin agent types**
 
@@ -331,10 +336,11 @@ The `TaskCompleted` and `TeammateIdle` hooks are command hooks that exit 2 to bl
 
 **FR-HM24: Command surface after the fold**
 
-`start-review-team`, `stop-review-team`, `list-teams`, and `configure-teams` move into `synthex` as commands gated by tool presence (they print a documented-gap message elsewhere). `team-review`, `team-implement`, `team-plan`, `team-refine`, and `team-init` are retired; their behavior is the capability ladder inside the existing commands. The generator emits wrappers for the four surviving commands with a `compatibility:` note.
+`start-review-team`, `stop-review-team`, and `list-teams` move into `synthex` as commands gated by tool presence (they print the single-sourced documented-gap sentence elsewhere). `configure-teams` also moves but is not gated, because it only writes config and a mixed-host team must be able to author it from any host. `team-review`, `team-implement`, `team-plan`, `team-refine`, and `team-init` are retired; their behavior is the capability ladder inside the existing commands. The generator emits wrappers for the four surviving commands with a `compatibility:` note. Pool configuration moves to `.synthex/config.yaml`; every reader falls back to `.synthex-plus/config.yaml` with a deprecation line for one major version.
 
 **Acceptance Criteria:**
-- Command count becomes 22; agent count becomes 31 (the three pool agents move); wrapper count 53. Count constants and the eight pinned agents in `synthex-plugin-json.test.ts` are updated.
+- Final counts after this PRD are 24 commands, 26 agents, and 50 wrappers (the fold adds four commands and three agents; utility retirement removes five agents; `decide` and `schedule` add two commands). Count constants and the eight pinned agents in `synthex-plugin-json.test.ts` are updated in the same commit as each change.
+- Every `standing_pools.*` read in the routing doc, the pool commands, and the pool agents points at `.synthex/config.yaml` with the fallback sentence; Layer 2 fixtures cover both the new location and the legacy fallback.
 - `tests/schemas/synthex-plus/` suites are ported or deleted with the features they test.
 
 **FR-HM25: Standing pools on other hosts**
@@ -355,17 +361,17 @@ Standing pools are a documented gap on Codex (ephemeral in-session teams only), 
 | `plan-linter` | `scripts/lint-plan.mjs` ported from `tests/schemas/implementation-plan.ts` after the two rubrics are reconciled | Node required; `plan-linter.md` kept only until the script reaches parity |
 
 **Acceptance Criteria:**
-- Every script is POSIX `sh` or `#!/usr/bin/env node`, `jq` optional; each state-writing script calls the FR-HM18 writability check.
+- Every script is `bash` or `#!/usr/bin/env node`, `jq` optional; each state-writing script calls the FR-HM18 writability check. `.synthex/tmp/` and `.synthex/decisions/` create a self-ignoring `.gitignore` on first write, and bundles are deleted at run end or after 24 hours.
 - Each retired agent is removed from `plugin.json` and the wrapper tree in the same commit; `synthex-plugin-json.test.ts` pins are updated.
 - The FR-MR9 inline `context_bundle` envelope is unchanged in v1 (adapters are not touched); an optional `context_bundle_path` is future work.
 
 **FR-HM27: Retire `commit-message-author`**
 
-The three delegation blocks (`tech-lead.md`, `lead-frontend-engineer.md`, `next-priority.md`) collapse to one sentence requiring a Conventional Commits subject plus a what/why body, carrying issue keys from the branch name. A `git.commit_convention: conventional|issue-key|gitmoji|plain|auto` key (default `conventional`) is written once by `init` from a 50-commit sample. On hosts with hooks, a `PreToolUse` hook on `git commit` lints the subject with the regex `release.yml` uses.
+The three delegation blocks (`tech-lead.md`, `lead-frontend-engineer.md`, `next-priority.md`) collapse to one sentence requiring a Conventional Commits subject plus a what/why body, carrying issue keys from the branch name. A `git.commit_convention: conventional|issue-key|gitmoji|plain|auto` key (default `auto`, meaning no lint until `init` has sampled history) is written by `init` from a 50-commit sample. On hosts with hooks, a `PreToolUse` hook on `git commit` lints the subject with the regex `release.yml` uses.
 
 **Acceptance Criteria:**
-- The hook fails open: it lints only when the key is `conventional`, only messages it can extract deterministically (`-m`, `-F <file>`, `-F -` heredoc), skips `--amend --no-edit`, `-C`, `-c`, `--fixup`, `--squash`, and merge commits, tolerates an `rtk git commit` prefix, and returns the fix hint on block.
-- The Codex manifest gains `"hooks": "./hooks/hooks.json"` so the same hook runs where the user enables `features.hooks`; Gemini receives the same script as a `BeforeTool` hook only once an extension manifest exists (future work); Hermes and OpenCode are prose-only.
+- The hook fails open: it lints only when the project config explicitly sets `conventional` (a project with no config, or the `auto` default, is never linted, per NFR-HM1), only messages it can extract deterministically (`-m`, `-F <file>`, `-F -` heredoc), skips `--amend --no-edit`, `-C`, `-c`, `--fixup`, `--squash`, and merge commits, tolerates an `rtk git commit` prefix, and returns the fix hint on block.
+- The Codex manifest points at a generated `hooks/codex-hooks.json` containing only host-safe hooks (commit-lint at first, with the Codex tool matcher emitted from the host matrix); a test asserts it contains no `Stop`, `SessionStart`, `TaskCompleted`, or `TeammateIdle` entries, so Codex never inherits the loop gate. A Codex canary case confirms a bad subject is blocked with `features.hooks` on. Gemini receives the same script as a `BeforeTool` hook only once an extension manifest exists (future work); Hermes and OpenCode are prose-only.
 - `release.yml` continues to detect the semver bump from subjects.
 
 **FR-HM28: Adapter consolidation for multi-model review**
@@ -438,7 +444,7 @@ When `artifacts.plan_cockpit.enabled` is true and an `Artifact` tool is in the t
 
 **FR-HM34: Plugin eval suite alongside promptfoo**
 
-`plugins/synthex/evals/` holds the 18 planted-issue fixtures as direct-agent cases with deterministic graders only (regex on locked verdict headers, planted CWE IDs, and destructive-action strings; one `tool_used` on the review-code fan-out). Ablation stays on so each release reports the plugin's delta over vanilla Claude. `runs: 1`, `--threshold 0.67` in the manual CI job, and a hash-keyed wrapper skips unchanged cases (the eval harness has no cross-run cache). Layer 1 vitest remains the free PR gate; `tests/compat` remains the multi-host gate.
+`plugins/synthex/evals/` holds the 18 planted-issue fixtures as direct-agent cases with deterministic graders only (regex on locked verdict headers, planted CWE IDs, and destructive-action strings; one `tool_used` on the review-code fan-out). Ablation stays on so each release reports the plugin's delta over vanilla Claude. Each fixture runs at least 3 times; a gate passes when aggregate recall is at least the baseline and no fixture loses more than one planted issue (a single run is too noisy to gate a model change). A hash-keyed wrapper skips unchanged cases (the eval harness has no cross-run cache), and the baseline's own variance is recorded in `docs/testing.md`. Layer 1 vitest remains the free PR gate; `tests/compat` remains the multi-host gate.
 
 **Acceptance Criteria:**
 - FR-HM14 tier changes and FR-HM15 profiles are gated on planted-issue recall from this suite.
@@ -449,7 +455,7 @@ When `artifacts.plan_cockpit.enabled` is true and an `Artifact` tool is in the t
 
 **FR-HM40: Portable-script contract**
 
-Every shipped runtime script: POSIX `sh` or `#!/usr/bin/env node`; `jq` optional with a working no-`jq` path; a `command -v node` guard where node is required, with the calling command stating the prose fallback; no `python`; a writability preflight for any state write; exit codes documented in the script header. `SYNTHEX_LOOP_IDLE_MAX` is honored by every waiting script.
+Every shipped runtime script: `bash` (present on every supported host and compat image; the existing scripts are bash) or `#!/usr/bin/env node`; `jq` optional with a working no-`jq` path; a `command -v node` guard where node is required, with the calling command stating the prose fallback; no `python`; a writability preflight for any state write; exit codes documented in the script header. `SYNTHEX_LOOP_IDLE_MAX` is honored by every waiting script. Build-time tools (the wrapper generator and the host matrix) are excluded from this contract by an explicit list. Every runtime script has a smoke case in the compat offline profile covering its happy path and its missing-`jq` or missing-node fallback on each image.
 
 **FR-HM41: Headless approval modes**
 
@@ -475,8 +481,8 @@ The Gemini per-skill install recipe, the OpenCode `.agents/` copy, the Hermes `.
 
 "Supported" means present in `tests/compat` with passing `offline` and `activation` profiles per `ADDING_HARNESS.md`. Neither Hermes nor Grok meets that today.
 
-- **Hermes Agent** (Nous Research; v0.21.4, 2026-09-21): admission requires a git-tag pin (no npm package; PyPI is stale and unsupported upstream), a Python + uv + Node Dockerfile, install via project `.agents/skills/` with the full plugin tree (per-skill `hermes skills install` copies only the skill folder and breaks the wrapper's `../../commands/` link), activation via `hermes -z "/<slug> <nonce>"` against an OpenAI-compatible loopback, and a hard timeout to avoid the known headless `clarify` hang. Documented gaps: no plugin-shipped hooks, no Artifact, no ScheduleWakeup, no main-agent output schema.
-- **Grok Build** (xAI): admission is blocked on finding a pinnable install (no npm package, no GitHub releases). Until then Grok stays "manifest-supported, compat-unverified" and the README says so. Open verification items: whether `.grok-plugin/plugin.json` is honored over `.claude-plugin/`, whether `commands: []`/`agents: []` suppress auto-discovery, and whether plugin hooks dispatch (upstream issue #236).
+- **Hermes Agent** (Nous Research; v0.21.4, 2026-09-21): admission requires a git-tag pin (no npm package; PyPI is stale and unsupported upstream), a Python + uv + Node Dockerfile, install via project `.agents/skills/` with the full plugin tree (per-skill `hermes skills install` copies only the skill folder and breaks the wrapper's `../../commands/` link), activation via `hermes -z "/<slug> <nonce>"` against an OpenAI-compatible loopback, and a hard timeout to avoid the known headless `clarify` hang. Documented gaps: no plugin-shipped hooks, no Artifact, no ScheduleWakeup, no main-agent output schema. Hermes stays out of the release gate's harness set until two weekly drift runs pass, and its README row carries that footnote.
+- **Grok Build** (xAI): admission is blocked on finding a pinnable install (no npm package, no GitHub releases). Until then Grok's README row reads `Manifest-supported (compat pending: no pinnable install)`. Open verification items: whether `.grok-plugin/plugin.json` is honored over `.claude-plugin/`, whether `commands: []`/`agents: []` suppress auto-discovery, and whether plugin hooks dispatch (upstream issue #236).
 
 **Acceptance Criteria:**
 - The README's harness table has three states: supported (in compat matrix), manifest-supported (compat pending, with the blocker named), and not supported.
@@ -566,9 +572,9 @@ Marketplace and manifest (`.claude-plugin/marketplace.json:26-39`, `plugins/synt
 
 **NFR-HM2: Measured savings.** Every token claim in this PRD is verified before merge by a Layer 2 fixture or a compat loopback capture and recorded in `docs/testing.md`. Current verified estimates: review-code default path halved (~3.3k tokens per invocation); performance-audit down ~2k tokens; 400 to 500 tokens per specialist spawn from boilerplate; 6 to 9k tokens per review cycle on the workflow engine; 35 to 50 KB per standing-pool task from identity-as-system-prompt; 7 to 15k Haiku tokens per commit from retiring `commit-message-author`; 30 to 45k output tokens per plan cycle from retiring `plan-scribe`.
 
-**NFR-HM3: Cost floor.** No change increases per-invocation cost on the default path of any command on any host, except FR-HM14's move of `code-reviewer` from Haiku to Sonnet, which is accepted deliberately and gated on FR-HM34 recall data.
+**NFR-HM3: Cost floor.** No change increases per-invocation cost on the default path of any command on any host, except FR-HM14's move of `code-reviewer` from Haiku to Sonnet and the `effort:` pins that pass the FR-HM34 eval gate, each accepted deliberately with token cost recorded before and after.
 
-**NFR-HM4: Portability parity.** For each proposal, the §5.1 verdict is the contract: a WORKS or DEGRADED cell must hold in the compat activation profile for that host; a NO-OP cell must be verified as safe by an activation probe that shows no unavailable-tool retry.
+**NFR-HM4: Portability parity.** For each proposal, the §5.1 verdict is the contract: a WORKS or DEGRADED cell must hold for that host, with request-side facts (catalog size, install shape) checked in the compat activation profile and tool-behavior facts (no unavailable-tool retry, instruction-file read, parallel fan-out) checked in the credential-gated canary profile, because the activation loopback providers never emit tool calls.
 
 **NFR-HM5: Single source of truth.** Anything emitted per host (wrapper descriptions, tool maps, tier tables, headless recipes) is generated from one constant or one config block; `--check` proves the tree is in sync.
 
@@ -623,7 +629,8 @@ Marketplace and manifest (`.claude-plugin/marketplace.json:26-39`, `plugins/synt
 
 **Constraints:**
 - Per `CLAUDE.md`: agent and command definitions are markdown. This PRD introduces runtime scripts under `scripts/` (already precedent: three shell scripts) and one JavaScript workflow file; it does not introduce a runtime dependency on any package.
-- Release automation owns version bumps; this work ships as Conventional Commits with `feat:` (minor) for new commands and `feat!:` (major) for the `synthex-plus` removal.
+- Release automation owns version bumps; this work ships as Conventional Commits with `feat:` (minor) for new commands. The major bump for the `synthex-plus` fold is requested through `.release-intent.json` (`bump: major`) committed in the tombstone task's own `feat!:` commit, because this repo merges with merge commits whose subjects `release.yml` does not read; the later marketplace-removal commit is `chore:`.
+- The `synthex-plus` fold lands as one integration branch with CI enabled for it, merged as a single PR after the tombstone release, so no half-folded state (doubled pool commands or doubled lifecycle hooks) is ever released.
 - The FR-MR23 byte-identical native path and the loop state-file contract are frozen interfaces.
 - Layer 2/3 caches key on agent file hashes; each agent edit invalidates cached outputs once (roughly $11 per full re-run at current fixture counts).
 
