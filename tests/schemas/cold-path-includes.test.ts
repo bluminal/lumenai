@@ -286,22 +286,30 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
 
   it(
     'evidence: today\'s 32+ docs/native-looping.md mentions in commands/ are markdown ' +
-      'links, not Read gates; Task 13 adds the first 3 real gates in review-code.md',
+      'links, not Read gates; Task 13 added the first 3 real gates in review-code.md, ' +
+      'Task 14 (FR-HM5) adds 3 more across performance-audit.md (2) and ' +
+      'write-implementation-plan.md (1)',
     () => {
       const nativeLoopingMentions = files.reduce((count, relFile) => {
         const text = readFileSync(join(ROOT, relFile), 'utf8');
         return count + (text.match(/docs\/native-looping\.md/g) ?? []).length;
       }, 0);
       expect(nativeLoopingMentions).toBeGreaterThanOrEqual(32);
-      expect(allIncludes).toHaveLength(3);
+      expect(allIncludes).toHaveLength(6);
       expect(new Set(allIncludes.map((i) => i.file))).toEqual(
-        new Set(['plugins/synthex/commands/review-code.md']),
+        new Set([
+          'plugins/synthex/commands/review-code.md',
+          'plugins/synthex/commands/performance-audit.md',
+          'plugins/synthex/commands/write-implementation-plan.md',
+        ]),
       );
       expect(new Set(allIncludes.map((i) => i.rawTarget))).toEqual(
         new Set([
           '${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/sandbox-yolo.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/multi-model-decision.md',
+          '${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing-performance-audit.md',
+          '${CLAUDE_PLUGIN_ROOT}/docs/plan-multi-model.md',
         ]),
       );
     },

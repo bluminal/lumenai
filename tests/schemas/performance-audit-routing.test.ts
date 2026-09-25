@@ -1,6 +1,6 @@
 /**
  * Layer 1: Structural validation tests for the pool routing section
- * in plugins/synthex/commands/performance-audit.md.
+ * formerly inline in plugins/synthex/commands/performance-audit.md's Step 1b.
  *
  * Validates all [T] acceptance criteria from Task 57:
  *   - Static required-reviewer-set [performance-engineer] — no resolver chain
@@ -15,7 +15,24 @@
  *   - Recovery path present (reviewer_crashed, source.source_type)
  *   - standing-pool-cleanup invoked on stale detection
  *   - explicit-pool-required error text present
- *   - Cross-file: verbatim NFR-MMT7 strings identical to review-code.md
+ *   - Cross-file: verbatim NFR-MMT7 strings identical across both routing docs
+ *
+ * Task 14 (FR-HM5, D17) repoint: this section's body moved byte-identical
+ * from performance-audit.md's Step 1b to
+ * plugins/synthex/docs/standing-pool-routing-performance-audit.md, replaced
+ * in performance-audit.md by a two-line D17 gate. Most assertions below now
+ * read the doc file instead of the command file; a couple of "absence"
+ * checks and the D17-gate-shape check still read the command file directly.
+ *
+ * This is a SEPARATE doc from review-code's docs/standing-pool-routing.md
+ * (Task 13) — the two Step 1b bodies are materially different (static vs.
+ * dynamic required-reviewer-set, one pool task vs. one-per-reviewer,
+ * differing Skip-Steps counts), so Task 14 did not force them into one
+ * parameterized file. The 4 NFR-MMT7 user-visible strings are still locked
+ * verbatim across both docs — item 13 below compares the doc BODIES for
+ * those 4 strings, and separately compares the two commands' D17 GATE LINES
+ * (not full bodies, which now legitimately differ) for structural
+ * consistency.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -27,16 +44,27 @@ const PERF_AUDIT_MD_PATH = join(
   '..', '..', 'plugins', 'synthex', 'commands', 'performance-audit.md'
 );
 
-// Task 13 (FR-HM5, D17) repoint: review-code.md's Step 1b body (which held
-// these NFR-MMT7 strings) moved byte-identical to
-// plugins/synthex/docs/standing-pool-routing.md, replaced in review-code.md
-// by a two-line D17 gate. Read the doc file for the cross-file comparison.
+const REVIEW_CODE_MD_PATH = join(
+  import.meta.dirname,
+  '..', '..', 'plugins', 'synthex', 'commands', 'review-code.md'
+);
+
+// Task 14 (FR-HM5, D17) repoint: performance-audit.md's Step 1b body now
+// lives in its own doc (materially different from review-code's).
+const STANDING_POOL_ROUTING_PERF_AUDIT_DOC_PATH = join(
+  import.meta.dirname,
+  '..', '..', 'plugins', 'synthex', 'docs', 'standing-pool-routing-performance-audit.md'
+);
+
+// Task 13 (FR-HM5, D17): review-code.md's Step 1b body lives here.
 const STANDING_POOL_ROUTING_DOC_PATH = join(
   import.meta.dirname,
   '..', '..', 'plugins', 'synthex', 'docs', 'standing-pool-routing.md'
 );
 
-const content = readFileSync(PERF_AUDIT_MD_PATH, 'utf-8');
+const commandContent = readFileSync(PERF_AUDIT_MD_PATH, 'utf-8');
+const reviewCodeCommandContent = readFileSync(REVIEW_CODE_MD_PATH, 'utf-8');
+const content = readFileSync(STANDING_POOL_ROUTING_PERF_AUDIT_DOC_PATH, 'utf-8');
 const reviewCodeContent = readFileSync(STANDING_POOL_ROUTING_DOC_PATH, 'utf-8');
 
 describe('performance-audit.md — Task 57 [T] acceptance criteria (inline discovery + pool routing + recovery)', () => {
@@ -47,7 +75,7 @@ describe('performance-audit.md — Task 57 [T] acceptance criteria (inline disco
   });
 
   it('[T] static required-reviewer-set — no --reviewers flag resolver chain present', () => {
-    // performance-audit.md should NOT have a --reviewers flag (that belongs to review-code.md)
+    // performance-audit's routing doc should NOT have a --reviewers flag (that belongs to review-code's doc)
     expect(content).not.toContain('--reviewers flag');
   });
 
@@ -62,8 +90,8 @@ describe('performance-audit.md — Task 57 [T] acceptance criteria (inline disco
   });
 
   // ── [T] 3. standing_pools.enabled conditional gate is documented ──────────
-  it('[T] standing_pools.enabled conditional gate is documented', () => {
-    expect(content).toContain('standing_pools.enabled');
+  it('[T] standing_pools.enabled conditional gate is documented (at the D17 gate in the command)', () => {
+    expect(commandContent).toContain('standing_pools.enabled');
   });
 
   // ── [T] 4. Verbatim FR-MMT17 routing notification ─────────────────────────
@@ -139,29 +167,34 @@ describe('performance-audit.md — Task 57 [T] acceptance criteria (inline disco
     expect(content).toContain('No standing pool matches the required reviewers');
   });
 
-  // ── [T] 13. Cross-file: verbatim NFR-MMT7 strings identical to review-code.md ──
-  it('[T] NFR-MMT7 Item 1 routing notification is verbatim-identical in both files', () => {
-    const item1 = "Routing to standing pool '{pool_name}' (multi-model: {yes|no}).";
-    expect(content).toContain(item1);
-    expect(reviewCodeContent).toContain(item1);
-  });
+  // ── [T] 13. Cross-file: verbatim NFR-MMT7 strings identical, gate lines consistent ──
+  //
+  // The two Step 1b DOC bodies are no longer expected to be identical (Task
+  // 14 kept them as separate docs because the surrounding prose differs
+  // materially). What stays locked verbatim per D25/NFR-MMT7 is the 4
+  // user-visible strings themselves, in both docs, and the D17 gate SHAPE
+  // in both commands (same "If ... Read `${CLAUDE_PLUGIN_ROOT}/docs/...` and
+  // follow it; otherwise ...; On other hosts, ..." pattern) — not the full
+  // extracted bodies.
+  const NFR_MMT7_ITEMS = [
+    "Routing to standing pool '{pool_name}' (multi-model: {yes|no}).",
+    "Submitted task '{uuid}' to pool '{pool_name}'. Polling for completion (timeout: {timeout}s).",
+    "Pool '{pool_name}' working: {tasks_complete}/{tasks_total} tasks complete...",
+    "Review path: standing pool '{pool_name}' (multi-model: {yes|no}).",
+  ];
 
-  it('[T] NFR-MMT7 Item 2 submission confirmation is verbatim-identical in both files', () => {
-    const item2 = "Submitted task '{uuid}' to pool '{pool_name}'. Polling for completion (timeout: {timeout}s).";
-    expect(content).toContain(item2);
-    expect(reviewCodeContent).toContain(item2);
-  });
+  it.each(NFR_MMT7_ITEMS.map((item, i) => [i + 1, item] as const))(
+    '[T] NFR-MMT7 Item %i is verbatim-identical across both routing docs',
+    (_i, item) => {
+      expect(content).toContain(item);
+      expect(reviewCodeContent).toContain(item);
+    },
+  );
 
-  it('[T] NFR-MMT7 Item 3 waiting indicator is verbatim-identical in both files', () => {
-    const item3 = "Pool '{pool_name}' working: {tasks_complete}/{tasks_total} tasks complete...";
-    expect(content).toContain(item3);
-    expect(reviewCodeContent).toContain(item3);
-  });
-
-  it('[T] NFR-MMT7 Item 4 provenance line is verbatim-identical in both files', () => {
-    const item4 = "Review path: standing pool '{pool_name}' (multi-model: {yes|no}).";
-    expect(content).toContain(item4);
-    expect(reviewCodeContent).toContain(item4);
+  it('[T] both commands\' Step 1b D17 gates follow the same shape (Read ${CLAUDE_PLUGIN_ROOT}/docs/... ; other-hosts fallback)', () => {
+    const gateRe = /Read `\$\{CLAUDE_PLUGIN_ROOT\}\/docs\/[^`]+\.md` and follow it[^.]*\. On other hosts, resolve the plugin root/;
+    expect(commandContent).toMatch(gateRe);
+    expect(reviewCodeCommandContent).toMatch(gateRe);
   });
 
 });
