@@ -46,7 +46,7 @@ npx vitest watch schemas/
 3. Add the command filename to the `commands` array in `plugins/synthex/.claude-plugin/plugin.json`
 4. Regenerate the shared Agent Skills entrypoints: `node plugins/synthex/scripts/generate-codex-skills.mjs`
 
-The generated `plugins/synthex/skills/*/SKILL.md` files are thin Agent Skills metadata wrappers. Do not edit them directly; command and agent Markdown files remain the shared behavioral source of truth for Claude Code, Codex, Grok, Gemini CLI, and OpenCode.
+The generated `plugins/synthex/portable-skills/*/SKILL.md` files are thin Agent Skills metadata wrappers. Do not edit them directly; command and agent Markdown files remain the shared behavioral source of truth for Claude Code, Codex, Grok, Gemini CLI, and OpenCode.
 
 ### Improving Existing Agents
 

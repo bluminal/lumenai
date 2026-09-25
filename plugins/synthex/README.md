@@ -39,7 +39,25 @@ Grok loads the same generated `portable-skills/` entrypoints Codex uses. The Gro
 
 Gemini CLI and OpenCode use the same generated Agent Skills bundle rather than a native marketplace plugin. Install `portable-skills/` with the sibling `agents/`, `commands/`, `config/`, `scripts/`, and `docs/` directories under the harness's documented workspace or project skill root; preserving that layout lets each `SKILL.md` load the canonical workflow source and lets cold-path includes (`${CLAUDE_PLUGIN_ROOT}/docs/<x>.md`) resolve.
 
+OpenCode's built-in skill discovery only scans `.claude/skills/**` and `.agents/skills/**`, so a `portable-skills/` install is otherwise invisible to it. Add an `opencode.json` at the project root pointing `skills.paths` at wherever you installed the bundle, for example:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "skills": { "paths": [".agents/portable-skills"] }
+}
+```
+
+This restores full discovery (confirmed empirically; see `docs/specs/harness-modernization/spikes.md`, Task 21, Q7).
+
 For copyable installation and update instructions, see [Agent compatibility](https://slashsynthex.com/docs/agent-compatibility).
+
+### Upgrading a manual install
+
+Gemini CLI and OpenCode installs from before the `skills/` → `portable-skills/` rename (FR-HM11) reference a directory name that no longer exists in the plugin:
+
+- **Gemini CLI:** uninstall each stale skill from the old `skills/` source (`gemini skills uninstall <id> --scope workspace` for every previously installed id), then reinstall from the new `portable-skills/<id>` path as shown above. `gemini skills install` always copies into Gemini's own managed `.gemini/skills/` location, so nothing besides the source path changes.
+- **OpenCode:** re-copy the bundle so `portable-skills/` (not the old `skills/`) lands under your project's `.agents/` (or wherever you installed it), and update `opencode.json`'s `skills.paths` entry to point at the new location as shown above. Without that update OpenCode silently stops seeing any Synthex skills.
 
 ### Project Setup
 

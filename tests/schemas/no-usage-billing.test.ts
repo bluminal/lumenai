@@ -35,7 +35,7 @@ const ROOT = join(__dirname, '..', '..');
 const README_PATH = join(ROOT, 'plugins/synthex/README.md');
 
 // "Executable prose" per Task 2: commands, agents, docs, and hooks markdown.
-// Generated skill wrappers (plugins/synthex/skills/) are out of scope here —
+// Generated skill wrappers (plugins/synthex/portable-skills/) are out of scope here —
 // they only point back at these canonical files.
 const SCAN_DIRS = [
   'plugins/synthex/commands',

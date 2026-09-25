@@ -12,6 +12,7 @@ Milestone 1.2 spikes for `docs/plans/harness-modernization.md`. Question, Decisi
 | 10 | OQ-8 | refuted | yes |
 | 11 | OQ-9 | partial (identity confirmed; compaction static) | no |
 | 12 | D17 expansion (FR-HM43/D17/FR-HM13) | confirmed (unexpanded in prose) | yes |
+| 21 | Q7 (OpenCode `skills.paths`) + OQ-1 Grok re-test | confirmed (both) | no |
 
 ## Task 5 — OQ-1: rename `skills/` to `portable-skills/` (FR-HM11)
 
@@ -579,3 +580,122 @@ system/init: model="claude-opus-5-5", permissionMode="bypassPermissions",
 
 `$SCRATCH/spikes/task12/d17-expansion-stream.jsonl` (full stream-json transcript), `$SCRATCH/spikes/task12/d17-expansion-stderr.log` (empty — clean exit 0). Temp project removed after the spike; no repo files were changed by it.
 
+
+## Task 21 — Q7 (OpenCode `skills.paths`) + OQ-1 Grok re-test (FR-HM11)
+
+**Verdict:** confirmed (both). **Fallback fired:** no.
+
+### Question
+
+(a) Q7: Does an `opencode.json` `skills.paths` entry restore OpenCode discovery of the renamed `portable-skills/` wrapper tree (0/46 under a plain rename, per Task 5)? (b) OQ-1 follow-up: with the Task 5 plugin-name collision against the pre-existing Claude-marketplace-cached `synthex` entry removed, does Grok discover the `portable-skills/` wrappers from its own native plugin install?
+
+### Method
+
+**Q7 (OpenCode):** manual probe first — copied `plugins/synthex` to a scratch `.agents/` directory, wrote `{"skills": {"paths": [".agents/portable-skills"]}}` as `opencode.json` at the workspace root, ran `opencode debug skill` in the pinned `synthex-compat-opencode:stable-1.18.15` container (writing output to a file inside the bind-mounted workspace to avoid a 64 KiB stdout-capture truncation seen when piping `docker run` output through the host shell). Confirmed 46/46 discovery, then applied the same `skills.paths` config to all three OpenCode compat scenarios (`opencode-offline.mjs`, `opencode-activation.mjs`, `opencode-canary.mjs`) and ran the real suite via `node compat/scripts/run-suite.mjs --profile {offline,activation} --harness opencode --rebuild`.
+
+**OQ-1 (Grok):** copied `plugins/synthex` to a scratch directory and renamed `name` to `synthex-spike21` in both `.grok-plugin/plugin.json` and `.claude-plugin/plugin.json` (no marketplace.json used — local-path install). `grok plugin list --json` confirmed empty before. `grok plugin validate ./synthex-spike21`, `grok plugin install ./synthex-spike21 --trust` (the bare name form errors — local installs need the `./` path form), `grok plugin list --json`, `grok plugin details synthex-spike21`, `grok inspect --json` from an isolated scratch git-initialized project (not the real repo, to avoid the real project's own instructions/state), a headless probe `grok -p "list the names of skills available to you that start with synthex-spike21" --output-format json --max-turns 3` (an initial `--max-turns 1` run was cut off mid-reasoning with `stopReason: "cancelled"`; `--max-turns 3` let it finish), a direct read of `~/.grok/logs/unified.jsonl` for `slash.advertise` events, then `grok plugin uninstall synthex-spike21 --confirm` and a final `grok plugin list --json` to confirm empty again. No `~/.grok/config` or `~/.claude` file was modified.
+
+### Result
+
+**Q7 confirmed.** `opencode.json`'s `skills` config key does support `{"paths": [...]}`; OpenCode merges those paths into its skill-discovery scan (in addition to the hardcoded `.claude/skills/**` and `.agents/skills/**`). With `skills.paths: [".agents/portable-skills"]`, `opencode debug skill` (and the real compat scenarios) went from 0/46 to 46/46 on both offline and activation. The manual probe's raw `opencode debug skill` output was 84,734 bytes and `init count=47` (46 wrappers + 1 built-in `customize-opencode` skill) in `--log-level DEBUG` output — an initial 34/47 reading was a host-side artifact of `docker run … > file` truncating at exactly 65,536 bytes (a pipe-buffer boundary), not an OpenCode limitation; writing the CLI's own output to a file inside the bind-mounted workspace (`opencode debug skill > /workspace/.out.json`) avoided it. The `.opencode/skill(s)/**` and `.claude/skills/**`/`.agents/skills/**` conventions from `docs/specs/.../opencode-assessment.md` remain unaffected; `skills.paths` is additive.
+
+**OQ-1 confirmed.** With the plugin renamed to `synthex-spike21` (no name collision), Grok's own installed-plugins system resolved and advertised all 46 `portable-skills/` wrappers: `grok plugin details` reports "1 skill dir(s)"; `grok inspect --json` lists all 46 as `synthex-spike21:<id>` with `location` paths under `~/.grok/installed-plugins/synthex-spike21-<hash>/portable-skills/<id>/SKILL.md`; and — the strongest signal, a live headless session — `~/.grok/logs/unified.jsonl` recorded `slash.advertise` events with `trigger: "session_start"` and `trigger: "skills_reload"` whose `names` array contained all 46 `synthex-spike21:*` entries (`count: 183` total skills across all sources for that session). The probe's own reply text ("No skills available... start with `synthex-spike21`") is a correct literal answer to a badly-phrased test prompt, not evidence of non-discovery: its `thought` field explicitly lists seeing `architect`, `audit-artifact-writer`, `bedrock-review-prompter`, and others from "that plugin" in its system prompt — i.e. the model itself confirms the skills are loaded under their short (unprefixed) names, which is the correct behavior. This replaces Task 5's INCONCLUSIVE Grok signal (a genuine plugin-name collision with the pre-existing Claude-marketplace-cached `synthex` entry, which `grok inspect` continues to surface independently under the real `synthex` name — unrelated to and unaffected by this test) with a clean, positive result.
+
+### Decision
+
+Ship Q7's OpenCode route as the Task 21 baseline: an `opencode.json` at the install root with `skills.paths` pointing at the installed `portable-skills/` directory. Applied to all three OpenCode compat scenarios and the `plugins/synthex/README.md` OpenCode install recipe (including an "Upgrading a manual install" note for pre-rename Gemini/OpenCode installs, D21). Grok is treated as verified for the `portable-skills/` rename; no further action needed. Neither fallback (Q6 "accept the OpenCode gap" or a Grok re-spike) fires.
+
+### Evidence
+
+**OpenCode manual probe (`opencode debug skill`, `.out.json`, 47 entries)**
+```
+$ opencode debug skill --log-level DEBUG --print-logs   (stderr)
+... message=init count=47 ...
+$ node -e "console.log(JSON.parse(readFileSync('.out.json')).length)"
+47
+```
+
+**OpenCode compat suite, offline + activation (post-fix, via run-suite.mjs)**
+```
+{"harness":"opencode","phase":"install","ok":true,"method":"project .agents compatibility bundle plus opencode.json skills.paths (Q7)","destination":"/workspace/.agents","config":"/workspace/opencode.json","count":46}
+{"harness":"opencode","phase":"inventory","ok":true,"expectedCount":46,"discoveredCount":46,"missing":[],"unexpected":[]}
+{"harness":"opencode","phase":"complete","ok":true,"elapsedMs":1307}
+...
+{"harness":"opencode","phase":"inventory","ok":true,"profile":"activation","expectedCount":46,"discoveredCount":46}
+{"harness":"opencode","phase":"complete","ok":true,"profile":"activation","activated":46,"elapsedMs":2120}
+```
+
+**Grok: empty before, install, discovery, empty after**
+```
+$ grok plugin list --json
+[]
+$ grok plugin install ./synthex-spike21 --trust
+Installed 1 plugin(s) from ./synthex-spike21: synthex-spike21
+$ grok plugin details synthex-spike21
+  components: 1 skill dir(s), 0 command dir(s), 0 agent dir(s), hooks
+$ grok inspect --json | grep -o 'synthex-spike21:[a-z0-9_-]*' | sort -u | wc -l
+46
+$ grok plugin uninstall synthex-spike21 --confirm
+Uninstalled 1 plugin(s): synthex-spike21
+$ grok plugin list --json
+[]
+```
+
+**Grok live-session advertisement (`~/.grok/logs/unified.jsonl`, `slash.advertise`)**
+```
+{"ts":"2026-09-25T19:39:04.191Z", "msg":"slash.advertise", "ctx":{"trigger":"session_start","count":183,"names":[..., "synthex-spike21:architect", ..., "synthex-spike21:write-rfc", ...]}}
+(46 of 183 names match the synthex-spike21: prefix, matching the full wrapper count)
+```
+
+**Grok probe model reasoning (confirms discovery despite a literal "no match" answer)**
+```
+"thought": "... Looking at the available skills in the system prompt, the skill names themselves are things like \"architect\", \"code-reviewer\", etc. ... I don't have any skills available to me whose names start with \"synthex-spike21\". The skills I have access to from that plugin are things like architect, audit-artifact-writer, bedrock-review-prompter, and others, but none of their actual names begin with that prefix."
+```
+
+### Plan updates applied
+
+- `tests/compat/scenarios/opencode-offline.mjs`, `opencode-activation.mjs`, `opencode-canary.mjs`: write `opencode.json` with `skills: { paths: [".agents/portable-skills"] }` before the first discovery check.
+- `plugins/synthex/README.md`: OpenCode `opencode.json` `skills.paths` recipe added under "Gemini CLI and OpenCode"; new "Upgrading a manual install" section (D21) for Gemini/OpenCode users on a pre-rename install.
+- `tests/compat/scenarios/claude-offline.mjs`: inventory assertion flipped from "expect all 46 discovered" to "expect 0 discovered" (Claude Code no longer auto-loads the wrappers by design); reference-integrity (`validateSkillTree` on the staged fixture) and uninstall checks unchanged.
+- `tests/compat/scenarios/claude-activation.mjs`: the same stale "expect 46 discovered via `plugin details`" gate relaxed to "expect 0" (informational, non-blocking beyond a regression check) since `plugin details` no longer names components at all post-rename; the real activation proof (unique token in the loopback Messages request) is unchanged and still requires 46/46.
+- `CONTRIBUTING.md:49`, `tests/schemas/no-usage-billing.test.ts:38`, `docs/plans/next-priority-delegation-autonomy.md:108`: swept from `plugins/synthex/skills/` to `plugins/synthex/portable-skills/` (the D7 historical-decision citation at `next-priority-delegation-autonomy.md:27` is intentionally left as-is — it accurately describes what existed at that 2026-09-21 decision's time).
+- `tests/schemas/cross-harness-compat.test.ts`: new test asserting no file under `tests/`, `.github/`, `CONTRIBUTING.md`, or `plugins/synthex` references the pre-rename `plugins/synthex/skills/` path (`docs/plans/` intentionally excluded — historical plan prose may correctly describe the past).
+
+### Unknowns
+
+- Whether OpenCode's `skills.paths` entries are also picked up by `opencode.json` files at other merge-order levels (global `~/.config/opencode/opencode.json`, `.opencode/` subdirectory configs) — only the project-root `opencode.json` form was tested.
+- Whether Grok's `slash.advertise` skill list is truncated or paginated beyond some very large plugin count (183 total skills were advertised cleanly here; not stress-tested at higher counts).
+- Grok headless `--max-turns 1` is unreliable for this kind of "look at your own skill list and answer" probe — the model's reasoning pass alone can exceed one turn budget, producing a `stopReason: "cancelled"` with no final answer; `--max-turns 3` was needed. Future Grok probes in this repo should budget at least 2-3 turns.
+
+### Artifacts
+
+`$SCRATCH/spikes/task21/opencode-q7-a*` (manual probe files and logs), `$SCRATCH/spikes/task21/opencode-offline-v1.log`, `$SCRATCH/spikes/task21/opencode-activation-v1.log`, `$SCRATCH/spikes/task21/grok/` (01–11: validate, list before/after install, install, details, inspect, probe ×2, log excerpts, uninstall, list after uninstall), `$SCRATCH/spikes/task21/claude-evidence/` (skill-doctor and `plugin details` evidence, see below). Scratch directories removed after the spike where they held only copies of tracked files; no repo files outside this branch's own edits were changed, and `~/.grok`/`~/.claude` state matches its pre-spike empty/unchanged baseline.
+
+## Task 21 — Claude Code zero-skills evidence
+
+### Result
+
+`claude plugin details <path>` does not accept a bare path (consistent with Task 5): `Plugin "<path>" not found. Run \`claude plugin list\`... or pass --plugin-dir <path>...`. The correct invocation, `claude --plugin-dir <worktree>/plugins/synthex plugin details synthex`, reports **Skills (0)**, **Agents (0)**, and **`Always-on: ~0 tok`**, matching Task 5's confirmed baseline for the renamed tree.
+
+`/skill-doctor` (via `claude -p "/skill-doctor" --plugin-dir <worktree>/plugins/synthex --output-format json --max-turns 1`, run from a throwaway project directory) resolved with `num_turns: 0` and `total_cost_usd: 0` (a built-in report, not a model turn) and printed a **global, cross-session** "Skills loaded this session" table that does include `synthex:*` and `synthex-plus:*` entries with real historical usage stats (e.g. `synthex:next-priority` — `2.1b` 7-day tokens, `470×` uses, `today`). This table is **not scoped to the ad hoc `--plugin-dir` session**: those entries come from the user's separately, previously installed real `synthex` marketplace plugin (which predates and is untouched by this Task 21 worktree) and its accumulated usage history — every row's "context" column reads `-` (not loaded into this specific session's context), consistent with a report that aggregates all skills the user has ever had registered rather than what the current `--plugin-dir` override contributed. `/skill-doctor` is therefore not clean per-worktree evidence on its own; `claude --plugin-dir … plugin details synthex` (Skills 0, ~0 tok) is the authoritative, worktree-scoped signal, and it confirms the acceptance criterion: this worktree's renamed plugin contributes zero Synthex skill entries and zero token cost.
+
+### Evidence
+
+```
+$ claude --plugin-dir <worktree>/plugins/synthex plugin details synthex
+synthex 1.3.0
+  ...
+Component inventory
+  Skills (0)
+  Agents (0)
+  Hooks (2)  SessionStart, Stop  (harness-only — no model context cost)
+  MCP servers (0)
+  LSP servers (0)
+
+Projected token cost
+  Always-on:   ~0 tok   added to every session
+```
+
+### Artifacts
+
+`$SCRATCH/spikes/task21/claude-evidence/01-skill-doctor.json`, `02-plugin-details-path.log` (expected failure, bare path), `03-plugin-details-plugindir.log` (Skills 0 confirmation).
