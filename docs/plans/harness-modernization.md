@@ -149,12 +149,11 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 ### Milestone 2.2: Agent and Command Prose Diet
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 16 | FR-HM6 across the 12 specialists: Interaction tables → `docs/agent-interactions.md`; Future Considerations → `docs/roadmap.md`; Scope Boundaries → 2 lines (keep "Overlap"); delete the tech-lead/lead-frontend registries; the design-system registry becomes a pointer; keep terraform routing; drop orchestrator bookkeeping | M | None | pending |
-| 17 | FR-HM8: one sentence replaces the next-priority STOP banner; product-manager's AskUserQuestion rule goes from 4 statements to 1; drop untested traceability IDs | S | None | pending |
-| 18 | FR-HM13 + FR-HM42: other-hosts line after every `${CLAUDE_PLUGIN_ROOT}/scripts` call; depth-1 inline rule in `tech-lead.md`, the orchestrator, and `next-priority.md` | S | Task 17 | pending |
-
+| 16 | FR-HM6 across the 12 specialists: Interaction tables → `docs/agent-interactions.md`; Future Considerations → `docs/roadmap.md`; Scope Boundaries → 2 lines (keep "Overlap"); delete the tech-lead/lead-frontend registries; the design-system registry becomes a pointer; keep terraform routing; drop orchestrator bookkeeping | M | None | in progress |
+| 17 | FR-HM8: one sentence replaces the next-priority STOP banner; product-manager's AskUserQuestion rule goes from 4 statements to 1; drop untested traceability IDs | S | None | done |
+| 18 | FR-HM13 + FR-HM42: other-hosts line after every `${CLAUDE_PLUGIN_ROOT}/scripts` call; depth-1 inline rule in `tech-lead.md`, the orchestrator, and `next-priority.md` | S | Task 17 | in progress |
 **Task 16 Acceptance Criteria:** `[T]` `agent-boilerplate.test.ts`: each specialist is ≥ 1.5 KB smaller than the recorded size; H1s unchanged; `## Output Format` byte-identical. `[T]` Pass: standing-pool-cleanup headings, `orchestrator-md`, 7 `*-adapter-md`, `context-bundle-assembler-md`, `audit-writer-md`, `--check`. `[T]` Layer 2: no verdict change on 3 code-reviewer and 7 security-reviewer fixtures.
-**Task 17 Acceptance Criteria:** `[T]` `native-looping-wiring`/`-baselines`/`-doc` pass. `[T]` `portability-prose`: the rule appears at most twice in `product-manager.md`; the banner is gone.
+**Task 17 Acceptance Criteria:** `[T]` `native-looping-wiring`/`-baselines`/`-doc` pass. `[T]` `portability-prose`: the rule appears at most twice in `product-manager.md`; the banner is gone. → done in `d4ba06c`: STOP banner replaced by one sentence; product-manager AskUserQuestion rule 5 → 2 statements (product-manager.ts validator relaxed accordingly); 8 untested FR-NL citations dropped from init, loop, next-priority, refine-requirements, review-code, write-implementation-plan. `portability-prose.test.ts` gained the banner and rule-count assertions; native-looping wiring/baselines/doc pass unmodified.
 **Task 18 Acceptance Criteria:** `[T]` `portability-prose`: every plugin-root script line has an other-hosts line; the depth-1 sentence is in all 3 files. `[T]` `next-priority-auto-decide.test.ts:84-100` passes.
 
 **Parallelizable:** {16, 17} → 18 (18 and 17 share `next-priority.md`).
