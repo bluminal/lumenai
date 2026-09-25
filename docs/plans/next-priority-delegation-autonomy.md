@@ -105,6 +105,6 @@ The one criterion here that *did* ship is the D3/D9 guard, which was folded into
 - `plugins/synthex/commands/next-priority.md` — Parameters table (lines 13–22), Step 5 "Delegate to Tech Lead" (lines 69–92), Step 7 `[H]` validation (lines 110–114), Step 8 pre-merge gate (lines 125–128), Step 9 plan update (lines 148–157), Native Looping option (C) / `AskUserQuestion` release of the Stop hook (line 183), Critical Requirements `[H]` and 1500-line rules (lines 253–264).
 - `plugins/synthex/agents/tech-lead.md` — Decision Authority table (lines 103–109), Behavioral Rule 7 (line 223), caller-owns-git-workflow precedent (line 175, Behavioral Rule 8).
 - `plugins/synthex/docs/native-looping.md` — `compaction-safety` anchor (all iteration output must live in the persistent artifact), and the Stop hook stepping aside for a pending `AskUserQuestion` (shared-iter § "Turn-per-iteration").
-- `plugins/synthex/skills/next-priority/SKILL.md` — generated thin wrapper proving the same markdown is the behavioral source of truth for Codex/Gemini/OpenCode, which is why harness gating must live in the command file itself.
+- `plugins/synthex/portable-skills/next-priority/SKILL.md` — generated thin wrapper proving the same markdown is the behavioral source of truth for Codex/Gemini/OpenCode, which is why harness gating must live in the command file itself.
 - `tests/schemas/next-priority-worktree-cleanup.test.ts` — the Layer 1 test pattern T3 follows.
 - `CLAUDE.md` — release automation owns `CHANGELOG.md` and all version fields; Conventional Commits drive the bump.

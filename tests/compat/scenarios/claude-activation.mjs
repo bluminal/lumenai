@@ -3,10 +3,7 @@
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertIsolatedEnvironment } from '../lib/assert-isolated.mjs';
-import {
-  assertCompleteInventory,
-  readExpectedEntrypoints,
-} from '../lib/contract.mjs';
+import { readExpectedEntrypoints } from '../lib/contract.mjs';
 import { startLoopbackAnthropicProvider } from '../lib/loopback-anthropic-provider.mjs';
 import { createProbeOverlay } from '../lib/probe-overlay.mjs';
 import {
@@ -90,19 +87,22 @@ try {
     count: entries.length,
   });
 
+  // `plugin details` no longer names components at all once the wrappers
+  // move out of `.claude/skills/**` (Task 21/FR-HM11): it must report zero
+  // Skills for every entrypoint here too. The real activation proof is the
+  // per-probe loopback request check below, not this inventory listing.
   const details = runCommand('claude', ['plugin', 'details', selector]);
-  const inventory = assertCompleteInventory(
-    entries,
-    idsMentionedInOutput(entries, details.stdout),
-  );
-  if (inventory.missing.length > 0) {
-    throw new Error(`Claude component inventory is incomplete: ${inventory.missing.join(', ')}`);
+  const discovered = idsMentionedInOutput(entries, details.stdout);
+  if (discovered.length > 0) {
+    throw new Error(
+      `Claude Code unexpectedly surfaced skill wrappers as Skills (expected 0 discovered after the portable-skills/ rename): ${discovered.join(', ')}`,
+    );
   }
   emit(harness, 'inventory', {
     ok: true,
     profile,
-    expectedCount: inventory.expected.length,
-    discoveredCount: inventory.discovered.length,
+    expectedCount: entries.length,
+    discoveredCount: discovered.length,
   });
 
   provider = await startLoopbackAnthropicProvider();
