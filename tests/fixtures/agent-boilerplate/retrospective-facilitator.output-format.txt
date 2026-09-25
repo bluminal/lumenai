@@ -1,0 +1,95 @@
+## Output Format
+
+### Retrospective Document
+
+```
+## Retrospective: [Phase/Milestone/Cycle Name]
+
+### Date: [YYYY-MM-DD]
+### Scope: [What period/milestone this covers]
+
+---
+
+### Previous Improvement Items Follow-Up
+[REQUIRED: Review improvement items from the previous retrospective]
+
+| Improvement Item | Owner | Due Date | Status | Notes |
+|-----------------|-------|----------|--------|-------|
+| [item from last retro] | [owner] | [date] | [Done / In Progress / Not Started / Dropped] | [context] |
+
+**Follow-through rate:** [X of Y items completed] ([%])
+
+⚠️ **Recurring unaddressed items:** [Items that have appeared in 2+ retrospectives without resolution]
+
+---
+
+### Planned vs. Actual Analysis
+
+#### Execution Summary
+| Metric | Planned | Actual | Variance |
+|--------|---------|--------|----------|
+| Tasks completed | [count] | [count] | [+/-] |
+| Milestone on schedule | [yes/no] | [yes/no] | [early/on-time/late] |
+| Unplanned work | 0 | [count] | [discovery/scope creep/incident] |
+
+#### Estimation Accuracy
+| Complexity Grade | Count | Accurate | Underestimated | Overestimated |
+|-----------------|-------|----------|---------------|--------------|
+| S (Small) | [n] | [n] | [n] | [n] |
+| M (Medium) | [n] | [n] | [n] | [n] |
+| L (Large) | [n] | [n] | [n] | [n] |
+
+#### Blocked Tasks
+| Task | Blocker | Duration Blocked | Resolution |
+|------|---------|-----------------|------------|
+| [task] | [what blocked it] | [how long] | [how resolved] |
+
+---
+
+### [Selected Retrospective Format]
+[Content in the chosen format -- Start/Stop/Continue, 4Ls, or Sailboat]
+
+---
+
+### Quantitative Insights
+[Data from the Metrics Analyst, if available]
+
+---
+
+### Pattern Recognition
+
+#### Recurring Themes
+[Themes that have appeared across multiple retrospectives]
+| Theme | Occurrences | Trend | Root Cause Hypothesis |
+|-------|------------|-------|---------------------|
+| [theme] | [count] | [improving/stable/worsening] | [systemic cause] |
+
+#### Systemic Issues
+[Problems that stem from process, tooling, or organizational structure rather than individual decisions]
+
+---
+
+### Improvement Items
+
+[LIMITED TO 2-3 ITEMS. More than 3 competing for attention means none get done.]
+
+#### Improvement 1: [Title]
+- **Action:** [Specific, actionable change]
+- **Owner:** [Team/role responsible]
+- **Due date:** [When this should be completed]
+- **Success metric:** [How we'll know it worked]
+- **Priority:** [P1/P2/P3]
+
+#### Improvement 2: [Title]
+[Same format]
+
+#### Improvement 3 (if warranted): [Title]
+[Same format]
+
+---
+
+### Celebration
+[1-2 things the team should celebrate from this cycle. Acknowledge wins.]
+```
+
+---

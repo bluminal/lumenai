@@ -1,0 +1,74 @@
+{
+  "architect": {
+    "before_bytes": 11978,
+    "h1": "# Architect",
+    "has_output_format": false,
+    "output_format_bytes": null
+  },
+  "code-reviewer": {
+    "before_bytes": 13790,
+    "h1": "# Code Reviewer",
+    "has_output_format": true,
+    "output_format_bytes": 1733
+  },
+  "security-reviewer": {
+    "before_bytes": 15146,
+    "h1": "# Security Reviewer",
+    "has_output_format": true,
+    "output_format_bytes": 1384
+  },
+  "terraform-plan-reviewer": {
+    "before_bytes": 14389,
+    "h1": "# Terraform Plan Reviewer",
+    "has_output_format": true,
+    "output_format_bytes": 2277
+  },
+  "quality-engineer": {
+    "before_bytes": 11643,
+    "h1": "# Quality Engineer",
+    "has_output_format": false,
+    "output_format_bytes": null
+  },
+  "design-system-agent": {
+    "before_bytes": 11067,
+    "h1": "# Design System Agent",
+    "has_output_format": false,
+    "output_format_bytes": null
+  },
+  "performance-engineer": {
+    "before_bytes": 11408,
+    "h1": "# Performance Engineer",
+    "has_output_format": true,
+    "output_format_bytes": 1771
+  },
+  "sre-agent": {
+    "before_bytes": 13178,
+    "h1": "# SRE Agent",
+    "has_output_format": false,
+    "output_format_bytes": null
+  },
+  "technical-writer": {
+    "before_bytes": 9878,
+    "h1": "# Technical Writer",
+    "has_output_format": false,
+    "output_format_bytes": null
+  },
+  "ux-researcher": {
+    "before_bytes": 12628,
+    "h1": "# UX Researcher",
+    "has_output_format": false,
+    "output_format_bytes": null
+  },
+  "metrics-analyst": {
+    "before_bytes": 10719,
+    "h1": "# Metrics Analyst",
+    "has_output_format": true,
+    "output_format_bytes": 1105
+  },
+  "retrospective-facilitator": {
+    "before_bytes": 11035,
+    "h1": "# Retrospective Facilitator",
+    "has_output_format": true,
+    "output_format_bytes": 2627
+  }
+}

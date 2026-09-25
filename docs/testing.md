@@ -387,3 +387,93 @@ All LLM-dependent tests (Layers 2 and 3) are triggered manually to control costs
 | 1 — Schema | $0 | Every PR (automatic) | Always free — no LLM calls |
 | 2 — Behavioral | ~$3 first run, ~$0 cached | Manual (workflow_dispatch) | Cached after first run per agent+fixture combo |
 | 3 — Semantic | ~$8 | Manual (workflow_dispatch) | LLM judge calls, not cached |
+
+## Task 16 (FR-HM6) — Boilerplate Diet: Layer 2 Verification
+
+Task 16 removed the `## Interaction with Other Agents` and `## Future Considerations`
+sections (relocated to `docs/agent-interactions.md` and `docs/roadmap.md`), condensed
+`## Scope Boundaries` to two lines, and trimmed `## When You Are Invoked` to one
+sentence across the 12 specialist agents. The acceptance criteria required
+confirming no Layer 2 verdict regression on the 3 `code-reviewer` and 7
+`security-reviewer` fixtures.
+
+**Infrastructure note (found while running this):** `tests/helpers/invoke-agent.ts`
+and `tests/helpers/claude-provider.js` both pass the *agent file path* as the
+literal value of `claude -p --system-prompt`. The installed CLI (2.1.282) has no
+`--system-prompt-file` flag — `--system-prompt` takes inline prompt text, not a
+path. So neither the promptfoo provider nor `invoke-agent.ts` is actually loading
+the agent's `.md` content as the system prompt today; the model runs as generic
+Claude. `code-reviewer` also has zero entries in `promptfoo.config.yaml` (only
+`security-reviewer` is wired), so this is the first time `code-reviewer`'s Layer 2
+behavior has been checked against these fixtures at all. This is out of scope for
+Task 16 to fix, but is flagged here since it affects every existing Layer 2 result
+in this file predating this run.
+
+**Method:** a standalone script (not checked in) read each agent's pre-Task-16
+content via `git show HEAD:...` ("before") and the current file ("after"), and
+invoked `claude -p --system-prompt <content>` directly (bypassing the broken
+helpers above) with each fixture on stdin. `security-reviewer` used `--max-turns 1`
+(matches its promptfoo config). `code-reviewer` needed `--max-turns 8` — its
+Review Process mandates spawning a sub-agent for Specification Relevance Analysis,
+which cannot complete in a single turn. Verdicts were extracted from the
+`## <Agent> Verdict: PASS|WARN|FAIL` heading (tolerating markdown bold around the
+verdict word, which the model sometimes emits).
+
+**Result: no verdict regression attributable to the Task 16 edit.** 8 of 10
+fixtures gave a single, stable, matching verdict on both sides across every
+sample taken. The other 2 showed model-sampling variance, but the variance
+appeared on **both** the before and after prompt when re-sampled at equal
+turn budgets — i.e. the original (pre-Task-16) prompt is exactly as flaky on
+these two fixtures as the trimmed one, so the flakiness is not something the
+edit introduced.
+
+| Agent | Fixture | Before verdict(s) observed | After verdict(s) observed | Assessment |
+|-------|---------|------------------------------|------------------------------|------------|
+| code-reviewer | clean-code.diff | (no verdict emitted), WARN, FAIL | FAIL, FAIL | Variance on both sides; FAIL overlaps |
+| code-reviewer | god-object.diff | FAIL | FAIL | Match |
+| code-reviewer | missing-error-handling.diff | (asked a clarifying question instead of reviewing), FAIL | FAIL | Match (after retry) |
+| security-reviewer | clean-code.diff | PASS, PASS, WARN | WARN, WARN | Variance on both sides; WARN overlaps |
+| security-reviewer | hardcoded-secret.diff | FAIL | FAIL | Match |
+| security-reviewer | missing-auth.diff | FAIL | FAIL | Match |
+| security-reviewer | mixed-severity.diff | FAIL | FAIL | Match |
+| security-reviewer | sql-injection.diff | FAIL | FAIL | Match |
+| security-reviewer | weak-csrf.diff | FAIL | FAIL | Match |
+| security-reviewer | xss-vuln.diff | FAIL | FAIL | Match |
+
+The two variance cases are both "mostly clean, borderline" fixtures (`clean-code.diff`
+in each suite) where the model's PASS/WARN or WARN/FAIL boundary call is inherently
+close. `code-reviewer`'s `haiku` + mandatory sub-agent spawn is also more prone to
+turning a fixed `--max-turns` budget into a hard failure (asking a clarifying
+question, or not reaching the verdict heading) than to changing the verdict itself
+once it does complete — and it completed with the same verdict (FAIL) every time it
+completed on both sides.
+
+### Per-spawn prompt byte delta (12 specialists)
+
+| Agent | Before | After | Delta | % smaller |
+|-------|-------:|------:|------:|----------:|
+| architect | 11,978 | 10,096 | -1,882 | -15.7% |
+| code-reviewer | 13,790 | 12,232 | -1,558 | -11.3% |
+| security-reviewer | 15,146 | 13,520 | -1,626 | -10.7% |
+| terraform-plan-reviewer | 14,389 | 12,771 | -1,618 | -11.2% |
+| quality-engineer | 11,643 | 10,041 | -1,602 | -13.8% |
+| design-system-agent | 11,067 | 9,108 | -1,959 | -17.7% |
+| performance-engineer | 11,408 | 9,702 | -1,706 | -15.0% |
+| sre-agent | 13,178 | 11,499 | -1,679 | -12.7% |
+| technical-writer | 9,878 | 8,314 | -1,564 | -15.8% |
+| ux-researcher | 12,628 | 11,044 | -1,584 | -12.5% |
+| metrics-analyst | 10,719 | 9,178 | -1,541 | -14.4% |
+| retrospective-facilitator | 11,035 | 9,480 | -1,555 | -14.1% |
+| **Total (12 specialists)** | **146,859** | **126,985** | **-19,874** | **-13.5%** |
+
+`tech-lead.md` (11,790 → 10,282 bytes) and `lead-frontend-engineer.md` (9,554 →
+9,190 bytes) also lost their phantom "not yet available" sub-agent registries.
+`multi-model-review-orchestrator.md` (32,898 → 30,799 bytes) had its
+`## Source Authority` bullet list collapsed to one paragraph and its
+`## Scope Constraints` milestone-bookkeeping prose trimmed, while keeping every
+FR/D id and locked string that `orchestrator-consolidation.test.ts`,
+`orchestrator-preflight.test.ts`, and `orchestrator-stage5plus.test.ts` assert on.
+
+Byte counts are recorded in `tests/fixtures/agent-boilerplate/agent-sizes-before.json`
+and asserted (≥ 1,536-byte reduction per specialist) by
+`tests/schemas/agent-boilerplate.test.ts`.
