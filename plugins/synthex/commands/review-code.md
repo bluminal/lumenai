@@ -321,7 +321,7 @@ Resolve what code to review based on the `target` parameter:
 
 Before launching reviewers, gather context they'll need:
 
-- Read `@CLAUDE.md` for project conventions
+- If the host did not already inject the project instruction file into your context, Read the first of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.hermes.md` that exists at the repository root.
 - Read convention sources from config (e.g., `.eslintrc`, `.prettierrc`)
 - Identify the programming language(s) and frameworks in the diff
 

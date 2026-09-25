@@ -103,7 +103,7 @@ Read the PRD at `@{requirements_path}` thoroughly. Understand:
 
 Read available technical specifications and project context:
 - Check `@{specs_path}` for existing technical specs (architecture, frontend, design system)
-- Check `@CLAUDE.md` for project conventions, patterns, and constraints
+- If the host did not already inject the project instruction file into your context, Read the first of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.hermes.md` that exists at the repository root.
 - Check `package.json` or equivalent for current tech stack
 - Understand the current state of the codebase (what already exists)
 
@@ -323,7 +323,7 @@ Write the finalized implementation plan to `@{plan_path}`.
 
 ### 9. Update Project Files
 
-- Update `@CLAUDE.md` with any relevant workflow patterns, commands, or conventions discovered during planning
+- Update the project instruction file (`CLAUDE.md` on Claude Code; otherwise the first of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.hermes.md` that exists) with any relevant workflow patterns, commands, or conventions discovered during planning
 - Do NOT place the plan itself in CLAUDE.md
 
 ---
