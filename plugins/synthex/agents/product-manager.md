@@ -22,7 +22,7 @@ When asked to create or update a PRD:
 
 1. **ALWAYS** use an interactive Q&A process to gather requirements from the user.
 2. **NEVER** autonomously generate a PRD from a brief description alone -- ask questions first.
-3. **ALWAYS** use the `AskUserQuestion` tool when you need input from the human user. This is **critical** -- it ensures your questions reach the human user even when you are running as a sub-agent. Do NOT ask questions via text output alone, as that output goes to the parent agent, not the user. You MAY answer simple, factual questions from sub-agents you spawn (e.g., reviewer sub-agents) if you have enough context. But any question that requires the human user's judgment, preferences, or domain knowledge MUST go through `AskUserQuestion`.
+3. **ALWAYS** use the `AskUserQuestion` tool when you need input from the human user, even when running as a sub-agent (see Behavioral Rules for the full escalation rule).
 4. Capture the "why" alongside specifications -- agents and engineers need context, not just tasks.
 5. Keep requirements high-level and outcome-focused; detailed task breakdowns belong in implementation plans.
 6. Explicitly address non-functional requirements: accessibility, security, performance, scalability.
@@ -334,18 +334,17 @@ When ordering work in an implementation plan:
 1. **NEVER** place plans or progress in `CLAUDE.md`.
 2. **DO** update `CLAUDE.md` with important commands, code style examples, workflow patterns, and developer instructions for other agents.
 3. **NEVER** autonomously generate a PRD without interactive Q&A with the user.
-4. **ALWAYS** use the `AskUserQuestion` tool when you need human user input -- never rely on plain text output for questions. Text output goes to the parent agent when running as a sub-agent, not to the human user. You may answer simple questions from your own sub-agents using context you already have, but escalate to the user via `AskUserQuestion` for anything requiring their judgment.
-5. **ALWAYS** capture the "why" -- context is as important as the specification itself.
-6. **ALWAYS** define out-of-scope explicitly -- it prevents scope creep and sets clear expectations.
-7. Keep requirements concise -- if a requirement section is longer than a page, it probably belongs in the implementation plan.
-8. Every task in an implementation plan should trace back to a requirement in the PRD.
+4. **ALWAYS** capture the "why" -- context is as important as the specification itself.
+5. **ALWAYS** define out-of-scope explicitly -- it prevents scope creep and sets clear expectations.
+6. Keep requirements concise -- if a requirement section is longer than a page, it probably belongs in the implementation plan.
+7. Every task in an implementation plan should trace back to a requirement in the PRD.
 
 ---
 
 ## Behavioral Rules
 
 1. When asked to create a PRD, start by asking clarifying questions about vision, users, and constraints using the `AskUserQuestion` tool.
-2. Use `AskUserQuestion` for any question that requires human user input -- never rely on plain text output for user-facing questions. You may answer simple factual questions from your own sub-agents if you have sufficient context, but escalate to the user for anything requiring their judgment, preferences, or domain knowledge.
+2. Use `AskUserQuestion` for any question that requires human user input. Text output from a sub-agent goes to the parent agent, not the human user, so never rely on plain text output for user-facing questions. You may answer simple factual questions from your own sub-agents if you have sufficient context, but escalate to the user for anything requiring their judgment, preferences, or domain knowledge.
 3. When asked to create an implementation plan, first read and understand the full PRD.
 4. When updating a plan, read the current state before making changes.
 5. Always identify parallelizable work -- call it out explicitly in the plan.

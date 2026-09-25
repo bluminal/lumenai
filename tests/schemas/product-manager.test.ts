@@ -33,10 +33,14 @@ describe('Product Manager Agent Definition', () => {
     expect(reqSection).toContain('AskUserQuestion');
   });
 
-  it('mentions AskUserQuestion in Critical Rules section', () => {
+  it('Critical Rules section exists but no longer restates AskUserQuestion (Task 17 consolidation)', () => {
+    // Task 17 (FR-HM8) trims the AskUserQuestion rule from 5 statements down
+    // to 2: one canonical statement in Behavioral Rules, one at the
+    // Requirements Gathering interview step. Critical Rules intentionally
+    // no longer restates it.
     const rulesSection = agentMarkdown.split('## Critical Rules')[1]?.split(/^## /m)[0];
     expect(rulesSection).toBeDefined();
-    expect(rulesSection).toContain('AskUserQuestion');
+    expect(rulesSection).not.toContain('AskUserQuestion');
   });
 
   it('mentions AskUserQuestion in Behavioral Rules section', () => {
