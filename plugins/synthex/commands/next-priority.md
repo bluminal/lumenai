@@ -69,6 +69,8 @@ git worktree add {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short
 
 ### 5. Delegate to Tech Lead
 
+If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Build, and Hermes), perform the role inline in this session, then continue.
+
 **This is the key orchestration step.** For each task, launch a **Tech Lead sub-agent** instance with:
 
 - The specific task description and acceptance criteria (with their type tags: `[T]`, `[H]`, `[O]`)
@@ -232,11 +234,11 @@ When an iteration finds nothing actionable, do NOT end the turn and do NOT re-ru
 ```bash
 # Claude Code
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/loop-idle-wait.sh" <loop-id> <implementation-plan-path>
-# Other hosts (Codex, Grok, Gemini CLI, OpenCode): use the installed plugin root
-bash <synthex-plugin-root>/scripts/loop-idle-wait.sh <loop-id> <implementation-plan-path>
 ```
 
-It blocks until the plan file changes, the loop leaves `running` (e.g. `/synthex:cancel-loop`), or a backoff limit elapses (60s → 120s → 300s → 540s over consecutive idle iterations; it tracks `idle_streak` in the state file itself). It prints one `idle-wait <loop-id>: <reason> …` line and always exits 0. Then continue with step 1 of the next iteration in the same turn. If `${CLAUDE_PLUGIN_ROOT}` is not expanded, use the absolute path from the `loop-advance-gate` block reason (Claude Code only) or the installed plugin root. If your shell tool cannot allow 600s, prefix the command with `SYNTHEX_LOOP_IDLE_MAX=<your cap minus 30>`. If the script cannot be found or the host has no shell tool, continue to the next iteration without waiting — never end the turn instead. Hosts without the Stop hook (Codex, Grok, and others) have no gate to re-invoke you, so a turn-end there stops the loop.
+On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
+
+It blocks until the plan file changes, the loop leaves `running` (e.g. `/synthex:cancel-loop`), or a backoff limit elapses (60s → 120s → 300s → 540s over consecutive idle iterations; it tracks `idle_streak` in the state file itself). It prints one `idle-wait <loop-id>: <reason> …` line and always exits 0. Then continue with step 1 of the next iteration in the same turn. If the `loop-advance-gate` block reason (Claude Code only) gives an absolute path, prefer that. If your shell tool cannot allow 600s, prefix the command with `SYNTHEX_LOOP_IDLE_MAX=<your cap minus 30>`. If the script cannot be found or the host has no shell tool, continue to the next iteration without waiting — never end the turn instead. Hosts without the Stop hook (Codex, Grok, and others) have no gate to re-invoke you, so a turn-end there stops the loop.
 
 ### Emission Point
 
