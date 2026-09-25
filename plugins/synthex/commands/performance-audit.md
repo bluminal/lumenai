@@ -191,7 +191,7 @@ Resolve what to audit based on the `scope` parameter:
 
 Before invoking the Performance Engineer, gather context:
 
-- Read `@CLAUDE.md` for project conventions and stack details
+- If the host did not already inject the project instruction file into your context, Read the first of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.hermes.md` that exists at the repository root.
 - Read `package.json` for dependencies and bundle analysis context
 - Check for existing performance budgets or benchmarks
 - Identify the deployment target (Vercel, AWS, self-hosted) for environment-specific recommendations
