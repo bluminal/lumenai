@@ -18,10 +18,13 @@
  * never itself preceded by "Read". This distinction matters today because
  * every one of the 32 existing `docs/native-looping.md` mentions in
  * `commands/` (see the evidence test below) is a markdown link, not a
- * Read gate — Task 13 is what introduces the first real gates, so this
- * suite ships the rule ahead of that move per the Task 12 brief. No
- * KNOWN_* allowlist is seeded: there is no real, today-existing D17
- * violation to grandfather.
+ * Read gate — this suite shipped the rule ahead of Task 13 per the Task 12
+ * brief. Task 13 (FR-HM5) introduces the first three real gates, splitting
+ * `review-code.md`'s Standing Pool Discovery (1b), Sandbox-Yolo Spawn
+ * Confirmation (1c), and FR-MR21 Steps 4-8 + Complexity Gate out to
+ * `docs/standing-pool-routing.md`, `docs/sandbox-yolo.md`, and
+ * `docs/multi-model-decision.md`. No KNOWN_* allowlist is seeded: there is
+ * no real, today-existing D17 violation to grandfather.
  *
  * Rules enforced against every detected Read gate:
  *   1. The target must be written as `${CLAUDE_PLUGIN_ROOT}/docs/<x>.md`
@@ -282,15 +285,25 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
   });
 
   it(
-    'evidence: today\'s 32 docs/native-looping.md mentions in commands/ are markdown ' +
-      'links, not Read gates, so no cold-path include exists yet (Task 13 adds the first)',
+    'evidence: today\'s 32+ docs/native-looping.md mentions in commands/ are markdown ' +
+      'links, not Read gates; Task 13 adds the first 3 real gates in review-code.md',
     () => {
       const nativeLoopingMentions = files.reduce((count, relFile) => {
         const text = readFileSync(join(ROOT, relFile), 'utf8');
         return count + (text.match(/docs\/native-looping\.md/g) ?? []).length;
       }, 0);
       expect(nativeLoopingMentions).toBeGreaterThanOrEqual(32);
-      expect(allIncludes).toHaveLength(0);
+      expect(allIncludes).toHaveLength(3);
+      expect(new Set(allIncludes.map((i) => i.file))).toEqual(
+        new Set(['plugins/synthex/commands/review-code.md']),
+      );
+      expect(new Set(allIncludes.map((i) => i.rawTarget))).toEqual(
+        new Set([
+          '${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md',
+          '${CLAUDE_PLUGIN_ROOT}/docs/sandbox-yolo.md',
+          '${CLAUDE_PLUGIN_ROOT}/docs/multi-model-decision.md',
+        ]),
+      );
     },
   );
 

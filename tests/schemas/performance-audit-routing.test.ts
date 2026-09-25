@@ -27,13 +27,17 @@ const PERF_AUDIT_MD_PATH = join(
   '..', '..', 'plugins', 'synthex', 'commands', 'performance-audit.md'
 );
 
-const REVIEW_CODE_MD_PATH = join(
+// Task 13 (FR-HM5, D17) repoint: review-code.md's Step 1b body (which held
+// these NFR-MMT7 strings) moved byte-identical to
+// plugins/synthex/docs/standing-pool-routing.md, replaced in review-code.md
+// by a two-line D17 gate. Read the doc file for the cross-file comparison.
+const STANDING_POOL_ROUTING_DOC_PATH = join(
   import.meta.dirname,
-  '..', '..', 'plugins', 'synthex', 'commands', 'review-code.md'
+  '..', '..', 'plugins', 'synthex', 'docs', 'standing-pool-routing.md'
 );
 
 const content = readFileSync(PERF_AUDIT_MD_PATH, 'utf-8');
-const reviewCodeContent = readFileSync(REVIEW_CODE_MD_PATH, 'utf-8');
+const reviewCodeContent = readFileSync(STANDING_POOL_ROUTING_DOC_PATH, 'utf-8');
 
 describe('performance-audit.md — Task 57 [T] acceptance criteria (inline discovery + pool routing + recovery)', () => {
 

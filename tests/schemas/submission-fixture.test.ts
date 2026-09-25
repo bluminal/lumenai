@@ -42,9 +42,13 @@ const FIXTURE_PATH = join(
   '..', 'fixtures', 'multi-model-teams', 'submission', 'discovery-and-submit', 'fixture.json'
 );
 
+// Task 13 (FR-HM5, D17) repoint: review-code.md's Step 1b body (which held
+// these strings) moved byte-identical to
+// plugins/synthex/docs/standing-pool-routing.md, replaced in review-code.md
+// by a two-line D17 gate.
 const REVIEW_CODE_MD_PATH = join(
   import.meta.dirname,
-  '..', '..', 'plugins', 'synthex', 'commands', 'review-code.md'
+  '..', '..', 'plugins', 'synthex', 'docs', 'standing-pool-routing.md'
 );
 
 const SUBMITTER_MD_PATH = join(
@@ -365,27 +369,28 @@ describe('[9] submitter_inputs.tasks is a non-empty array', () => {
   });
 });
 
-// ── [10] review-code.md contains provenance line text verbatim ───────────
+// ── [10] docs/standing-pool-routing.md contains provenance line text verbatim ───────────
+// (moved from plugins/synthex/commands/review-code.md's Step 1b by Task 13, FR-HM5/D17)
 
-describe('[10] plugins/synthex/commands/review-code.md contains provenance line verbatim', () => {
+describe('[10] plugins/synthex/docs/standing-pool-routing.md contains provenance line verbatim', () => {
   const reviewCodeContent = readFileSync(REVIEW_CODE_MD_PATH, 'utf-8');
 
-  it('review-code.md is readable and non-empty', () => {
+  it('docs/standing-pool-routing.md is readable and non-empty', () => {
     expect(reviewCodeContent.length).toBeGreaterThan(0);
   });
 
-  it('review-code.md contains the verbatim provenance line template (NFR-MMT7 Item 4)', () => {
+  it('docs/standing-pool-routing.md contains the verbatim provenance line template (NFR-MMT7 Item 4)', () => {
     // The normative form uses template variables per the spec
     expect(reviewCodeContent).toContain(
       "Review path: standing pool '{pool_name}' (multi-model: {yes|no})."
     );
   });
 
-  it('review-code.md contains "Review path: standing pool" (provenance line prefix)', () => {
+  it('docs/standing-pool-routing.md contains "Review path: standing pool" (provenance line prefix)', () => {
     expect(reviewCodeContent).toContain('Review path: standing pool');
   });
 
-  it('review-code.md contains the verbatim routing notification template (FR-MMT17)', () => {
+  it('docs/standing-pool-routing.md contains the verbatim routing notification template (FR-MMT17)', () => {
     expect(reviewCodeContent).toContain(
       "Routing to standing pool '{pool_name}' (multi-model: {yes|no})."
     );

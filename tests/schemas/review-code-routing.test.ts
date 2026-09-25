@@ -1,6 +1,6 @@
 /**
  * Layer 1: Structural validation tests for the pool routing section
- * in plugins/synthex/commands/review-code.md.
+ * formerly inline in plugins/synthex/commands/review-code.md's Step 1b.
  *
  * Validates all [T] acceptance criteria from Tasks 54 + 55:
  *   - Discovery runs at command-invocation time
@@ -16,18 +16,24 @@
  *   - Task 55 Item 4: provenance line verbatim
  *   - Item 3 TTY conditional suppression language
  *   - Item 3 60s threshold language
+ *
+ * Task 13 (FR-HM5, D17) repoint: this entire section's body moved
+ * byte-identical from review-code.md's Step 1b to
+ * plugins/synthex/docs/standing-pool-routing.md, replaced in
+ * review-code.md by a two-line D17 gate. All assertions below now read
+ * the doc file instead of the command file.
  */
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const REVIEW_CODE_MD_PATH = join(
+const STANDING_POOL_ROUTING_DOC_PATH = join(
   import.meta.dirname,
-  '..', '..', 'plugins', 'synthex', 'commands', 'review-code.md'
+  '..', '..', 'plugins', 'synthex', 'docs', 'standing-pool-routing.md'
 );
 
-const content = readFileSync(REVIEW_CODE_MD_PATH, 'utf-8');
+const content = readFileSync(STANDING_POOL_ROUTING_DOC_PATH, 'utf-8');
 
 describe('review-code.md — Tasks 54+55 [T] acceptance criteria (inline discovery + pool routing + recovery)', () => {
 

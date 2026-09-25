@@ -8,6 +8,12 @@ type Cmd = { name: string; file: string; followupContext: string };
 
 // Task 83 requires the verbatim warning string + y/N confirmation prompt
 // to appear in three commands.
+//
+// Task 13 (FR-HM5, D17) repoint: /synthex:review-code's Step 1c body moved
+// byte-identical to plugins/synthex/docs/sandbox-yolo.md, replaced in
+// review-code.md by a two-line D17 gate (the TTY-guard sentence itself
+// stays inline — see sandbox-yolo-tty-guard.test.ts). These verbatim
+// strings now live in the doc file, so this entry reads it instead.
 const COMMANDS: Cmd[] = [
   {
     name: '/synthex-plus:start-review-team',
@@ -16,7 +22,7 @@ const COMMANDS: Cmd[] = [
   },
   {
     name: '/synthex:review-code',
-    file: join(PLUGINS, 'synthex', 'commands', 'review-code.md'),
+    file: join(PLUGINS, 'synthex', 'docs', 'sandbox-yolo.md'),
     followupContext: 'review',
   },
   {
