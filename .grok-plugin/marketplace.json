@@ -3,7 +3,7 @@
   "owner": {
     "name": "Bluminal Labs"
   },
-  "version": "1.3.0",
+  "version": "1.4.0",
   "license": "Apache-2.0",
   "description": "Bluminal Labs AI plugin marketplace — collections of AI agents, commands, and skills for autonomous software delivery.",
   "plugins": [
@@ -13,7 +13,7 @@
         "type": "local",
         "path": "./plugins/synthex"
       },
-      "version": "1.3.0",
+      "version": "1.4.0",
       "category": "productivity",
       "keywords": [
         "agents",

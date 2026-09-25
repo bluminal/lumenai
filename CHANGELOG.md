@@ -5,6 +5,41 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 1.4.0 / synthex-plus 1.4.0] - 2026-09-25
+
+### Added
+
+- (synthex) include docs/ in support bundles with plugin_root fallback
+- (synthex) rename generated wrapper tree to portable-skills/ (spike OQ-1)
+
+### Changed
+
+- (plans) record Task 21 done with [H] approvals; resolve Q7
+- complete portable-skills/ rename per Task 21
+- (plans) record Task 14 done; Milestone 2.1 complete
+- (synthex) extract performance-audit and write-implementation-plan cold paths per FR-HM5
+- (plans) record Task 13 done; Task 14 in progress
+- (synthex) extract review-code cold paths to standalone docs per FR-HM5
+- (plans) record Task 12 done with [H] approval; Task 13 in progress
+- (plans) record Task 15 done with [H] approval
+- replace @CLAUDE.md references with host-aware instruction-file wording
+- (plans) record Tasks 9-11 Claude capability spikes; Milestone 1.3 and Phase 1 complete
+- (plans) record Task 8 Hermes spike; Milestone 1.2 complete
+- (plans) record spike results for Tasks 5-7 (OQ-1, OQ-2, OQ-3/4) with [H] approval
+
+## [synthex 1.3.1 / synthex-plus 1.3.1] - 2026-09-24
+
+### Changed
+
+- (plans) record Task 4 done; Milestone 1.1 complete
+- (plans) record Tasks 1-3 done with test linkage; Task 4 in progress
+- add Layer 1 tests for H1 detection, frontmatter parsing, and host-matrix scaffold
+- add Layer 1 schema validators for tool-presence gates and usage-billing
+- introduce inventory constants for command/agent/wrapper counts
+- read agent model and effort from markdown frontmatter
+- (plans) add harness-modernization implementation plan
+- (reqs) add harness-modernization PRD with cross-harness impact analysis
+
 ## [synthex 1.3.0 / synthex-plus 1.3.0] - 2026-09-23
 
 ### Added
