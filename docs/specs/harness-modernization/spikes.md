@@ -11,6 +11,7 @@ Milestone 1.2 spikes for `docs/plans/harness-modernization.md`. Question, Decisi
 | 9 | Workflow (FR-HM16/19, Q5) | a confirmed, b confirmed, c refuted, d confirmed | yes (c only) |
 | 10 | OQ-8 | refuted | yes |
 | 11 | OQ-9 | partial (identity confirmed; compaction static) | no |
+| 12 | D17 expansion (FR-HM43/D17/FR-HM13) | confirmed (unexpanded in prose) | yes |
 
 ## Task 5 — OQ-1: rename `skills/` to `portable-skills/` (FR-HM11)
 
@@ -527,4 +528,54 @@ PROMPT_SNAPSHOT systemPrompt total chars= 15050 sha= 6b31f7ecb389 first 160: '# 
 ### Unknowns
 - No live compaction was forced.
 - Whether an agent-file `effort:` pin is honored for Agent-tool teammates was not exercised (the code-reviewer file has none).
+
+## Task 12 — D17 expansion (FR-HM43, D17, FR-HM13)
+
+**Verdict:** confirmed — `${CLAUDE_PLUGIN_ROOT}` does **not** expand in Bash-tool command prose during a headless `claude -p` session; it is documented for hooks only, so command-prose Read gates need the D17 fallback. **Fallback fired:** yes — `plugin_root` is now written to `.synthex/state.json` by `upgrade-nudge.sh` for command prose to read on hosts/contexts where the variable is unexpanded (this task).
+
+### Question
+
+Does `${CLAUDE_PLUGIN_ROOT}` expand when a command instructs the agent to run a shell command referencing it (as opposed to a plugin-authored hook script, where it is documented to expand)? This determines whether the D17 fallback (reading `plugin_root` from `.synthex/state.json`) is load-bearing or merely defensive.
+
+### Method
+
+In a temp project **outside the repo** (`/tmp/synthex-d17-spike-project`, removed after the spike), ran one headless turn against the worktree's plugin:
+
+```
+claude -p "Run the shell command: echo \"\$CLAUDE_PLUGIN_ROOT\" via the Bash tool exactly as written \
+  (including the quotes), then reply with exactly one line: RESULT=<the command's stdout output>. \
+  Do nothing else." \
+  --plugin-dir "<worktree>/plugins/synthex" \
+  --output-format stream-json --verbose \
+  --dangerously-skip-permissions \
+  < /dev/null
+```
+
+Single run, `timeout 180`, stdin `/dev/null`, Claude Code 2.1.282, model `claude-opus-5-5`. The `system/init` event's `slash_commands` confirmed the plugin loaded correctly (`synthex:review-code`, `synthex:next-priority`, etc.), ruling out "plugin not found" as an explanation for a blank result.
+
+### Result
+
+The agent issued `Bash {"command": "echo \"$CLAUDE_PLUGIN_ROOT\""}`. The tool result was `(Bash completed with no output)` — the variable expanded to the empty string inside the Bash tool's shell, not to the plugin's install path. The agent's final reply was `RESULT=` (empty), matching the empty tool output rather than fabricating a path. This confirms the plan's assumption in D17 and FR-HM13: `${CLAUDE_PLUGIN_ROOT}` is populated for Claude Code (and Codex) **hook** invocations only, not for ordinary Bash-tool commands run from command/agent prose. Any cold-path include or script invocation that tells the agent to run `bash "${CLAUDE_PLUGIN_ROOT}/..."` from prose (as opposed to a hook's own script body) cannot rely on shell expansion and needs either (a) the two-line "other hosts" fallback already used for scripts (`next-priority.md:233-236`), or (b) for doc Reads specifically, the D17 `plugin_root` fallback this task adds to `upgrade-nudge.sh`'s `.synthex/state.json` write.
+
+### Evidence
+
+```
+TOOL_USE: Bash {"command": "echo \"$CLAUDE_PLUGIN_ROOT\"", "description": "Print plugin root env var"}
+TOOL_RESULT: "(Bash completed with no output)"
+ASSISTANT TEXT: RESULT=
+```
+```
+system/init: model="claude-opus-5-5", permissionMode="bypassPermissions",
+  slash_commands includes "synthex:review-code", "synthex:next-priority", "synthex:init", ...
+```
+
+### Unknowns
+
+- Not tested on Codex, which FR-HM13 also documents as expanding `${CLAUDE_PLUGIN_ROOT}` for hooks; only Claude Code's Bash-tool prose path was exercised here.
+- Not tested inside an actual hook invocation (e.g. `upgrade-nudge.sh` itself, which resolves its own root via `dirname "$0"` rather than reading the env var) — this spike is about prose-driven Bash commands, which is the FR-HM5/D17 cold-path-include case.
+- Single run on Claude Code 2.1.282; not re-checked across versions.
+
+### Artifacts
+
+`$SCRATCH/spikes/task12/d17-expansion-stream.jsonl` (full stream-json transcript), `$SCRATCH/spikes/task12/d17-expansion-stderr.log` (empty — clean exit 0). Temp project removed after the spike; no repo files were changed by it.
 

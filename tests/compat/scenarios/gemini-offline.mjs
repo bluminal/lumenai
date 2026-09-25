@@ -44,7 +44,7 @@ try {
   }
 
   mkdirSync(workspaceSupportRoot, { recursive: true });
-  for (const directory of ['commands', 'agents', 'config', 'scripts']) {
+  for (const directory of ['commands', 'agents', 'config', 'scripts', 'docs']) {
     cpSync(join(stagingRoot, directory), join(workspaceSupportRoot, directory), {
       recursive: true,
     });
