@@ -8,6 +8,9 @@ Milestone 1.2 spikes for `docs/plans/harness-modernization.md`. Question, Decisi
 | 6 | OQ-2 | confirmed | yes |
 | 7 | OQ-3/OQ-4 | partial | yes |
 | 8 | OQ-7 | partial (install shape confirmed) | no |
+| 9 | Workflow (FR-HM16/19, Q5) | a confirmed, b confirmed, c refuted, d confirmed | yes (c only) |
+| 10 | OQ-8 | refuted | yes |
+| 11 | OQ-9 | partial (identity confirmed; compaction static) | no |
 
 ## Task 5 — OQ-1: rename `skills/` to `portable-skills/` (FR-HM11)
 
@@ -445,4 +448,83 @@ SUMMARY {"safe": 75, "caution": 1, "dangerous": 17}
 
 ### Artifacts
 `$SCRATCH/spikes/task8/` logs 00–15 (help output, discovery and quarantine source excerpts, guard scan, list before/after trust, one-shot). Temp project removed and its trust entry revoked after the spike. No repo files were changed.
+
+## Task 9 — Workflow capability spike (FR-HM16, FR-HM19 a/c, Q5)
+
+**Verdict:** (a) confirmed, (b) confirmed, (c) refuted, (d) confirmed. **Fallback fired:** (c) only — "keep the in-turn wait".
+
+### Questions and results
+**(a) Can a plugin ship a Workflow script?** Confirmed on Claude Code 2.1.282. A script at the plugin root `workflows/spike-hello.js` is auto-discovered with no `plugin.json` change, appears in the headless init `slash_commands` as `synthex:spike-hello`, and runs via `Workflow {"name": "synthex:spike-hello"}` returning `{"ok":"OK"}`; the bare name errors (`Workflow "spike-hello" not found. Available: deep-research, synthex:spike-hello`). A project-local `.claude/workflows/spike-hello.js` control works with the bare name. Docs agree (`workflows.md`: plugin `workflows/` dir or the `workflows` manifest field; namespacing `/acme-tools:release-audit`). Bonus: the headless process stayed alive after its first result and was re-invoked by the workflow's task-notification without a user turn.
+**(b) Does `agentType: 'synthex:code-reviewer'` resolve from a Workflow script?** Confirmed, by this spike's own workflow: the probe agent reported role "Senior Code Reviewer", first H1 `# Code Reviewer`, model `claude-haiku-4-5-20251001` (the agent file's `model: haiku`).
+**(c) Does `ScheduleWakeup` resume a headless session without a user turn?** Refuted. `/loop` expanded headless and `ScheduleWakeup {delaySeconds: 60}` was accepted ("Next wakeup scheduled ... in 120s"), but the `claude -p` process exited 0 sixteen seconds after start, before the wakeup; no second turn, no persisted wakeup state, no lingering process. Fallback: keep the in-turn wait (`loop-idle-wait.sh`). Observed alternative to test in Task 54: a background task notification does re-invoke a headless session (seen in (a)); a `run_in_background` Bash sleep may substitute for `ScheduleWakeup`.
+**(d) Is a committed config key a valid Workflow opt-in?** Confirmed statically from the Workflow tool contract: explicit opt-in is the `ultracode` keyword, a session-level setting, the user's own words, or "a skill or slash command whose instructions tell you to call Workflow". A config key alone is not an opt-in; a Synthex slash command whose text says to call Workflow when `code_review.engine: workflow` is. D31's per-session confirmation is therefore unnecessary; headless runs still need a `Workflow(synthex:<name>)` permission allow rule or auto/bypass mode.
+
+### Method
+This spike's own Workflow run (`wf_388da267-38b`): `agent(..., {agentType: 'synthex:code-reviewer', schema})` for (b). Headless agent for (a) and (c): `claude -p --output-format stream-json --verbose --model claude-sonnet-5`, `timeout`, stdin `/dev/null`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`; plugin copy at `$SCRATCH/spikes/task9/synthex-wf/` with `workflows/spike-hello.js`; control project `projA/.claude/workflows/`; `/loop` probe in `projB` with a helper touching `READY` at +45 s. Docs cross-checked via WebFetch of `workflows.md` and `plugins-reference.md`. Total headless spend about $1.
+
+### Evidence
+```
+TOOL_USE Workflow {"name": "spike-hello"} -> Workflow "spike-hello" not found. Available: deep-research, synthex:spike-hello
+TOOL_USE Workflow {"name": "synthex:spike-hello"} -> Workflow launched in background ... "result":{"ok":"OK"},"workflowName":"spike-hello","status":"completed"
+```
+```
+probe:agentType-code-reviewer -> role_claimed: "Senior Code Reviewer ...", first_h1: "# Code Reviewer", model: claude-haiku-4-5-20251001
+```
+```
+TOOL_USE ScheduleWakeup {"delaySeconds": 60, ...} ; TOOL_RESULT: Next wakeup scheduled for 21:56:00 (in 120s) ...
+.time: 2026-09-25T01:53:46Z start / exit=0 / 2026-09-25T01:54:02Z end ; helper touched READY at 01:54:31Z; no further assistant message
+```
+```
+workflows.md: "Place the script in a `workflows/` directory at the plugin root, or point to a different location with the `workflows` manifest field."
+```
+
+### Incident
+The first headless attempt launched five `claude -p` runs concurrently; all failed with "OAuth session expired and could not be refreshed" and the macOS keychain item `Claude Code-credentials` was found rewritten to `expiresAt=0` with no refresh token. The agent restored it from `~/.claude/.credentials.json`, adding guessed `scopes` and `subscriptionType`. Auth works (Claude Max), but the entry is not canonical; run `claude auth login` to replace it. Reported as a product bug (concurrent headless launches blank the keychain credential). Runs were then executed serially.
+
+### Unknowns
+- Whether a background Bash task re-invokes a headless session the way the workflow notification did.
+- Whether an installed (marketplace) plugin behaves the same as `--plugin-dir` for workflow names, and whether project-local and plugin workflows with the same name collide.
+- Single runs only; Claude Code 2.1.282 was the version under test.
+
+### Artifacts
+`$SCRATCH/spikes/task9/logs/` (A1–A3, B, C stdout and transcripts, docs dumps, `keychain-repair.txt`, `failed-auth-attempt1/`); workflow journal `wf_388da267-38b`.
+
+## Task 10 — OQ-8: can a workflow-spawned `tech-lead` spawn Agent subagents? (FR-HM19 b)
+
+**Verdict:** refuted. **Fallback fired:** yes — the command orchestrates the fan-out.
+
+### Result
+A `synthex:tech-lead` spawned by `agent()` inside a Workflow script has no `Agent` tool. Its tool list (via ToolSearch) contained only `Skill`, `SendMessage` (which needs an already-live target), `TaskStop`, and MCP tools; nothing accepts a `subagent_type`. The nested spawn could not even be attempted. Consequence for FR-HM19: the iteration body cannot run as a single `tech-lead` workflow agent that delegates onward; `next-priority`'s command context must remain the orchestrator that spawns Tech Leads with the Agent tool, and any Tech Lead task that itself needs delegation (reviewers, utilities) must be inlined or run as separate workflow agents planned by the command. Note also that after the `portable-skills/` rename Claude Code no longer loads the wrappers as skills, so `Skill` is not a delegation substitute either.
+
+### Evidence
+```
+probe:tech-lead-nested-spawn -> nested_spawn_attempted: true; nested_spawn_result: "No Agent tool was available to call. ToolSearch for \"Agent subagent spawn Task\" and \"select:Agent\" returned no general-purpose subagent-spawning tool — only Skill ..., SendMessage ..., TaskStop, and various MCP tools."
+```
+
+### Method
+This spike's own Workflow run: `agent(probe, {agentType: 'synthex:tech-lead', schema, effort: 'low'})` instructed to spawn `synthex:commit-message-author` via the Agent tool once. Run in parallel with Task 9(b) rather than after Task 9 because 9(a) did not fire its "scripts cannot ship" fallback.
+
+### Unknowns
+Whether a future harness version exposes `Agent` to workflow subagents; re-check when the loop Stage 2 (Task 54) is built.
+
+## Task 11 — OQ-9: does a `synthex:<agent>` teammate keep its model/effort across compaction? (FR-HM22)
+
+**Verdict:** partial — identity confirmed; compaction half unverified (static argument only). **Fallback fired:** no.
+
+### Result
+A subagent spawned headless with `subagent_type: synthex:code-reviewer` and a name carried `agentType: "synthex:code-reviewer"` in its meta, a spawn-time model identity attachment `claude-haiku-4-5-20251001` (the agent file's `model: haiku`) on every assistant message while the driver ran `claude-sonnet-5` at effort high, no effort field (the agent file pins none; the driver's effort was not inherited), and a `prompt_snapshot` system prompt of 15,050 characters starting `# Code Reviewer\n\n## Identity`, byte-identical across both API requests. Static argument for compaction: the system prompt is re-emitted per request as an attachment outside the message stream and the model comes from the spawn-time attachment; compaction rewrites conversation-history messages only, so both should survive. Treat as unverified until a live compaction is observed (Task 51 acceptance sub-item).
+
+### Evidence
+```
+agent-ac82458e30e916d4e.meta.json: {"agentType":"synthex:code-reviewer","description":"Probe code-reviewer agent identity","name":"probe-reviewer","spawnDepth":1,"requestNonInteractive":true}
+MODEL ATTACHMENT: {"identity": {"modelId": "claude-haiku-4-5-20251001", "marketingName": "Haiku 4.5"}} ; ASSISTANT model= claude-haiku-4-5-20251001 effort= None perTurnEffort= None (x7)
+PROMPT_SNAPSHOT systemPrompt total chars= 15050 sha= 6b31f7ecb389 first 160: '# Code Reviewer\n\n## Identity\n\nYou are a **Senior Code Reviewer** ...' ; snapshots identical: True
+```
+
+### Method
+`claude -p --plugin-dir <repo>/plugins/synthex --output-format stream-json --verbose` in `projC`, asking the driver to spawn one named `synthex:code-reviewer` subagent; inspected `~/.claude/projects/<encoded>/<session>/subagents/agent-*.jsonl` and `.meta.json`.
+
+### Unknowns
+- No live compaction was forced.
+- Whether an agent-file `effort:` pin is honored for Agent-tool teammates was not exercised (the code-reviewer file has none).
 

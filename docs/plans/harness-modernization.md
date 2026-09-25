@@ -49,7 +49,9 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 | D28 | Eval gates: ≥ 3 runs; aggregate recall ≥ baseline; no fixture loses > 1 planted issue. | Noise. A9. |
 | D29 | Frontmatter = `balanced`; `economy`/`premium` are per-agent deltas. | NFR-HM5. |
 | D30 | Decision waits use `loop-step.sh hold`; the Stop gate allows a stop while a decision is pending; stale `runId` is cleared. | A10. |
-| D31 | If a config key is not a Workflow opt-in, ask once per session; never select the engine headless; schedule forces `prose`. | Q5. |
+| D31 | Resolved by Task 9(d): a Synthex slash command whose text says to call Workflow is the opt-in; no per-session confirmation. Headless runs need a `Workflow(synthex:<name>)` allow rule or auto mode. | Q5. |
+| D32 | `ScheduleWakeup` does not resume a headless session (Task 9c); loops keep the in-turn wait everywhere. Task 54 may test a `run_in_background` sleep as a substitute, since task notifications do re-invoke headless sessions. *Assumed; confirm.* | Fallback fired. |
+| D33 | Workflow subagents cannot spawn subagents (Task 10). The command context orchestrates every fan-out; `agent()` runs leaf work only. | Fallback fired. |
 
 **PRD amendments** (apply in the same PR as this plan):
 - A1: FR-HM4/16 engine paths.
@@ -116,16 +118,15 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 ### Milestone 1.3: Claude Capability Spikes (gate Phases 6–8)
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 9 | Spike Workflow (FR-HM16, FR-HM19 a/c, Q5): plugin-shipped script? `agentType: 'synthex:code-reviewer'` resolves? `ScheduleWakeup` resumes without a user turn? config key = opt-in? **Fallbacks:** if the script can't ship, defer Phases 7–8; if `agentType` fails, inline the prompts and drop the cache target; if resume fails, keep the in-turn wait; for opt-in, D31. | S | None | pending |
-| 10 | Spike OQ-8 (FR-HM19 b): can a workflow `tech-lead` spawn Agent subagents? **Fallback:** the command orchestrates the fan-out. `skipped` if Task 9 finds scripts can't ship. | S | Task 9 | pending |
-| 11 | Spike OQ-9 (FR-HM22, 30 min): does a `synthex:<agent>` teammate keep its model/effort across compaction? **Fallback:** keep read-on-spawn and drop the context target. | S | None | pending |
-
-**Task 9 Acceptance Criteria:** `[H]` `spikes.md` answers all 4 questions with reproduction scripts; any fallback that fired becomes a D-row.
-**Task 10 Acceptance Criteria:** `[H]` `spikes.md` OQ-8 has a transcript; Task 59 names the orchestration shape.
-**Task 11 Acceptance Criteria:** `[H]` `spikes.md` OQ-9 shows model/effort before and after compaction; Task 51 names the path.
+| 9 | Spike Workflow (FR-HM16, FR-HM19 a/c, Q5): plugin-shipped script? `agentType: 'synthex:code-reviewer'` resolves? `ScheduleWakeup` resumes without a user turn? config key = opt-in? **Fallbacks:** if the script can't ship, defer Phases 7–8; if `agentType` fails, inline the prompts and drop the cache target; if resume fails, keep the in-turn wait; for opt-in, D31. **Result (spikes.md):** (a) plugin `workflows/` dir auto-discovered, invoked as `synthex:<meta.name>`; (b) `agentType: synthex:<agent>` resolves with the agent file's model; (c) `ScheduleWakeup` does not resume a headless process — fallback D32; (d) the slash command's own instructions are the Workflow opt-in — D31 confirmation unnecessary, headless needs a `Workflow(synthex:<name>)` allow rule. | S | None | done |
+| 10 | Spike OQ-8 (FR-HM19 b): can a workflow `tech-lead` spawn Agent subagents? **Fallback:** the command orchestrates the fan-out. `skipped` if Task 9 finds scripts can't ship. **Result (spikes.md):** refuted — workflow subagents have no `Agent` tool (only Skill, SendMessage, TaskStop, MCP); D33. | S | Task 9 | done |
+| 11 | Spike OQ-9 (FR-HM22, 30 min): does a `synthex:<agent>` teammate keep its model/effort across compaction? **Fallback:** keep read-on-spawn and drop the context target. **Result (spikes.md):** identity confirmed (model and system prompt come from the agent file, byte-identical per request); compaction unverified — Task 51 keeps a live-compaction check as a sub-item. | S | None | done |
+**Task 9 Acceptance Criteria:** `[H]` `spikes.md` answers all 4 questions with reproduction scripts; any fallback that fired becomes a D-row. → spikes.md. `[H]` approved by A.J. Brown on 2026-09-24 via next-priority review.
+**Task 10 Acceptance Criteria:** `[H]` `spikes.md` OQ-8 has a transcript; Task 59 names the orchestration shape. → spikes.md. `[H]` approved by A.J. Brown on 2026-09-24 via next-priority review.
+**Task 11 Acceptance Criteria:** `[H]` `spikes.md` OQ-9 shows model/effort before and after compaction; Task 51 names the path. → spikes.md. `[H]` approved by A.J. Brown on 2026-09-24 via next-priority review.
 
 **Parallelizable:** 9 and 11 concurrently (`[H]`, day one); 10 follows 9 only. Runs alongside Phases 2–5.
-**Milestone Value:** Gated phases start with known feasibility.
+**Milestone Value:** Gated phases start with known feasibility. **Status: complete (2026-09-24)** — Phases 7–8 not deferred; D31 resolved; D32 (no headless ScheduleWakeup) and D33 (no nesting inside workflow agents) added; Task 51 keeps a live-compaction sub-check.
 
 ## Phase 2: Prompt Diet and Portable Catalog (PRD Phase 1)
 
@@ -321,7 +322,7 @@ Per D20: Tasks 47–54 = PR 1 (`harness/one-plugin`); Task 55 = PR 2.
 ### Milestone 6.2: Identity, Gaps, and synthex-plus Removal
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 51 | FR-HM22 per Task 11: spawn teammates as `synthex:<agent>`; delete read-on-spawn, the FR-MMT5b re-read, and the D26 overlay re-paste; verify via `ListAgents`; write ADR-plus-002 (which records the retention instead if the fallback fired) | M | Tasks 11, 47 | pending |
+| 51 | FR-HM22 per Task 11: spawn teammates as `synthex:<agent>`; delete read-on-spawn, the FR-MMT5b re-read, and the D26 overlay re-paste; verify via `ListAgents`; write ADR-plus-002 (which records the retention instead if the fallback fired) Spawn teammates as `synthex:<agent>` (Task 11 confirmed identity); add a live-compaction sub-check before deleting read-on-spawn. | M | Tasks 11, 47 | pending |
 | 52 | FR-HM25: pool gap entries (Codex, Gemini, OpenCode, Grok) in `harnesses.mjs` and the README using `GAP_MESSAGES.pool`; note Hermes Kanban as future work | S | Task 47 | pending |
 | 53 | NFR-HM7: CLAUDE.md (drop Synthex Plus; pool routing goes under synthex); `docs/migrations/synthex-plus.md` (step 1: stop running pools); READMEs link to it; `.gitignore:33`; superseded banners on `plus.md` and `multi-model-teams.md`; the D7 nudge | S | Tasks 47, 48 | pending |
 | 54 | FR-HM2 tombstone (D7, D8): synthex-plus gets an empty `hooks.json`, no agents, and command stubs that print migration steps. Commit `.release-intent.json` (`bump: major`, reason naming `docs/migrations/synthex-plus.md`) in its own `feat!:` commit. | S | Tasks 47–52, 53 | pending |
@@ -357,7 +358,7 @@ Per D20: Tasks 47–54 = PR 1 (`harness/one-plugin`); Task 55 = PR 2.
 ### Milestone 8.1: Stage 2 Loop
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 59 | FR-HM19: when a `Workflow` tool is present, `--loop` runs the iteration via a script with schema `{done, idle, blocked_on_human[], summary}`. `idle` triggers `ScheduleWakeup` backoff; `runId` is written to state and the Stop gate skips while it is set; stale `runId` is cleared (D30); cancel is re-read between resumes; timestamps come from `loop-step.sh`. Prose goes to `docs/engines/loop-workflow.md`; use the Task 10 shape. | L | Tasks 10, 34, 57 | pending |
+| 59 | FR-HM19: when a `Workflow` tool is present, `--loop` runs the iteration via a script with schema `{done, idle, blocked_on_human[], summary}`. `idle` triggers `ScheduleWakeup` backoff; `runId` is written to state and the Stop gate skips while it is set; stale `runId` is cleared (D30); cancel is re-read between resumes; timestamps come from `loop-step.sh`. Prose goes to `docs/engines/loop-workflow.md`; use the Task 10 shape. Orchestration shape per Task 10: the command context stays the orchestrator and spawns Tech Leads with the Agent tool; workflow `agent()` calls run leaf tasks only (no delegation inside them); `ScheduleWakeup` is not used headless (D32). | L | Tasks 10, 34, 57 | pending |
 
 **Task 59 Acceptance Criteria:** `[T]` `loop-state-file.ts` accepts `runId`; `loop-advance-gate-behavioral` exits 0 with a fresh `runId` and blocks once it is stale. `[T]` Claude-path loop prose is ≥ 8 KB smaller. `[T]` Without `Workflow`/`Monitor`, native-looping tests pass unchanged. `[H]` A live multi-iteration run with a mid-run cancel.
 **Milestone Value:** Validated loop termination; idle loops stop burning turns.
