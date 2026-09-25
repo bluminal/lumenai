@@ -165,3 +165,104 @@ describe('Task 15: host-aware project-instruction-file prose (FR-HM7)', () => {
     'Task 18: other-hosts guidance follows every ${CLAUDE_PLUGIN_ROOT}/scripts call'
   );
 });
+
+// ---------------------------------------------------------------------------
+// Task 17 (Phase 2, Milestone 2.2; FR-HM8)
+//
+// Drop emphasis scaffolding written for older models:
+//   1. next-priority.md's `--loop` STOP blockquote banner is replaced by one
+//      plain sentence.
+//   2. product-manager.md's AskUserQuestion rule — previously restated in
+//      full up to 5 times — is trimmed to at most 2 statements: one
+//      canonical statement in `## Behavioral Rules` and one at the
+//      Requirements Gathering ("interview") step.
+// ---------------------------------------------------------------------------
+
+const NEXT_PRIORITY_PATH = join(COMMANDS_DIR, 'next-priority.md');
+const PRODUCT_MANAGER_PATH = join(AGENTS_DIR, 'product-manager.md');
+
+/** The plain-sentence replacement for the removed STOP banner (FR-HM8). */
+const LOOP_REPLACEMENT_SENTENCE =
+  '`--loop` here is Synthex native looping (see the Native Looping section), ' +
+  'not the harness `/loop` skill.';
+
+/**
+ * Counts statements of "the AskUserQuestion rule" in product-manager.md.
+ *
+ * "The rule" is defined as a sentence that BOTH names the `AskUserQuestion`
+ * tool AND explicitly frames it as required for human-user input (the
+ * phrase "human user", as in "human user input" / "input from the human
+ * user"). This distinguishes a full rule *statement* from an incidental
+ * *usage* mention of the tool inside an unrelated workflow instruction
+ * (e.g. "ask 3-5 at a time using `AskUserQuestion`", or "start by asking
+ * clarifying questions ... using the `AskUserQuestion` tool" — neither of
+ * which restates the human-vs-sub-agent escalation rule and both of which
+ * are kept intact by Task 17).
+ *
+ * Sentences are split on `.`/`!`/`?` followed by whitespace; markdown
+ * em-dash clauses ("--") do not end a sentence for this purpose, matching
+ * how the rule is actually written in product-manager.md.
+ */
+function countAskUserQuestionRuleStatements(content: string): number {
+  const sentences = content.split(/(?<=[.!?])\s+/);
+  return sentences.filter(
+    (s) => /AskUserQuestion/.test(s) && /human user/i.test(s)
+  ).length;
+}
+
+describe('Task 17: emphasis scaffolding diet (FR-HM8)', () => {
+  describe('next-priority.md: STOP banner replaced', () => {
+    let content: string;
+
+    it('reads the file', () => {
+      content = readFileSync(NEXT_PRIORITY_PATH, 'utf8');
+      expect(content.length).toBeGreaterThan(0);
+    });
+
+    it('no longer contains the STOP blockquote banner', () => {
+      content = readFileSync(NEXT_PRIORITY_PATH, 'utf8');
+      expect(content).not.toMatch(/STOP and jump to/);
+      expect(content).not.toMatch(/>\s*\*\*If `--loop` appears/);
+    });
+
+    it('contains the plain-sentence replacement', () => {
+      content = readFileSync(NEXT_PRIORITY_PATH, 'utf8');
+      expect(content).toContain(LOOP_REPLACEMENT_SENTENCE);
+    });
+  });
+
+  describe('product-manager.md: AskUserQuestion rule stated at most twice', () => {
+    it('the rule appears at most twice', () => {
+      const content = readFileSync(PRODUCT_MANAGER_PATH, 'utf8');
+      expect(countAskUserQuestionRuleStatements(content)).toBeLessThanOrEqual(2);
+    });
+
+    it('one canonical statement lives in ## Behavioral Rules', () => {
+      const content = readFileSync(PRODUCT_MANAGER_PATH, 'utf8');
+      const behavioralSection = content.slice(content.indexOf('## Behavioral Rules'));
+      expect(countAskUserQuestionRuleStatements(behavioralSection)).toBe(1);
+    });
+
+    it('one statement remains at the interview (Requirements Gathering) step', () => {
+      const content = readFileSync(PRODUCT_MANAGER_PATH, 'utf8');
+      const interviewSection = content.slice(
+        content.indexOf('## Requirements Gathering'),
+        content.indexOf('## Primary Documents')
+      );
+      expect(countAskUserQuestionRuleStatements(interviewSection)).toBe(1);
+    });
+
+    it('detection self-test: counts a full rule restatement', () => {
+      const sample =
+        '**ALWAYS** use the `AskUserQuestion` tool when you need human user input.';
+      expect(countAskUserQuestionRuleStatements(sample)).toBe(1);
+    });
+
+    it('detection self-test: does not count an incidental usage mention', () => {
+      const sample =
+        'Group them logically, ask 3-5 at a time using `AskUserQuestion`, ' +
+        'and adapt follow-ups based on answers.';
+      expect(countAskUserQuestionRuleStatements(sample)).toBe(0);
+    });
+  });
+});

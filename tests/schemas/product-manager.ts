@@ -78,15 +78,13 @@ export function validateAgentDefinition(agentMarkdown: string): ValidationResult
     );
   }
 
-  // 3. Critical Rules section must reference AskUserQuestion
+  // 3. Critical Rules section must exist (Task 17/FR-HM8 intentionally
+  //    consolidated the AskUserQuestion restatement out of this section —
+  //    the canonical statement now lives in Behavioral Rules only, to avoid
+  //    repeating the same rule in three places).
   const criticalRules = extractSection(agentMarkdown, 'Critical Rules');
   if (!criticalRules) {
     errors.push('Missing "Critical Rules" section');
-  } else if (!criticalRules.includes('AskUserQuestion')) {
-    errors.push(
-      'Critical Rules section does not mention AskUserQuestion. ' +
-      'This section must reinforce the AskUserQuestion requirement.'
-    );
   }
 
   // 4. Behavioral Rules section must reference AskUserQuestion
