@@ -7,7 +7,7 @@ Milestone 1.2 spikes for `docs/plans/harness-modernization.md`. Question, Decisi
 | 5 | OQ-1 | partial | no |
 | 6 | OQ-2 | confirmed | yes |
 | 7 | OQ-3/OQ-4 | partial | yes |
-| 8 | OQ-7 | pending | pending |
+| 8 | OQ-7 | partial (install shape confirmed) | no |
 
 ## Task 5 — OQ-1: rename `skills/` to `portable-skills/` (FR-HM11)
 
@@ -385,6 +385,64 @@ sub-agent: assistant: {"model":"claude-sonnet-5","effort":"low","perTurnEffort":
 
 - `$SCRATCH/spikes/task7/logs/` (CLI JSON, transcripts, env probes, binary strings, fixtures) and `parse.mjs`. Temp project deleted after archiving; no repo files changed.
 
-## Task 8 — OQ-7 (pending): Hermes `skills list`, `skill_view`, Skills Guard (FR-HM45)
+## Task 8 — OQ-7: Hermes Agent install shape (FR-HM45)
 
-Pending; same subsections as above once Task 8 reports (plan updates: Tasks 20, 21, 65).
+**Verdict:** partial (discovery and install shape confirmed; runtime `skill_view` behaviour static-only). **Fallback fired:** no (the "whole tree + path rewrite" shape is the confirmed shape, not a fallback).
+
+### Question
+Does `hermes skills list` see skills under a project's `.agents/skills/`? Can the wrapper's `../../commands/<x>.md` link be followed, or must the whole plugin tree ship? Does Skills Guard flag Synthex files?
+
+### Method
+Hermes Agent v0.20.4 (2026.8.18), Python 3.11.16, install dir `~/.hermes/hermes-agent`. Temp project `$SCRATCH/spikes/task8/projA` (git-initialised) with the full `plugins/synthex` tree copied to `.agents/synthex/` and `.agents/skills` symlinked to `.agents/synthex/portable-skills` so each wrapper's `../../commands/<x>.md` resolves (`test -f` confirmed). Commands, each with `timeout` and stdin from `/dev/null`: `hermes skills list` before and after `hermes skills trust`; `hermes skills list --source local`; `hermes skills install --help`; `hermes skills inspect review-code`; a one-shot `hermes -z` against the locally configured Ollama provider (`ollama-launch`, `127.0.0.1:11434`). Source inspection of `tools/skill_utils.py`, `tools/skills_tool.py`, and `tools/skills_guard.py`; scan cache at `~/.hermes/cache/project_skill_scans/`. A whole-tree Skills Guard scan of `plugins/synthex` was run by the earlier (stalled) agent and its log reused.
+
+### Result
+1. **Discovery is gated on trust.** Before `hermes skills trust`, `hermes skills list` shows only builtin/profile skills. After trust: "46 project skill(s) will load in sessions started inside this repo (they take precedence over same-named profile skills)". `--source local` then lists all 46 wrappers (review-code, next-priority, architect, tech-lead, star all present). Trust is per git checkout and recorded in `skills.trusted_project_dirs`; non-interactive sessions inherit it.
+2. **Per-skill local install is impossible.** `hermes skills install` takes only a registry identifier or an HTTPS URL to a SKILL.md; there is no local-path form. The whole plugin tree must be placed in the project, with `.agents/skills` pointing at the wrapper directory.
+3. **Skills Guard applies to project skills at load, fail-closed.** `is_quarantined_project_skill()` quarantines any project skill whose scan verdict is `dangerous`; the scan cache shows all 46 wrapper folders as `safe` (0 dangerous). The whole-tree scan of `plugins/synthex` is `dangerous` (97 findings: 47 path_traversal, 30 agent_config_mod for `CLAUDE.md` references, 2 curl-pipe-shell in the Ollama adapter, unpinned npm/pip installs, AWS-dir access in the Bedrock adapter). Those findings live in `commands/` and `agents/`, which are **not** inside any skill folder in the symlink layout, so nothing is quarantined. Nesting the canonical files inside `.agents/skills/` would quarantine them.
+4. **`skill_view` cannot follow `../../`.** `skill_view(name, path)` rejects any `..` component ("Path traversal ('..') is not allowed") and validates within the skill directory. The relative link in the wrapper must be followed with the general `read_file` tool against the resolved path. Project-tier skill dirs are added to the trusted set, so no "outside trusted skills directory" warning fires for them.
+5. **The `portable-skills/` rename is neutral for Hermes**: it reads `.agents/skills/` regardless of the source directory name.
+6. Live one-shot: timed out after 170 s with no output (local 120B model cold start); not repeated.
+
+### Decision
+Hermes install shape: copy the whole plugin tree to `<project>/.agents/synthex/`, symlink `<project>/.agents/skills` to `.agents/synthex/portable-skills`, never nest `commands/` or `agents/` inside a skill folder, and run `hermes skills trust` once per checkout. The Hermes wrapper text (Task 19 host row) must say "follow the `../../commands/` link with `read_file`; `skill_view` cannot read it". Compat adapter (Task 65): install mode `project-agent-skills` with that layout plus `hermes skills trust <fixture>`, inventory via `hermes skills list --source local` expecting 46 `local` rows, and an assertion that `$HERMES_HOME/cache/project_skill_scans/` holds 46 `safe` verdicts.
+
+### Evidence
+```
+$ hermes skills trust
+Trusted: .../spikes/task8/projA
+46 project skill(s) will load in sessions started inside this repo (they take precedence over same-named profile skills).
+```
+```
+$ hermes skills install --help
+positional arguments:
+  identifier           Skill identifier (e.g. openai/skills/skill-creator) or
+                       a direct HTTP(S) URL to a SKILL.md file
+```
+```
+tools/skill_utils.py
+def is_quarantined_project_skill(skill_md) -> bool:
+    """True when a project skill's scan verdict is ``dangerous``.
+    Fail-closed: a scanner crash or missing scanner quarantines the skill
+```
+```
+~/.hermes/cache/project_skill_scans/  → verdict counts: {'safe': 46}
+```
+```
+tools/skills_tool.py:947-949
+        if has_traversal_component(file_path):
+            {"success": False, "error": "Path traversal ('..') is not allowed."}
+```
+```
+06-guard-scan-main.log
+WHOLE-TREE verdict=dangerous findings=97 :: synthex: dangerous — 97 finding(s) in exfiltration, network, persistence, structural, supply_chain, traversal
+SUMMARY {"safe": 75, "caution": 1, "dangerous": 17}
+```
+
+### Unknowns
+- Runtime behaviour of a real Hermes session following the wrapper (which tool the model picks, whether it loops) was not observed; the one-shot timed out on a cold local model.
+- Hermes v0.21.4 (2026-09-21) was not tested; the local install is v0.20.4.
+- Whether `hermes skills list` in a non-git directory finds project skills (find_project_root requires `.git`).
+
+### Artifacts
+`$SCRATCH/spikes/task8/` logs 00–15 (help output, discovery and quarantine source excerpts, guard scan, list before/after trust, one-shot). Temp project removed and its trust entry revoked after the spike. No repo files were changed.
+
