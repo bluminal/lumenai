@@ -14,7 +14,6 @@
     "### 1c. Sandbox-Yolo Spawn Confirmation (ADR-003 / D27 / FR-MMT21)",
     "## Multi-Model Review Decision Framework (FR-MR21)",
     "### 8-Step Decision Order",
-    "### Complexity Gate (FR-MR21a)",
     "### Invocation Flags (FR-MR6)",
     "### Path-and-Reason Header Spec (D21)",
     "### 2. Determine Review Scope",
@@ -37,5 +36,5 @@
     "# .synthex/config.yaml (code_review section)",
     "## Critical Requirements"
   ],
-  "note": "Pre-native-looping baseline captured before Phase 4/5 added --loop. Body text intentionally omitted; only deterministic envelope (frontmatter + Parameters + heading structure) is preserved."
+  "note": "Pre-native-looping baseline captured before Phase 4/5 added --loop. Body text intentionally omitted; only deterministic envelope (frontmatter + Parameters + heading structure) is preserved. Updated by Task 13 (FR-HM5, D17): the '### Complexity Gate (FR-MR21a)' heading moved verbatim to plugins/synthex/docs/multi-model-decision.md (along with FR-MR21 Steps 4-8) and no longer appears in review-code.md; '### 1b.'/'### 1c.' headings and '## Multi-Model Review Decision Framework (FR-MR21)' stay (now fronting two-line D17 gates instead of their full former bodies)."
 }

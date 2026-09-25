@@ -1,0 +1,15 @@
+# Fixture project config for the promptfoo "pool-gate-enabled" case
+# (tests/promptfoo.config.yaml, Task 13 / FR-HM5 / D17).
+#
+# standing_pools.enabled: true means /synthex:review-code's Step 1b D17
+# gate fires. The gate must Read the PLUGIN-shipped doc at
+# ${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md — never this
+# project's own docs/standing-pool-routing.md (see the decoy file
+# alongside this one), which is a project-authored file the plugin does
+# not own or control.
+standing_pools:
+  enabled: true
+  ttl_minutes: 60
+  default_name: review-pool
+  matching_mode: covers
+  routing_mode: prefer-with-fallback

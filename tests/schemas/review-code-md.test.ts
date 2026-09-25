@@ -10,6 +10,15 @@
  *   - D21 path-and-reason header spec (Task 36): 3 invariants, literal regex, 2 sub-formats, 6 PRD examples
  *   - Orchestrator invocation prose present (Task 33b): multi-model-review-orchestrator, command:, review-code
  *   - Standing Pool Discovery (Step 1b from multi-model-teams) STILL present (regression)
+ *
+ * Task 13 (FR-HM5, D17) repoint: review-code.md's Step 1b body, and FR-MR21
+ * Steps 4-8 + the Complexity Gate, moved verbatim to
+ * plugins/synthex/docs/standing-pool-routing.md and
+ * plugins/synthex/docs/multi-model-decision.md respectively, replaced in
+ * review-code.md by two-line D17 gates. Assertions on content that moved
+ * now read the doc file it moved to instead of review-code.md's `content`.
+ * Steps 1-3 (compact gate), the Invocation Flags (FR-MR6), and the D21
+ * Path-and-Reason Header Spec all stay in review-code.md unmoved.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -21,7 +30,19 @@ const REVIEW_CODE_MD_PATH = join(
   '..', '..', 'plugins', 'synthex', 'commands', 'review-code.md'
 );
 
+const STANDING_POOL_ROUTING_DOC_PATH = join(
+  import.meta.dirname,
+  '..', '..', 'plugins', 'synthex', 'docs', 'standing-pool-routing.md'
+);
+
+const MULTI_MODEL_DECISION_DOC_PATH = join(
+  import.meta.dirname,
+  '..', '..', 'plugins', 'synthex', 'docs', 'multi-model-decision.md'
+);
+
 const content = readFileSync(REVIEW_CODE_MD_PATH, 'utf-8');
+const routingDocContent = readFileSync(STANDING_POOL_ROUTING_DOC_PATH, 'utf-8');
+const decisionDocContent = readFileSync(MULTI_MODEL_DECISION_DOC_PATH, 'utf-8');
 
 // ── Regression: Standing Pool Discovery must still be present ────────────────
 
@@ -35,12 +56,12 @@ describe('review-code.md — Standing Pool Discovery regression (Step 1b from mu
     expect(content).toContain('standing_pools.enabled');
   });
 
-  it('[regression] standing-pool-cleanup agent reference still present', () => {
-    expect(content).toContain('standing-pool-cleanup');
+  it('[regression] standing-pool-cleanup agent reference still present (moved to docs/standing-pool-routing.md, Task 13)', () => {
+    expect(routingDocContent).toContain('standing-pool-cleanup');
   });
 
-  it('[regression] verbatim FR-MMT17 routing notification still present', () => {
-    expect(content).toContain(
+  it('[regression] verbatim FR-MMT17 routing notification still present (moved to docs/standing-pool-routing.md, Task 13)', () => {
+    expect(routingDocContent).toContain(
       "Routing to standing pool '{pool_name}' (multi-model: {yes|no})."
     );
   });
@@ -55,119 +76,123 @@ describe('review-code.md — Tasks 33a: FR-MR21 8-step decision order', () => {
     expect(content).toContain('Multi-Model Review Decision Framework (FR-MR21)');
   });
 
-  it('[T] Step 1: reads multi_model_review config', () => {
-    expect(content).toContain('Step 1');
+  it('[T] Steps 1-3: reads multi_model_review config (compact gate, Task 13)', () => {
+    expect(content).toContain('Steps 1-3');
     expect(content).toContain('multi_model_review');
   });
 
-  it('[T] Step 2: resolves invocation flags with FR-MR6 reference', () => {
-    expect(content).toContain('Step 2');
+  it('[T] Steps 1-3: resolves invocation flags with FR-MR6 reference (compact gate, Task 13)', () => {
+    expect(content).toContain('Steps 1-3');
     expect(content).toContain('FR-MR6');
   });
 
-  it('[T] Step 3: native-only branch documented', () => {
-    expect(content).toContain('Step 3');
+  it('[T] Steps 1-3: native-only branch documented (compact gate, Task 13)', () => {
+    expect(content).toContain('Steps 1-3');
     expect(content).toContain('native-only branch');
   });
 
-  it('[T] Step 4: complexity gate referenced', () => {
-    expect(content).toContain('Step 4');
-    expect(content).toContain('complexity gate');
+  it('[T] Step 4: complexity gate referenced (moved to docs/multi-model-decision.md, Task 13)', () => {
+    expect(decisionDocContent).toContain('Step 4');
+    expect(decisionDocContent).toContain('complexity gate');
   });
 
-  it('[T] Step 5: multi-model branch with orchestrator invocation', () => {
-    expect(content).toContain('Step 5');
-    expect(content).toContain('multi-model branch');
+  it('[T] Step 5: multi-model branch with orchestrator invocation (moved to docs/multi-model-decision.md, Task 13)', () => {
+    expect(decisionDocContent).toContain('Step 5');
+    expect(decisionDocContent).toContain('multi-model branch');
   });
 
-  it('[T] Step 6: gate decision cached (D9)', () => {
-    expect(content).toContain('Step 6');
-    expect(content).toContain('cached');
-    expect(content).toContain('D9');
+  it('[T] Step 6: gate decision cached (D9) (moved to docs/multi-model-decision.md, Task 13)', () => {
+    expect(decisionDocContent).toContain('Step 6');
+    expect(decisionDocContent).toContain('cached');
+    expect(decisionDocContent).toContain('D9');
   });
 
-  it('[T] Step 7: path-and-reason header rendered (D21)', () => {
-    expect(content).toContain('Step 7');
-    expect(content).toContain('D21');
+  it('[T] Step 7: path-and-reason header rendered (D21) (moved to docs/multi-model-decision.md, Task 13)', () => {
+    expect(decisionDocContent).toContain('Step 7');
+    expect(decisionDocContent).toContain('D21');
   });
 
-  it('[T] Step 8: emit consolidated review', () => {
-    expect(content).toContain('Step 8');
-    expect(content).toContain('consolidated review');
+  it('[T] Step 8: emit consolidated review (moved to docs/multi-model-decision.md, Task 13)', () => {
+    expect(decisionDocContent).toContain('Step 8');
+    expect(decisionDocContent).toContain('consolidated review');
   });
 
-  it('[T] native-only branch stub (FR-MR23) present', () => {
+  it('[T] native-only branch stub (FR-MR23) present (stays in review-code.md, Task 13)', () => {
     // The native-only comment stub marks where the native path is documented
     expect(content).toContain('native-only path: today\'s review-code logic byte-identical to baseline (FR-MR23)');
   });
 
+  it('[T] the gate that reads docs/multi-model-decision.md for Steps 4-8 is present (D17, Task 13)', () => {
+    expect(content).toContain('${CLAUDE_PLUGIN_ROOT}/docs/multi-model-decision.md');
+  });
+
 });
 
-// ── Task 33b: Orchestrator invocation prose ───────────────────────────────────
+// ── Task 33b: Orchestrator invocation prose (moved to docs/multi-model-decision.md, Task 13) ──
 
 describe('review-code.md — Task 33b: orchestrator invocation prose in multi-model branch', () => {
 
   it('[T] multi-model-review-orchestrator agent referenced by name', () => {
-    expect(content).toContain('multi-model-review-orchestrator');
+    expect(decisionDocContent).toContain('multi-model-review-orchestrator');
   });
 
   it('[T] command: "review-code" present in orchestrator input contract', () => {
-    expect(content).toContain('command: "review-code"');
+    expect(decisionDocContent).toContain('command: "review-code"');
   });
 
   it('[T] artifact_path field documented in orchestrator invocation', () => {
-    expect(content).toContain('artifact_path');
+    expect(decisionDocContent).toContain('artifact_path');
   });
 
   it('[T] native_reviewers field documented in orchestrator invocation', () => {
-    expect(content).toContain('native_reviewers');
+    expect(decisionDocContent).toContain('native_reviewers');
   });
 
   it('[T] per_reviewer_timeout_seconds field documented', () => {
-    expect(content).toContain('per_reviewer_timeout_seconds');
+    expect(decisionDocContent).toContain('per_reviewer_timeout_seconds');
   });
 
   it('[T] orchestrator stub marker NOT present (replaced by actual invocation prose in Task 33b)', () => {
     // After Task 33b, the TODO stub must be replaced; assert it is gone
-    expect(content).not.toContain('orchestrator invocation: TODO in Task 33b');
+    expect(decisionDocContent).not.toContain('orchestrator invocation: TODO in Task 33b');
   });
 
-  it('[T] FR-MR23 regression reference present (native-only byte-identical)', () => {
+  it('[T] FR-MR23 regression reference present (native-only byte-identical; stays in review-code.md, Task 13)', () => {
     expect(content).toContain('FR-MR23');
   });
 
 });
 
-// ── Task 34: Complexity Gate (FR-MR21a) ──────────────────────────────────────
+// ── Task 34: Complexity Gate (FR-MR21a) — moved to docs/multi-model-decision.md, Task 13 ────
 
 describe('review-code.md — Task 34: Complexity Gate (FR-MR21a)', () => {
 
   it('[T] Complexity Gate sub-section header present', () => {
-    expect(content).toContain('Complexity Gate (FR-MR21a)');
+    expect(decisionDocContent).toContain('Complexity Gate (FR-MR21a)');
   });
 
   it('[T] threshold_lines_changed config key documented', () => {
-    expect(content).toContain('threshold_lines_changed');
+    expect(decisionDocContent).toContain('threshold_lines_changed');
   });
 
   it('[T] threshold_files_touched config key documented', () => {
-    expect(content).toContain('threshold_files_touched');
+    expect(decisionDocContent).toContain('threshold_files_touched');
   });
 
   it('[T] always_escalate_paths config key documented', () => {
-    expect(content).toContain('always_escalate_paths');
+    expect(decisionDocContent).toContain('always_escalate_paths');
   });
 
   it('[T] gate decision computed once ("cached") per invocation', () => {
-    expect(content).toContain('cached');
+    expect(decisionDocContent).toContain('cached');
   });
 
   it('[T] D9 reference present for gate-decision caching', () => {
-    expect(content).toContain('D9');
+    expect(decisionDocContent).toContain('D9');
   });
 
   it('[T] ESCALATE language for always_escalate_paths match', () => {
-    expect(content).toContain('ESCALATE');
+    expect(decisionDocContent).toContain('ESCALATE');
   });
 
 });
