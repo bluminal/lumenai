@@ -39,7 +39,7 @@ try {
     ]);
   }
   mkdirSync(workspaceSupportRoot, { recursive: true });
-  for (const directory of ['commands', 'agents', 'config', 'scripts']) {
+  for (const directory of ['commands', 'agents', 'config', 'scripts', 'docs']) {
     cpSync(join(overlayRoot, directory), join(workspaceSupportRoot, directory), { recursive: true });
   }
   emit(harness, 'install', { ok: true, profile, count: entries.length });

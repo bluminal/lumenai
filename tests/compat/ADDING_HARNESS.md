@@ -34,7 +34,11 @@ meet either required profile is not added to the supported matrix.
    `USER 10001:10001`.
 4. Add `<id>-offline.mjs`. Begin with `assertIsolatedEnvironment()`, emit the
    shared NDJSON phases, derive entries with `readExpectedEntrypoints()`, and
-   complete install, inventory, references, and uninstall checks.
+   complete install, inventory, references, and uninstall checks. Any support
+   bundle the adapter copies alongside `portable-skills/` (`commands/`,
+   `agents/`, `config/`, `scripts/`) must also include `docs/` (FR-HM43) — a
+   harness that drops it will fail to resolve the `${CLAUDE_PLUGIN_ROOT}/docs/
+   <x>.md` cold-path includes described in `docs/plans/harness-modernization.md`.
 5. Add `<id>-activation.mjs`. Build a temporary overlay with
    `createProbeOverlay()`, invoke every entrypoint through the native skill or
    plugin boundary, and prove each nonce reaches the loopback provider.

@@ -6,6 +6,13 @@
  * Six paths × 2 plugins = 12 behavioral tests, plus timing-budget tests
  * for NFR-UO1 (steady-state p95 ≤ 50 ms) and NFR-UO2 (cold path ≤ 200 ms).
  *
+ * Task 12 of harness-modernization plan (FR-HM13, D17 fallback) adds a
+ * `synthex`-only assertion block (below, under "D17 plugin_root
+ * fallback") that `plugin_root` is written to state.json and survives a
+ * later rewrite. It is synthex-only because Task 12 extends only
+ * `plugins/synthex/scripts/upgrade-nudge.sh`; the synthex-plus copy is
+ * unchanged.
+ *
  * Implementation note: The plan envisions sub-fixture directories at
  * tests/fixtures/upgrade-onboarding/<plugin>-hook/<path>/. We collapse
  * those into a single vitest file using dynamic temp dirs because the
@@ -24,6 +31,7 @@ import {
   writeFileSync,
   readFileSync,
   existsSync,
+  realpathSync,
 } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
@@ -357,6 +365,66 @@ describe.each(variants)(
         expect(existsSync(join(projectDir, variant.stateDir, 'state.json'))).toBe(false);
       });
     });
+
+    (variant.label === 'synthex' ? describe : describe.skip)(
+      'D17 plugin_root fallback (Task 12, FR-HM13)',
+      () => {
+        // The resolved plugin root, computed the same way the script
+        // computes it (two directories above the script) — expressed via
+        // realpathSync so a symlinked temp/OS path doesn't cause a false
+        // mismatch.
+        const expectedPluginRoot = realpathSync(dirname(dirname(variant.scriptPath)));
+
+        it('writes plugin_root on the fresh-install path (FR-UO10)', () => {
+          mkdirSync(join(projectDir, variant.stateDir), { recursive: true });
+
+          const { status } = runHook(variant.scriptPath, projectDir);
+
+          expect(status).toBe(0);
+          const state = readStateJson(projectDir, variant.stateDir);
+          expect(state.plugin_root).toBe(expectedPluginRoot);
+        });
+
+        it('writes plugin_root on the upgrade-nudge path (FR-UO12)', () => {
+          mkdirSync(join(projectDir, variant.stateDir), { recursive: true });
+          writeStateJson(projectDir, variant.stateDir, {
+            last_seen_version: variant.preThresholdVersion,
+            dismissed: false,
+          });
+
+          const { status } = runHook(variant.scriptPath, projectDir);
+
+          expect(status).toBe(0);
+          const state = readStateJson(projectDir, variant.stateDir);
+          expect(state.plugin_root).toBe(expectedPluginRoot);
+        });
+
+        it('preserves plugin_root across a later rewrite', () => {
+          mkdirSync(join(projectDir, variant.stateDir), { recursive: true });
+
+          // First write: fresh-install seed.
+          const first = runHook(variant.scriptPath, projectDir);
+          expect(first.status).toBe(0);
+          const seeded = readStateJson(projectDir, variant.stateDir);
+          expect(seeded.plugin_root).toBe(expectedPluginRoot);
+
+          // Simulate a later session that observes a prior (older)
+          // last_seen_version, forcing the hook down the upgrade-nudge
+          // write path again rather than the steady-state early exit.
+          writeStateJson(projectDir, variant.stateDir, {
+            last_seen_version: variant.preThresholdVersion,
+            dismissed: seeded.dismissed,
+            starred: seeded.starred,
+            star_dismissed: seeded.star_dismissed,
+          });
+
+          const second = runHook(variant.scriptPath, projectDir);
+          expect(second.status).toBe(0);
+          const rewritten = readStateJson(projectDir, variant.stateDir);
+          expect(rewritten.plugin_root).toBe(expectedPluginRoot);
+        });
+      },
+    );
 
     describe('NFR-UO1 / NFR-UO2 timing budgets (Task 26)', () => {
       it('NFR-UO1: steady-state p95 ≤ 50 ms over 30 invocations', () => {

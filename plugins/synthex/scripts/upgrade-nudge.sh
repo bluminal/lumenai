@@ -14,6 +14,12 @@
 # the session. Exit code: always 0. Never reads stdin. Never prompts.
 #
 # See: docs/plans/upgrade-onboarding.md (Task 8, FR-UO7..FR-UO21).
+#
+# D17 fallback (docs/plans/harness-modernization.md Task 12, FR-HM13):
+# every write also records "plugin_root" — the resolved plugin directory
+# (equivalent to Claude Code's ${CLAUDE_PLUGIN_ROOT}) — into state.json so
+# command prose on hosts where that variable is not expanded can read it
+# back as a fallback for D17 cold-path includes.
 
 set -u
 
@@ -69,6 +75,7 @@ write_state() {
         printf '{\n'
         printf '  "schema_version": 1,\n'
         printf '  "last_seen_version": "%s",\n' "$new_version"
+        printf '  "plugin_root": "%s",\n' "$PLUGIN_DIR"
         printf '  "dismissed": %s,\n' "$new_dismissed"
         printf '  "starred": %s,\n' "$new_starred"
         printf '  "star_dismissed": %s,\n' "$new_star_dismissed"
