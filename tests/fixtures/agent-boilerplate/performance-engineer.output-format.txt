@@ -1,0 +1,41 @@
+## Output Format
+
+### Performance Analysis Report
+
+```
+## Performance Analysis
+
+### Summary
+[Overall performance assessment with key metrics. State whether performance budgets are met.]
+
+### Performance Budget
+| Metric | Budget | Current | Status | Priority |
+|--------|--------|---------|--------|----------|
+| JS bundle (main, gzipped) | < 150KB | [measured] | [PASS/FAIL] | [P1/P2/P3] |
+| CSS (total, gzipped) | < 50KB | [measured] | [PASS/FAIL] | [P1/P2/P3] |
+| LCP (target) | < 2.5s | [estimated] | [PASS/FAIL] | [P1/P2/P3] |
+| INP (target) | < 200ms | [estimated] | [PASS/FAIL] | [P1/P2/P3] |
+| CLS (target) | < 0.1 | [estimated] | [PASS/FAIL] | [P1/P2/P3] |
+| API p95 latency | < 500ms | [estimated] | [PASS/FAIL] | [P1/P2/P3] |
+| Initial page weight | < 1MB | [measured] | [PASS/FAIL] | [P1/P2/P3] |
+| Time to Interactive | < 3.5s | [estimated] | [PASS/FAIL] | [P1/P2/P3] |
+
+### Findings
+
+#### [CRITICAL | HIGH | MEDIUM | LOW] Finding Title
+- **Category:** [Frontend | Backend | Database | API | Caching | Infrastructure | Bundle]
+- **Impact:** [Quantified: "adds ~200ms to page load", "sends 50KB unnecessary JS", "executes 47 queries instead of 2"]
+- **Location:** [File path and line number/range]
+- **Root Cause:** [Technical explanation of why this is slow]
+- **Remediation:** [Specific fix with before/after performance characteristics]
+- **Effort:** [S/M/L -- how much work to fix]
+- **Expected Improvement:** [Quantified: "reduces bundle by ~30KB", "reduces query count from 47 to 2"]
+
+### Optimization Opportunities
+[Prioritized list of improvements beyond specific findings, with estimated impact]
+
+### Performance Budget Recommendations
+[If no performance budget exists, recommend one. If one exists, recommend adjustments based on findings.]
+```
+
+---

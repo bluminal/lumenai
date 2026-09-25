@@ -321,3 +321,103 @@ All advisory agents follow the same quality gate pattern:
 | **Planning + Strategy** | Product Manager | Gathers requirements, creates plans |
 | **Planning + Advisory** | Architect, UX Researcher, Retrospective Facilitator, Design System Agent (plan review mode) | Designs approaches, provides structured guidance |
 | **Utility (Haiku-backed)** | Findings Consolidator, Plan Linter, Plan Scribe, Commit Message Author | Narrow-scope helpers that let expensive agents delegate mechanical work (deduplication, structural audit, document rewriting, commit-message authoring) |
+
+---
+
+## Per-Agent Interaction Tables (Task 16 / FR-HM6)
+
+Moved verbatim from each specialist's `## Interaction with Other Agents` section (removed from the agent .md files to shrink per-spawn prompt size). Only specialists that had this section are listed; `security-reviewer` and `terraform-plan-reviewer` never had one.
+
+### Architect
+
+| Agent | Interaction |
+|-------|------------|
+| **Product Manager** | PM invokes you for feasibility consultation. You provide technical analysis; PM makes the scope decision. |
+| **Tech Lead** | Tech Lead invokes you for architectural decisions. You provide guidance; Tech Lead implements. |
+| **Security Reviewer** | You may identify architectural security gaps (missing auth layer, insecure service communication). Flag them and recommend involving the Security Reviewer for detailed analysis. |
+| **Terraform Plan Reviewer** | For infrastructure architecture concerns, recommend involving the Terraform Plan Reviewer for implementation-level analysis. |
+| **SRE Agent** | For reliability and observability architecture, recommend involving the SRE Agent when available. |
+
+### Code Reviewer
+
+| Agent | Interaction |
+|-------|------------|
+| **Security Reviewer** | You both review code but with different lenses. Your findings may overlap. The `review-code` command deduplicates. |
+| **Tech Lead** | Tech Lead invokes you as a quality gate. You provide the verdict; Tech Lead decides. |
+| **Lead Frontend Engineer** | Lead FE invokes you for frontend code review. Same relationship as with Tech Lead. |
+| **Quality Engineer** | If you identify test quality issues, the Quality Engineer can be invoked to address them. |
+
+### Quality Engineer
+
+| Agent | Interaction |
+|-------|------------|
+| **Tech Lead** | Tech Lead delegates test writing to you and may ask for coverage analysis before accepting work. |
+| **Lead Frontend Engineer** | Lead FE delegates frontend test writing (component tests, interaction tests) to you. |
+| **Code Reviewer** | Code Reviewer may flag test quality issues; you are the expert who addresses them. |
+| **Product Manager** | PM defines acceptance criteria. If they are too vague, you escalate for clarification. |
+
+### Design System Agent
+
+| Agent | Interaction |
+|-------|------------|
+| **Tech Lead** | Tech Lead escalates design system changes to you. You own the decision. |
+| **Lead Frontend Engineer** | Lead FE consults you on component usage, requests new components, and coordinates integration. |
+| **Product Manager** | You may be consulted on design feasibility during requirements gathering. |
+| **UX Researcher** | Research findings may inform design system evolution (e.g., usability issues with existing components). |
+
+### Performance Engineer
+
+| Agent | Interaction |
+|-------|------------|
+| **Tech Lead** | Tech Lead invokes you for performance review. You provide quantified findings; Tech Lead decides what to optimize. |
+| **Lead Frontend Engineer** | Lead FE invokes you for frontend-specific performance analysis. You provide Core Web Vitals assessment and bundle analysis. |
+| **Code Reviewer** | Code Reviewer may flag obvious performance concerns. You provide the deep analysis. |
+| **SRE Agent** | Your latency findings may impact SLOs. Coordinate on performance-related reliability concerns. |
+| **Architect** | Architect may consult you on performance implications of architectural decisions (caching strategies, database choices, service boundaries). |
+
+### SRE Agent
+
+| Agent | Interaction |
+|-------|------------|
+| **Tech Lead** | Tech Lead invokes you for reliability review. You provide findings; Tech Lead addresses them. |
+| **Terraform Plan Reviewer** | You identify infrastructure reliability concerns; Terraform Reviewer handles infrastructure implementation details. |
+| **Security Reviewer** | Security and reliability overlap (e.g., DDoS resilience). Coordinate when both perspectives are needed. |
+| **Metrics Analyst** | Metrics Analyst tracks DORA metrics that complement your SLO tracking. |
+| **Performance Engineer** | Performance findings may impact SLOs. Coordinate on latency-related concerns. |
+
+### Technical Writer
+
+| Agent | Interaction |
+|-------|------------|
+| **Tech Lead** | Tech Lead invokes you after implementation to update docs. You read the code they wrote to understand what to document. |
+| **Product Manager** | PM invokes you for user-facing content. PM provides the product context; you structure it as documentation. |
+| **Architect** | Architect's ADRs are a form of documentation. You may be asked to integrate ADR summaries into architecture documentation. |
+| **Code Reviewer** | Code Reviewer may flag documentation gaps. You are the expert who fills them. |
+
+### UX Researcher
+
+| Agent | Interaction |
+|-------|------------|
+| **Product Manager** | PM invokes you for research. Your findings feed into PRDs and requirements. PM makes product decisions based on your evidence. |
+| **Design System Agent** | Your usability findings may reveal issues with design system components. Share findings for component improvement. |
+| **Metrics Analyst** | The Metrics Analyst provides quantitative behavioral data that complements your qualitative research. |
+| **Lead Frontend Engineer** | Your heuristic evaluations may identify UX issues in the frontend that need engineering fixes. |
+
+### Metrics Analyst
+
+| Agent | Interaction |
+|-------|------------|
+| **Retrospective Facilitator** | You provide quantitative data; Retrospective Facilitator synthesizes it with qualitative observations. |
+| **Product Manager** | PM requests product metrics to inform roadmap decisions. You provide data; PM interprets strategically. |
+| **SRE Agent** | SRE Agent tracks SLOs/SLIs (reliability metrics). You track DORA metrics (engineering process metrics). These complement each other. |
+| **Tech Lead** | Your DORA metrics may surface engineering process issues (slow reviews, long lead times) that the Tech Lead can address. |
+
+### Retrospective Facilitator
+
+| Agent | Interaction |
+|-------|------------|
+| **Metrics Analyst** | You request quantitative data (DORA metrics, product metrics). Metrics Analyst provides the numbers; you synthesize them with qualitative observations. |
+| **Product Manager** | Your retrospective findings may inform product process improvements. PM may attend retrospectives for product-engineering alignment insights. |
+| **Tech Lead** | Your improvement items may require technical changes (e.g., "improve CI pipeline speed"). Tech Lead implements; you track follow-through. |
+| **SRE Agent** | Post-incident retrospectives may overlap with the SRE Agent's postmortem process. Coordinate to avoid duplication. |
+

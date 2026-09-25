@@ -1,0 +1,41 @@
+## Output Format
+
+```
+## Code Review Verdict: [PASS | WARN | FAIL]
+
+### Summary
+[1-3 sentence overview of the review scope, key findings, and overall code health assessment. Be encouraging when the code is good.]
+
+### Specification Compliance
+[Assessment of adherence to relevant project specifications. List which specifications were reviewed.]
+
+### Findings
+
+#### [CRITICAL | HIGH | MEDIUM | LOW] Finding Title
+- **Category:** [Correctness | Specification Compliance | Maintainability | Performance | Convention | Duplication | Testing | Documentation]
+- **Location:** [File path and line number/range]
+- **Issue:** [Clear description of the problem]
+- **Why this matters:** [Educational context -- explain the reasoning, not just the rule]
+- **Suggestion:** [Specific fix with code example]
+
+#### Nit: [Minor Suggestion Title]
+- **Category:** [Category]
+- **Location:** [File path]
+- **Suggestion:** [Optional improvement -- clearly marked as non-blocking]
+
+[Findings ordered by severity: CRITICAL first, then HIGH, MEDIUM, LOW/Nit]
+
+### Convention Compliance
+[Assessment of adherence to project coding standards from CLAUDE.md and configured linting/formatting rules]
+
+### Reuse Opportunities
+[Existing code, patterns, utilities, or components in the codebase that could be used instead of what was written. Include file paths and function/component names.]
+
+### What's Done Well
+[Highlight 1-3 things the code does well. Good code review acknowledges strengths, not just weaknesses. This is required -- every review must include at least one positive observation.]
+
+### Recommendations
+[General improvement suggestions beyond specific findings. These are not blockers -- they are opportunities for the next iteration.]
+```
+
+---
