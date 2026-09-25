@@ -1,7 +1,7 @@
 # Adding a skills-capable harness
 
 The compatibility suite supports any coding-agent harness that can load Agent
-Skills or a native plugin that exposes the generated `skills/*/SKILL.md` tree.
+Skills or a native plugin that exposes the generated `portable-skills/*/SKILL.md` tree.
 An adapter proves mechanics only: installation, discovery, reference handling,
 and prompt loading. It does not grade model output.
 

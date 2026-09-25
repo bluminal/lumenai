@@ -256,7 +256,7 @@ describe('cross-harness compatibility contract', () => {
         readFileSync(resolve(overlayRoot, 'commands/review-code.md'), 'utf8'),
       ).toContain(PROBE_MARKER);
       expect(
-        readFileSync(resolve(overlayRoot, 'skills/review-code/SKILL.md'), 'utf8'),
+        readFileSync(resolve(overlayRoot, 'portable-skills/review-code/SKILL.md'), 'utf8'),
       ).toContain(reviewProbe?.token);
       expect(readFileSync(resolve(pluginRoot, 'commands/review-code.md'), 'utf8')).toBe(
         canonicalBefore,

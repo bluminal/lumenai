@@ -17,7 +17,7 @@ describe('Synthex Grok compatibility', () => {
 
     expect(grok.name).toBe('synthex');
     expect(grok.version).toBe(claude.version);
-    expect(grok.skills).toBe('./skills/');
+    expect(grok.skills).toBe('./portable-skills/');
     // Empty arrays override Claude's command and agent lists so Grok does not
     // register those files twice beside the skill wrappers.
     expect(grok.commands).toEqual([]);
@@ -43,7 +43,7 @@ describe('Synthex Grok compatibility', () => {
   });
 
   it('points each shared skill at the canonical definition without copying it', () => {
-    const skill = readFileSync(join(PLUGIN_ROOT, 'skills', 'review-code', 'SKILL.md'), 'utf8');
+    const skill = readFileSync(join(PLUGIN_ROOT, 'portable-skills', 'review-code', 'SKILL.md'), 'utf8');
     const canonical = readFileSync(join(PLUGIN_ROOT, 'commands', 'review-code.md'), 'utf8');
 
     expect(skill).toContain('name: review-code');

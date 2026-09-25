@@ -39,7 +39,7 @@ try {
     runCommand('gemini', [
       'skills',
       'install',
-      join(overlayRoot, 'skills', entry.id),
+      join(overlayRoot, 'portable-skills', entry.id),
       '--scope',
       'workspace',
       '--consent',
