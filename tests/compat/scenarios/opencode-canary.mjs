@@ -34,6 +34,22 @@ try {
   const representatives = selectRepresentativeProbes(probes);
   emit(harness, 'install', { ok: true, profile, count: entries.length });
 
+  // OpenCode's own skill discovery is hardcoded to `.claude/skills/**` and
+  // `.agents/skills/**` (Task 5/Q7); the `portable-skills/` rename needs an
+  // explicit `opencode.json` `skills.paths` entry to be visible at all. See
+  // spikes.md Task 21 (Q7). Write it before the first discovery check.
+  writeFileSync(
+    '/workspace/opencode.json',
+    `${JSON.stringify(
+      {
+        $schema: 'https://opencode.ai/config.json',
+        skills: { paths: ['.agents/portable-skills'] },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+
   const discoveredSkills = JSON.parse(
     runCommand('opencode', ['debug', 'skill'], {
       env: { OPENCODE_DISABLE_CLAUDE_CODE: '1' },
@@ -56,6 +72,7 @@ try {
         },
       },
       permission: { '*': 'deny', skill: { '*': 'allow' } },
+      skills: { paths: ['.agents/portable-skills'] },
     }, null, 2)}\n`,
   );
   for (const probe of representatives) {

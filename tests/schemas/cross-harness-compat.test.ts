@@ -1,11 +1,13 @@
 import {
   existsSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
+  statSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   readExpectedEntrypoints,
@@ -60,6 +62,42 @@ describe('cross-harness compatibility contract', () => {
       unexpected: [],
       invalid: [],
     });
+  });
+
+  it('has no leftover references to the pre-rename plugins/synthex/skills/ path (Task 21)', () => {
+    // FR-HM11: Task 5 renamed the generated wrapper tree skills/ ->
+    // portable-skills/; this guards against the pre-rename path creeping
+    // back into any tests, CI workflow, contributor doc, or the plugin
+    // itself. `docs/plans/` is intentionally out of scope: historical plan
+    // prose may correctly describe what existed at decision time.
+    // Built via join(), not a literal, so this assertion's own source file
+    // does not match its own search fragment.
+    const staleFragment = ['plugins', 'synthex', 'skills', ''].join('/');
+    const skipDirNames = new Set(['node_modules', '.git']);
+    const selfPath = resolve(import.meta.dirname, 'cross-harness-compat.test.ts');
+    const offenders: string[] = [];
+
+    function scan(path: string): void {
+      const stats = statSync(path);
+      if (stats.isDirectory()) {
+        for (const entry of readdirSync(path)) {
+          if (skipDirNames.has(entry)) continue;
+          scan(join(path, entry));
+        }
+        return;
+      }
+      if (!stats.isFile() || path === selfPath) return;
+      const contents = readFileSync(path, 'utf8');
+      if (contents.includes(staleFragment)) {
+        offenders.push(path);
+      }
+    }
+
+    for (const target of ['tests', '.github', 'CONTRIBUTING.md', 'plugins/synthex']) {
+      scan(resolve(repoRoot, target));
+    }
+
+    expect(offenders).toEqual([]);
   });
 
   it('prevents the host runner from invoking an installed harness', () => {
@@ -256,7 +294,7 @@ describe('cross-harness compatibility contract', () => {
         readFileSync(resolve(overlayRoot, 'commands/review-code.md'), 'utf8'),
       ).toContain(PROBE_MARKER);
       expect(
-        readFileSync(resolve(overlayRoot, 'skills/review-code/SKILL.md'), 'utf8'),
+        readFileSync(resolve(overlayRoot, 'portable-skills/review-code/SKILL.md'), 'utf8'),
       ).toContain(reviewProbe?.token);
       expect(readFileSync(resolve(pluginRoot, 'commands/review-code.md'), 'utf8')).toBe(
         canonicalBefore,

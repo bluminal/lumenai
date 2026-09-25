@@ -161,7 +161,7 @@ Mark completed tasks as "done" in the implementation plan with:
 - Any learnings or discoveries
 - Follow-up tasks identified during implementation
 
-Update `@CLAUDE.md` with any build/test optimization insights discovered.
+Update the project instruction file (`CLAUDE.md` on Claude Code; otherwise the first of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.hermes.md` that exists) with any build/test optimization insights discovered.
 
 After updating the plan, if running under `--loop`, check the [Emission Point](#emission-point) conditions:
 

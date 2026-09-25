@@ -61,7 +61,7 @@ Read the PRD at `@{requirements_path}` thoroughly. Build a mental model of:
 
 Read available technical context to inform whether reviewer questions already have answers:
 - Check `@{specs_path}` for existing technical specs
-- Check `@CLAUDE.md` for project conventions, patterns, and constraints
+- If the host did not already inject the project instruction file into your context, Read the first of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.hermes.md` that exists at the repository root.
 - Check `package.json` or equivalent for current tech stack
 - Understand the current state of the codebase (what already exists)
 

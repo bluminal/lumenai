@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { cpSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { assertIsolatedEnvironment } from '../lib/assert-isolated.mjs';
@@ -13,6 +13,25 @@ import {
 const startedAt = Date.now();
 const fixtureRoot = '/fixture/synthex';
 const installedRoot = '/workspace/.agents';
+// OpenCode's own skill discovery is hardcoded to `.claude/skills/**` and
+// `.agents/skills/**` (Task 5/Q7); the `portable-skills/` rename is
+// invisible without an explicit `opencode.json` `skills.paths` entry
+// pointing at the renamed tree. See spikes.md Task 21 (Q7).
+const opencodeConfigPath = '/workspace/opencode.json';
+
+function writeSkillsPathConfig() {
+  writeFileSync(
+    opencodeConfigPath,
+    `${JSON.stringify(
+      {
+        $schema: 'https://opencode.ai/config.json',
+        skills: { paths: ['.agents/portable-skills'] },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
 
 function emit(phase, details) {
   console.log(JSON.stringify({ harness: 'opencode', phase, ...details }));
@@ -44,10 +63,12 @@ try {
   }
 
   cpSync(fixtureRoot, installedRoot, { recursive: true });
+  writeSkillsPathConfig();
   emit('install', {
     ok: true,
-    method: 'project .agents compatibility bundle',
+    method: 'project .agents compatibility bundle plus opencode.json skills.paths (Q7)',
     destination: installedRoot,
+    config: opencodeConfigPath,
     count: entries.length,
   });
 
@@ -70,7 +91,7 @@ try {
 
   const discovered = entries
     .filter(({ id }) => {
-      const path = `/workspace/.agents/skills/${id}/SKILL.md`;
+      const path = `/workspace/.agents/portable-skills/${id}/SKILL.md`;
       return debugResult.stdout.includes(path);
     })
     .map(({ id }) => id);
@@ -136,7 +157,7 @@ try {
     );
   }
   const remaining = entries.filter(({ id }) =>
-    uninstallResult.stdout.includes(`/workspace/.agents/skills/${id}/SKILL.md`),
+    uninstallResult.stdout.includes(`/workspace/.agents/portable-skills/${id}/SKILL.md`),
   );
   if (remaining.length > 0) {
     throw new Error(

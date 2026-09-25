@@ -17,7 +17,7 @@
     "autonomous",
     "synthesis"
   ],
-  "skills": "./skills/",
+  "skills": "./portable-skills/",
   "interface": {
     "displayName": "Synthex",
     "shortDescription": "A software delivery organization of reusable AI workflows",

@@ -4,7 +4,6 @@ import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertIsolatedEnvironment } from '../lib/assert-isolated.mjs';
 import {
-  assertCompleteInventory,
   readExpectedEntrypoints,
   validateSkillTree,
 } from '../lib/contract.mjs';
@@ -91,21 +90,27 @@ try {
     throw new Error(`Claude plugin list did not include Synthex: ${list.stdout}`);
   }
 
+  // Claude Code intentionally no longer auto-loads the generated skill
+  // wrappers now that they live outside `.claude/skills/**` under
+  // `portable-skills/` (FR-HM11, Task 21): `plugin details` must report
+  // zero Skills for every entrypoint. This is the opposite assertion from
+  // every other harness's offline scenario, which expects full discovery.
   const details = runCommand('claude', ['plugin', 'details', selector]);
   const discovered = idsMentionedInOutput(entries, details.stdout);
-  const inventory = assertCompleteInventory(entries, discovered);
   emit(harness, 'inventory', {
-    ok: inventory.missing.length === 0,
-    expectedCount: inventory.expected.length,
-    discoveredCount: inventory.discovered.length,
-    missing: inventory.missing,
-    unexpected: inventory.unexpected,
+    ok: discovered.length === 0,
+    expectedCount: entries.length,
+    discoveredCount: discovered.length,
+    discovered,
   });
-  if (inventory.missing.length > 0) {
+  if (discovered.length > 0) {
     throw new Error(
-      `Claude component inventory is incomplete: ${inventory.missing.join(', ')}\n${details.stdout.slice(0, 4_000)}`,
+      `Claude Code unexpectedly surfaced skill wrappers as Skills (expected 0 discovered after the portable-skills/ rename): ${discovered.join(', ')}\n${details.stdout.slice(0, 4_000)}`,
     );
   }
+  // Reference integrity: every canonical command/agent still resolves to a
+  // valid generated wrapper on disk (checked above via validateSkillTree),
+  // even though Claude Code itself no longer surfaces them.
   emit(harness, 'references', { ok: true, checked: entries.length });
 
   const uninstall = runCommand('claude', [

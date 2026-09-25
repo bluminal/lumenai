@@ -27,7 +27,7 @@ export function readExpectedEntrypoints(pluginRoot) {
         id,
         kind,
         source,
-        skill: `skills/${id}/SKILL.md`,
+        skill: `portable-skills/${id}/SKILL.md`,
       });
     }
   }
@@ -43,9 +43,24 @@ export function readExpectedEntrypoints(pluginRoot) {
   return entries.sort((left, right) => left.id.localeCompare(right.id));
 }
 
-export function validateSkillTree(pluginRoot, entries) {
+/**
+ * Validates a directory of installed/generated SKILL.md files against the
+ * canonical manifest entries.
+ *
+ * `skillsDirName` defaults to the repo's generated tree name
+ * (`portable-skills`) but must be overridden to `'skills'` when validating a
+ * location a harness manages itself: Gemini CLI's `skills install --scope
+ * workspace`, for example, always lands files under `<workspace>/.gemini/
+ * skills/<id>/SKILL.md` regardless of the source path it was installed from,
+ * so that check target's directory name is a Gemini convention, not ours.
+ *
+ * @param {string} pluginRoot
+ * @param {Array<{id: string, source: string}>} entries
+ * @param {string} [skillsDirName]
+ */
+export function validateSkillTree(pluginRoot, entries, skillsDirName = 'portable-skills') {
   const expectedIds = new Set(entries.map(({ id }) => id));
-  const skillsRoot = join(pluginRoot, 'skills');
+  const skillsRoot = join(pluginRoot, skillsDirName);
   const actualIds = readdirSync(skillsRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -56,7 +71,7 @@ export function validateSkillTree(pluginRoot, entries) {
   const invalid = [];
 
   for (const entry of entries) {
-    const skillPath = join(pluginRoot, entry.skill);
+    const skillPath = join(skillsRoot, entry.id, 'SKILL.md');
     if (!existsSync(skillPath)) continue;
 
     const contents = readFileSync(skillPath, 'utf8');

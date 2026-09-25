@@ -17,7 +17,7 @@ describe('Synthex Codex compatibility', () => {
 
     expect(codex.name).toBe('synthex');
     expect(codex.version).toBe(claude.version);
-    expect(codex.skills).toBe('./skills/');
+    expect(codex.skills).toBe('./portable-skills/');
   });
 
   it('publishes Synthex under the same name in the Codex marketplace', () => {

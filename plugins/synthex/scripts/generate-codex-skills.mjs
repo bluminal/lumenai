@@ -27,7 +27,7 @@ const FRONTMATTER_FENCE = '---';
 const checkOnly = process.argv.includes('--check');
 const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const claudeManifestPath = join(pluginRoot, '.claude-plugin', 'plugin.json');
-const skillsRoot = join(pluginRoot, 'skills');
+const skillsRoot = join(pluginRoot, 'portable-skills');
 const claudeManifest = JSON.parse(readFileSync(claudeManifestPath, 'utf8'));
 
 /**

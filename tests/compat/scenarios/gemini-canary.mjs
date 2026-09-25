@@ -35,11 +35,11 @@ try {
   const representatives = selectRepresentativeProbes(probes);
   for (const entry of entries) {
     runCommand('gemini', [
-      'skills', 'install', join(overlayRoot, 'skills', entry.id), '--scope', 'workspace', '--consent',
+      'skills', 'install', join(overlayRoot, 'portable-skills', entry.id), '--scope', 'workspace', '--consent',
     ]);
   }
   mkdirSync(workspaceSupportRoot, { recursive: true });
-  for (const directory of ['commands', 'agents', 'config', 'scripts']) {
+  for (const directory of ['commands', 'agents', 'config', 'scripts', 'docs']) {
     cpSync(join(overlayRoot, directory), join(workspaceSupportRoot, directory), { recursive: true });
   }
   emit(harness, 'install', { ok: true, profile, count: entries.length });

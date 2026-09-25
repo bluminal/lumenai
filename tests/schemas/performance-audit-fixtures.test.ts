@@ -16,6 +16,12 @@
  *   routing_decision enum: routed-to-pool, fell-back-roster-mismatch, skipped-routing-mode-explicit
  *   Static required-reviewer-set for /performance-audit is [performance-engineer]
  *   Cross-file: performance-audit.md contains verbatim explicit-pool-required error text for performance-engineer
+ *
+ * Task 14 (FR-HM5, D17) repoint: performance-audit.md's Step 1b body (which
+ * held this text) moved byte-identical to
+ * plugins/synthex/docs/standing-pool-routing-performance-audit.md, replaced
+ * in performance-audit.md by a two-line D17 gate. The cross-file describe
+ * block below now reads the doc file instead.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -34,6 +40,12 @@ const FIXTURES_BASE = join(
 const PERF_AUDIT_MD_PATH = join(
   import.meta.dirname,
   '..', '..', 'plugins', 'synthex', 'commands', 'performance-audit.md'
+);
+
+// Task 14 (FR-HM5, D17) repoint: the moved-block content now lives here.
+const STANDING_POOL_ROUTING_PERF_AUDIT_DOC_PATH = join(
+  import.meta.dirname,
+  '..', '..', 'plugins', 'synthex', 'docs', 'standing-pool-routing-performance-audit.md'
 );
 
 function loadFixture(scenarioDir: string): Record<string, unknown> {
@@ -371,36 +383,43 @@ describe('(c) explicit-pool-required-abort — no pool, aborts with verbatim FR-
 
 // ── Cross-file: performance-audit.md contains verbatim error text ─────────────
 
-describe('cross-file: plugins/synthex/commands/performance-audit.md — verbatim explicit-pool-required error for performance-engineer', () => {
+describe('cross-file: plugins/synthex/docs/standing-pool-routing-performance-audit.md — verbatim explicit-pool-required error for performance-engineer', () => {
 
   const perfAuditContent = readFileSync(PERF_AUDIT_MD_PATH, 'utf-8');
+  const routingDocContent = readFileSync(STANDING_POOL_ROUTING_PERF_AUDIT_DOC_PATH, 'utf-8');
 
   it('performance-audit.md is readable and non-empty', () => {
     expect(perfAuditContent.trim().length).toBeGreaterThan(0);
   });
 
-  it('performance-audit.md references "performance-engineer" as the static required reviewer', () => {
-    expect(perfAuditContent).toContain('performance-engineer');
+  it('performance-audit.md\'s Step 1b gate points at the doc (D17)', () => {
+    expect(perfAuditContent).toContain(
+      '${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing-performance-audit.md'
+    );
   });
 
-  it('performance-audit.md contains the FR-MMT17 first-line error text for performance-engineer', () => {
-    expect(perfAuditContent).toContain(
+  it('the doc references "performance-engineer" as the static required reviewer', () => {
+    expect(routingDocContent).toContain('performance-engineer');
+  });
+
+  it('the doc contains the FR-MMT17 first-line error text for performance-engineer', () => {
+    expect(routingDocContent).toContain(
       'No standing pool matches the required reviewers (performance-engineer).'
     );
   });
 
-  it('performance-audit.md contains the explicit-pool-required routing mode name', () => {
-    expect(perfAuditContent).toContain('explicit-pool-required');
+  it('the doc contains the explicit-pool-required routing mode name', () => {
+    expect(routingDocContent).toContain('explicit-pool-required');
   });
 
-  it('performance-audit.md contains the start-review-team remediation hint for performance-engineer', () => {
-    expect(perfAuditContent).toContain(
+  it('the doc contains the start-review-team remediation hint for performance-engineer', () => {
+    expect(routingDocContent).toContain(
       '/synthex-plus:start-review-team --reviewers performance-engineer'
     );
   });
 
-  it('performance-audit.md contains the config change remediation hint', () => {
-    expect(perfAuditContent).toContain(
+  it('the doc contains the config change remediation hint', () => {
+    expect(routingDocContent).toContain(
       "Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml"
     );
   });

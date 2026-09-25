@@ -868,3 +868,54 @@ tests:
         value: "regardless of"
       - type: not-icontains
         value: "can be auto-approved"
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # COLD-PATH DOC GATE (Layer 2)
+  # docs/plans/harness-modernization.md, Task 13 (FR-HM5, D17).
+  #
+  # Manual-trigger only — NOT run as part of routine CI per Task 13's
+  # instructions (billed). Cache population requires one initial
+  # `npx promptfoo eval --filter-pattern "MMT-GATE-B"` against the live
+  # `claude` CLI; subsequent runs hit the cache. Pattern matches the
+  # NL-B/AD-B convention above.
+  #
+  # Fixture project: tests/fixtures/multi-model-teams/pool-gate-enabled/
+  # — has its OWN docs/standing-pool-routing.md (a decoy, marked
+  # DECOY-PROJECT-DOCS-MARKER) and its own .synthex-plus/config.yaml with
+  # standing_pools.enabled: true. The case proves the D17 gate in
+  # review-code.md's Step 1b resolves the PLUGIN-shipped doc path
+  # (${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md) and never the
+  # project's own same-named docs/ file.
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "MMT-GATE-B1: pool-gate-enabled — review-code Step 1b D17 gate reads the plugin's docs/standing-pool-routing.md, not the project's"
+    vars:
+      agent: review-code
+      input: |
+        You are running /synthex:review-code in a project whose resolved
+        `.synthex-plus/config.yaml` contains:
+
+          standing_pools:
+            enabled: true
+            ttl_minutes: 60
+            default_name: review-pool
+            matching_mode: covers
+            routing_mode: prefer-with-fallback
+
+        This SAME project also has its own file at the project-relative
+        path `docs/standing-pool-routing.md`, whose content begins with
+        the heading "# DECOY-PROJECT-DOCS-MARKER" — this is a project-
+        authored file, not anything shipped by the Synthex plugin, and it
+        happens to share a filename with a plugin-shipped doc.
+
+        Per Step 1b of your workflow ("Standing Pool Discovery and
+        Routing"), `standing_pools.enabled` is true, so the D17 gate
+        fires. State, verbatim, the exact file path your Read tool call
+        would target for Step 1b, and confirm in one sentence why it is
+        NOT the project's own `docs/standing-pool-routing.md` file shown
+        above.
+    assert:
+      - type: icontains
+        value: "${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md"
+      - type: not-icontains
+        value: "DECOY-PROJECT-DOCS-MARKER"

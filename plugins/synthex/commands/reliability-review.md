@@ -40,7 +40,7 @@ Check for a project configuration file at `@{config_path}`. Load the reliability
 
 Before invoking the SRE Agent, gather context about the service:
 
-- Read `@CLAUDE.md` for project conventions and infrastructure details
+- If the host did not already inject the project instruction file into your context, Read the first of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.hermes.md` that exists at the repository root.
 - Check for existing SLO definitions at the configured path
 - Check for existing runbooks at the configured path
 - Identify the deployment infrastructure (Vercel, AWS, GCP, Docker, Kubernetes, etc.)
