@@ -78,18 +78,6 @@ Check for a project configuration file at `@{config_path}`. If it exists, load t
 
 Projects can customize by running `init` to create `.synthex/config.yaml`, then editing it. They can add reviewers (e.g., a security reviewer, compliance reviewer), disable defaults that aren't relevant, adjust max review cycles, or change the minimum severity threshold. See the Project Configuration section below for full details.
 
-### Invocation Flags (FR-MR6)
-
-The command accepts two mutually exclusive flags:
-- `--multi-model` — force multi-model plan review regardless of config
-- `--no-multi-model` — force native-only plan review regardless of config
-
-Flag value overrides BOTH the master `multi_model_review.enabled` config AND the per-command `multi_model_review.per_command.write_implementation_plan.enabled` config.
-
-When neither flag is set, the resolved config determines the path. **No complexity gate is consulted (FR-MR22)** — when multi-model is enabled (by config or flag), the orchestrator runs.
-
-> **Contrast with `review-code`:** `review-code` has a complexity gate (FR-MR21a) that can skip multi-model for trivial diffs. `write-implementation-plan` has NO complexity gate — plans are always substantive enough to warrant full multi-model review when enabled. This distinction is explicit per FR-MR22.
-
 ### 2. Read and Understand Requirements
 
 Read the PRD at `@{requirements_path}` thoroughly. Understand:
@@ -152,76 +140,19 @@ This is the core quality mechanism. The draft plan is reviewed by specialist sub
 
 **Process:**
 
-```
-┌─────────────────┐
-│  Draft Plan      │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐     Haiku-backed structural audit
-│  Plan Linter     │──── Runs ONCE per draft (Step 5.5)
-│  (pre-review)    │     PM addresses structural findings
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐     Spawn FRESH reviewers IN PARALLEL
-│  Peer Review     │──── Each reviewer is a new sub-agent
-│  (all reviewers) │     (never resumed from prior cycle)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐     Haiku-backed dedup/group/sort
-│  Findings        │──── Consolidates N reviewer outputs
-│  Consolidator    │     into a single attributed list
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐     PM addresses all CRITICAL and HIGH
-│  PM Addresses    │──── PM has final say on requirements
-│  Feedback        │     PM asks user for help when unsure
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  All CRITICAL/   │── No ──► Loop back to Peer Review
-│  HIGH addressed? │         (up to review_loops.max_cycles)
-└────────┬────────┘
-         │ Yes
-         ▼
-┌─────────────────┐
-│  Compactness     │
-│  Review          │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Write Final     │
-│  Plan            │
-└─────────────────┘
-```
+1. **Plan Linter** (pre-review, Haiku-backed) — runs ONCE per draft (Step 5.5); PM addresses structural findings.
+2. **Peer Review** (all reviewers) — spawn FRESH reviewers IN PARALLEL; each is a new sub-agent, never resumed from a prior cycle.
+3. **Findings Consolidator** (Haiku-backed) — dedups/groups/sorts N reviewer outputs into a single attributed list.
+4. **PM Addresses Feedback** — PM addresses all CRITICAL and HIGH findings; PM has final say on requirements and asks the user for help when unsure.
+5. If CRITICAL/HIGH findings remain unaddressed, loop back to step 2 (up to `review_loops.max_cycles`); otherwise continue to **Compactness Review**, then **Write Final Plan**.
 
 **Step 6a: Resolve Multi-Model Branch**
 
-Determine whether multi-model plan review is active for this invocation:
-
-1. Check for `--multi-model` / `--no-multi-model` flags (see "### Invocation Flags (FR-MR6)" above). Flag value overrides config.
-2. If no flag is set, read `multi_model_review.enabled` and `multi_model_review.per_command.write_implementation_plan.enabled` from the resolved config.
-3. **No complexity gate is consulted (FR-MR22).** Unlike `review-code`, there is no "trivial plan" path — when multi-model is enabled (by config or flag), the orchestrator ALWAYS runs for plan review.
+Resolve `--multi-model`/`--no-multi-model` flags (FR-MR6) against the master `multi_model_review.enabled` and per-command `multi_model_review.per_command.write_implementation_plan.enabled` config — flag value overrides config. **No complexity gate is consulted (FR-MR22)** — unlike `review-code`'s complexity gate, there is no "trivial plan" path, so the orchestrator ALWAYS runs for plan review whenever multi-model is active.
 
 <!-- native-only path: today's write-implementation-plan native reviewer logic byte-identical to baseline (FR-MR23) -->
 
-**Multi-model active → invoke orchestrator:**
-
-When multi-model is active, invoke the `multi-model-review-orchestrator` agent with:
-- `command: "write-implementation-plan"`
-- `artifact_path` = the current draft plan path
-- `native_reviewers: ["architect", "design-system-agent", "tech-lead"]` (the three native plan reviewers)
-- `config` = the resolved `multi_model_review` block (from `.synthex/config.yaml` merged onto `defaults.yaml`)
-- `per_reviewer_timeout_seconds` = from `multi_model_review.per_reviewer_timeout_seconds` config (default 180)
-
-The orchestrator fans out to the three native reviewers AND all configured external adapters in a single parallel Task batch (FR-MR12), runs the full consolidation pipeline (Stages 1, 2, 4, 5, 5b, 6), and returns a unified consolidated envelope with `findings[]` attributed by reviewer.
-
-Receive the unified consolidated envelope and pass its consolidated findings list directly to the Product Manager (Step 6d). The PM receives a single consolidated findings list with attribution — it does NOT process raw per-reviewer outputs.
+If multi-model is active, Read `${CLAUDE_PLUGIN_ROOT}/docs/plan-multi-model.md` and follow it for the full Invocation Flags reference and the orchestrator invocation contract; otherwise continue below with the native-only path (FR-MR23 byte-identical). On other hosts, resolve the plugin root from `.synthex/state.json`'s `plugin_root` field and read the same file relative to it.
 
 **Native-only active → spawn native reviewers directly:**
 
