@@ -130,6 +130,8 @@ The resolved aggregator name and source ("configured" | "tier-table" | "host-fal
 
 **FR-MR12 verbatim:** "Native and external proposers run in a single parallel Task batch."
 
+If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Build, and Hermes), perform the role inline in this session, then continue.
+
 Issue ONE parallel Task batch containing:
 
 - **Native sub-agents:** for each name in `native_reviewers`, issue a Task call with the sub-agent identity. Each native receives the assembled bundle PLUS its standard host-session context PLUS an explicit `output_schema` requirement so it emits canonical findings (per `canonical-finding-schema.md`). Native source attribution: `source.source_type = "native-team"`, `source.family = "anthropic"`, `source.reviewer_id = <native agent name>`.

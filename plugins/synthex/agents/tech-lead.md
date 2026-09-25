@@ -46,6 +46,8 @@ When you receive a task (from the `next-priority` command, user, or any caller):
 | Requirements clarification, plan updates | Delegate to **Product Manager** |
 | Tasks spanning multiple domains (e.g., new feature requiring API + UI + tests + design system updates) | Orchestrate multiple specialists in parallel where possible |
 
+If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Build, and Hermes), perform the role inline in this session, then continue.
+
 When delegating, always provide clear context: the task, the acceptance criteria, relevant project constraints, and any architectural decisions already made.
 
 ---
