@@ -3,9 +3,14 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { assertIsolatedEnvironment } from '../lib/assert-isolated.mjs';
 import {
+  extractAvailableSkillsBlock,
+  parseAvailableSkillsEntries,
+} from '../lib/available-skills-block.mjs';
+import {
   assertCompleteInventory,
   readExpectedEntrypoints,
 } from '../lib/contract.mjs';
+import { catalogBudget } from '../lib/harnesses.mjs';
 import { startLoopbackOpenAIChatProvider } from '../lib/loopback-openai-chat-provider.mjs';
 import { createProbeOverlay } from '../lib/probe-overlay.mjs';
 import { emit, runCommand, runCommandAsync } from '../lib/scenario-helpers.mjs';
@@ -127,6 +132,46 @@ try {
     );
   }
   const skillToolRequest = chatRequests[activationRequestIndex];
+
+  // FR-HM9 (Task 22): the request that offers the `skill` tool carries the
+  // full `<available_skills>` system-prompt block the host sends to the
+  // model; measure and budget it here rather than in a separate capture
+  // pass so the activation scenario itself is the source of truth.
+  const catalogBudgetLimits = catalogBudget(harness);
+  const catalogBlock = extractAvailableSkillsBlock(skillToolRequest.body);
+  if (!catalogBlock.found) {
+    throw new Error('OpenCode request offering the skill tool had no <available_skills> block');
+  }
+  const synthexIds = new Set(entries.map(({ id }) => id));
+  const catalogEntries = parseAvailableSkillsEntries(catalogBlock.block).filter(({ name }) =>
+    synthexIds.has(name),
+  );
+  const catalogBlankDescriptionCount = catalogEntries.filter(
+    ({ description }) => description.length === 0,
+  ).length;
+  const catalogOverBudget =
+    catalogBlock.bytes > catalogBudgetLimits.maxAvailableSkillsBlockBytes;
+  emit(harness, 'catalog', {
+    ok: !catalogOverBudget && catalogBlankDescriptionCount === 0,
+    profile,
+    count: catalogEntries.length,
+    bytes: catalogBlock.bytes,
+    systemPromptBytes: catalogBlock.systemPromptBytes,
+    blankDescriptionCount: catalogBlankDescriptionCount,
+    budget: catalogBudgetLimits,
+  });
+  if (catalogOverBudget) {
+    throw new Error(
+      `OpenCode <available_skills> block exceeded its budget: ${catalogBlock.bytes} bytes ` +
+        `(budget ${catalogBudgetLimits.maxAvailableSkillsBlockBytes})`,
+    );
+  }
+  if (catalogBlankDescriptionCount > 0) {
+    throw new Error(
+      `OpenCode <available_skills> block had ${catalogBlankDescriptionCount} blank synthex descriptions`,
+    );
+  }
+
   const activatedToolRequest = chatRequests[activationRequestIndex + 1];
   const activatedRequest = JSON.stringify(activatedToolRequest.body);
   for (const probe of probes) {
