@@ -6,6 +6,12 @@ import {
   AGENT_OPENAI_YAML,
   COMMAND_DESCRIPTIONS,
 } from '../../plugins/synthex/scripts/generate-codex-skills.mjs';
+import {
+  HERMES_READ_FILE_NOTE,
+  renderToolMapTable,
+  RULE_ADOPT_INLINE,
+  RULE_SKIP_UNAVAILABLE_TOOL,
+} from '../../plugins/synthex/scripts/lib/host-matrix.mjs';
 import { WRAPPER_COUNT } from '../compat/lib/inventory.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -143,3 +149,69 @@ describe('wrapper catalog baseline captures (Task 19)', () => {
     expect(baseline.availableSkillsBlockBytes).toBeGreaterThan(0);
   });
 });
+
+describe('wrapper tool-name map (Task 20, FR-HM12/FR-HM45)', () => {
+  const allSlugs = [...Object.keys(COMMAND_DESCRIPTIONS), ...Object.keys(AGENT_DESCRIPTIONS)];
+  const table = renderToolMapTable();
+
+  it('renders a non-empty table keyed by the five non-Claude hosts', () => {
+    expect(table).toMatch(/^\| Claude tool \| Codex CLI \| Gemini CLI \| OpenCode \| Grok Build \| Hermes Agent \|$/m);
+    expect(table).not.toContain('Claude Code');
+  });
+
+  // The table lives in one generated shared file, `docs/tool-map.md`, that
+  // every wrapper's step 4 reads, rather than being embedded in all 46
+  // wrapper bodies. Embedding the ~900-byte table directly in every wrapper
+  // was tried first (the FR-HM12 default), but it pushed the combined size
+  // of all 46 wrappers past a hard truncation limit in `opencode debug
+  // skill`'s piped stdout (observed truncating JSON output around ~146 KB
+  // combined), which broke OpenCode's compat activation profile. See the
+  // generator's `TOOL_MAP_DOCS_RELATIVE_PATH` comment and the Task 20
+  // commit message for the reproduction. This is the "shared docs/tool-map.md
+  // the wrapper Reads" fallback the Task 20 acceptance criteria names.
+  const toolMapDocPath = join(pluginRoot, 'docs', 'tool-map.md');
+
+  it('renders the host-matrix.mjs tool-map table byte-for-byte into the shared docs/tool-map.md', () => {
+    const doc = readFileSync(toolMapDocPath, 'utf8');
+    expect(doc).toContain(table);
+    expect(doc).toContain(HERMES_READ_FILE_NOTE);
+  });
+
+  it('points every wrapper step 4 at the shared docs/tool-map.md', () => {
+    for (const slug of allSlugs) {
+      expect(readSkill(slug)).toContain('docs/tool-map.md');
+    }
+  });
+
+  it('states both FR-HM12 rules verbatim, as their own numbered steps, in every wrapper', () => {
+    for (const slug of allSlugs) {
+      const skill = readSkill(slug);
+      expect(skill).toMatch(new RegExp(`^\\d+\\. ${escapeRegExp(RULE_SKIP_UNAVAILABLE_TOOL)}$`, 'm'));
+      expect(skill).toMatch(new RegExp(`^\\d+\\. ${escapeRegExp(RULE_ADOPT_INLINE)}$`, 'm'));
+    }
+  });
+
+  it('gives every wrapper the Hermes skill_view/read_file footnote (Task 8 finding)', () => {
+    for (const slug of allSlugs) {
+      expect(readSkill(slug)).toContain(HERMES_READ_FILE_NOTE);
+    }
+  });
+
+  it('names Hermes alongside Codex, Gemini CLI, OpenCode, and Grok in the intro sentence of every wrapper', () => {
+    for (const slug of allSlugs) {
+      expect(readSkill(slug)).toContain('Codex, Gemini CLI, OpenCode, Grok, and Hermes load this file.');
+    }
+  });
+
+  it('lists all five non-Claude harnesses in the generator header comment', () => {
+    const generatorSource = readFileSync(
+      join(pluginRoot, 'scripts', 'generate-codex-skills.mjs'),
+      'utf8',
+    );
+    expect(generatorSource).toContain('Codex, Gemini CLI, OpenCode, Grok, and Hermes');
+  });
+});
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

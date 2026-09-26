@@ -50,6 +50,18 @@ OpenCode's built-in skill discovery only scans `.claude/skills/**` and `.agents/
 
 This restores full discovery (confirmed empirically; see `docs/specs/harness-modernization/spikes.md`, Task 21, Q7).
 
+### Hermes Agent
+
+Hermes has no local-path form for `hermes skills install` (it only takes a registry identifier or an HTTPS URL to a `SKILL.md`), so the whole plugin tree has to be placed in the project rather than installed skill-by-skill:
+
+```bash
+cp -R path/to/plugins/synthex <project>/.agents/synthex
+ln -s .agents/synthex/portable-skills <project>/.agents/skills
+cd <project> && hermes skills trust
+```
+
+Never nest `commands/` or `agents/` inside a skill folder — Hermes's Skills Guard scans project skills at load and quarantines (fail-closed) any it scores `dangerous`, and the canonical `commands/`/`agents/` files trip several of its heuristics (path traversal, agent-config modification) when placed inside a skill directory. The symlink layout above keeps them outside every skill folder, so nothing is quarantined. `hermes skills trust` is per git checkout; run it again after re-cloning. See `docs/specs/harness-modernization/spikes.md`, Task 8, for the full spike this recipe is based on.
+
 For copyable installation and update instructions, see [Agent compatibility](https://slashsynthex.com/docs/agent-compatibility).
 
 ### Upgrading a manual install

@@ -48,7 +48,7 @@ describe('Synthex Grok compatibility', () => {
 
     expect(skill).toContain('name: review-code');
     expect(skill).toContain('../../commands/review-code.md');
-    expect(skill).toContain('Codex, Gemini CLI, OpenCode, and Grok');
+    expect(skill).toContain('Codex, Gemini CLI, OpenCode, Grok, and Hermes');
     expect(skill).not.toContain('closest available Codex tools');
     expect(skill.length).toBeLessThan(canonical.length / 2);
   });
