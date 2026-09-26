@@ -83,3 +83,60 @@ describe('Task 91: helper behavior', () => {
     expect(c).toEqual(a);
   });
 });
+
+describe('Task 24 (FR-HM44): multi_model_review.context.* and per_reviewer_timeout_seconds via the helper', () => {
+  it('loadDefaultsYaml() exposes multi_model_review.per_reviewer_timeout_seconds: 180', async () => {
+    const cfg = await loadDefaultsYaml();
+    expect(cfg.multi_model_review.per_reviewer_timeout_seconds).toBe(180);
+  });
+
+  it('loadDefaultsYaml() exposes multi_model_review.context with max_bundle_bytes and max_file_bytes', async () => {
+    const cfg = await loadDefaultsYaml();
+    expect(cfg.multi_model_review.context.max_bundle_bytes).toBe(204800);
+    expect(cfg.multi_model_review.context.max_file_bytes).toBe(65536);
+  });
+
+  it('loadDefaultsYaml() exposes multi_model_review.context.convention_paths and spec_paths', async () => {
+    const cfg = await loadDefaultsYaml();
+    expect(cfg.multi_model_review.context.convention_paths).toEqual([
+      'CLAUDE.md',
+      '.eslintrc',
+      '.prettierrc',
+    ]);
+    expect(cfg.multi_model_review.context.spec_paths).toEqual(['docs/specs']);
+  });
+
+  it('loadDefaultsYamlText() contains the new keys with comments (raw-text check)', () => {
+    const text = loadDefaultsYamlText();
+    for (const key of [
+      'per_reviewer_timeout_seconds:',
+      'context:',
+      'max_bundle_bytes:',
+      'max_file_bytes:',
+      'convention_paths:',
+      'spec_paths:',
+    ]) {
+      const lines = text.split('\n');
+      const idx = lines.findIndex((l) => l.includes(key));
+      expect(idx, `Expected to find ${key} in defaults.yaml`).toBeGreaterThan(0);
+      const window = lines.slice(Math.max(0, idx - 5), idx + 1).join('\n');
+      expect(window, `Expected a comment above ${key}`).toMatch(/#/);
+    }
+  });
+});
+
+describe('Task 26 (FR-HM44): code_review.spec_inline_bytes via the helper', () => {
+  it('loadDefaultsYaml() exposes code_review.spec_inline_bytes: 65536', async () => {
+    const cfg = await loadDefaultsYaml();
+    expect(cfg.code_review.spec_inline_bytes).toBe(65536);
+  });
+
+  it('loadDefaultsYamlText() contains spec_inline_bytes with a comment above it (raw-text check)', () => {
+    const text = loadDefaultsYamlText();
+    const lines = text.split('\n');
+    const idx = lines.findIndex((l) => l.includes('spec_inline_bytes:'));
+    expect(idx, 'Expected to find spec_inline_bytes: in defaults.yaml').toBeGreaterThan(0);
+    const window = lines.slice(Math.max(0, idx - 6), idx + 1).join('\n');
+    expect(window, 'Expected a comment above spec_inline_bytes').toMatch(/#/);
+  });
+});

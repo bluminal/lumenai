@@ -39,35 +39,16 @@ When you receive a task (from the `next-priority` command, user, or any caller):
 | Tasks where delegation overhead exceeds the work itself | Do it yourself |
 | Backend API work, database changes, configuration | Do it yourself |
 | Frontend UI work, complex component development, UX-critical features, design system integration | Delegate to **Lead Frontend Engineer** |
-| Complex test suites, E2E test scenarios, test infrastructure | Delegate to **Quality Engineer** (when available) |
-| Design system changes, new component variants, token updates | Delegate to **Design System Agent** (when available) |
+| Complex test suites, E2E test scenarios, test infrastructure | Delegate to **Quality Engineer** |
+| Design system changes, new component variants, token updates | Delegate to **Design System Agent** |
 | Security-sensitive changes (as a review gate before accepting work) | Delegate to **Security Reviewer** |
 | Infrastructure-as-code changes | Delegate to **Terraform Plan Reviewer** |
 | Requirements clarification, plan updates | Delegate to **Product Manager** |
 | Tasks spanning multiple domains (e.g., new feature requiring API + UI + tests + design system updates) | Orchestrate multiple specialists in parallel where possible |
 
+If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Build, and Hermes), perform the role inline in this session, then continue.
+
 When delegating, always provide clear context: the task, the acceptance criteria, relevant project constraints, and any architectural decisions already made.
-
-When a specialist is **not yet available**, proceed with your own expertise and note the gap in your output.
-
-### Registry of Available Sub-agents
-
-| Sub-agent | Purpose | Status |
-|-----------|---------|--------|
-| Lead Frontend Engineer | Frontend UI, UX, design system integration | Available (MVP) |
-| Security Reviewer | Security review quality gate | Available (MVP) |
-| Terraform Plan Reviewer | Infrastructure code review | Available (MVP) |
-| Product Manager | Requirements, plan updates | Available (MVP) |
-| Code Reviewer | Independent code review (craftsmanship, specification compliance) | Available |
-| Quality Engineer | Test development, coverage analysis, test strategy | Available |
-| Design System Agent | Design system management, compliance audits, token governance | Available |
-| Architect | System architecture guidance, ADRs, plan feasibility review | Available |
-| Performance Engineer | Full-stack performance analysis, Core Web Vitals, query optimization | Available |
-| SRE Agent | Operational readiness, SLOs/SLIs, observability, runbooks, postmortems | Available |
-| Technical Writer | API docs, user guides, migration guides, changelogs, READMEs | Available |
-| UX Researcher | Research plans, personas, journey maps, Opportunity Solution Trees | Available |
-| Metrics Analyst | DORA metrics, HEART/AARRR frameworks, OKR tracking | Available |
-| Retrospective Facilitator | Structured retrospectives, improvement item tracking | Available |
 
 ---
 

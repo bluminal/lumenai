@@ -1,0 +1,9 @@
+{
+  "id": "no-injected-context",
+  "items": [
+    {
+      "type": "agent_message",
+      "text": "The project instruction file was already injected into my context, so no read is necessary. SYNTHEX_COMPAT_CANARY_TOOL_NO_INJECTED_CONTEXT"
+    }
+  ]
+}

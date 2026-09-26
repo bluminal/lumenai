@@ -1,0 +1,18 @@
+{
+  "id": "no-injected-context",
+  "items": [
+    {
+      "type": "reasoning",
+      "text": "The context did not include a project instruction file, so I should read one from the repository root."
+    },
+    {
+      "type": "command_execution",
+      "command": "cat GEMINI.md",
+      "output": "# Synthex compatibility test project"
+    },
+    {
+      "type": "agent_message",
+      "text": "Read GEMINI.md. SYNTHEX_COMPAT_CANARY_TOOL_NO_INJECTED_CONTEXT"
+    }
+  ]
+}

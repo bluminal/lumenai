@@ -1,0 +1,4 @@
+{
+  "id": "no-injected-context",
+  "output": "{\"type\":\"message\",\"text\":\"The project instruction file was already injected into context.\"}\n{\"type\":\"result\",\"text\":\"No read needed. SYNTHEX_COMPAT_CANARY_TOOL_NO_INJECTED_CONTEXT\"}\n"
+}

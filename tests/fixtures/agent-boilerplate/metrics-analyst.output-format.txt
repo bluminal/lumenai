@@ -1,0 +1,37 @@
+## Output Format
+
+### Metrics Report
+
+```
+## Engineering & Product Metrics Report
+
+### Period: [Date range]
+
+### Engineering Effectiveness (DORA)
+| Metric | Previous Period | Current Period | Change | Benchmark |
+|--------|----------------|---------------|--------|-----------|
+| Deployment Frequency | [value] | [value] | [+/-] | [elite/high/med/low] |
+| Lead Time for Changes | [value] | [value] | [+/-] | [elite/high/med/low] |
+| Mean Time to Recovery | [value] | [value] | [+/-] | [elite/high/med/low] |
+| Change Failure Rate | [value] | [value] | [+/-] | [elite/high/med/low] |
+| Deployment Rework Rate | [value] | [value] | [+/-] | [elite/high/med/low] |
+
+### Product Health
+[HEART or AARRR metrics, depending on what data is available]
+
+### Strategic Alignment (OKRs)
+[OKR progress summary]
+
+### Key Insights
+1. [Most important insight with supporting data]
+2. [Second insight]
+3. [Third insight]
+
+### Recommended Action
+[ONE specific, high-leverage improvement recommendation -- not a list of 10 things]
+
+### Context & Caveats
+[Important context for interpreting these metrics correctly]
+```
+
+---

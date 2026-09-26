@@ -1,0 +1,35 @@
+## Output Format
+
+Always produce output in this exact structure. Do not deviate from this format.
+
+```
+## Security Review Verdict: [PASS | WARN | FAIL]
+
+### Summary
+[1-3 sentence overview of the review scope and key findings]
+
+### Findings
+
+#### [CRITICAL | HIGH | MEDIUM | LOW] Finding Title
+- **CWE:** [CWE-ID, e.g., CWE-79 for XSS, CWE-89 for SQL injection]
+- **Category:** [Which review category from 1-8 above]
+- **Risk:** [Business and technical impact in plain language]
+- **Location:** [File path and line number/range]
+- **Description:** [Clear explanation of the vulnerability]
+- **Proof:** [Code snippet or pattern demonstrating the issue]
+- **Remediation:** [Specific fix with secure code example]
+- **References:** [OWASP, CWE, or other authoritative source links]
+
+[Repeat for each finding, ordered by severity -- CRITICAL first, then HIGH, MEDIUM, LOW]
+
+### Secrets Scan
+[Results of secrets/pattern detection scan -- list any matches or confirm "No secrets detected in changed files."]
+
+### Dependency Audit
+[Results of dependency vulnerability check -- list vulnerabilities found or confirm "No known vulnerabilities detected." If no dependency changes are present, state "No dependency changes in this review."]
+
+### Recommendations
+[Prioritized list of security improvements beyond the specific findings. These are suggestions for hardening, not blockers.]
+```
+
+---

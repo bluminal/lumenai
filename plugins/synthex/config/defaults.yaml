@@ -122,6 +122,14 @@ code_review:
   spec_paths:
     - docs/specs
 
+  # Size gate (in bytes) for the code-reviewer's inline Specification Relevance
+  # Analysis (Step 2). When the total bytes under spec_paths is at or below this,
+  # specs are read directly in full; above it, only the first 50 lines of each
+  # spec are scanned for relevance before the relevant ones are read in full.
+  # Replaces a "spawn a sub-agent" step, which is dead when code-reviewer itself
+  # runs as a subagent (subagents cannot spawn subagents on Claude Code).
+  spec_inline_bytes: 65536
+
   # Additional specialist reviewers (optional).
   # Example: Add a domain-specific reviewer for regulated industries.
   # specialists:
@@ -305,6 +313,41 @@ multi_model_review:
   # Minimum number of available proposers required to proceed. Below this,
   # preflight aborts (strict_mode) or emits a critical warning (lenient).
   min_proposers_to_proceed: 2
+
+  # Maximum seconds the orchestrator waits on any single proposer's Task call
+  # (FR-MR28, orchestrator Step 4). A timeout surfaces as a per-reviewer error
+  # envelope (error_code: timeout), not an orchestrator-level failure — one
+  # slow proposer never blocks the rest of the single-batch fan-out.
+  per_reviewer_timeout_seconds: 180
+
+  # Context bundle assembly (D5, FR-MR28). The orchestrator assembles this
+  # bundle ONCE per invocation via `context-bundle-assembler` and delivers it
+  # identically to every proposer (native and external) so no reviewer sees a
+  # different artifact, conventions, or specs than the others.
+  context:
+    # Hard cap on total assembled bundle size (200 KB). If the artifact alone
+    # exceeds this, the assembler returns `error_code: narrow_scope_required`
+    # instead of summarizing the artifact itself.
+    max_bundle_bytes: 204800
+
+    # Per-file cap (64 KB) before a touched file is replaced with a
+    # Haiku-produced summary (exports, top-level structure, diff-adjacent
+    # regions) rather than sent verbatim.
+    max_file_bytes: 65536
+
+    # Project convention files read verbatim into the bundle (orchestrator
+    # Step 1 default when unset). Mirrors `code_review.convention_sources`
+    # so multi-model and single-model review see the same conventions.
+    convention_paths:
+      - CLAUDE.md
+      - .eslintrc
+      - .prettierrc
+
+    # Directories searched for specs matching touched files (filename-
+    # substring heuristic, OQ-8). Mirrors `code_review.spec_paths` so
+    # multi-model review checks compliance against the same specs.
+    spec_paths:
+      - docs/specs
 
   # External proposer adapter list. Each entry references a `*-review-prompter`
   # agent name. Empty list means "natives only" — equivalent to today's review.

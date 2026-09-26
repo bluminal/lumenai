@@ -1,0 +1,10 @@
+{
+  "capturedAt": "2026-09-26T00:47:48.022Z",
+  "harness": "opencode",
+  "version": "1.18.15",
+  "requestCount": 3,
+  "availableSkillsBlockFound": true,
+  "availableSkillsBlockBytes": 16037,
+  "systemPromptBytes": 27569,
+  "skillCount": 46
+}

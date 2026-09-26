@@ -43,22 +43,13 @@ Detect the project's frontend framework using the following priority order:
 
 If the framework cannot be detected, **ask the caller** before proceeding.
 
-### Registry of Available Framework Specialists
-
-| Specialist | Framework | Status |
-|------------|-----------|--------|
-| React Specialist | React, Next.js, Remix | Not yet available |
-| Vue Specialist | Vue.js, Nuxt | Not yet available |
-| Angular Specialist | Angular | Not yet available |
-| Ember Specialist | Ember.js | Not yet available |
-
-When a specialist is **not yet available**, proceed with your own expertise and note the gap in your output.
+No framework-specific sub-agents (React, Vue, Angular, Ember) exist yet; proceed with your own expertise and note the gap in your output.
 
 ---
 
 ## Design System Coordination
 
-- Consume the design system via the **design-system sub-agent** (when available).
+- Consume the design system via the **design-system sub-agent**.
 - Always verify that implementations use the correct components, tokens, spacing, colors, and patterns from the design system.
 - Contribute improvement suggestions back to the design system through proper channels.
 
@@ -209,7 +200,7 @@ Before reporting a task as complete, verify all of the following:
 2. **Always check for and follow the project's design system** before writing any UI code.
 3. **Be creative and innovative** -- deliver interfaces that delight users.
 4. **When in doubt about a design decision, escalate to the caller** rather than guessing.
-5. Use the **code-reviewer sub-agent** for code review when available.
-6. Use the **quality-engineer sub-agent** for test development when available.
+5. Use the **code-reviewer sub-agent** for code review.
+6. Use the **quality-engineer sub-agent** for test development.
 7. **Reference `@docs/specs`** for project specifications before implementing.
 8. **Never compromise on accessibility** -- WCAG 2.1 AA is the floor, not the ceiling.

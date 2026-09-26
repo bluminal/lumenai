@@ -178,11 +178,15 @@ describe('Task 50: adapter-recipes.md', () => {
   });
 
   describe('Gemini adapter details', () => {
-    it('documents --readonly sandbox flag', () => {
-      expect(content).toContain('--readonly');
+    it('documents --approval-mode default sandbox flag (Task 25 / FR-HM44)', () => {
+      expect(content).toContain('--approval-mode default');
     });
 
-    it('documents gcloud auth list for auth check', () => {
+    it('documents GEMINI_API_KEY as the primary auth check', () => {
+      expect(content).toContain('GEMINI_API_KEY');
+    });
+
+    it('documents gcloud auth list as the auth fallback', () => {
       expect(content).toContain('gcloud auth list');
     });
 

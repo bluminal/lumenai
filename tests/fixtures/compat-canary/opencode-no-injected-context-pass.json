@@ -1,0 +1,4 @@
+{
+  "id": "no-injected-context",
+  "output": "{\"type\":\"tool_call\",\"tool\":\"read\",\"args\":{\"path\":\"GEMINI.md\"}}\n{\"type\":\"tool_result\",\"tool\":\"read\",\"output\":\"# Synthex compatibility test project\"}\n{\"type\":\"result\",\"text\":\"Read GEMINI.md. SYNTHEX_COMPAT_CANARY_TOOL_NO_INJECTED_CONTEXT\"}\n"
+}

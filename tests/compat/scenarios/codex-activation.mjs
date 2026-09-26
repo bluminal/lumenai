@@ -12,10 +12,12 @@ import {
   activateCodexSkills,
   listCodexSkills,
 } from '../lib/codex-app-server.mjs';
+import { summarizeCodexCatalog } from '../lib/codex-catalog.mjs';
 import {
   assertCompleteInventory,
   readExpectedEntrypoints,
 } from '../lib/contract.mjs';
+import { catalogBudget } from '../lib/harnesses.mjs';
 import { startLoopbackResponsesProvider } from '../lib/loopback-responses-provider.mjs';
 import { createProbeOverlay } from '../lib/probe-overlay.mjs';
 import { emit, parseLastJsonLine, runCommand } from '../lib/scenario-helpers.mjs';
@@ -105,6 +107,38 @@ try {
     expectedCount: inventory.expected.length,
     discoveredCount: synthexSkills.length,
   });
+
+  // FR-HM9 (Task 22): the app-server's own skills/list catalog is the
+  // skill-catalog block Codex sends to the model, so assert its budget
+  // straight off the same `synthexSkills` the inventory check just used,
+  // reading each source description from the probe overlay (the probe
+  // marker is injected after the frontmatter closing fence, so it never
+  // touches the description: value itself).
+  const catalogBudgetLimits = catalogBudget(harness);
+  const catalogSummary = summarizeCodexCatalog(entries, synthexSkills, (entry) =>
+    readFileSync(join(overlayRoot, entry.skill), 'utf8'),
+  );
+  const catalogOverBudget =
+    catalogSummary.totalRenderedChars > catalogBudgetLimits.maxTotalRenderedChars ||
+    catalogSummary.blankDescriptionCount > catalogBudgetLimits.maxBlankDescriptionCount ||
+    catalogSummary.shortenedDescriptionCount > catalogBudgetLimits.maxShortenedDescriptionCount;
+  emit(harness, 'catalog', {
+    ok: !catalogOverBudget,
+    profile,
+    count: catalogSummary.synthexCount,
+    chars: catalogSummary.totalRenderedChars,
+    blankDescriptionCount: catalogSummary.blankDescriptionCount,
+    shortenedDescriptionCount: catalogSummary.shortenedDescriptionCount,
+    budget: catalogBudgetLimits,
+  });
+  if (catalogOverBudget) {
+    throw new Error(
+      `Codex skill catalog exceeded its budget: ${catalogSummary.totalRenderedChars} chars ` +
+        `(budget ${catalogBudgetLimits.maxTotalRenderedChars}), ` +
+        `${catalogSummary.blankDescriptionCount} blank (budget ${catalogBudgetLimits.maxBlankDescriptionCount}), ` +
+        `${catalogSummary.shortenedDescriptionCount} shortened (budget ${catalogBudgetLimits.maxShortenedDescriptionCount})`,
+    );
+  }
 
   provider = await startLoopbackResponsesProvider();
   mkdirSync('/home/synthex-test/.codex', { recursive: true });

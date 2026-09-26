@@ -1,0 +1,4 @@
+{
+  "id": "workflow-step-gate",
+  "output": "{\"type\":\"reasoning\",\"text\":\"Checking whether a Workflow tool is available.\"}\n{\"type\":\"tool_error\",\"tool\":\"Workflow\",\"message\":\"unavailable tool: Workflow\"}\n{\"type\":\"result\",\"text\":\"Skipped once, no retry. SYNTHEX_COMPAT_CANARY_TOOL_WORKFLOW_STEP\"}\n"
+}

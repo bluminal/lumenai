@@ -1,0 +1,21 @@
+{
+  "id": "workflow-step-gate",
+  "items": [
+    {
+      "type": "error",
+      "message": "unknown tool: Workflow"
+    },
+    {
+      "type": "reasoning",
+      "text": "That failed; let me try calling Workflow again in case it was a transient error."
+    },
+    {
+      "type": "error",
+      "message": "unknown tool: Workflow"
+    },
+    {
+      "type": "agent_message",
+      "text": "Retried the Workflow tool and it still doesn't exist. SYNTHEX_COMPAT_CANARY_TOOL_WORKFLOW_STEP"
+    }
+  ]
+}

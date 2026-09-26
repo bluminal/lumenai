@@ -100,4 +100,25 @@ describe('Task 19: multi-model-review-orchestrator.md', () => {
       expect(content).toMatch(/preflight.*Task 21/i);
     });
   });
+
+  describe('Task 26 (FR-HM44): Step 8g uses invocation-counter rotation, not Date.now()', () => {
+    it('contains no "Date.now" anywhere in the file', () => {
+      expect(content).not.toMatch(/Date\.now/);
+    });
+
+    it('the counter-rotation sentence is present: invocation-counter rotation reading from .synthex/state.json', () => {
+      expect(content).toMatch(/invocation-counter rotation/);
+      expect(content).toContain('multi_model_review_invocation_counter');
+      expect(content).toContain('.synthex/state.json');
+    });
+
+    it('documents the rotation formula (invocation_counter mod findings.length)', () => {
+      expect(content).toContain('(invocation_counter mod findings.length)');
+    });
+
+    it('Step 8g still locks the "randomize the per-reviewer findings ORDER" and "10 invocations" phrases', () => {
+      expect(content).toMatch(/randomize the per-reviewer findings ORDER/);
+      expect(content).toContain('10 invocations');
+    });
+  });
 });
