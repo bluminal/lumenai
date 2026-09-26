@@ -1,0 +1,17 @@
+{
+  "id": "workflow-step-gate",
+  "items": [
+    {
+      "type": "reasoning",
+      "text": "The tool list has no entry named Workflow; I will call it once to check, then continue without retrying."
+    },
+    {
+      "type": "error",
+      "message": "unknown tool: Workflow"
+    },
+    {
+      "type": "agent_message",
+      "text": "Skipped the unavailable Workflow tool once and continued. SYNTHEX_COMPAT_CANARY_TOOL_WORKFLOW_STEP"
+    }
+  ]
+}

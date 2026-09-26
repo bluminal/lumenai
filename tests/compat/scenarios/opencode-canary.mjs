@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { assertIsolatedEnvironment } from '../lib/assert-isolated.mjs';
 import {
   assertCanaryToken,
@@ -11,6 +12,18 @@ import {
 import { assertCompleteInventory, readExpectedEntrypoints } from '../lib/contract.mjs';
 import { createProbeOverlay } from '../lib/probe-overlay.mjs';
 import { emit, runCommand, runCommandAsync } from '../lib/scenario-helpers.mjs';
+import {
+  NO_INJECTED_CONTEXT_PROBE_ID,
+  NO_INJECTED_CONTEXT_PROBE_TOKEN,
+  WORKFLOW_STEP_PROBE_ID,
+  WORKFLOW_STEP_PROBE_TOKEN,
+  assertInjectedContextFileRead,
+  assertToolAttemptedAtMostOnce,
+  countOpenCodeToolAttempts,
+  noInjectedContextProbePrompt,
+  opencodeReadInjectedContextFile,
+  workflowStepProbePrompt,
+} from '../lib/tool-probes.mjs';
 
 const harness = 'opencode';
 const profile = 'canary';
@@ -103,10 +116,97 @@ try {
       proof: 'real provider returned the temporary activation token',
     });
   }
+
+  // Task 23 (NFR-HM4, FR-HM7, FR-HM12; D22): tool-BEHAVIOR probes. These are
+  // deliberately skill-less (no catalog/skill permission involvement) and
+  // run from a throwaway project whose only instruction files are
+  // GEMINI.md and .hermes.md — files OpenCode does not auto-inject — so
+  // probe (b) can assert a real Read rather than relying on host-injected
+  // context. Permission is switched to allow only `read` (OpenCode's Read
+  // tool, per plugins/synthex/scripts/lib/host-matrix.mjs) so the model can
+  // actually read those files; the container's read-only filesystem is the
+  // outer safety net either way (tests/compat/scripts/run-suite.mjs).
+  const toolBehaviorRoot = '/workspace/probe-tool-behavior';
+  mkdirSync(toolBehaviorRoot, { recursive: true });
+  writeFileSync(join(toolBehaviorRoot, 'GEMINI.md'), '# Synthex compatibility test project\n');
+  writeFileSync(join(toolBehaviorRoot, '.hermes.md'), '# Synthex compatibility test project\n');
+  writeFileSync(
+    join(toolBehaviorRoot, 'opencode.json'),
+    `${JSON.stringify({
+      $schema: 'https://opencode.ai/config.json',
+      model,
+      provider: {
+        openai: {
+          options: { apiKey: '{env:SYNTHEX_COMPAT_CANARY_CREDENTIAL}' },
+        },
+      },
+      permission: { '*': 'deny', read: 'allow' },
+    }, null, 2)}\n`,
+  );
+
+  const toolProbeRunArgs = (prompt) => [
+    'run',
+    prompt,
+    '--standalone',
+    '--model', model,
+    '--format', 'json',
+  ];
+  const toolProbeRunOptions = {
+    cwd: toolBehaviorRoot,
+    timeout: 120_000,
+    env: {
+      OPENCODE_DISABLE_CLAUDE_CODE: '1',
+      OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX: '128',
+    },
+  };
+
+  const workflowStepResult = await runCommandAsync(
+    'opencode',
+    toolProbeRunArgs(workflowStepProbePrompt(WORKFLOW_STEP_PROBE_TOKEN)),
+    toolProbeRunOptions,
+  );
+  const workflowStepOutput = `${workflowStepResult.stdout}\n${workflowStepResult.stderr}`;
+  assertCanaryToken({
+    harness,
+    id: WORKFLOW_STEP_PROBE_ID,
+    token: WORKFLOW_STEP_PROBE_TOKEN,
+    output: workflowStepOutput,
+  });
+  const workflowAttempts = countOpenCodeToolAttempts(workflowStepOutput);
+  assertToolAttemptedAtMostOnce({ harness, id: WORKFLOW_STEP_PROBE_ID, attempts: workflowAttempts });
+  emit(harness, 'tool-behavior', {
+    ok: true,
+    profile,
+    id: WORKFLOW_STEP_PROBE_ID,
+    attempts: workflowAttempts,
+  });
+
+  const noInjectedContextResult = await runCommandAsync(
+    'opencode',
+    toolProbeRunArgs(noInjectedContextProbePrompt(NO_INJECTED_CONTEXT_PROBE_TOKEN)),
+    toolProbeRunOptions,
+  );
+  const noInjectedContextOutput = `${noInjectedContextResult.stdout}\n${noInjectedContextResult.stderr}`;
+  assertCanaryToken({
+    harness,
+    id: NO_INJECTED_CONTEXT_PROBE_ID,
+    token: NO_INJECTED_CONTEXT_PROBE_TOKEN,
+    output: noInjectedContextOutput,
+  });
+  const contextFileRead = opencodeReadInjectedContextFile(noInjectedContextOutput);
+  assertInjectedContextFileRead({ harness, id: NO_INJECTED_CONTEXT_PROBE_ID, file: contextFileRead });
+  emit(harness, 'tool-behavior', {
+    ok: true,
+    profile,
+    id: NO_INJECTED_CONTEXT_PROBE_ID,
+    file: contextFileRead,
+  });
+
   emit(harness, 'complete', {
     ok: true,
     profile,
     activated: representatives.length,
+    toolBehaviorProbes: 2,
     maxOutputTokens: 128,
     elapsedMs: Date.now() - startedAt,
   });
