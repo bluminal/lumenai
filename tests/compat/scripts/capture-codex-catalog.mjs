@@ -15,6 +15,7 @@ import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertIsolatedEnvironment } from '../lib/assert-isolated.mjs';
 import { listCodexSkills } from '../lib/codex-app-server.mjs';
+import { summarizeCodexCatalog } from '../lib/codex-catalog.mjs';
 import { readExpectedEntrypoints } from '../lib/contract.mjs';
 import { parseLastJsonLine, runCommand } from '../lib/scenario-helpers.mjs';
 
@@ -23,31 +24,6 @@ const marketplaceRoot = '/workspace/marketplace';
 const installedFixture = join(marketplaceRoot, 'plugins', 'synthex');
 const marketplaceName = 'synthex-compat-catalog';
 const selector = `synthex@${marketplaceName}`;
-
-function extractFrontmatterDescription(source) {
-  if (!source.startsWith('---\n')) return '';
-  const lines = source.split('\n');
-  let closeIndex = -1;
-  for (let i = 1; i < lines.length; i += 1) {
-    if (lines[i] === '---') {
-      closeIndex = i;
-      break;
-    }
-  }
-  if (closeIndex === -1) return '';
-  const frontmatter = lines.slice(1, closeIndex).join('\n');
-  const match = frontmatter.match(/^description:\s*(.*)$/m);
-  if (!match) return '';
-  const raw = match[1].trim();
-  if (raw.startsWith('"') && raw.endsWith('"')) {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return raw;
-    }
-  }
-  return raw;
-}
 
 assertIsolatedEnvironment();
 const version = runCommand('codex', ['--version']).stdout;
@@ -91,26 +67,9 @@ try {
   const skills = await listCodexSkills('/workspace');
   const synthex = skills.filter((skill) => skill.name.startsWith('synthex:'));
 
-  const perSkill = entries.map((entry) => {
-    const observed = synthex.find((skill) => skill.name === `synthex:${entry.id}`);
-    const sourcePath = join(fixtureRoot, 'portable-skills', entry.id, 'SKILL.md');
-    const sourceDescription = extractFrontmatterDescription(readFileSync(sourcePath, 'utf8'));
-    const observedDescription = observed?.description ?? '';
-
-    return {
-      id: entry.id,
-      kind: entry.kind,
-      name: observed?.name ?? null,
-      description: observedDescription,
-      descriptionChars: observedDescription.length,
-      sourceDescriptionChars: sourceDescription.length,
-      blanked: sourceDescription.length > 0 && observedDescription.length === 0,
-      shortened:
-        sourceDescription.length > 0 &&
-        observedDescription.length > 0 &&
-        observedDescription.length < sourceDescription.length,
-    };
-  });
+  const summary = summarizeCodexCatalog(entries, synthex, (entry) =>
+    readFileSync(join(fixtureRoot, 'portable-skills', entry.id, 'SKILL.md'), 'utf8'),
+  );
 
   const sourceCommandSkills = skills
     .filter((skill) => skill.name.includes('source-command-'))
@@ -121,12 +80,12 @@ try {
     harness: 'codex',
     version,
     totalSkillsInCatalog: skills.length,
-    synthexCount: synthex.length,
-    totalRenderedChars: perSkill.reduce((sum, skill) => sum + skill.descriptionChars, 0),
-    blankDescriptionCount: perSkill.filter((skill) => skill.blanked).length,
-    shortenedDescriptionCount: perSkill.filter((skill) => skill.shortened).length,
+    synthexCount: summary.synthexCount,
+    totalRenderedChars: summary.totalRenderedChars,
+    blankDescriptionCount: summary.blankDescriptionCount,
+    shortenedDescriptionCount: summary.shortenedDescriptionCount,
     sourceCommandSkillNames: sourceCommandSkills,
-    skills: perSkill.sort((left, right) => left.id.localeCompare(right.id)),
+    skills: summary.perSkill.sort((left, right) => left.id.localeCompare(right.id)),
   };
 } finally {
   try {

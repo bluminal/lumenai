@@ -11,6 +11,7 @@
  */
 import { writeFileSync } from 'node:fs';
 import { assertIsolatedEnvironment } from '../lib/assert-isolated.mjs';
+import { extractAvailableSkillsBlock } from '../lib/available-skills-block.mjs';
 import { readExpectedEntrypoints } from '../lib/contract.mjs';
 import { startLoopbackOpenAIChatProvider } from '../lib/loopback-openai-chat-provider.mjs';
 import { createProbeOverlay } from '../lib/probe-overlay.mjs';
@@ -95,28 +96,8 @@ try {
   // Extract the raw system/developer prompt text (not a JSON.stringify of
   // the whole body) so escaped-newline bloat from JSON encoding does not
   // distort the byte count.
-  const systemEntries = [
-    ...(catalogRequest.body.messages ?? []),
-    ...(catalogRequest.body.input ?? []),
-  ].filter((entry) => entry.role === 'system' || entry.role === 'developer');
-  const systemText = systemEntries
-    .map((entry) =>
-      typeof entry.content === 'string'
-        ? entry.content
-        : (entry.content ?? [])
-            .map((part) => part.text ?? '')
-            .join(''),
-    )
-    .join('\n');
-
-  const openTag = '<available_skills>';
-  const closeTag = '</available_skills>';
-  const openIndex = systemText.indexOf(openTag);
-  const closeIndex = systemText.indexOf(closeTag);
-  const hasBlock = openIndex >= 0 && closeIndex > openIndex;
-  const blockText = hasBlock
-    ? systemText.slice(openIndex, closeIndex + closeTag.length)
-    : null;
+  const { found: hasBlock, bytes: blockBytes, systemPromptBytes } =
+    extractAvailableSkillsBlock(catalogRequest.body);
 
   const result = {
     capturedAt: new Date().toISOString(),
@@ -124,8 +105,8 @@ try {
     version,
     requestCount: chatRequests.length,
     availableSkillsBlockFound: hasBlock,
-    availableSkillsBlockBytes: blockText ? Buffer.byteLength(blockText, 'utf8') : null,
-    systemPromptBytes: Buffer.byteLength(systemText, 'utf8'),
+    availableSkillsBlockBytes: blockBytes,
+    systemPromptBytes,
     skillCount: entries.length,
     // Optional full-body dump for ad hoc debugging (e.g. when OpenCode
     // changes its prompt structure); off by default to keep the captured
