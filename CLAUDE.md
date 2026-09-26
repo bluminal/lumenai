@@ -264,6 +264,7 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 | `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `review-code` command |
 | `code_review.max_diff_lines` | 300 | Warn when diff exceeds this size |
 | `code_review.spec_paths` | `[docs/specs]` | Specifications for compliance checking |
+| `code_review.spec_inline_bytes` | 65536 | Size gate for inline spec scan in Step 2 (above this, only the first 50 lines of each spec are scanned) |
 | `quality.coverage_thresholds` | line: 80, branch: 70, function: 80 | Coverage thresholds |
 | `quality.test_runner` | vitest | Test runner for coverage reports |
 | `architecture.decisions_path` | `docs/specs/decisions` | ADR storage |

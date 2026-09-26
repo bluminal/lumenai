@@ -372,7 +372,7 @@ For each consolidated finding where `raised_by.length === 1` (raised by exactly 
 
 #### Position-randomization across per-reviewer findings before aggregation
 
-When the orchestrator presents findings to the aggregator for consolidation, **randomize the per-reviewer findings ORDER** before the aggregator processes them. Use a per-invocation seed (e.g., `Date.now() % findings.length` rotation) to vary the ordering across runs. A sample of 10 invocations across the same input MUST show order variation — the same ordering must not be presented every time.
+When the orchestrator presents findings to the aggregator for consolidation, **randomize the per-reviewer findings ORDER** before the aggregator processes them. Use an invocation-counter rotation, not a wall-clock seed: increment `multi_model_review_invocation_counter` in `.synthex/state.json`, then rotate findings by `(invocation_counter mod findings.length)` — deterministic, unlike a clock-based seed. A sample of 10 invocations across the same input MUST show order variation — the same ordering must not be presented every time.
 
 This position-randomization is applied to the full per-reviewer findings array submitted to the aggregator, not per-pair (contrast with Stage 4's alternating order, which operates per LLM call pair). The intent is to prevent the aggregator from systematically advantaging findings that appear first in the list.
 

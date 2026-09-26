@@ -124,3 +124,19 @@ describe('Task 24 (FR-HM44): multi_model_review.context.* and per_reviewer_timeo
     }
   });
 });
+
+describe('Task 26 (FR-HM44): code_review.spec_inline_bytes via the helper', () => {
+  it('loadDefaultsYaml() exposes code_review.spec_inline_bytes: 65536', async () => {
+    const cfg = await loadDefaultsYaml();
+    expect(cfg.code_review.spec_inline_bytes).toBe(65536);
+  });
+
+  it('loadDefaultsYamlText() contains spec_inline_bytes with a comment above it (raw-text check)', () => {
+    const text = loadDefaultsYamlText();
+    const lines = text.split('\n');
+    const idx = lines.findIndex((l) => l.includes('spec_inline_bytes:'));
+    expect(idx, 'Expected to find spec_inline_bytes: in defaults.yaml').toBeGreaterThan(0);
+    const window = lines.slice(Math.max(0, idx - 6), idx + 1).join('\n');
+    expect(window, 'Expected a comment above spec_inline_bytes').toMatch(/#/);
+  });
+});
