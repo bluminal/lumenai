@@ -7,7 +7,8 @@
  *   - NDJSON streaming quirk (gotcha #2): documented; not present in this success fixture
  *     (single-envelope response), but the recorded invocation confirms standard flag set.
  *   - findings:null normalization (gotcha #3): positive case — findings array is non-null.
- *   - FR-MR26 sandbox-flag parity: --readonly is a substring of recorded-cli-invocation.txt.
+ *   - FR-MR26 sandbox-flag parity: --approval-mode default is a substring of
+ *     recorded-cli-invocation.txt (Task 25 / FR-HM44 — supersedes the removed --readonly probe).
  *   - NFR-MR4 usage object: input_tokens, output_tokens, model all present.
  */
 
@@ -92,14 +93,19 @@ describe('Gemini Layer 2 — successful fixture', () => {
     expect(src.source_type).toBe('external');
   });
 
-  // 3. FR-MR26 sandbox-flag parity
+  // 3. FR-MR26 sandbox-flag parity (Task 25 / FR-HM44)
   describe('FR-MR26 sandbox-flag parity', () => {
-    it('recorded-cli-invocation.txt contains --readonly (documented sandbox flag)', () => {
-      expect(invocation).toContain('--readonly');
+    it('recorded-cli-invocation.txt contains --approval-mode default (documented sandbox flag)', () => {
+      expect(invocation).toContain('--approval-mode default');
     });
 
-    it('gemini-review-prompter.md documents --readonly as the sandbox flag', () => {
-      expect(agentMd).toContain('--readonly');
+    it('gemini-review-prompter.md documents --approval-mode default as the sandbox flag', () => {
+      expect(agentMd).toContain('--approval-mode default');
+    });
+
+    it('neither recorded-cli-invocation.txt nor gemini-review-prompter.md reference the removed --readonly flag', () => {
+      expect(invocation).not.toContain('--readonly');
+      expect(agentMd).not.toContain('--readonly');
     });
   });
 

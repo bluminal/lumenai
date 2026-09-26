@@ -2,8 +2,8 @@
   "scenario": "read-only",
   "description": "Gemini invoked with --readonly (Pattern 1); review completes via the model alone — no tool-use; canonical findings returned.",
   "permission_mode": "read-only",
-  "recorded_cli_invocation": "gemini -p \"<prompt>\" --output-format json --readonly",
-  "documented_flags": ["--readonly", "--output-format", "json"],
+  "recorded_cli_invocation": "gemini -p \"<prompt>\" --approval-mode default --output-format json",
+  "documented_flags": ["--approval-mode", "default", "--output-format", "json"],
   "tool_use_attempts": [],
   "recorded_cli_stdout": {
     "findings": [

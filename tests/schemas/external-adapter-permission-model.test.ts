@@ -21,7 +21,10 @@ const ADAPTERS: Adapter[] = [
     name: 'gemini',
     file: 'gemini-review-prompter.md',
     cliKey: 'gemini',
-    readOnlyMarker: '--readonly',
+    // Task 25 / FR-HM44: --readonly/--no-tools never existed in the Gemini CLI and were
+    // removed; --approval-mode default is the real read-only guarantee (headless mode
+    // denies every confirmation-requiring tool since there is no TTY to confirm on).
+    readOnlyMarker: '--approval-mode default',
   },
   {
     name: 'bedrock',

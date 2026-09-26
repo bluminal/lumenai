@@ -22,14 +22,14 @@ Resolved per `multi_model_review.external_permission_mode.gemini` from the host 
 
 | Mode | Behavior |
 |------|----------|
-| `read-only` (default for gemini) | Pattern 1 — invoke `gemini` with `--readonly` (or `--no-tools` on older CLI builds; see gotcha) restricting tool execution to read-only |
+| `read-only` (default for gemini) | Pattern 1 — invoke `gemini -p … --approval-mode default --output-format json`; headless `default` approval mode denies and excludes every write/shell/confirmation-requiring tool outright (the Gemini CLI has no dedicated read-only/no-tools flag in any version — see Known Gotchas / Task 25), which is the Pattern 1 read-only guarantee |
 | `sandbox-yolo` | Pattern 2 — invoke Gemini with full tool permissions inside an OS-level sandbox (`sandbox-exec` on macOS, `bwrap` on Linux); requires explicit user confirmation at spawn |
 | `parent-mediated` | **Not supported** by the Gemini CLI; the adapter fails loudly with `error_code: cli_unsupported_mode` and a one-line message directing the user to `read-only` or `sandbox-yolo` |
 
-**Safety rationale:** Gemini's CLI does not expose a JSON-RPC approval-proxy mode (unlike Codex's `app-server`). Pattern 1 (`--readonly`) is the only safe default — it restricts the CLI from writing files, executing shell commands, or making outbound network calls beyond Gemini's own API. `sandbox-yolo` is the escape hatch for users who want Gemini to use its full tool surface inside an OS sandbox; the OS sandbox becomes the trust boundary.
+**Safety rationale:** Gemini's CLI does not expose a JSON-RPC approval-proxy mode (unlike Codex's `app-server`), and it has no dedicated readonly-mode or no-tools-mode flag — neither exists in any Gemini CLI version (verified against v0.39.1 and `main`; see FR-HM44). Pattern 1's read-only guarantee instead comes from headless `--approval-mode default`: in non-interactive (`-p`) invocation there is no TTY to confirm a tool call on, so any tool requiring confirmation (shell exec, file writes, `activate_skill`, `ask_user`) is denied and excluded outright. This restricts the CLI from writing files, executing shell commands, or making outbound network calls beyond Gemini's own API — the same safety property an earlier (mistaken) revision of this adapter had assumed a dedicated flag provided. `sandbox-yolo` is the escape hatch for users who want Gemini to use its full tool surface inside an OS sandbox; the OS sandbox becomes the trust boundary.
 
 **Config-read step:** Before each invocation, the adapter reads the resolved value of `multi_model_review.external_permission_mode.gemini` and branches:
-- `read-only` (or absent) → invoke per Step 4 below with `--readonly`
+- `read-only` (or absent) → invoke per Step 4 below with `--approval-mode default`
 - `sandbox-yolo` → wrap the invocation in `sandbox-exec` (macOS) or `bwrap` (Linux); pre-flight requires user confirmation logged at spawn AND the Step 0 profile-existence check below
 - `parent-mediated` → return `error_code: cli_unsupported_mode` with the documented message
 
@@ -127,7 +127,15 @@ If `which gemini` returns non-zero exit, return immediately:
 
 ### 2. Auth Check
 
-Verify that a Google Cloud account is authenticated via:
+**API-key check first (primary — Task 25 / FR-HM44):** Check `GEMINI_API_KEY`, falling back to `GOOGLE_API_KEY`, before considering any other authentication mechanism — headless (`-p`) Gemini CLI invocations most commonly authenticate via an API key exported in the environment:
+
+```bash
+[ -n "$GEMINI_API_KEY" ] || [ -n "$GOOGLE_API_KEY" ]
+```
+
+If either `GEMINI_API_KEY` or `GOOGLE_API_KEY` is set to a non-empty value, treat auth as satisfied and proceed directly to Step 3 (Prompt Construction) — do **not** run the fallback check below.
+
+**Fallback (Code Assist / OAuth users):** Only if neither `GEMINI_API_KEY` nor `GOOGLE_API_KEY` is set, fall back to checking for an authenticated Google Cloud / Gemini Code Assist account:
 
 ```bash
 gcloud auth list
@@ -139,7 +147,7 @@ Treat exit 0 with **non-empty output** (at least one account listed) as authenti
 {
   "status": "failed",
   "error_code": "cli_auth_failed",
-  "error_message": "No authenticated gcloud account found. Run: gcloud auth login",
+  "error_message": "No Gemini credentials found. Set GEMINI_API_KEY (or GOOGLE_API_KEY) for API-key auth, or run: gcloud auth login for Code Assist / OAuth auth.",
   "findings": [],
   "usage": null,
   "raw_output_path": "<config.raw_output_path>"
@@ -147,6 +155,8 @@ Treat exit 0 with **non-empty output** (at least one account listed) as authenti
 ```
 
 **Advisory stderr:** `gcloud auth list` may emit advisory text to stderr (e.g., deprecation warnings, credential helper messages). Per FR-MR19 D22 conventions, treat stderr output as advisory only; do not fail on stderr unless exit code is non-zero.
+
+**Why API-key-first matters (Task 25 / FR-HM44):** `gcloud auth list` reports Application Default Credentials, which is the wrong signal for API-key users — they never run `gcloud auth login` at all — and, since 2026-06-18, it is no longer a reliable signal for Gemini's consumer/free tiers either. Checking `GEMINI_API_KEY`/`GOOGLE_API_KEY` first avoids a false `cli_auth_failed` for the now-common API-key deployment path; `gcloud` remains a correct fallback for Code Assist / enterprise OAuth users.
 
 ### 3. Prompt Construction
 
@@ -206,71 +216,42 @@ If no issues are found, return: { "findings": [], "usage": { ... } }
 
 ### 4. CLI Invocation
 
-#### 4a. Read-only flag probe (Task 86 — ADR-003 hardening)
+#### 4a. Invocation (Task 25 — FR-HM44 fix; no flag probe)
 
-Before invoking Gemini, probe `gemini --help` to determine which read-only flag the installed Gemini CLI version supports. The flag varies across CLI builds:
-
-```bash
-gemini --help
-```
-
-Parse the help output and select the flag using this priority order:
-
-1. If `--readonly` appears in the help text, use `--readonly` (preferred — current Gemini CLI default).
-2. Else if `--no-tools` appears in the help text, use `--no-tools` (older Gemini CLI builds).
-3. Else (neither flag is present), abort the invocation and return:
-
-   ```json
-   {
-     "status": "failed",
-     "error_code": "cli_failed",
-     "error_message": "Gemini CLI does not advertise --readonly or --no-tools in `gemini --help`. The installed Gemini CLI version may be too old or too new for the documented Pattern 1 (read-only) contract. Install a Gemini CLI version that supports one of these flags, or set multi_model_review.external_permission_mode.gemini: sandbox-yolo to opt into Pattern 2 with an OS sandbox.",
-     "findings": [],
-     "usage": null,
-     "raw_output_path": "<config.raw_output_path>"
-   }
-   ```
-
-This probe makes the read-only guarantee **observable** (the adapter detects when the safety contract cannot be honored) rather than **assumed** (silently invoking with a flag the CLI ignores). Mirrors the precedent established by `codex-review-prompter` probing `codex app-server --help` to verify Pattern 3 availability.
-
-The probe result MAY be cached for the lifetime of the adapter invocation; do NOT cache across invocations because a Gemini CLI upgrade between runs would invalidate the cached choice.
-
-#### 4b. Invocation
-
-Invoke the Gemini CLI with the constructed prompt and the flag selected by the probe:
+Invoke the Gemini CLI headless with the constructed prompt:
 
 ```bash
-gemini -p "<prompt>" --output-format json <selected-flag>
+gemini -p "<prompt>" --approval-mode default --output-format json
 ```
 
-Where `<selected-flag>` is the result of Step 4a (`--readonly` or `--no-tools`).
+**No `gemini --help` flag probe (superseding Task 86):** Earlier revisions of this adapter probed `gemini --help` for a dedicated readonly-mode or no-tools-mode flag before invoking, and aborted with `cli_failed` if neither was advertised. **Neither flag has ever existed in the Gemini CLI** (confirmed absent from `gemini --help` and `config.ts` at v0.39.1 and on `main`), so the probe always fell through to its "neither flag present" branch and every read-only invocation aborted before Gemini was ever called — a latent defect (FR-HM44/FR-HM28). The probe is removed; there is nothing to detect or cache.
 
-**Sandbox flags (FR-MR26):** The selected flag restricts Gemini from executing tools that write to disk or make network calls. `--readonly` is the canonical Gemini CLI read-only equivalent for restricting tool execution scope; `--no-tools` is its predecessor on older CLI builds.
+Read-only enforcement instead comes from `--approval-mode default` itself: headless (`-p`, non-interactive) invocation under `default` approval mode denies and excludes every tool that requires user confirmation — shell exec, file writes, `activate_skill`, `ask_user` — because there is no TTY for the CLI to prompt on. This is the Pattern 1 read-only guarantee (FR-MR26), holds across CLI versions without flag detection, and matches the documented `--approval-mode` choices (`default`, `auto_edit`, `yolo`, `plan`) — `default` is always present.
 
-#### 4c. sandbox_violation detection
+**Sandbox flags (FR-MR26):** `--approval-mode default` is the canonical Gemini CLI read-only equivalent for restricting tool execution scope in headless mode.
 
-If, during output parsing (Step 5), the adapter observes evidence in Gemini's output that a write-tool was invoked despite the read-only flag — for example, an `events` or `tool_calls` field describing a `write_file`, `shell_exec`, `web_fetch` (with side-effecting method), or any other state-mutating tool — treat this as a `sandbox_violation` and abort with:
+#### 4b. sandbox_violation detection
+
+If, during output parsing (Step 5), the adapter observes evidence in Gemini's output that a write-tool was invoked despite `--approval-mode default` — for example, an `events` or `tool_calls` field describing a `write_file`, `shell_exec`, `web_fetch` (with side-effecting method), or any other state-mutating tool — treat this as a `sandbox_violation` and abort with:
 
 ```json
 {
   "status": "failed",
   "error_code": "sandbox_violation",
-  "error_message": "Gemini emitted evidence of a write-tool invocation despite --readonly/--no-tools flag. The CLI may be ignoring the read-only flag. Inspect raw output at raw_output_path. Consider upgrading the Gemini CLI or escalating the issue.",
+  "error_message": "Gemini emitted evidence of a write-tool invocation despite --approval-mode default. The CLI may be ignoring the approval mode. Inspect raw output at raw_output_path. Consider upgrading the Gemini CLI or escalating the issue.",
   "findings": [],
   "usage": null,
   "raw_output_path": "<config.raw_output_path>"
 }
 ```
 
-This detection is best-effort — it depends on Gemini emitting structured tool-call evidence in its output. Absence of such evidence does NOT prove the read-only flag was honored; it only proves no observable violation. The probe in Step 4a remains the primary verification mechanism.
+This detection is best-effort — it depends on Gemini emitting structured tool-call evidence in its output. Absence of such evidence does NOT prove no write-tool was attempted; it only proves no observable violation was recorded in the parsed response.
 
 **Model selection:** If `config.model` is set, pass it as the `--model` flag:
 
 ```bash
-gemini -p "<prompt>" --output-format json <selected-flag> --model gemini-2.5-pro
+gemini -p "<prompt>" --approval-mode default --output-format json --model gemini-2.5-pro
 ```
-
-Where `<selected-flag>` is the result of the Step 4a probe.
 
 Write the raw CLI stdout to `config.raw_output_path` immediately upon capture, before any parsing (FR-MR24 §6).
 
@@ -289,7 +270,12 @@ If the CLI exits non-zero, return:
 
 ### 5. Output Parsing
 
-Parse the raw CLI output as JSON. See **Known Gotchas** for Gemini-specific parsing quirks that MUST be handled before calling `JSON.parse`.
+**Outer CLI envelope unwrap (Task 25 — FR-HM44 fix):** With `--output-format json`, the Gemini CLI's own stdout is a JSON object shaped `{ "response": "<Gemini's reply, as a string>", "stats": { ... }, "error"?: "<string, present on CLI-level failure>" }`. This outer envelope is the CLI's wrapper, not the adapter's `{ findings, usage }` payload. Parse the raw stdout as JSON and:
+
+1. If the parsed object has a non-null `error` field, treat this as a CLI-level failure and return `error_code: "cli_failed"` with that `error` string folded into `error_message` (in addition to the non-zero-exit-code check in Step 4a).
+2. Otherwise, take the `.response` string — this is Gemini's actual reply to the constructed prompt. Apply the **Known Gotchas** parsing quirks (markdown-fence stripping, NDJSON decomposition, trailing-comma stripping) to `.response`, THEN call `JSON.parse` on the result to obtain the `{ findings, usage }` object.
+
+`stream-json` output-format is not used by this adapter (`--output-format json` is always passed — see Step 4a); if a future revision adopts `stream-json`, the equivalent per-event field is `result` rather than `response` (per `gemini --help`'s `-o/--output-format` choices: `text`, `json`, `stream-json`).
 
 Extract `findings` and `usage` from the parsed object.
 
@@ -301,7 +287,7 @@ If `JSON.parse` fails after applying all gotcha mitigations:
 
 1. Append a clarification to the original prompt: `"Your previous response could not be parsed as JSON. Respond with ONLY valid JSON, no markdown fences, no prose."`
 2. Re-invoke the CLI once.
-3. Attempt `JSON.parse` again on the new output.
+3. Attempt the outer-envelope unwrap (Step 5) and `JSON.parse` again on the new output.
 4. If parsing still fails, return `error_code: "parse_failed"` terminally.
 
 ```json
@@ -385,6 +371,10 @@ If the above package name has changed, consult the official Gemini CLI documenta
 
 ### Auth setup
 
+**Primary (API key — Task 25 / FR-HM44):** export `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in the environment. No further setup is required for headless (`-p`) invocation; the adapter's Auth Check (Step 2) checks this first.
+
+**Fallback (Code Assist / OAuth):** if no API key is available, authenticate via Google Cloud:
+
 ```bash
 gcloud auth login
 ```
@@ -404,11 +394,11 @@ You should see at least one account listed with `(ACTIVE)` status.
 | error_code | Trigger |
 |------------|---------|
 | `cli_missing` | `which gemini` returns non-zero |
-| `cli_auth_failed` | `gcloud auth list` exits non-zero or produces empty output |
-| `cli_failed` | `gemini` subprocess exits non-zero |
+| `cli_auth_failed` | Neither `GEMINI_API_KEY` nor `GOOGLE_API_KEY` is set, AND the `gcloud auth list` fallback exits non-zero or produces empty output |
+| `cli_failed` | `gemini` subprocess exits non-zero, or the parsed outer envelope's `error` field is non-null (Step 5) |
 | `parse_failed` | JSON parse fails after retry |
 | `timeout` | Adapter exceeds per-reviewer timeout |
-| `sandbox_violation` | CLI attempts a forbidden operation under `--readonly` |
+| `sandbox_violation` | CLI attempts a forbidden operation despite `--approval-mode default` |
 | `unknown_error` | Catch-all for unexpected failures |
 
 Adapters MUST NOT introduce new error_code values per FR-MR16.
@@ -419,9 +409,11 @@ Adapters MUST NOT introduce new error_code values per FR-MR16.
 
 ### Gemini-Specific Output-Parsing Quirks
 
-1. **JSON wrapped in markdown code block.** Even with `--output-format json` set, Gemini sometimes wraps its JSON response in triple-backtick fences (`` ```json ... ``` `` or `` ``` ... ``` ``). The parser MUST strip markdown code-block fences before calling `JSON.parse`. Use a regex such as `/^```(?:json)?\s*([\s\S]*?)\s*```$/` to detect and unwrap fenced content before parsing.
+These quirks apply to the unwrapped `.response` string (Step 5's outer CLI envelope unwrap, Task 25 / FR-HM44) — i.e. Gemini's own reply text, not the outer `{ response, stats, error? }` CLI envelope itself.
 
-2. **Streaming envelope shape (line-delimited JSON chunks).** With certain model configurations or when the response is large, `gemini -p` may return line-delimited JSON chunks (newline-delimited JSON / NDJSON) rather than a single JSON envelope. If the initial `JSON.parse` attempt on the full stdout fails, the parser MUST attempt to split on newlines and re-concatenate: collect all lines that are valid JSON objects, merge their `findings` arrays, and combine `usage` token counts. Retry this decomposition strategy before escalating to the retry-once clarification prompt.
+1. **JSON wrapped in markdown code block.** Even with `--output-format json` set, Gemini sometimes wraps its JSON response (inside `.response`) in triple-backtick fences (`` ```json ... ``` `` or `` ``` ... ``` ``). The parser MUST strip markdown code-block fences before calling `JSON.parse`. Use a regex such as `/^```(?:json)?\s*([\s\S]*?)\s*```$/` to detect and unwrap fenced content before parsing.
+
+2. **Streaming envelope shape (line-delimited JSON chunks).** With certain model configurations or when the response is large, the `.response` string may itself contain line-delimited JSON chunks (newline-delimited JSON / NDJSON) rather than a single JSON envelope. If the initial `JSON.parse` attempt on `.response` fails, the parser MUST attempt to split on newlines and re-concatenate: collect all lines that are valid JSON objects, merge their `findings` arrays, and combine `usage` token counts. Retry this decomposition strategy before escalating to the retry-once clarification prompt.
 
 3. **Empty findings array vs. null.** Gemini may emit `"findings": null` instead of `"findings": []` when there are no issues found. Per Step 5 (Null normalization), the normalizer MUST treat `null` as an empty array `[]` to conform to the adapter-contract.md requirement that `findings` is always an array on success. Do NOT propagate a `null` findings value into the output envelope.
 
@@ -449,3 +441,4 @@ This adapter does NOT:
 - FR-MR26 (sandbox flags for external CLI adapters)
 - D3 (external adapters are additive; native reviewers are not replaced)
 - NFR-MR4 (usage object surfaces verbatim from CLI envelope)
+- FR-HM44 / FR-HM28 (Task 25: drop the non-existent readonly/no-tools flag probe in favor of `--approval-mode default`; API-key-first auth check; `.response` envelope unwrap)
