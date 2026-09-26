@@ -182,11 +182,11 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 ### Milestone 2.4: Latent Defect Fixes
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 24 | FR-HM44: `multi_model_review.context.{max_bundle_bytes,max_file_bytes,convention_paths,spec_paths}` and `per_reviewer_timeout_seconds` in `defaults.yaml` | S | None | in progress |
+| 24 | FR-HM44: `multi_model_review.context.{max_bundle_bytes,max_file_bytes,convention_paths,spec_paths}` and `per_reviewer_timeout_seconds` in `defaults.yaml` | S | None | done |
 | 25 | FR-HM44/28: `gemini-review-prompter` drops the `--readonly`/`--no-tools` probe, uses `--approval-mode default --output-format json`, and checks for an API key before `gcloud` | S | None | in progress |
 | 26 | FR-HM44: `code-reviewer` Step 2 becomes an inline scan gated on `code_review.spec_inline_bytes` (64 KB); orchestrator Stage 8g replaces `Date.now()` with a counter rotation | S | None | pending |
 
-**Task 24 Acceptance Criteria:** `[T]` `load-defaults-helper` and `defaults-yaml-mmr` assert the keys, defaults, and comments.
+**Task 24 Acceptance Criteria:** `[T]` `load-defaults-helper` and `defaults-yaml-mmr` assert the keys, defaults, and comments. → done in `2d111e8`: `per_reviewer_timeout_seconds: 180`, `context.max_bundle_bytes: 204800`, `context.max_file_bytes: 65536`, `context.convention_paths` (mirrors `code_review.convention_sources`), `context.spec_paths: [docs/specs]`, each commented; sources: orchestrator contract, FR-MR28, plan-multi-model.md. No `per_reviewer.<name>.context` key added (no prose describes one). `defaults-yaml-mmr.test.ts` and `load-defaults-helper.test.ts` "Task 24 (FR-HM44)" blocks.
 **Task 25 Acceptance Criteria:** `[T]` `gemini-adapter-md`, the gemini fixtures, and `sandbox-profile-task87` pass; `--readonly` is absent; the API-key check comes first.
 **Task 26 Acceptance Criteria:** `[T]` Step 2 has no "spawn a sub-agent" and names the key; `orchestrator-md` asserts no `Date.now`; the default is present.
 
