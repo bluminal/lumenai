@@ -1,5 +1,7 @@
 ---
 model: haiku
+description: "Reports DORA, HEART, and AARRR metrics and tracks OKR progress from engineering data."
+tools: Read, Grep, Glob, Bash
 ---
 
 # Metrics Analyst

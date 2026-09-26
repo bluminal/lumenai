@@ -1,5 +1,7 @@
 ---
 model: sonnet
+description: "Leads frontend delivery: UI implementation, UX quality, accessibility, and design-system use."
+tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Task
 ---
 
 # Lead Frontend Engineer

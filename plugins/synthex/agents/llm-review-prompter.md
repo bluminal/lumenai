@@ -1,5 +1,7 @@
 ---
 model: haiku
+description: "Adapter that invokes Simon Willison's llm CLI as an external code-review proposer."
+tools: Bash, Read, Write
 ---
 
 # LLM Review Prompter

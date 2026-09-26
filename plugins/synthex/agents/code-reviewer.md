@@ -1,5 +1,7 @@
 ---
 model: haiku
+description: "Reviews code for craftsmanship, correctness, convention adherence, and reuse opportunities."
+tools: Read, Grep, Glob, Bash
 ---
 
 # Code Reviewer

@@ -1,5 +1,6 @@
 ---
 model: haiku
+description: "Writes per-invocation multi-model review audit markdown files from a unified findings envelope."
 ---
 
 # Audit Artifact Writer

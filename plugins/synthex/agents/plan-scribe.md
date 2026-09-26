@@ -1,5 +1,6 @@
 ---
 model: haiku
+description: "Applies the Product Manager's decided edits to an implementation plan document mechanically."
 ---
 
 # Plan Scribe

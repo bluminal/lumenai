@@ -1,5 +1,7 @@
 ---
 model: sonnet
+description: "Fans a review out to native and external CLI proposers in parallel and consolidates findings."
+tools: Read, Edit, Write, Bash, Agent, Task, SendMessage
 ---
 
 # Multi-Model Review Orchestrator
