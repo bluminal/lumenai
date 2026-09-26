@@ -5,6 +5,32 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 1.4.1 / synthex-plus 1.4.1] - 2026-09-26
+
+### Fixed
+
+- (synthex) fix latent defects in code-reviewer and orchestrator agents (FR-HM44)
+- (synthex) correct Gemini adapter read-only invocation and auth ordering
+- (synthex) add missing multi-model-review context and timeout config keys
+
+### Changed
+
+- (plans) record Tasks 22-23 done; Milestone 2.3 and Phase 2 complete; amend OpenCode catalog target (A17)
+- (compat) add tool-behavior probes to authenticated canary scenarios (Task 23, D22)
+- (compat) add skill-catalog budget assertions (FR-HM9, Task 22)
+- (plans) record Tasks 20 and 26 done; Milestone 2.4 complete; Tasks 22-23 in progress
+- (synthex) generate shared tool-map.md and refactor wrapper tool instructions (FR-HM12, FR-HM45)
+- (plans) record Task 25 done; Task 26 in progress
+- (plans) record Task 24 done
+- (plans) record Task 19 done; Task 20 in progress
+- (synthex) shorten wrapper-catalog descriptions per FR-HM9, FR-HM10
+- (plans) record Task 18 done; Milestone 2.2 complete
+- (synthex) implement Task 18 portability prose validators (FR-HM13, FR-HM42)
+- (plans) record Task 16 done; add Layer 2 helper defect as Task 27 prerequisite
+- (synthex) remove agent boilerplate per Task 16 (FR-HM6)
+- (plans) record Task 17 done; Task 18 in progress
+- (synthex) drop emphasis scaffolding per FR-HM8
+
 ## [synthex 1.4.0 / synthex-plus 1.4.0] - 2026-09-25
 
 ### Added
