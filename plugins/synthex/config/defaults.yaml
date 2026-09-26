@@ -130,6 +130,14 @@ code_review:
   # runs as a subagent (subagents cannot spawn subagents on Claude Code).
   spec_inline_bytes: 65536
 
+  # FR-HM17 prose verification pass (D18): code-reviewer, security-reviewer, and
+  # performance-engineer each gain a "Verification pass (CRITICAL/HIGH only, top
+  # 5)" step that uses an LSP tool (or grep, as a fallback) to check the top 5
+  # CRITICAL/HIGH findings before rendering a `- **Verification:**` line in the
+  # finding block. Opt-in and off by default (NFR-HM1, NFR-HM3): it changes
+  # zero-config output and adds tool calls. Options: prose | off.
+  verification: off
+
   # Additional specialist reviewers (optional).
   # Example: Add a domain-specific reviewer for regulated industries.
   # specialists:

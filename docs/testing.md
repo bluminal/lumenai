@@ -477,3 +477,132 @@ FR/D id and locked string that `orchestrator-consolidation.test.ts`,
 Byte counts are recorded in `tests/fixtures/agent-boilerplate/agent-sizes-before.json`
 and asserted (≥ 1,536-byte reduction per specialist) by
 `tests/schemas/agent-boilerplate.test.ts`.
+
+## Task 29 — Verification pass (FR-HM17, D18)
+
+FR-HM17's prose path adds a short "Verification pass (CRITICAL/HIGH only, top
+5)" section to `code-reviewer.md`, `security-reviewer.md`, and
+`performance-engineer.md`: for each CRITICAL/HIGH finding, up to the top 5 by
+severity, use an LSP tool if one is in the tool list, otherwise grep for the
+symbol's references; never block the review on verification; log when the
+top-5 cap fires. Result renders as `- **Verification:** CONFIRMED (lsp|grep) |
+PLAUSIBLE (none)` inside the finding block. Gated on
+`code_review.verification: prose|off`, default `off` (D18, NFR-HM1, NFR-HM3).
+
+### Byte-budget blocker: section not yet inserted into the three agent bodies
+
+Task 16 (FR-HM6) trimmed the 12 specialists to at least `MIN_REDUCTION_BYTES =
+1536` below their pre-Task-16 `before_bytes`
+(`tests/fixtures/agent-boilerplate/agent-sizes-before.json`), enforced by
+`tests/schemas/agent-boilerplate.test.ts`. Task 26 trimmed `code-reviewer.md`
+further. Measuring the current headroom against that floor:
+
+| Agent | `before_bytes` (pre-Task-16) | Current bytes | Reduction | Floor (1,536) | Headroom to insert |
+|-------|---:|---:|---:|---:|---:|
+| code-reviewer.md | 13,790 | 12,105 | 1,685 | 1,536 | **149 bytes** |
+| security-reviewer.md | 15,146 | 13,520 | 1,626 | 1,536 | **90 bytes** |
+| performance-engineer.md | 11,408 | 9,702 | 1,706 | 1,536 | **170 bytes** |
+
+The shared section text must be byte-identical across all three, so the
+binding constraint is the smallest headroom (security-reviewer.md, 90 bytes).
+Even the terse form of the required content (gate description, LSP/grep
+instruction, non-blocking rule, cap-logging, render format) measures ~340
+bytes — well over 90 bytes, and still over the 149/170-byte headroom on the
+other two agents. Per the task instruction ("keep the section under ~900
+bytes or tell me the numbers and stop rather than weakening the test"): the
+numbers do not work at any content-preserving length, so the section is
+**not inserted** into the three agent bodies in this task.
+`tests/schemas/agent-boilerplate.test.ts` and its 1,536-byte floor are
+unchanged. `tests/schemas/verification-pass.test.ts` documents this
+explicitly and asserts the three agents are consistently either all-present
+or all-absent (never a partial rollout), and byte-identical if a future
+change adds the section to all three.
+
+Everything else in Task 29 is independent of this blocker and is complete:
+`code_review.verification: off` (with comment) in
+`plugins/synthex/config/defaults.yaml`, the config table row in `CLAUDE.md`,
+the `Finding.verification` parser support and `parseVerificationField()` in
+`tests/schemas/helpers.ts`, the optional-line validation in
+`code-reviewer.ts`/`security-reviewer.ts`/`performance-engineer.ts`
+(warnings only — verification never becomes a validation error), fixtures
+under `tests/fixtures/verification-pass/`, and the Layer 2 runs below (which
+simulate the `prose` config by injecting the section text and a resolved
+`code_review.verification: prose` line directly into the system prompt, the
+same way a command would resolve config and pass it to the agent).
+
+### Layer 2 method
+
+Same direct-invocation method as Task 16 (`docs/testing.md` "Task 16"
+section): `tests/helpers/invoke-agent.ts` and `claude-provider.js` still pass
+the agent file path as literal `--system-prompt` text (Task 27 is fixing this
+in parallel), so a standalone script read each agent's current `.md` content
+and invoked `claude -p --system-prompt <content>` directly, with each fixture
+on stdin. `security-reviewer` used `--max-turns 1` for `off` (matches its
+promptfoo config) and `--max-turns 5` for `prose` (the added verification
+steps need headroom beyond one turn). `code-reviewer` used `--max-turns 8`
+for both, per Task 16. For the `prose` runs, the agent content sent as
+`--system-prompt` had the Verification Pass section (identical text drafted
+for the blocked agent-body insertion above) spliced in before `## Output
+Format`, plus one line stating the resolved config
+(`code_review.verification: prose`) — mirroring what `review-code.md` would
+resolve and hand to the agent. 20 calls total (10 fixtures × 2 configs), the
+same 3 `code-reviewer` + 7 `security-reviewer` fixtures Task 16 used.
+
+### (a) `off` (default): output structure matches the redacted baseline shape
+
+All 10 fixtures, run with the unmodified agent content (no Verification Pass
+section, `code_review.verification` unset ⇒ default `off`), produced the
+expected verdict-header-plus-finding-blocks shape (matching the redacted
+FR-MR23 baseline structure: `## <Agent> Review Verdict: PASS|WARN|FAIL`
+followed by `#### [SEV] Title` finding blocks) and emitted **no**
+`- **Verification:**` line anywhere, confirming the default skips the
+section entirely.
+
+| Agent | Fixture | Verdict header present | Finding blocks (`#### [SEV] ...`) | Verification line present |
+|-------|---------|:---:|:---:|:---:|
+| code-reviewer | clean-code | yes | yes (6) | no |
+| code-reviewer | god-object | yes | yes (14) | no |
+| code-reviewer | missing-error-handling | yes | yes (12) | no |
+| security-reviewer | clean-code | yes | yes (4) | no |
+| security-reviewer | hardcoded-secret | yes | yes (10) | no |
+| security-reviewer | missing-auth | yes | yes (7) | no |
+| security-reviewer | mixed-severity | yes | yes (6) | no |
+| security-reviewer | sql-injection | yes | yes (8) | no |
+| security-reviewer | weak-csrf | yes | yes (9) | no |
+| security-reviewer | xss-vuln | yes | yes (5) | no |
+
+### (b) `prose`: verdicts unchanged, recall/precision deltas
+
+Verdict was identical between `off` and `prose` on all 10 fixtures. The
+verification pass correctly capped at the top 5 CRITICAL/HIGH findings by
+severity (logging the cap, e.g. "Verification cap reached: 9 CRITICAL/HIGH
+findings, and only the top 5 above were verified") whenever more than 5 were
+present, used grep-based verification in every case observed (no LSP tool
+was available in this headless CLI invocation), and never blocked or altered
+a verdict. "Planted" issues are the fixture's designed-in defects (self-
+evident from filename/content; `code-reviewer` has no promptfoo entries yet
+per Task 16, so its planted issues are named directly below).
+
+| Agent | Fixture | Verdict off→prose | Planted issue(s) | Recall off→prose | CRIT+HIGH count off→prose | Cap fired? | Precision notes |
+|-------|---------|:---:|---|:---:|:---:|:---:|---|
+| code-reviewer | clean-code | FAIL→FAIL | Unused `ConflictError` import (HIGH) | 1/1→1/1 | 1→1 | no | Prose swapped one MEDIUM ("no tests") for one Nit ("unused `verifyPassword` import"); no spurious findings either side |
+| code-reviewer | god-object | FAIL→FAIL | 4 correctness bugs: stale-Promise cache, undefined `order.id`, non-atomic multi-step writes, double-charge/float amount (all CRITICAL) | 4/4→4/4 | 8→9 | **yes** (9 eligible, top 5 verified) | All 4 defects present both sides; 2 reclassified CRITICAL→HIGH and one split into two HIGH findings in prose (net 14→13 total findings); no spurious findings |
+| code-reviewer | missing-error-handling | FAIL→FAIL | Order saved before validation/payment, bad float amount to Stripe, unvalidated quantity (all CRITICAL) | 3/3→3/3 | 8→8 | **yes** (8 eligible, top 5 verified, cap logged twice for the remaining 2 HIGHs) | Same 3 defects present both sides (one reclassified CRITICAL→HIGH); no spurious findings |
+| security-reviewer | clean-code | PASS→PASS | none (clean fixture) | n/a | 0→0 | no | No CRITICAL/HIGH either side; verification pass correctly did not trigger |
+| security-reviewer | hardcoded-secret | FAIL→FAIL | 5 hardcoded secrets: AWS key, Postgres creds, Redis creds, Stripe key, SendGrid key (all CRITICAL) | 5/5→5/5 | 5→5 | **at boundary** (exactly 5; 6th eligible HIGH logged as capped) | 10 findings both sides; prose swapped one LOW for another (Stripe publishable key vs. "move before production" TODO); no spurious findings |
+| security-reviewer | missing-auth | FAIL→FAIL | Missing auth/authz on admin endpoints, unrestricted role-assignment privilege escalation (both CRITICAL) | 2/2→2/2 | 3→3 | no | 7→8 total findings (prose adds one legitimate LOW: unchecked `role` type); no spurious findings |
+| security-reviewer | mixed-severity | FAIL→FAIL | Hardcoded Stripe secret key, unauthenticated destructive DELETE endpoint (both CRITICAL) | 2/2→2/2 | 2→2 | no | 6→6 total findings; no spurious findings |
+| security-reviewer | sql-injection | FAIL→FAIL | SQL injection ×3 endpoints (CRITICAL), IDOR/missing authorization (HIGH) | 4/4→4/4 | 4→4 | no | 8→8 total findings (prose adds one legitimate MEDIUM: unreachable `/search` route); no spurious findings |
+| security-reviewer | weak-csrf | FAIL→FAIL | Missing CSRF protection, account takeover via unauthenticated email change, unauthenticated account deletion (all HIGH) | 3/3→4/4 | 3→4 | no | Prose promotes a related session-management defect from MEDIUM to a 4th HIGH finding (recall gain, not loss); no spurious findings |
+| security-reviewer | xss-vuln | FAIL→FAIL | Stored XSS via `dangerouslySetInnerHTML` (HIGH) | 1/1→1/1 | 1→1 | no | 5→7 total findings (prose adds two legitimate LOW findings); no spurious findings |
+
+**Result: no recall loss on any planted issue, no verdict regressions, and no
+spurious findings introduced by the verification pass across the 10
+fixtures.** Where finding counts differ, prose is equal or higher (never
+lower) on substantive findings; severity reclassifications and merges/splits
+observed on `god-object` and `missing-error-handling` are consistent with the
+ordinary model-sampling variance Task 16 documented on these same fixtures,
+not something attributable to the verification pass. The cap-and-log
+behavior ("Verification: Not run (top-5 cap reached)" /
+"Verification cap reached: N CRITICAL/HIGH findings...") worked correctly on
+every fixture with more than 5 eligible findings.

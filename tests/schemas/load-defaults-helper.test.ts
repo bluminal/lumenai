@@ -140,3 +140,20 @@ describe('Task 26 (FR-HM44): code_review.spec_inline_bytes via the helper', () =
     expect(window, 'Expected a comment above spec_inline_bytes').toMatch(/#/);
   });
 });
+
+describe('Task 29 (FR-HM17, D18): code_review.verification via the helper', () => {
+  it('loadDefaultsYaml() exposes code_review.verification: "off" (default, opt-in)', async () => {
+    const cfg = await loadDefaultsYaml();
+    expect(cfg.code_review.verification).toBe('off');
+  });
+
+  it('loadDefaultsYamlText() contains verification: off with a comment above it (raw-text check)', () => {
+    const text = loadDefaultsYamlText();
+    const lines = text.split('\n');
+    const idx = lines.findIndex((l) => /^\s*verification:\s*off\s*$/.test(l));
+    expect(idx, 'Expected to find "verification: off" in defaults.yaml').toBeGreaterThan(0);
+    const window = lines.slice(Math.max(0, idx - 8), idx + 1).join('\n');
+    expect(window, 'Expected a comment above verification: off').toMatch(/#/);
+    expect(window, 'Expected the comment to reference FR-HM17').toMatch(/FR-HM17/);
+  });
+});
