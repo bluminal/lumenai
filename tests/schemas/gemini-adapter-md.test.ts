@@ -82,8 +82,41 @@ describe('Task 13: gemini-review-prompter.md', () => {
   });
 
   // 6. Documents sandbox flag set (FR-MR26)
-  it('documents the --readonly sandbox flag', () => {
-    expect(content).toContain('--readonly');
+  it('documents the --approval-mode default sandbox flag', () => {
+    expect(content).toContain('--approval-mode default');
+  });
+
+  // Task 25 (FR-HM44/FR-HM28): the --readonly/--no-tools probe never worked (neither flag
+  // exists in any Gemini CLI version) and always aborted Pattern 1 invocations with cli_failed.
+  // The fix drops the probe entirely in favor of --approval-mode default.
+  describe('Task 25 (FR-HM44/FR-HM28): --readonly/--no-tools probe removed', () => {
+    it('does not document a --readonly invocation flag', () => {
+      expect(content).not.toContain('--readonly');
+    });
+
+    it('does not document a --no-tools invocation flag', () => {
+      expect(content).not.toContain('--no-tools');
+    });
+
+    it('documents --approval-mode default in the CLI invocation', () => {
+      expect(content).toMatch(/gemini -p ["'`]?<prompt>["'`]?\s+--approval-mode default\s+--output-format json/);
+    });
+
+    it('documents --output-format json in the CLI invocation', () => {
+      expect(content).toContain('--output-format json');
+    });
+
+    it('the API-key check (GEMINI_API_KEY) appears before any gcloud mention', () => {
+      const apiKeyIdx = content.indexOf('GEMINI_API_KEY');
+      const gcloudIdx = content.indexOf('gcloud');
+      expect(apiKeyIdx).toBeGreaterThanOrEqual(0);
+      expect(gcloudIdx).toBeGreaterThanOrEqual(0);
+      expect(apiKeyIdx).toBeLessThan(gcloudIdx);
+    });
+
+    it('also checks GOOGLE_API_KEY as a fallback env var', () => {
+      expect(content).toContain('GOOGLE_API_KEY');
+    });
   });
 
   // 7. References FR-MR26

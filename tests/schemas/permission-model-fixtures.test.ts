@@ -142,10 +142,12 @@ describe('Task 84 [T] (2): Layer 2 fixture — Codex app-server requestApproval 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// [T] Criterion 3: Layer 2 fixture — Gemini --readonly invocation (no destructive tool-use)
+// [T] Criterion 3: Layer 2 fixture — Gemini --approval-mode default invocation
+// (no destructive tool-use). Task 25 / FR-HM44 superseded the --readonly/--no-tools
+// probe (neither flag ever existed in the Gemini CLI) with --approval-mode default.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Task 84 [T] (3): Layer 2 fixture — Gemini --readonly invocation (no destructive tool-use)', () => {
+describe('Task 84 [T] (3): Layer 2 fixture — Gemini --approval-mode default invocation (no destructive tool-use)', () => {
   const FIX = join(FIXTURES, 'multi-model-review', 'adapters', 'gemini', 'read-only');
   let fixture: any;
   let expected: any;
@@ -163,12 +165,12 @@ describe('Task 84 [T] (3): Layer 2 fixture — Gemini --readonly invocation (no 
     expect(fixture.permission_mode).toBe('read-only');
   });
 
-  it('recorded CLI invocation contains --readonly flag (raw-string check)', () => {
-    expect(invocation).toContain('--readonly');
+  it('recorded CLI invocation contains --approval-mode default flag (raw-string check)', () => {
+    expect(invocation).toContain('--approval-mode default');
   });
 
-  it('documented_flags lists --readonly as a required flag', () => {
-    expect(fixture.documented_flags).toContain('--readonly');
+  it('documented_flags lists --approval-mode as a required flag', () => {
+    expect(fixture.documented_flags).toContain('--approval-mode');
   });
 
   it('no destructive tool-use is recorded (tool_use_attempts is empty)', () => {
@@ -185,8 +187,13 @@ describe('Task 84 [T] (3): Layer 2 fixture — Gemini --readonly invocation (no 
 
   it('scenario.md describes Pattern 1 trust-boundary semantics', () => {
     expect(scenario).toContain('Pattern 1');
-    expect(scenario).toContain('--readonly');
+    expect(scenario).toContain('--approval-mode default');
     expect(scenario).toContain('trust boundary');
+  });
+
+  it('neither the fixture invocation nor scenario.md reference the removed --readonly flag', () => {
+    expect(invocation).not.toContain('--readonly');
+    expect(scenario).not.toContain('--readonly');
   });
 });
 

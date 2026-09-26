@@ -60,11 +60,16 @@ npm install -g @google/gemini-cli
 
 ### Auth setup
 
+Primary: export `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in the environment. Fallback, for
+Code Assist / OAuth users with no API key:
+
 ```bash
 gcloud auth login
 ```
 
-The adapter checks auth via `gcloud auth list` — exit 0 with non-empty output means authenticated.
+The adapter checks auth via `GEMINI_API_KEY`/`GOOGLE_API_KEY` first; only if neither is set
+does it fall back to `gcloud auth list` — exit 0 with non-empty output means authenticated
+(Task 25 / FR-HM44).
 
 ### Recommended flagship model
 
@@ -72,7 +77,11 @@ The adapter checks auth via `gcloud auth list` — exit 0 with non-empty output 
 
 ### Sandbox flags (FR-MR26)
 
-- `--readonly` — read-only filesystem access (Gemini's read-only flag form)
+- `--approval-mode default` — headless (`-p`) invocation under `default` approval mode denies
+  and excludes every tool that requires confirmation (shell exec, file writes, etc.), since
+  there is no TTY to confirm on. This is Gemini's read-only guarantee (Task 25 / FR-HM44).
+  There is no dedicated `--readonly` or `--no-tools` flag in the Gemini CLI — an earlier
+  adapter revision assumed one existed; it did not.
 
 ### Known gotchas
 

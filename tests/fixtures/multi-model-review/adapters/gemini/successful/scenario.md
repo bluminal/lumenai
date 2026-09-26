@@ -8,7 +8,7 @@ This fixture exercises the Gemini adapter's success path with quirk-handling eng
 2. `gcloud auth list` exits 0 with at least one account listed (FR-MR8 step 2 — Auth Check passes).
 3. Prompt is constructed from `command: "review-code"` and `context_bundle` (FR-MR8 step 3).
 4. CLI is invoked with the mandatory sandbox flag per FR-MR26:
-   `--readonly` (FR-MR8 step 4).
+   `--approval-mode default` (FR-MR8 step 4; Task 25 / FR-HM44 — supersedes the removed `--readonly`/`--no-tools` probe).
 5. Raw CLI stdout contains markdown-fence-wrapped JSON (gotcha #1) — adapter strips
    `\`\`\`json ... \`\`\`` fences before calling `JSON.parse`.
 6. No retry needed after fence-stripping succeeds (FR-MR8 step 6 — skipped).
@@ -40,11 +40,11 @@ The null-normalization path is covered by a dedicated failure-path fixture.
 - FR-MR8 steps 1–8 (full success-path flow)
 - FR-MR9 (output envelope shape)
 - FR-MR16 (error_code is null on success)
-- FR-MR26 (sandbox flag `--readonly` in recorded-cli-invocation.txt)
+- FR-MR26 (sandbox flag `--approval-mode default` in recorded-cli-invocation.txt)
 - NFR-MR4 (usage object surfaced verbatim from CLI envelope)
 
 ## Fixture Files
 
 - `fixture.json` — raw Gemini CLI stdout including markdown-fence quirk (gotcha #1)
-- `recorded-cli-invocation.txt` — exact CLI command string Gemini was called with (includes `--readonly`)
+- `recorded-cli-invocation.txt` — exact CLI command string Gemini was called with (includes `--approval-mode default`)
 - `expected_envelope.json` — normalized canonical envelope the adapter must produce after quirk handling
