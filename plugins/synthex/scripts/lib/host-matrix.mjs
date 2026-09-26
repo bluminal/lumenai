@@ -214,3 +214,71 @@ export const HOSTS = Object.freeze({
 
 /** Host ids in matrix declaration order. */
 export const HOST_IDS = Object.freeze(Object.keys(HOSTS));
+
+/**
+ * The two FR-HM12 rules every wrapper renders as their own numbered steps,
+ * verbatim, immediately after the tool-map table (Task 20). Single-sourced
+ * here so `generate-codex-skills.mjs` never hand-copies the prose.
+ */
+export const RULE_SKIP_UNAVAILABLE_TOOL =
+  'If a named tool does not exist, skip that step once and continue; never retry it.';
+export const RULE_ADOPT_INLINE =
+  'If the host refuses a nested subagent, adopt the role inline: read the `agents/` file and perform it in this session.';
+
+/**
+ * Task 8 finding (spikes.md): Hermes's `skill_view` tool rejects any `..`
+ * path component, so the wrapper's own `../../commands/` or `../../agents/`
+ * canonical-file link (step 1) cannot be opened with `skill_view` and must
+ * be followed with the general `read_file` tool instead. Rendered once
+ * into every wrapper's step 4 (cheap, a single sentence) and again under
+ * the table in the shared `docs/tool-map.md` (see
+ * `generate-codex-skills.mjs`), rather than duplicated into the Hermes
+ * table cell for every one of the five translated tool rows.
+ */
+export const HERMES_READ_FILE_NOTE =
+  "On Hermes, follow this file's canonical-source link (step 1) with `read_file`, not `skill_view`: `skill_view` rejects `..` path components.";
+
+/**
+ * Renders the FR-HM12 tool-name map as a Markdown table: one column per
+ * non-Claude host (Claude Code is the source of these tool names and needs
+ * no translation, so it is excluded) and one row per grouped Claude-tool
+ * label from the PRD table (`docs/reqs/harness-modernization.md`). This is
+ * the single source `generate-codex-skills.mjs` renders into the shared
+ * `docs/tool-map.md` that every wrapper's step 4 points at (Task 20;
+ * embedding the table directly in all 46 wrappers overflowed a stdout
+ * truncation limit in the OpenCode compat harness, see that generator's
+ * comment); `tests/schemas/wrapper-catalog.test.ts` asserts
+ * `docs/tool-map.md` contains this exact table.
+ *
+ * @returns {string} the table, as Markdown, with no leading/trailing blank lines.
+ */
+export function renderToolMapTable() {
+  const hosts = HOST_IDS.filter((id) => id !== 'claude').map((id) => HOSTS[id]);
+
+  function groupedAgentTask(host) {
+    if (host.toolMap.Agent !== host.toolMap.Task) {
+      throw new Error(
+        `host-matrix.mjs: host "${host.id}" has different Agent and Task tool map values; the rendered table groups them into one row and requires them to match`,
+      );
+    }
+    return host.toolMap.Agent;
+  }
+
+  const header = `| Claude tool | ${hosts.map((host) => host.displayName).join(' | ')} |`;
+  const divider = `|${'---|'.repeat(hosts.length + 1)}`;
+  const readEditWriteRow = `| Read / Edit / Write | ${hosts
+    .map((host) => [host.toolMap.Read, host.toolMap.Edit, host.toolMap.Write].join(', '))
+    .join(' | ')} |`;
+  const bashRow = `| Bash | ${hosts.map((host) => host.toolMap.Bash).join(' | ')} |`;
+  const agentTaskRow = `| Agent / Task | ${hosts.map(groupedAgentTask).join(' | ')} |`;
+  const askUserQuestionRow = `| AskUserQuestion | ${hosts
+    .map((host) => host.toolMap.AskUserQuestion)
+    .join(' | ')} |`;
+  const skipListRow = `| ${SKIP_LIST_TOOL_NAMES.join(', ')} | ${hosts
+    .map((host) => host.toolMap[SKIP_LIST_TOOL_NAMES[0]])
+    .join(' | ')} |`;
+
+  return [header, divider, readEditWriteRow, bashRow, agentTaskRow, askUserQuestionRow, skipListRow].join(
+    '\n',
+  );
+}
