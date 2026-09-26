@@ -35,6 +35,10 @@ credentials.*
 # Test cache (LLM output cache for agent testing)
 tests/.cache/
 
+# claude plugin eval results cache (hash-keyed skip wrapper; FR-HM34, Task 27)
+tests/.eval-cache/
+plugins/synthex/evals/results/
+
 # MCP server build output
 packages/synthex-mcp/server/
 packages/synthex-mcp/*.mcpb

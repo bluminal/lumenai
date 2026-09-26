@@ -307,9 +307,14 @@ The GitHub Actions workflow (`.github/workflows/agent-tests.yml`) runs the three
 |  Manual: workflow_dispatch |
 |  run_semantic: true       |---> Layer 3: Semantic Evaluation (LLM-as-judge)
 +---------------------------+
+
++---------------------------+
+|  Manual: workflow_dispatch |
+|  run_plugin_eval: true    |---> Plugin Eval Suite (`claude plugin eval`, FR-HM34)
++---------------------------+
 ```
 
-To trigger Layers 2 or 3, go to **Actions > Agent Tests > Run workflow** and check the appropriate boxes.
+To trigger Layers 2 or 3 (or the plugin eval suite), go to **Actions > Agent Tests > Run workflow** and check the appropriate boxes.
 
 **Cache persistence in CI:** The LLM output cache is stored via `actions/cache@v4` with key `llm-cache-${{ hashFiles('plugins/synthex/agents/**', 'tests/fixtures/**') }}`. When agent definitions or fixtures change, the cache key changes and fresh invocations happen. Otherwise, cached outputs are restored from the previous run.
 
@@ -477,3 +482,206 @@ FR/D id and locked string that `orchestrator-consolidation.test.ts`,
 Byte counts are recorded in `tests/fixtures/agent-boilerplate/agent-sizes-before.json`
 and asserted (≥ 1,536-byte reduction per specialist) by
 `tests/schemas/agent-boilerplate.test.ts`.
+
+## Task 27 — Eval baseline (FR-HM34)
+
+### Prerequisite fix: Layer 2 helpers never loaded the agent prompt
+
+Task 16 found that `tests/helpers/invoke-agent.ts` and
+`tests/helpers/claude-provider.js` both passed the invoked agent's **file
+path** as the literal value of `claude -p --system-prompt`. `claude --help`
+documents `--system-prompt <prompt>` as "System prompt to use for the
+session" — it takes prompt *text*, not a path (there is no
+`--system-prompt-file` flag on this CLI). So every prior Layer 2 run
+(promptfoo and `invokeAgent()` alike) had been running the model with no
+custom system prompt at all; the agent's persona was never actually loaded.
+
+Fixed in both files: each now reads the agent's own markdown content, strips
+the leading frontmatter block (`stripFrontmatter` — the frontmatter is
+harness config, not part of the persona), and passes the resulting body as
+`--system-prompt`. Both call sites switched from `execSync` on a
+shell-joined command string to `execFileSync` with an argv array, since an
+agent body is arbitrary markdown that can contain quotes, backticks, or
+`$(...)` — exactly what a shell-interpreted string must not be trusted with.
+The Task 3 frontmatter → `{model, effort}` resolution and the cache-key
+construction (`getCacheKey(agentContent, ...)`, unchanged signature) are
+untouched — the cache key still hashes the *full* agent content (frontmatter
+included), so a frontmatter-only change (e.g. a future model/effort re-tier)
+still invalidates the cache as before.
+
+`tests/helpers/invoke-agent.ts` gained two exported pure functions so this is
+testable without shelling out: `stripFrontmatter(agentContent)` and
+`buildInvokeArgs({agentContent, model, effort, maxTurns})` (returns the full
+argv). `tests/helpers/claude-provider.js` gained the mirrored
+`stripFrontmatter` / `buildClaudeArgs`. New test:
+`tests/schemas/invoke-agent-system-prompt.test.ts` — asserts the constructed
+`--system-prompt` value contains the agent's H1 heading (not a `.md` path or
+path separator) for every real file under `plugins/synthex/agents/`, and that
+the frontmatter block itself is stripped out. 9 tests, all passing.
+
+`code-reviewer` also had zero cases in `tests/promptfoo.config.yaml` before
+this (only `security-reviewer` was wired). Added a `CODE REVIEWER` block (6
+cases: `CR-B1`–`CR-B6`) mirroring the `SECURITY REVIEWER` block's shape,
+against the 3 fixtures in `tests/fixtures/code-reviewer/`.
+
+### Eval suite layout: `plugins/synthex/evals/`
+
+`claude plugin eval init --help` documents two case layouts: `case.yaml`
+(single file; needed only for `scaffold_script`/`history_file`/`add_dirs`) or
+`prompt.md` + `graders/*.md` (frontmatter-per-file). Chose **`prompt.md` +
+`graders/*.md`** — none of the 18 cases need scaffold scripts or extra mounted
+directories, and the split keeps each grader's intent legible on its own.
+
+Each case dispatches its target agent directly: `prompt.md` sets
+`allowed_tools: [Agent]` and its body instructs the model to invoke the
+plugin agent by its namespaced id (e.g. `synthex:code-reviewer`) via the
+`Agent` tool and relay its response verbatim — this is the CLI's documented
+pattern for exercising one specific packaged agent (there is no `agent:`
+frontmatter key that runs a named agent directly without the top-level model
+choosing to dispatch it). A `tool_used` grader (`tool: Agent`, matching the
+namespaced id, `arm: with-only`) confirms the dispatch actually happened
+instead of the top-level model reviewing the fixture itself; being
+`with-only` keeps it out of the no-plugin baseline arm's score (that arm
+cannot dispatch a plugin agent by construction — that gap *is* the ablation
+signal) without failing that arm's own accounting.
+
+All 18 cases were generated from one manifest, `tests/scripts/eval-cases.json`
+(agent, fixture path, expected verdict words, planted-issue regex patterns —
+one entry per case), via `plugins/synthex/scripts` sibling
+`tests/scripts/generate-evals.mjs` (`--check` mode diffs the generated tree
+against the manifest and exits 1 on drift; wired into the CI job below).
+Every grader is **deterministic** — `type: regex` (verdict header, one per
+planted issue) or `type: tool_used` (dispatch confirmation) — per FR-HM34:
+"No LLM or baseline grader gates CI." No case's `allowed_tools` includes
+`Artifact`, and no prompt or grader body mentions it.
+
+Verdict-header regex is bold-tolerant (`\*{0,2}(?:PASS|WARN|FAIL)\*{0,2}`):
+the model sometimes wraps the verdict word in markdown bold (`**FAIL**`),
+the same quirk Task 16 already noted in its methodology.
+
+**18 cases** = 7 security-reviewer (`tests/fixtures/security/`) + 8
+terraform-plan-reviewer (`tests/fixtures/terraform/`) + 3 code-reviewer
+(`tests/fixtures/code-reviewer/`), one per existing fixture file. Structural
+compliance (case count, deterministic-only gating graders, no `Artifact`
+reference, fixture existence, CI job shape) is asserted by
+`tests/schemas/evals-config.test.ts` (216 assertions, all passing) — a Layer 1
+test, zero LLM cost.
+
+### Hash-keyed skip wrapper: `tests/scripts/run-evals.mjs`
+
+`claude plugin eval` has no cross-run cache — every invocation re-runs every
+selected case's `runs` agent calls, live, at cost. The wrapper hashes
+`sha256(agent.md content + fixture content + resolved model)` per case
+(mirrors `tests/helpers/cache.ts`'s key, keyed to the manifest instead of a
+promptfoo test) and records each case's result under its hash in the
+gitignored `tests/.eval-cache/results.json`. A case is only re-run when its
+agent prompt or fixture actually changed since the recorded hash — exactly
+the moments (e.g. Task 28/29 prose edits) when a fresh, paid run is
+warranted. The cache is saved after every case (not only at the end), so a
+crash or interrupt partway through an 18-case run doesn't lose the cases that
+already completed and were paid for.
+
+### Manual-trigger CI job
+
+`.github/workflows/agent-tests.yml` gained a `plugin-eval` job, gated on
+`workflow_dispatch` and its own `run_plugin_eval` input (default `false`) —
+never on `pull_request`/`push`, matching the existing `behavioral-assertions`
+/ `semantic-evaluation` jobs' manual-only convention. It installs the
+`claude` CLI (`npm install -g @anthropic-ai/claude-code@latest`, the same
+approach `release.yml` already uses), restores `tests/.eval-cache/` via
+`actions/cache@v5`, verifies the generated case tree isn't stale
+(`generate-evals.mjs --check`), then runs
+`node tests/scripts/run-evals.mjs --threshold 0.67` and uploads the report
+directory as an artifact.
+
+### Baseline run (FR-HM34, D28)
+
+Run against the agents **as they stand at Task 27** (pre-Task-28 frontmatter
+re-tier, pre-Task-29 verification-pass prose) — i.e. this *is* the baseline
+that Task 30's "D28 eval gate passes" criterion and Task 29's Layer 2
+redacted-baseline comparison will be checked against.
+
+**Command to reproduce** (run from the repo root; requires a local `claude`
+login or `ANTHROPIC_API_KEY`):
+
+```bash
+node tests/scripts/run-evals.mjs \
+  --runs 3 --ablation none --threshold 0 \
+  --concurrency 4 --max-cost-usd 40 \
+  --json /tmp/eval-baseline-final.json \
+  --report-dir /tmp/eval-baseline-reports
+```
+
+**Scoping note on ablation:** this one-time baseline capture used
+`--ablation none` (single arm) to bound cost/time — running the default
+`with-without` ablation would double every agent invocation (108 runs instead
+of 54) for a delta that is definitionally near-100% here (the no-plugin arm
+cannot dispatch a namespaced plugin agent at all, so its `tool_used` grader
+fails by construction on every case). The wrapper's own default, and the
+manual CI job above, both keep `--ablation with-without` per FR-HM34 ("ablation
+stays on for reporting"); only this specific baseline-capture invocation
+overrode it to `none`.
+
+**Recall table** (18 cases, 3 runs each, single arm; ✓ = grader passed that
+run):
+
+| Case | Agent | Planted | Run 1 | Run 2 | Run 3 | Found (majority) | Verdict pass |
+|------|-------|--------:|:-----:|:-----:|:-----:|:-----------------:|:------------:|
+| sec-clean-code | security-reviewer | 0 | n/a | n/a | n/a | n/a | 3/3 |
+| sec-hardcoded-secret | security-reviewer | 1 | ✓ | ✓ | ✓ | 1/1 | 3/3 |
+| sec-sql-injection | security-reviewer | 1 | ✓ | ✓ | ✓ | 1/1 | 3/3 |
+| sec-xss-vuln | security-reviewer | 1 | ✓ | ✓ | ✓ | 1/1 | 3/3 |
+| sec-missing-auth | security-reviewer | 1 | ✓ | ✓ | ✓ | 1/1 | 3/3 |
+| sec-weak-csrf | security-reviewer | 1 | ✓ | ✓ | ✓ | 1/1 | 3/3 |
+| sec-mixed-severity | security-reviewer | 3 | ✓✓✓ | ✓✓✓ | ✓✓✓ | 3/3 | 3/3 |
+| tf-destructive-rds | terraform-plan-reviewer | 1 | ✓ | ✓ | ✓ | 1/1 | 3/3 |
+| tf-missing-tags | terraform-plan-reviewer | 1 | ✓ | ✓ | ✓ | 1/1 | 3/3 |
+| tf-clean-plan-txt | terraform-plan-reviewer | 0 | n/a | n/a | n/a | n/a | **1/3** |
+| tf-empty-plan | terraform-plan-reviewer | 0 | n/a | n/a | n/a | n/a | 3/3 |
+| tf-clean-plan-json | terraform-plan-reviewer | 0 | n/a | n/a | n/a | n/a | 3/3 |
+| tf-multi-issue | terraform-plan-reviewer | 3 | ✓✓✓ | ✓✓✓ | ✓✓✓ | 3/3 | 3/3 |
+| tf-wide-open-sg | terraform-plan-reviewer | 1 | ✓ | ✓ | ✓ | 1/1 | 3/3 |
+| tf-surprise-cost-poc | terraform-plan-reviewer | 1 | ✓ | ✓ | ✗ | 1/1 | **2/3** |
+| cr-clean-code | code-reviewer | 0 | n/a | n/a | n/a | n/a | 3/3 |
+| cr-god-object | code-reviewer | 1 | ✓ | ✓ | ✓ | 1/1 | 3/3 |
+| cr-missing-error-handling | code-reviewer | 1 | ✓ | ✓ | ✓ | 1/1 | 3/3 |
+| **Total** | | **17** | | | | **17/17** | **51/54** |
+
+**Aggregate recall: 17/17 planted issues found (majority vote across 3 runs)
+= 100.0%.** Every planted issue that was found, was found in *all three*
+runs of its case — zero per-run flakiness on issue detection in this
+baseline. The only variance was in the **verdict header**, on two 0-planted
+("clean") fixtures/one WARN-tolerant fixture, neither of which affects
+recall:
+
+- **`tf-clean-plan-txt`** (expected `PASS` only): 1/3 runs matched `PASS`; the
+  other 2 runs produced some other verdict word (the run scaffold — and its
+  `trace.jsonl` — is not retained by default, so the exact alternate word
+  wasn't captured by this run; terraform-plan-reviewer is the more
+  conservative of the three agents in this suite, so `WARN` on a technically
+  clean plan is the likely candidate). Since this fixture plants zero
+  issues, this is a verdict-stability observation only, not a recall miss —
+  flagged here per D28's "the baseline's own variance is recorded."
+- **`tf-surprise-cost-poc`** (expected `WARN|FAIL`): 2/3 runs matched; the
+  planted-issue grader (surprise-cost language) still passed 2/3 runs, so it
+  counts as found under the majority-vote rule.
+
+**Verdict distribution** across all 54 runs: 51 matched their case's expected
+verdict pattern (94.4%); the 3 divergences above are the entirety of the
+mismatch.
+
+**Discovered while authoring the manifest:** `tests/fixtures/code-reviewer/clean-code.diff`
+is not actually free of code-quality issues — it uses `ConflictError` without
+ever importing it, a genuine `ReferenceError`-at-runtime bug. A correctly
+functioning `code-reviewer` therefore returns `FAIL`, not `PASS`, on this
+fixture (confirmed empirically: 3/3 runs here, and consistent with Task 16's
+own table, which recorded `FAIL, FAIL` post-Task-16). The manifest's expected
+verdict for `cr-clean-code` was set to `WARN|FAIL` accordingly — this fixture
+is "clean" only in the sense that it plants no *security* issue (it is
+reused, as a separate file, by `security-reviewer`'s clean-code case too),
+not that it is bug-free.
+
+**Cost:** $16.26 total for this single-arm, 18-case × 3-run baseline capture
+(mean ≈ $0.30/run). Per-case cost ranged $0.43 (`tf-empty-plan`, the
+smallest/simplest input) to $1.47 (`tf-multi-issue`, the largest fixture with
+the most findings to enumerate).
