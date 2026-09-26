@@ -35,6 +35,8 @@ describe('Task 2: multi_model_review block in defaults.yaml', () => {
       'include_native_reviewers:',
       'min_family_diversity:',
       'min_proposers_to_proceed:',
+      'per_reviewer_timeout_seconds:',
+      'context:',
       'reviewers:',
       'aggregator:',
       'per_command:',
@@ -53,6 +55,8 @@ describe('Task 2: multi_model_review block in defaults.yaml', () => {
         'include_native_reviewers:',
         'min_family_diversity:',
         'min_proposers_to_proceed:',
+        'per_reviewer_timeout_seconds:',
+        'context:',
         'reviewers:',
         'aggregator:',
         'per_command:',
@@ -65,6 +69,68 @@ describe('Task 2: multi_model_review block in defaults.yaml', () => {
         expect(idx).toBeGreaterThan(0);
         const window = lines.slice(Math.max(0, idx - 5), idx + 1).join('\n');
         expect(window).toMatch(/#/);
+      }
+    });
+  });
+
+  describe('Task 24 (FR-HM44): multi_model_review.context.* and per_reviewer_timeout_seconds', () => {
+    let parsed: any;
+    beforeAll(async () => {
+      try {
+        const yaml = await import('yaml');
+        parsed = yaml.parse(content);
+      } catch {
+        const yaml = await import('js-yaml');
+        parsed = (yaml as any).load(content);
+      }
+    });
+
+    it('multi_model_review.per_reviewer_timeout_seconds defaults to 180', () => {
+      expect(parsed.multi_model_review.per_reviewer_timeout_seconds).toBe(180);
+    });
+
+    it('multi_model_review.context block is defined', () => {
+      expect(parsed.multi_model_review.context).toBeDefined();
+      expect(typeof parsed.multi_model_review.context).toBe('object');
+    });
+
+    it('multi_model_review.context.max_bundle_bytes defaults to 204800 (200 KB, FR-MR28)', () => {
+      expect(parsed.multi_model_review.context.max_bundle_bytes).toBe(204800);
+    });
+
+    it('multi_model_review.context.max_file_bytes defaults to 65536 (64 KB, FR-MR28)', () => {
+      expect(parsed.multi_model_review.context.max_file_bytes).toBe(65536);
+    });
+
+    it('multi_model_review.context.convention_paths mirrors code_review.convention_sources', () => {
+      expect(parsed.multi_model_review.context.convention_paths).toEqual(
+        parsed.code_review.convention_sources
+      );
+      expect(parsed.multi_model_review.context.convention_paths).toEqual([
+        'CLAUDE.md',
+        '.eslintrc',
+        '.prettierrc',
+      ]);
+    });
+
+    it('multi_model_review.context.spec_paths mirrors code_review.spec_paths', () => {
+      expect(parsed.multi_model_review.context.spec_paths).toEqual(parsed.code_review.spec_paths);
+      expect(parsed.multi_model_review.context.spec_paths).toEqual(['docs/specs']);
+    });
+
+    it('each new key has a preceding comment', () => {
+      const keys = [
+        'max_bundle_bytes:',
+        'max_file_bytes:',
+        'convention_paths:',
+        'spec_paths:',
+      ];
+      const lines = content.split('\n');
+      for (const k of keys) {
+        const idx = lines.findIndex((l) => l.includes(k));
+        expect(idx, `Expected to find line containing ${k}`).toBeGreaterThan(0);
+        const window = lines.slice(Math.max(0, idx - 5), idx + 1).join('\n');
+        expect(window, `Expected a comment above ${k}`).toMatch(/#/);
       }
     });
   });
