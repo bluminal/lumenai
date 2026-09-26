@@ -138,11 +138,14 @@ export const COMMAND_DESCRIPTIONS = {
 
 // FR-HM10: agent wrappers are model-invocable, not user-invocable, and stay
 // off the Codex catalog budget's implicit-invocation path (see the
-// `agents/openai.yaml` sibling this generator also writes). Descriptions
-// live in this table today; Task 28 repoints `agentDescription()` at each
-// agent's own frontmatter `description:` field once PR-A lands, without
-// touching any other call site. Each entry must be <= 120 characters and a
-// concrete one-line summary of what the agent does.
+// `agents/openai.yaml` sibling this generator also writes). Task 28 (PR-A,
+// D10) landed the frontmatter `description:` on all 28 agents, sourced
+// verbatim from this table so wrapper text and frontmatter text agree; the
+// table itself is now only a fallback `agentDescription()` reaches for if a
+// canonical agent file is somehow missing its own frontmatter `description:`
+// (see the Layer-1 guard in tests/schemas/agent-frontmatter.test.ts, which
+// asserts that fallback path is never exercised). Each entry must be <= 120
+// characters and a concrete one-line summary of what the agent does.
 export const AGENT_DESCRIPTIONS = {
   architect:
     'Reviews system architecture, feasibility, and technical trade-offs; writes ADRs and RFC sections.',
@@ -257,6 +260,42 @@ export function extractTitle(source) {
   return stripFrontmatter(source).match(/^#\s+(.+)$/m)?.[1]?.trim();
 }
 
+/**
+ * Extracts the single-line `description:` frontmatter value from a
+ * canonical agent definition (Task 28, FR-HM14 PR-A, D10). Every agent's
+ * frontmatter renders the value as a single-line JSON string (matching how
+ * `skillContents` below renders wrapper descriptions), so scanning line by
+ * line for `description: "..."` and `JSON.parse`-ing the remainder is
+ * sufficient; no YAML parser is needed. Scoped to lines before the closing
+ * `---` fence so a body that happens to contain a `description:`-looking
+ * line (prose, a table, a code sample) is never picked up.
+ *
+ * @param {string} source
+ * @returns {string | undefined}
+ */
+export function extractFrontmatterDescription(source) {
+  if (!source.startsWith(`${FRONTMATTER_FENCE}\n`)) return undefined;
+
+  const lines = source.split('\n');
+  for (let i = 1; i < lines.length; i += 1) {
+    if (lines[i] === FRONTMATTER_FENCE) return undefined;
+
+    const match = lines[i].match(/^description:\s*(.*)$/);
+    if (!match) continue;
+
+    try {
+      return JSON.parse(match[1]);
+    } catch {
+      // Not a JSON-quoted scalar; fall back to the raw trimmed text rather
+      // than throwing, since a hand-edited unquoted description: value is
+      // still a valid single-line description.
+      return match[1].trim();
+    }
+  }
+
+  return undefined;
+}
+
 function sourceEntries(kind) {
   const entries = claudeManifest[`${kind}s`];
   if (!Array.isArray(entries)) {
@@ -301,19 +340,31 @@ function commandDescription(slug) {
 }
 
 /**
- * Looks up an agent wrapper's description. This is the one function Task
- * 28 repoints at the agent's own frontmatter `description:` field once
- * PR-A lands; every other reference to an agent wrapper's description goes
- * through this function so that change has a single call site.
+ * Looks up an agent wrapper's description. Task 28 (PR-A, D10) repointed
+ * this at the agent's own canonical frontmatter `description:` field;
+ * every other reference to an agent wrapper's description goes through
+ * this function so that change has a single call site. The
+ * `AGENT_DESCRIPTIONS` table is consulted only as a fallback for an agent
+ * whose canonical file is missing a frontmatter `description:` — Layer 1
+ * (tests/schemas/agent-frontmatter.test.ts) asserts every one of the 28
+ * agents has one, so this fallback should never actually fire.
  *
  * @param {string} slug
  */
 function agentDescription(slug) {
-  const description = AGENT_DESCRIPTIONS[slug];
-  if (!description) {
-    throw new Error(`Missing AGENT_DESCRIPTIONS entry for agent: ${slug}`);
+  const sourcePath = join(pluginRoot, 'agents', `${slug}.md`);
+  const frontmatterDescription = existsSync(sourcePath)
+    ? extractFrontmatterDescription(readFileSync(sourcePath, 'utf8'))
+    : undefined;
+  if (frontmatterDescription) return frontmatterDescription;
+
+  const fallback = AGENT_DESCRIPTIONS[slug];
+  if (!fallback) {
+    throw new Error(
+      `Missing description for agent: ${slug} (no frontmatter description: and no AGENT_DESCRIPTIONS fallback)`,
+    );
   }
-  return description;
+  return fallback;
 }
 
 // FR-HM12 (Task 20): rendered once from the single-sourced host-matrix.mjs

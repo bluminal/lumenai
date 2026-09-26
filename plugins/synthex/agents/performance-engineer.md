@@ -1,5 +1,7 @@
 ---
 model: sonnet
+description: "Analyzes full-stack performance: Core Web Vitals, queries, and bundles, with quantified fixes."
+tools: Read, Grep, Glob, Bash
 ---
 
 # Performance Engineer

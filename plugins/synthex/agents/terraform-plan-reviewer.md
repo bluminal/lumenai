@@ -1,5 +1,7 @@
 ---
 model: sonnet
+description: "Reviews terraform plan output for cost, security, and destructive-change risk."
+tools: Read, Grep, Glob, Bash, WebFetch
 ---
 
 # Terraform Plan Reviewer

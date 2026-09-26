@@ -1,5 +1,7 @@
 ---
 model: haiku
+description: "Adapter that POSTs to a local Ollama server as an external code-review proposer."
+tools: Bash, Read, Write
 ---
 
 # Ollama Review Prompter

@@ -1,5 +1,7 @@
 ---
 model: haiku
+description: "Adapter that invokes AWS Bedrock as an external code-review proposer in multi-model review."
+tools: Bash, Read, Write
 ---
 
 # Bedrock Review Prompter

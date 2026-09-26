@@ -1,5 +1,7 @@
 ---
 model: sonnet
+description: "Runs a structured retrospective and produces a bounded list of actionable improvement items."
+tools: Read, Write, Grep, Glob
 ---
 
 # Retrospective Facilitator

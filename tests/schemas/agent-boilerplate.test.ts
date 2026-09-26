@@ -23,6 +23,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { stripFrontmatter } from '../../plugins/synthex/scripts/generate-codex-skills.mjs';
 
 const AGENTS_DIR = join(__dirname, '..', '..', 'plugins', 'synthex', 'agents');
 const FIXTURES_DIR = join(__dirname, '..', 'fixtures', 'agent-boilerplate');
@@ -130,11 +131,27 @@ describe('Task 16 (FR-HM6): specialist agent boilerplate diet', () => {
 
         it(`shrank by at least ${MIN_REDUCTION_BYTES} bytes`, () => {
           const before = sizesBefore[agent].before_bytes;
-          const after = Buffer.byteLength(content, 'utf8');
+          // Compare against the body below the frontmatter fence, not the
+          // whole file (Task 28, FR-HM14 PR-A): `before_bytes` was captured
+          // pre-Task-16 when every agent's frontmatter was a fixed, minimal
+          // `---\nmodel: <tier>\n---\n` block. Task 28 added a per-agent
+          // `description:` line (and, for most agents, a `tools:`
+          // allowlist line) to every frontmatter block, growing it by
+          // anywhere from ~90 to ~300+ bytes depending on the allowlist
+          // length. Several specialists' Task 16 reduction margin over the
+          // 1,536-byte floor was under 30 bytes (e.g. metrics-analyst: 5
+          // bytes; technical-writer: 28 bytes), so comparing whole-file
+          // sizes would fail this test purely from Task 28's frontmatter
+          // growth -- a false failure unrelated to whether Task 16's
+          // boilerplate diet held. Stripping frontmatter from `after` here
+          // isolates the check to the body-diet Task 16 actually performed,
+          // which no later frontmatter-only task should be able to
+          // perturb.
+          const after = Buffer.byteLength(stripFrontmatter(content), 'utf8');
           const reduction = before - after;
           expect(
             reduction,
-            `expected ${agent}.md to shrink by >= ${MIN_REDUCTION_BYTES} bytes ` +
+            `expected ${agent}.md body (below frontmatter) to shrink by >= ${MIN_REDUCTION_BYTES} bytes ` +
               `(before=${before}, after=${after}, reduction=${reduction})`
           ).toBeGreaterThanOrEqual(MIN_REDUCTION_BYTES);
         });

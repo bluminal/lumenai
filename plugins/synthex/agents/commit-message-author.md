@@ -1,5 +1,6 @@
 ---
 model: haiku
+description: "Writes a Conventional-Commits-style commit message from a staged or specified change set."
 ---
 
 # Commit Message Author

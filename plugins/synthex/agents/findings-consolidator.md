@@ -1,5 +1,7 @@
 ---
 model: haiku
+description: "Deduplicates and merges findings from multiple reviewers into one attributed, sorted list."
+tools: Read
 ---
 
 # Findings Consolidator

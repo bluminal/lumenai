@@ -1,5 +1,7 @@
 ---
 model: haiku
+description: "Adapter that invokes the Gemini CLI as an external code-review proposer in multi-model review."
+tools: Bash, Read, Write
 ---
 
 # Gemini Review Prompter

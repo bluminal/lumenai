@@ -1,5 +1,6 @@
 ---
 model: haiku
+description: "Runs fast structural checks on a draft implementation plan before expensive reviewers see it."
 ---
 
 # Plan Linter
