@@ -30,6 +30,183 @@ const claudeManifestPath = join(pluginRoot, '.claude-plugin', 'plugin.json');
 const skillsRoot = join(pluginRoot, 'portable-skills');
 const claudeManifest = JSON.parse(readFileSync(claudeManifestPath, 'utf8'));
 
+// FR-HM9: Codex's default skill-catalog budget is 8,000 characters and 46
+// wrappers already leave little margin under it (see spikes.md Task 6).
+// Descriptions live here, generator-side, rather than in each command's own
+// frontmatter: OQ-2 (spikes.md Task 6) found that Codex silently migrates
+// any *described* command whose rendered skill is <= 4,000 bytes into a
+// second, duplicate `source-command-*` skill at install time. Commands
+// therefore never carry a frontmatter `description:` (guarded by
+// tests/schemas/wrapper-catalog.test.ts), and every command wrapper's
+// description comes only from this table. Each entry must be <= 120
+// characters, be a concrete one-line summary of what the command does (no
+// "Use when the user asks for /synthex:x, $x, ..." boilerplate), and pair
+// with a short `argument-hint` for the generated frontmatter.
+export const COMMAND_DESCRIPTIONS = {
+  init: {
+    description:
+      'Scaffold .synthex/config.yaml and the docs/reqs, docs/plans, docs/specs directories for a new project.',
+    argumentHint: '[config_path]',
+  },
+  'cancel-loop': {
+    description:
+      'Mark a running native-looping loop cancelled; polled at the next iteration boundary. Idempotent.',
+    argumentHint: '<loop_id> | --all',
+  },
+  'configure-multi-model': {
+    description:
+      'Wizard to enable or reconfigure multi-model code review (fan out to OpenAI, Google, Ollama, etc.).',
+    argumentHint: '[config_path]',
+  },
+  'dismiss-upgrade-nudge': {
+    description:
+      'Silence the Synthex SessionStart upgrade nudge for this project until manually re-enabled.',
+    argumentHint: '(no arguments)',
+  },
+  'list-loops': {
+    description: 'List running and recent native-looping loops tracked in .synthex/loops/. Read-only.',
+    argumentHint: '(no arguments)',
+  },
+  loop: {
+    description:
+      'Run an arbitrary prompt iteratively in this thread until a completion promise or max-iterations.',
+    argumentHint: '--prompt <string> | --prompt-file <path> [--max-iterations <int>]',
+  },
+  'next-priority': {
+    description: 'Execute the next highest-priority implementation-plan tasks via the Tech Lead sub-agent.',
+    argumentHint: '[implementation_plan_path] [--loop]',
+  },
+  'refine-requirements': {
+    description:
+      'Run a PRD through multi-agent review for clarity and completeness, then apply the edits.',
+    argumentHint: '[requirements_path] [specs_path] [--loop]',
+  },
+  'write-implementation-plan': {
+    description:
+      'Turn a PRD into a prioritized, parallelizable implementation plan via multi-agent review.',
+    argumentHint: '[requirements_path] [plan_path] [--loop]',
+  },
+  'review-code': {
+    description:
+      'Run craftsmanship, security, and optional performance review on a diff or file set in parallel.',
+    argumentHint: '[target] [--loop]',
+  },
+  'write-adr': {
+    description: 'Create an Architecture Decision Record interactively with the Architect sub-agent.',
+    argumentHint: '<title>',
+  },
+  'write-rfc': {
+    description:
+      'Create an RFC for a significant technical proposal via PM, Architect, and Security review.',
+    argumentHint: '<title>',
+  },
+  'test-coverage-analysis': {
+    description:
+      'Analyze test coverage gaps and quality, optionally writing tests for the highest-priority gaps.',
+    argumentHint: '[scope] [write_tests]',
+  },
+  'design-system-audit': {
+    description:
+      'Audit the frontend for design-token violations, misused components, and accessibility issues.',
+    argumentHint: '[scope]',
+  },
+  retrospective: {
+    description:
+      'Facilitate a structured end-of-cycle retrospective combining metrics with qualitative findings.',
+    argumentHint: '[scope] [implementation_plan_path]',
+  },
+  'reliability-review': {
+    description: "Assess a service's operational readiness: SLOs, observability, runbooks, deployment risk.",
+    argumentHint: '[scope]',
+  },
+  'performance-audit': {
+    description: 'Run a full-stack performance audit quantifying bottlenecks against budgets with fixes.',
+    argumentHint: '[scope] [url]',
+  },
+  star: {
+    description: 'Ask whether the user wants to star the Lumenai repo on GitHub, then help them do it.',
+    argumentHint: '(no arguments)',
+  },
+};
+
+// FR-HM10: agent wrappers are model-invocable, not user-invocable, and stay
+// off the Codex catalog budget's implicit-invocation path (see the
+// `agents/openai.yaml` sibling this generator also writes). Descriptions
+// live in this table today; Task 28 repoints `agentDescription()` at each
+// agent's own frontmatter `description:` field once PR-A lands, without
+// touching any other call site. Each entry must be <= 120 characters and a
+// concrete one-line summary of what the agent does.
+export const AGENT_DESCRIPTIONS = {
+  architect:
+    'Reviews system architecture, feasibility, and technical trade-offs; writes ADRs and RFC sections.',
+  'audit-artifact-writer':
+    'Writes per-invocation multi-model review audit markdown files from a unified findings envelope.',
+  'bedrock-review-prompter':
+    'Adapter that invokes AWS Bedrock as an external code-review proposer in multi-model review.',
+  'claude-review-prompter':
+    'Specialty adapter invoking a second Claude CLI session as an external multi-model review proposer.',
+  'code-reviewer':
+    'Reviews code for craftsmanship, correctness, convention adherence, and reuse opportunities.',
+  'codex-review-prompter':
+    'Adapter that invokes the OpenAI Codex CLI as an external proposer in multi-model review.',
+  'commit-message-author':
+    'Writes a Conventional-Commits-style commit message from a staged or specified change set.',
+  'context-bundle-assembler':
+    'Assembles the shared context bundle (files, diffs, conventions) delivered to review proposers.',
+  'design-system-agent':
+    'Owns the design token registry and component library; audits frontend design-system compliance.',
+  'findings-consolidator':
+    'Deduplicates and merges findings from multiple reviewers into one attributed, sorted list.',
+  'gemini-review-prompter':
+    'Adapter that invokes the Gemini CLI as an external code-review proposer in multi-model review.',
+  'lead-frontend-engineer':
+    'Leads frontend delivery: UI implementation, UX quality, accessibility, and design-system use.',
+  'llm-review-prompter':
+    "Adapter that invokes Simon Willison's llm CLI as an external code-review proposer.",
+  'metrics-analyst':
+    'Reports DORA, HEART, and AARRR metrics and tracks OKR progress from engineering data.',
+  'multi-model-review-orchestrator':
+    'Fans a review out to native and external CLI proposers in parallel and consolidates findings.',
+  'ollama-review-prompter':
+    'Adapter that POSTs to a local Ollama server as an external code-review proposer.',
+  'performance-engineer':
+    'Analyzes full-stack performance: Core Web Vitals, queries, and bundles, with quantified fixes.',
+  'plan-linter':
+    'Runs fast structural checks on a draft implementation plan before expensive reviewers see it.',
+  'plan-scribe':
+    "Applies the Product Manager's decided edits to an implementation plan document mechanically.",
+  'product-manager':
+    'Gathers requirements and turns them into a prioritized, value-driven implementation plan.',
+  'quality-engineer':
+    'Designs test strategy, writes test suites, and analyzes coverage gaps across the codebase.',
+  'retrospective-facilitator':
+    'Runs a structured retrospective and produces a bounded list of actionable improvement items.',
+  'security-reviewer':
+    'Reviews code for vulnerabilities, secret leaks, and access-control defects as a security gate.',
+  'sre-agent': 'Defines SLOs, designs observability, writes runbooks, and assesses deployment risk.',
+  'tech-lead': 'Primary coding and orchestration agent; implements features and delegates to specialists.',
+  'technical-writer': 'Writes and maintains API docs, user guides, migration guides, and changelogs.',
+  'terraform-plan-reviewer':
+    'Reviews terraform plan output for cost, security, and destructive-change risk.',
+  'ux-researcher':
+    'Designs research plans and produces personas, journey maps, and Opportunity Solution Trees.',
+};
+
+// FR-HM9: one shared agentskills.io `compatibility` sentence for every
+// command wrapper. None of the generated wrappers execute scripts
+// themselves (they only point at the canonical file to read), so a single
+// sentence describing the minimal host requirement covers all 18.
+export const COMMAND_COMPATIBILITY = 'Requires a shell tool; node or jq optional';
+
+// FR-HM10: Codex reads `agents/openai.yaml` next to each agent wrapper's
+// SKILL.md (see https://learn.chatgpt.com/docs/build-skills). Setting
+// `policy.allow_implicit_invocation: false` keeps agent wrappers off
+// Codex's implicit-invocation / catalog-budget path entirely, matching the
+// Grok-honored `user-invocable: false` frontmatter field on the same
+// wrapper's SKILL.md.
+export const AGENT_OPENAI_YAML =
+  '# Generated by scripts/generate-codex-skills.mjs; do not edit.\npolicy:\n  allow_implicit_invocation: false\n';
+
 /**
  * Strips a leading YAML frontmatter block from a canonical command or agent
  * definition, returning only the Markdown body.
@@ -100,27 +277,65 @@ function sourceEntries(kind) {
   });
 }
 
-function skillDescription({ kind, slug, title }) {
-  if (kind === 'command') {
-    return `Run the Synthex ${title} workflow. Use when the user asks for /synthex:${slug}, $${slug}, or the equivalent ${slug} command.`;
+/**
+ * Looks up a command wrapper's generator-side description and argument
+ * hint. Commands never source a description from their own frontmatter
+ * (OQ-2: spikes.md Task 6) so this table is the only place a command
+ * wrapper's description lives.
+ *
+ * @param {string} slug
+ */
+function commandDescription(slug) {
+  const entry = COMMAND_DESCRIPTIONS[slug];
+  if (!entry) {
+    throw new Error(`Missing COMMAND_DESCRIPTIONS entry for command: ${slug}`);
   }
+  return entry;
+}
 
-  return `Use the Synthex ${title} specialist. Trigger for direct ${title.toLowerCase()} work or when another Synthex workflow delegates to the ${slug} agent.`;
+/**
+ * Looks up an agent wrapper's description. This is the one function Task
+ * 28 repoints at the agent's own frontmatter `description:` field once
+ * PR-A lands; every other reference to an agent wrapper's description goes
+ * through this function so that change has a single call site.
+ *
+ * @param {string} slug
+ */
+function agentDescription(slug) {
+  const description = AGENT_DESCRIPTIONS[slug];
+  if (!description) {
+    throw new Error(`Missing AGENT_DESCRIPTIONS entry for agent: ${slug}`);
+  }
+  return description;
 }
 
 function skillContents(entry) {
   const skillDir = join(skillsRoot, entry.slug);
   const sourcePath = resolve(pluginRoot, entry.manifestPath);
   const canonicalPath = relative(skillDir, sourcePath).split(sep).join('/');
-  const description = skillDescription(entry);
-  const invocationRule =
-    entry.kind === 'command'
-      ? "Execute the requested workflow. When it names a Synthex agent, delegate with the host harness's subagent mechanism when the source calls for delegation, and tell that subagent to read the matching file under `agents/` completely before acting."
-      : 'Adopt the identity, responsibilities, review criteria, behavioral rules, and output contract in the source. If you are running as a delegated subagent, return the requested result to the caller.';
+  const isCommand = entry.kind === 'command';
+  const description = isCommand
+    ? commandDescription(entry.slug).description
+    : agentDescription(entry.slug);
+  const invocationRule = isCommand
+    ? "Execute the requested workflow. When it names a Synthex agent, delegate with the host harness's subagent mechanism when the source calls for delegation, and tell that subagent to read the matching file under `agents/` completely before acting."
+    : 'Adopt the identity, responsibilities, review criteria, behavioral rules, and output contract in the source. If you are running as a delegated subagent, return the requested result to the caller.';
+
+  const frontmatterLines = [`name: ${entry.slug}`, `description: ${JSON.stringify(description)}`];
+  if (isCommand) {
+    const { argumentHint } = commandDescription(entry.slug);
+    frontmatterLines.push(
+      `argument-hint: ${JSON.stringify(argumentHint)}`,
+      `compatibility: ${JSON.stringify(COMMAND_COMPATIBILITY)}`,
+      'metadata:',
+      `  short-description: ${JSON.stringify(description)}`,
+    );
+  } else {
+    frontmatterLines.push('user-invocable: false');
+  }
 
   return `---
-name: ${entry.slug}
-description: ${JSON.stringify(description)}
+${frontmatterLines.join('\n')}
 ---
 
 ${GENERATED_MARKER}
@@ -154,11 +369,27 @@ function main() {
       if (!existsSync(skillPath) || readFileSync(skillPath, 'utf8') !== expected) {
         mismatches.push(relative(pluginRoot, skillPath));
       }
-      continue;
+    } else {
+      mkdirSync(skillDir, { recursive: true });
+      writeFileSync(skillPath, expected);
     }
 
-    mkdirSync(skillDir, { recursive: true });
-    writeFileSync(skillPath, expected);
+    // FR-HM10: agent wrappers carry a sibling `agents/openai.yaml` (Codex
+    // reads it) that turns off implicit invocation, alongside the
+    // `user-invocable: false` frontmatter field on SKILL.md itself.
+    if (entry.kind === 'agent') {
+      const openaiYamlDir = join(skillDir, 'agents');
+      const openaiYamlPath = join(openaiYamlDir, 'openai.yaml');
+
+      if (checkOnly) {
+        if (!existsSync(openaiYamlPath) || readFileSync(openaiYamlPath, 'utf8') !== AGENT_OPENAI_YAML) {
+          mismatches.push(relative(pluginRoot, openaiYamlPath));
+        }
+      } else {
+        mkdirSync(openaiYamlDir, { recursive: true });
+        writeFileSync(openaiYamlPath, AGENT_OPENAI_YAML);
+      }
+    }
   }
 
   if (existsSync(skillsRoot)) {

@@ -1,0 +1,473 @@
+{
+  "capturedAt": "2026-09-26T00:45:51.266Z",
+  "harness": "codex",
+  "version": "codex-cli 0.154.0",
+  "totalSkillsInCatalog": 52,
+  "synthexCount": 46,
+  "totalRenderedChars": 7476,
+  "blankDescriptionCount": 0,
+  "shortenedDescriptionCount": 0,
+  "sourceCommandSkillNames": [],
+  "skills": [
+    {
+      "id": "architect",
+      "kind": "agent",
+      "name": "synthex:architect",
+      "description": "Use the Synthex Architect specialist. Trigger for direct architect work or when another Synthex workflow delegates to the architect agent.",
+      "descriptionChars": 138,
+      "sourceDescriptionChars": 138,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "audit-artifact-writer",
+      "kind": "agent",
+      "name": "synthex:audit-artifact-writer",
+      "description": "Use the Synthex Audit Artifact Writer specialist. Trigger for direct audit artifact writer work or when another Synthex workflow delegates to the audit-artifact-writer agent.",
+      "descriptionChars": 174,
+      "sourceDescriptionChars": 174,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "bedrock-review-prompter",
+      "kind": "agent",
+      "name": "synthex:bedrock-review-prompter",
+      "description": "Use the Synthex Bedrock Review Prompter specialist. Trigger for direct bedrock review prompter work or when another Synthex workflow delegates to the bedrock-review-prompter agent.",
+      "descriptionChars": 180,
+      "sourceDescriptionChars": 180,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "cancel-loop",
+      "kind": "command",
+      "name": "synthex:cancel-loop",
+      "description": "Run the Synthex Cancel one or all native-looping loops workflow. Use when the user asks for /synthex:cancel-loop, $cancel-loop, or the equivalent cancel-loop command.",
+      "descriptionChars": 166,
+      "sourceDescriptionChars": 166,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "claude-review-prompter",
+      "kind": "agent",
+      "name": "synthex:claude-review-prompter",
+      "description": "Use the Synthex Claude Review Prompter specialist. Trigger for direct claude review prompter work or when another Synthex workflow delegates to the claude-review-prompter agent.",
+      "descriptionChars": 177,
+      "sourceDescriptionChars": 177,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "code-reviewer",
+      "kind": "agent",
+      "name": "synthex:code-reviewer",
+      "description": "Use the Synthex Code Reviewer specialist. Trigger for direct code reviewer work or when another Synthex workflow delegates to the code-reviewer agent.",
+      "descriptionChars": 150,
+      "sourceDescriptionChars": 150,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "codex-review-prompter",
+      "kind": "agent",
+      "name": "synthex:codex-review-prompter",
+      "description": "Use the Synthex Codex Review Prompter specialist. Trigger for direct codex review prompter work or when another Synthex workflow delegates to the codex-review-prompter agent.",
+      "descriptionChars": 174,
+      "sourceDescriptionChars": 174,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "commit-message-author",
+      "kind": "agent",
+      "name": "synthex:commit-message-author",
+      "description": "Use the Synthex Commit Message Author specialist. Trigger for direct commit message author work or when another Synthex workflow delegates to the commit-message-author agent.",
+      "descriptionChars": 174,
+      "sourceDescriptionChars": 174,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "configure-multi-model",
+      "kind": "command",
+      "name": "synthex:configure-multi-model",
+      "description": "Run the Synthex Configure Multi-Model Review workflow. Use when the user asks for /synthex:configure-multi-model, $configure-multi-model, or the equivalent configure-multi-model command.",
+      "descriptionChars": 186,
+      "sourceDescriptionChars": 186,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "context-bundle-assembler",
+      "kind": "agent",
+      "name": "synthex:context-bundle-assembler",
+      "description": "Use the Synthex Context Bundle Assembler specialist. Trigger for direct context bundle assembler work or when another Synthex workflow delegates to the context-bundle-assembler agent.",
+      "descriptionChars": 183,
+      "sourceDescriptionChars": 183,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "design-system-agent",
+      "kind": "agent",
+      "name": "synthex:design-system-agent",
+      "description": "Use the Synthex Design System Agent specialist. Trigger for direct design system agent work or when another Synthex workflow delegates to the design-system-agent agent.",
+      "descriptionChars": 168,
+      "sourceDescriptionChars": 168,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "design-system-audit",
+      "kind": "command",
+      "name": "synthex:design-system-audit",
+      "description": "Run the Synthex Design System Audit workflow. Use when the user asks for /synthex:design-system-audit, $design-system-audit, or the equivalent design-system-audit command.",
+      "descriptionChars": 171,
+      "sourceDescriptionChars": 171,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "dismiss-upgrade-nudge",
+      "kind": "command",
+      "name": "synthex:dismiss-upgrade-nudge",
+      "description": "Run the Synthex Dismiss Synthex Upgrade Nudge workflow. Use when the user asks for /synthex:dismiss-upgrade-nudge, $dismiss-upgrade-nudge, or the equivalent dismiss-upgrade-nudge command.",
+      "descriptionChars": 187,
+      "sourceDescriptionChars": 187,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "findings-consolidator",
+      "kind": "agent",
+      "name": "synthex:findings-consolidator",
+      "description": "Use the Synthex Findings Consolidator specialist. Trigger for direct findings consolidator work or when another Synthex workflow delegates to the findings-consolidator agent.",
+      "descriptionChars": 174,
+      "sourceDescriptionChars": 174,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "gemini-review-prompter",
+      "kind": "agent",
+      "name": "synthex:gemini-review-prompter",
+      "description": "Use the Synthex Gemini Review Prompter specialist. Trigger for direct gemini review prompter work or when another Synthex workflow delegates to the gemini-review-prompter agent.",
+      "descriptionChars": 177,
+      "sourceDescriptionChars": 177,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "init",
+      "kind": "command",
+      "name": "synthex:init",
+      "description": "Run the Synthex Initialize Synthex workflow. Use when the user asks for /synthex:init, $init, or the equivalent init command.",
+      "descriptionChars": 125,
+      "sourceDescriptionChars": 125,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "lead-frontend-engineer",
+      "kind": "agent",
+      "name": "synthex:lead-frontend-engineer",
+      "description": "Use the Synthex Lead Frontend Engineer specialist. Trigger for direct lead frontend engineer work or when another Synthex workflow delegates to the lead-frontend-engineer agent.",
+      "descriptionChars": 177,
+      "sourceDescriptionChars": 177,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "list-loops",
+      "kind": "command",
+      "name": "synthex:list-loops",
+      "description": "Run the Synthex List native-looping loops in this project workflow. Use when the user asks for /synthex:list-loops, $list-loops, or the equivalent list-loops command.",
+      "descriptionChars": 166,
+      "sourceDescriptionChars": 166,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "llm-review-prompter",
+      "kind": "agent",
+      "name": "synthex:llm-review-prompter",
+      "description": "Use the Synthex LLM Review Prompter specialist. Trigger for direct llm review prompter work or when another Synthex workflow delegates to the llm-review-prompter agent.",
+      "descriptionChars": 168,
+      "sourceDescriptionChars": 168,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "loop",
+      "kind": "command",
+      "name": "synthex:loop",
+      "description": "Run the Synthex Loop a prompt natively workflow. Use when the user asks for /synthex:loop, $loop, or the equivalent loop command.",
+      "descriptionChars": 129,
+      "sourceDescriptionChars": 129,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "metrics-analyst",
+      "kind": "agent",
+      "name": "synthex:metrics-analyst",
+      "description": "Use the Synthex Metrics Analyst specialist. Trigger for direct metrics analyst work or when another Synthex workflow delegates to the metrics-analyst agent.",
+      "descriptionChars": 156,
+      "sourceDescriptionChars": 156,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "multi-model-review-orchestrator",
+      "kind": "agent",
+      "name": "synthex:multi-model-review-orchestrator",
+      "description": "Use the Synthex Multi-Model Review Orchestrator specialist. Trigger for direct multi-model review orchestrator work or when another Synthex workflow delegates to the multi-model-review-orchestrator agent.",
+      "descriptionChars": 204,
+      "sourceDescriptionChars": 204,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "next-priority",
+      "kind": "command",
+      "name": "synthex:next-priority",
+      "description": "Run the Synthex Next Priority workflow. Use when the user asks for /synthex:next-priority, $next-priority, or the equivalent next-priority command.",
+      "descriptionChars": 147,
+      "sourceDescriptionChars": 147,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "ollama-review-prompter",
+      "kind": "agent",
+      "name": "synthex:ollama-review-prompter",
+      "description": "Use the Synthex Ollama Review Prompter specialist. Trigger for direct ollama review prompter work or when another Synthex workflow delegates to the ollama-review-prompter agent.",
+      "descriptionChars": 177,
+      "sourceDescriptionChars": 177,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "performance-audit",
+      "kind": "command",
+      "name": "synthex:performance-audit",
+      "description": "Run the Synthex Performance Audit workflow. Use when the user asks for /synthex:performance-audit, $performance-audit, or the equivalent performance-audit command.",
+      "descriptionChars": 163,
+      "sourceDescriptionChars": 163,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "performance-engineer",
+      "kind": "agent",
+      "name": "synthex:performance-engineer",
+      "description": "Use the Synthex Performance Engineer specialist. Trigger for direct performance engineer work or when another Synthex workflow delegates to the performance-engineer agent.",
+      "descriptionChars": 171,
+      "sourceDescriptionChars": 171,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "plan-linter",
+      "kind": "agent",
+      "name": "synthex:plan-linter",
+      "description": "Use the Synthex Plan Linter specialist. Trigger for direct plan linter work or when another Synthex workflow delegates to the plan-linter agent.",
+      "descriptionChars": 144,
+      "sourceDescriptionChars": 144,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "plan-scribe",
+      "kind": "agent",
+      "name": "synthex:plan-scribe",
+      "description": "Use the Synthex Plan Scribe specialist. Trigger for direct plan scribe work or when another Synthex workflow delegates to the plan-scribe agent.",
+      "descriptionChars": 144,
+      "sourceDescriptionChars": 144,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "product-manager",
+      "kind": "agent",
+      "name": "synthex:product-manager",
+      "description": "Use the Synthex Product Manager specialist. Trigger for direct product manager work or when another Synthex workflow delegates to the product-manager agent.",
+      "descriptionChars": 156,
+      "sourceDescriptionChars": 156,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "quality-engineer",
+      "kind": "agent",
+      "name": "synthex:quality-engineer",
+      "description": "Use the Synthex Quality Engineer specialist. Trigger for direct quality engineer work or when another Synthex workflow delegates to the quality-engineer agent.",
+      "descriptionChars": 159,
+      "sourceDescriptionChars": 159,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "refine-requirements",
+      "kind": "command",
+      "name": "synthex:refine-requirements",
+      "description": "Run the Synthex Refine Requirements workflow. Use when the user asks for /synthex:refine-requirements, $refine-requirements, or the equivalent refine-requirements command.",
+      "descriptionChars": 171,
+      "sourceDescriptionChars": 171,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "reliability-review",
+      "kind": "command",
+      "name": "synthex:reliability-review",
+      "description": "Run the Synthex Reliability Review workflow. Use when the user asks for /synthex:reliability-review, $reliability-review, or the equivalent reliability-review command.",
+      "descriptionChars": 167,
+      "sourceDescriptionChars": 167,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "retrospective",
+      "kind": "command",
+      "name": "synthex:retrospective",
+      "description": "Run the Synthex Retrospective workflow. Use when the user asks for /synthex:retrospective, $retrospective, or the equivalent retrospective command.",
+      "descriptionChars": 147,
+      "sourceDescriptionChars": 147,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "retrospective-facilitator",
+      "kind": "agent",
+      "name": "synthex:retrospective-facilitator",
+      "description": "Use the Synthex Retrospective Facilitator specialist. Trigger for direct retrospective facilitator work or when another Synthex workflow delegates to the retrospective-facilitator agent.",
+      "descriptionChars": 186,
+      "sourceDescriptionChars": 186,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "review-code",
+      "kind": "command",
+      "name": "synthex:review-code",
+      "description": "Run the Synthex Review Code workflow. Use when the user asks for /synthex:review-code, $review-code, or the equivalent review-code command.",
+      "descriptionChars": 139,
+      "sourceDescriptionChars": 139,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "security-reviewer",
+      "kind": "agent",
+      "name": "synthex:security-reviewer",
+      "description": "Use the Synthex Security Reviewer specialist. Trigger for direct security reviewer work or when another Synthex workflow delegates to the security-reviewer agent.",
+      "descriptionChars": 162,
+      "sourceDescriptionChars": 162,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "sre-agent",
+      "kind": "agent",
+      "name": "synthex:sre-agent",
+      "description": "Use the Synthex SRE Agent specialist. Trigger for direct sre agent work or when another Synthex workflow delegates to the sre-agent agent.",
+      "descriptionChars": 138,
+      "sourceDescriptionChars": 138,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "star",
+      "kind": "command",
+      "name": "synthex:star",
+      "description": "Run the Synthex Star the Lumenai Repository workflow. Use when the user asks for /synthex:star, $star, or the equivalent star command.",
+      "descriptionChars": 134,
+      "sourceDescriptionChars": 134,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "tech-lead",
+      "kind": "agent",
+      "name": "synthex:tech-lead",
+      "description": "Use the Synthex Tech Lead specialist. Trigger for direct tech lead work or when another Synthex workflow delegates to the tech-lead agent.",
+      "descriptionChars": 138,
+      "sourceDescriptionChars": 138,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "technical-writer",
+      "kind": "agent",
+      "name": "synthex:technical-writer",
+      "description": "Use the Synthex Technical Writer specialist. Trigger for direct technical writer work or when another Synthex workflow delegates to the technical-writer agent.",
+      "descriptionChars": 159,
+      "sourceDescriptionChars": 159,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "terraform-plan-reviewer",
+      "kind": "agent",
+      "name": "synthex:terraform-plan-reviewer",
+      "description": "Use the Synthex Terraform Plan Reviewer specialist. Trigger for direct terraform plan reviewer work or when another Synthex workflow delegates to the terraform-plan-reviewer agent.",
+      "descriptionChars": 180,
+      "sourceDescriptionChars": 180,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "test-coverage-analysis",
+      "kind": "command",
+      "name": "synthex:test-coverage-analysis",
+      "description": "Run the Synthex Test Coverage Analysis workflow. Use when the user asks for /synthex:test-coverage-analysis, $test-coverage-analysis, or the equivalent test-coverage-analysis command.",
+      "descriptionChars": 183,
+      "sourceDescriptionChars": 183,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "ux-researcher",
+      "kind": "agent",
+      "name": "synthex:ux-researcher",
+      "description": "Use the Synthex UX Researcher specialist. Trigger for direct ux researcher work or when another Synthex workflow delegates to the ux-researcher agent.",
+      "descriptionChars": 150,
+      "sourceDescriptionChars": 150,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "write-adr",
+      "kind": "command",
+      "name": "synthex:write-adr",
+      "description": "Run the Synthex Write ADR workflow. Use when the user asks for /synthex:write-adr, $write-adr, or the equivalent write-adr command.",
+      "descriptionChars": 131,
+      "sourceDescriptionChars": 131,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "write-implementation-plan",
+      "kind": "command",
+      "name": "synthex:write-implementation-plan",
+      "description": "Run the Synthex Write Implementation Plan workflow. Use when the user asks for /synthex:write-implementation-plan, $write-implementation-plan, or the equivalent write-implementation-plan command.",
+      "descriptionChars": 195,
+      "sourceDescriptionChars": 195,
+      "blanked": false,
+      "shortened": false
+    },
+    {
+      "id": "write-rfc",
+      "kind": "command",
+      "name": "synthex:write-rfc",
+      "description": "Run the Synthex Write RFC workflow. Use when the user asks for /synthex:write-rfc, $write-rfc, or the equivalent write-rfc command.",
+      "descriptionChars": 131,
+      "sourceDescriptionChars": 131,
+      "blanked": false,
+      "shortened": false
+    }
+  ]
+}
