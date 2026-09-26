@@ -100,6 +100,29 @@ offline lifecycle profile, then invokes only two representative temporary
 probes (`review-code` and `code-reviewer`) against a real provider. The probes
 must return their injected token; their workflow outcomes are not evaluated.
 
+Codex and OpenCode additionally run two tiny, one-turn tool-BEHAVIOR probes
+(Task 23; NFR-HM4, FR-HM7, FR-HM12; D22) that only a real provider can
+exercise — the loopback offline/activation scenarios only assert
+request-side facts, never emitting an actual tool call:
+
+- **Workflow-step probe** (`workflow-step-gate`): a Synthex-style
+  tool-presence gate naming a tool (`Workflow`) that exists on neither
+  host. Passes when the host attempts the nonexistent tool at most once
+  (FR-HM12's skip-once rule: no retry).
+- **No-injected-context probe** (`no-injected-context`): run from a
+  throwaway project whose only instruction files are `GEMINI.md` and
+  `.hermes.md` — files neither host auto-injects (Codex always injects
+  `AGENTS.md`, so a project with no host-injected file at all isn't
+  reachable there) — with the canonical FR-HM7 sentence. Passes when the
+  model issues a Read of one of those files rather than claiming the
+  context was already injected.
+
+Both probes' prompt builders, per-host "attempt"/"read" definitions, and
+assertion helpers live in `tests/compat/lib/tool-probes.mjs`; see that
+module's header comment for the exact per-host definitions and
+`tests/schemas/compat-canary-tool-probes.test.ts` /
+`tests/fixtures/compat-canary/` for their Layer 1 fixture coverage.
+
 Configure these repository secrets only with dedicated, low-privilege keys:
 
 - `SYNTHEX_COMPAT_CLAUDE_API_KEY`
@@ -119,5 +142,6 @@ specific canary model. The Claude canary additionally honors
 container runner. OpenCode caps output at 128 tokens. Codex and Gemini do not
 offer a compatible per-request dollar ceiling through the exercised interfaces,
 so their dedicated test projects must have provider-side spend or quota caps;
-the runner additionally limits every harness to the same two probes. Keep
-provider keys and model choices outside the repository.
+the runner additionally limits every harness to the same two representative
+probes, plus (Codex and OpenCode only) the two tiny, one-turn tool-behavior
+probes above. Keep provider keys and model choices outside the repository.

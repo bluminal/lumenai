@@ -9,9 +9,25 @@ import {
   canaryModel,
   selectRepresentativeProbes,
 } from '../lib/canary.mjs';
-import { activateCodexSkills, listCodexSkills } from '../lib/codex-app-server.mjs';
+import {
+  activateCodexSkills,
+  listCodexSkills,
+  runCodexProbeTurns,
+} from '../lib/codex-app-server.mjs';
 import { assertCompleteInventory, readExpectedEntrypoints } from '../lib/contract.mjs';
 import { createProbeOverlay } from '../lib/probe-overlay.mjs';
+import {
+  NO_INJECTED_CONTEXT_PROBE_ID,
+  NO_INJECTED_CONTEXT_PROBE_TOKEN,
+  WORKFLOW_STEP_PROBE_ID,
+  WORKFLOW_STEP_PROBE_TOKEN,
+  assertInjectedContextFileRead,
+  assertToolAttemptedAtMostOnce,
+  codexReadInjectedContextFile,
+  countCodexToolAttempts,
+  noInjectedContextProbePrompt,
+  workflowStepProbePrompt,
+} from '../lib/tool-probes.mjs';
 import { emit, parseLastJsonLine, runCommand } from '../lib/scenario-helpers.mjs';
 
 const harness = 'codex';
@@ -98,10 +114,69 @@ try {
       proof: 'real provider returned the temporary activation token',
     });
   }
+
+  // Task 23 (NFR-HM4, FR-HM7, FR-HM12; D22): tool-BEHAVIOR probes. These are
+  // deliberately skill-less (no plugin/catalog involvement) and run from a
+  // throwaway project whose only instruction files are GEMINI.md and
+  // .hermes.md — files Codex does not auto-inject (it injects AGENTS.md;
+  // see Task 15) — so probe (b) can assert a real Read rather than relying
+  // on host-injected context.
+  const toolBehaviorRoot = '/workspace/probe/tool-behavior';
+  mkdirSync(toolBehaviorRoot, { recursive: true });
+  writeFileSync(join(toolBehaviorRoot, 'GEMINI.md'), '# Synthex compatibility test project\n');
+  writeFileSync(join(toolBehaviorRoot, '.hermes.md'), '# Synthex compatibility test project\n');
+
+  const toolProbeResults = await runCodexProbeTurns({
+    cwd: toolBehaviorRoot,
+    turns: [
+      { id: WORKFLOW_STEP_PROBE_ID, text: workflowStepProbePrompt(WORKFLOW_STEP_PROBE_TOKEN) },
+      {
+        id: NO_INJECTED_CONTEXT_PROBE_ID,
+        text: noInjectedContextProbePrompt(NO_INJECTED_CONTEXT_PROBE_TOKEN),
+      },
+    ],
+    model: canaryModel(undefined),
+  });
+
+  const workflowStepResult = toolProbeResults.find(({ id }) => id === WORKFLOW_STEP_PROBE_ID);
+  assertCanaryToken({
+    harness,
+    id: WORKFLOW_STEP_PROBE_ID,
+    token: WORKFLOW_STEP_PROBE_TOKEN,
+    output: JSON.stringify(workflowStepResult),
+  });
+  const workflowAttempts = countCodexToolAttempts(workflowStepResult?.items);
+  assertToolAttemptedAtMostOnce({ harness, id: WORKFLOW_STEP_PROBE_ID, attempts: workflowAttempts });
+  emit(harness, 'tool-behavior', {
+    ok: true,
+    profile,
+    id: WORKFLOW_STEP_PROBE_ID,
+    attempts: workflowAttempts,
+  });
+
+  const noInjectedContextResult = toolProbeResults.find(
+    ({ id }) => id === NO_INJECTED_CONTEXT_PROBE_ID,
+  );
+  assertCanaryToken({
+    harness,
+    id: NO_INJECTED_CONTEXT_PROBE_ID,
+    token: NO_INJECTED_CONTEXT_PROBE_TOKEN,
+    output: JSON.stringify(noInjectedContextResult),
+  });
+  const contextFileRead = codexReadInjectedContextFile(noInjectedContextResult?.items);
+  assertInjectedContextFileRead({ harness, id: NO_INJECTED_CONTEXT_PROBE_ID, file: contextFileRead });
+  emit(harness, 'tool-behavior', {
+    ok: true,
+    profile,
+    id: NO_INJECTED_CONTEXT_PROBE_ID,
+    file: contextFileRead,
+  });
+
   emit(harness, 'complete', {
     ok: true,
     profile,
     activated: activations.length,
+    toolBehaviorProbes: 2,
     elapsedMs: Date.now() - startedAt,
   });
 } catch (error) {

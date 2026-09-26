@@ -137,6 +137,41 @@ describe('cross-harness compatibility contract', () => {
       expect(supportsProfile(harness, 'canary')).toBe(true);
       expect(capabilityPolicy(harness).unsupported).toBe('documented-gap');
     }
+
+    // Task 23 (NFR-HM4, FR-HM7, FR-HM12; D22): Codex and OpenCode's canary
+    // scenarios additionally run two tool-BEHAVIOR probes that only a real
+    // provider can exercise (loopback offline/activation only assert
+    // request-side facts, per D22 — "Loopback emits no tool calls"). Assert
+    // the shared assertion helpers they call actually exist, and that both
+    // scenarios declare both probe ids and call those helpers.
+    const toolProbesModule = readFileSync(
+      resolve(compatRoot, 'lib/tool-probes.mjs'),
+      'utf8',
+    );
+    const requiredToolProbeExports = [
+      'WORKFLOW_STEP_PROBE_ID',
+      'NO_INJECTED_CONTEXT_PROBE_ID',
+      'assertToolAttemptedAtMostOnce',
+      'assertInjectedContextFileRead',
+      'countCodexToolAttempts',
+      'countOpenCodeToolAttempts',
+      'codexReadInjectedContextFile',
+      'opencodeReadInjectedContextFile',
+    ];
+    for (const exportName of requiredToolProbeExports) {
+      expect(toolProbesModule).toContain(exportName);
+    }
+
+    for (const toolProbeHarness of ['codex', 'opencode']) {
+      const scenarioContents = readFileSync(
+        resolve(compatRoot, 'scenarios', `${toolProbeHarness}-canary.mjs`),
+        'utf8',
+      );
+      expect(scenarioContents).toContain('WORKFLOW_STEP_PROBE_ID');
+      expect(scenarioContents).toContain('NO_INJECTED_CONTEXT_PROBE_ID');
+      expect(scenarioContents).toContain('assertToolAttemptedAtMostOnce');
+      expect(scenarioContents).toContain('assertInjectedContextFileRead');
+    }
   });
 
   it('keeps the oldest-supported lane explicit and stable by default', () => {
