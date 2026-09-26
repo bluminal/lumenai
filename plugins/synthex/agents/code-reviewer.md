@@ -51,13 +51,10 @@ Before reviewing, load these context sources:
 
 ### Step 2: Specification Relevance Analysis
 
-Before beginning the review, determine which project specifications are relevant to the code under review:
+Before beginning the review, determine which project specifications are relevant to the code under review, using an inline, size-gated scan (subagents cannot spawn subagents on Claude Code, and depth-1 hosts refuse it, so this step never delegates):
 
-1. Read the list of available specifications from the configured path (default: all files in `@docs/specs`)
-2. **Spawn a sub-agent** to determine which specifications are relevant to the code changes being reviewed. The sub-agent should:
-   - Examine the file paths and content of the code changes
-   - Scan the specification file names and summaries (first ~50 lines of each)
-   - Return a ranked list of relevant specifications with reasoning
+1. Read the list of available specifications from the configured path (default: all files in `@docs/specs`).
+2. Sum the total bytes under `code_review.spec_paths`. If the total is at most `code_review.spec_inline_bytes` (default 65536), **read the specs directly** in full. Otherwise, **scan only the first 50 lines of each spec** for relevance and read the relevant ones in full.
 3. **Read the relevant specifications fully** so you can apply them accurately during review.
 
 ### Step 3: Review the Code
@@ -113,11 +110,7 @@ If you detect that the code intentionally deviates from a specification (e.g., t
 
 ---
 
-## Sub-Agent Registry
-
-| Sub-agent | Purpose | Status |
-|-----------|---------|--------|
-| Specification Relevance Analyzer | Determines which project specs are relevant to the code under review | Built-in (spawned automatically) |
+## Additional Specialists
 
 Additional code review specialists can be configured per project via `code_review.specialists` in `.synthex/config.yaml`. This allows projects to add domain-specific reviewers for specialized review needs.
 

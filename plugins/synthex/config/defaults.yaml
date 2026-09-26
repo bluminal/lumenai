@@ -122,6 +122,14 @@ code_review:
   spec_paths:
     - docs/specs
 
+  # Size gate (in bytes) for the code-reviewer's inline Specification Relevance
+  # Analysis (Step 2). When the total bytes under spec_paths is at or below this,
+  # specs are read directly in full; above it, only the first 50 lines of each
+  # spec are scanned for relevance before the relevant ones are read in full.
+  # Replaces a "spawn a sub-agent" step, which is dead when code-reviewer itself
+  # runs as a subagent (subagents cannot spawn subagents on Claude Code).
+  spec_inline_bytes: 65536
+
   # Additional specialist reviewers (optional).
   # Example: Add a domain-specific reviewer for regulated industries.
   # specialists:
