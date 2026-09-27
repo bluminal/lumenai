@@ -28,8 +28,8 @@ describe('Task 53: CLAUDE.md agent table + command table updates', () => {
       expect(content).toContain('context-bundle-assembler');
     });
 
-    it('contains audit-artifact-writer', () => {
-      expect(content).toContain('audit-artifact-writer');
+    it('does not contain audit-artifact-writer (retired Task 42, FR-HM26/FR-HM44 — scripts/write-audit.mjs replaces it)', () => {
+      expect(content).not.toContain('audit-artifact-writer');
     });
 
     it('contains codex-review-prompter', () => {

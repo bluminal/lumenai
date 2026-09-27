@@ -152,8 +152,6 @@ export const COMMAND_DESCRIPTIONS = {
 export const AGENT_DESCRIPTIONS = {
   architect:
     'Reviews system architecture, feasibility, and technical trade-offs; writes ADRs and RFC sections.',
-  'audit-artifact-writer':
-    'Writes per-invocation multi-model review audit markdown files from a unified findings envelope.',
   'bedrock-review-prompter':
     'Adapter that invokes AWS Bedrock as an external code-review proposer in multi-model review.',
   'claude-review-prompter':

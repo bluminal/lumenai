@@ -14,7 +14,7 @@ import { readExpectedEntrypoints } from './contract.mjs';
  * use `diffInventoryAgainstManifest()` in a test to catch that drift.
  */
 export const COMMAND_COUNT = 18;
-export const AGENT_COUNT = 28;
+export const AGENT_COUNT = 27;
 
 /** Wrappers = every generated portable skill, one per command + agent. */
 export const WRAPPER_COUNT = COMMAND_COUNT + AGENT_COUNT;

@@ -153,7 +153,6 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 | `plan-linter` | Structural audit of implementation plan drafts against the template rubric | Utility |
 | `plan-scribe` | Applies Product Manager's decided edits to the plan document mechanically | Utility |
 | `context-bundle-assembler` | Haiku-backed; assembles the canonical context bundle delivered to every multi-model review proposer (FR-MR28, D5) | Utility |
-| `audit-artifact-writer` | Haiku-backed; writes per-invocation audit-artifact markdown files for multi-model review runs (FR-MR24). Command-agnostic per D20. | Utility |
 | `codex-review-prompter` | Haiku-backed; OpenAI Codex CLI adapter for multi-model review (`agentic` tier; family `openai`) | Utility |
 | `gemini-review-prompter` | Haiku-backed; Google Gemini CLI adapter for multi-model review (`agentic` tier; family `google`) | Utility |
 | `ollama-review-prompter` | Haiku-backed; local Ollama HTTP API adapter for multi-model review (`text-only` tier; family `local-<model>`) | Utility |
