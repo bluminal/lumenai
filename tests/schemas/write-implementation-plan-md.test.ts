@@ -2,13 +2,16 @@
  * Layer 1: Structural validation tests for the multi-model integration
  * in plugins/synthex/commands/write-implementation-plan.md.
  *
- * Validates all [T] acceptance criteria from Tasks 42, 43, 44:
+ * Validates all [T] acceptance criteria from Tasks 42, 43, 44, 45:
  *   Task 42 — multi-model orchestrator invocation in plan-review step
  *   Task 43 — --multi-model and --no-multi-model flags (FR-MR6)
- *   Task 44 [H] — plan-linter runs BEFORE orchestrator (doc text present)
+ *   Task 44 [H] — structural lint runs BEFORE orchestrator (doc text present)
  *   Task 44 [T] — plan-scribe retired (FR-HM26): no plan-scribe reference,
  *     the Step 5 `<!-- DRAFT -->` marker and the one-sentence renumbering
  *     rule are present, and the agent inventory drops by one.
+ *   Task 45 [T] — plan-linter retired (FR-HM26): no plan-linter reference;
+ *     Step 5.5 runs `scripts/lint-plan.mjs` guarded by `command -v node`,
+ *     with a `docs/plan-lint-rubric.md` prose fallback.
  *
  * Source authority: FR-MR6, FR-MR22, FR-MR23, FR-HM26
  *
@@ -18,7 +21,7 @@
  * write-implementation-plan.md by a 3-line D17 gate. Assertions that pin
  * strings unique to those two moved blocks now read the doc file instead;
  * assertions pinning strings that stay in the command (the native-only
- * path, Step 6c consolidation, Step 6d PM flow, plan-linter positioning)
+ * path, Step 6c consolidation, Step 6d PM flow, structural-lint positioning)
  * are unchanged.
  */
 
@@ -291,34 +294,50 @@ describe('write-implementation-plan.md — Task 43: Invocation Flags (FR-MR6)', 
 
 });
 
-// ── Task 44 [H]: plan-linter runs BEFORE orchestrator ───────────────────────
+// ── Task 44/45 [H]: structural lint runs BEFORE orchestrator ────────────────
+// Task 45 (FR-HM26) retired the plan-linter sub-agent in favor of the
+// zero-token scripts/lint-plan.mjs; this block's assertions were repointed
+// from "plan-linter" wording to the Step 5.5 "structural lint" wording that
+// replaced it, keeping the underlying Task 44 [H] positioning guarantees.
 
-describe('write-implementation-plan.md — Task 44 [H]: plan-linter runs before orchestrator', () => {
+describe('write-implementation-plan.md — Task 44/45 [H]: structural lint runs before orchestrator', () => {
 
-  it('[H] plan-linter is UNAFFECTED by multi-model — text states this explicitly', () => {
+  it('[H] the Step 5.5 structural lint is UNAFFECTED by multi-model — text states this explicitly', () => {
     const hasUnaffected =
       content.includes('UNAFFECTED by multi-model') ||
       content.includes('unaffected by multi-model');
     expect(hasUnaffected).toBe(true);
   });
 
-  it('[H] plan-linter runs BEFORE the orchestrator — "before" + "orchestrator" present near plan-linter', () => {
-    // Check that "plan-linter" and "before" and "orchestrator" all appear in the document
-    expect(content).toContain('plan-linter');
+  it('[T] plan-linter is no longer invoked as a sub-agent — only mentioned as retired', () => {
+    // The command no longer invokes plan-linter as a running sub-agent
+    // ("Invoke the **plan-linter** sub-agent", "Plan Linter sub-agent
+    // (Haiku)"); the one remaining mention documents that it was retired
+    // in favor of the script.
+    expect(content).not.toContain('Invoke the **plan-linter**');
+    expect(content).not.toContain('Plan Linter sub-agent (Haiku)');
+    expect(content).not.toContain('**Plan Linter** (pre-review, Haiku-backed)');
+    const mentions = content.match(/plan-linter/g) ?? [];
+    expect(mentions.length).toBeLessThanOrEqual(1);
+    if (mentions.length === 1) {
+      expect(content).toContain('retired `plan-linter`');
+    }
+  });
+
+  it('[H] structural lint runs BEFORE the orchestrator — "before" + "orchestrator" present', () => {
+    expect(content).toContain('lint-plan.mjs');
     expect(content).toContain('before');
     expect(content).toContain('orchestrator');
   });
 
-  it('[H] plan-linter "runs BEFORE the orchestrator" phrase present (verbatim or close match)', () => {
+  it('[H] "runs BEFORE the orchestrator" phrase present (verbatim or close match)', () => {
     const hasBeforeOrchestrator =
       content.includes('runs BEFORE the orchestrator') ||
-      content.includes('runs before the orchestrator') ||
-      content.includes('plan-linter runs BEFORE') ||
-      content.includes('plan-linter runs before');
+      content.includes('runs before the orchestrator');
     expect(hasBeforeOrchestrator).toBe(true);
   });
 
-  it('[H] plan-linter structural-check-only scope documented (not consuming reviewer findings)', () => {
+  it('[H] structural-check-only scope documented (not consuming reviewer findings)', () => {
     const hasScopeDoc =
       content.includes('does not consume reviewer findings') ||
       content.includes('structural validation') ||
@@ -326,11 +345,16 @@ describe('write-implementation-plan.md — Task 44 [H]: plan-linter runs before 
     expect(hasScopeDoc).toBe(true);
   });
 
-  it('[H] plan-linter not in orchestrator reviewer set — documented', () => {
+  it('[H] not in orchestrator reviewer set — documented', () => {
     const hasNotInReviewerSet =
       content.includes('not part of the orchestrator\'s reviewer set') ||
       content.includes('not part of the orchestrator');
     expect(hasNotInReviewerSet).toBe(true);
+  });
+
+  it('[T] Step 5.5 guards the script call with `command -v node` and documents a prose fallback (FR-HM26)', () => {
+    expect(content).toContain('command -v node');
+    expect(content).toContain('docs/plan-lint-rubric.md');
   });
 
 });

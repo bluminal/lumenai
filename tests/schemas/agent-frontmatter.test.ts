@@ -17,11 +17,9 @@
  *     Haiku 4.5 silently ignores `effort:` on Claude Code 2.1.281 — D15
  *     fallback); wherever an `effort:` key is present, its value is one of
  *     `low|medium|high|xhigh|max`.
- *   - The 1 still-present agent Phase 5 retires (plan-linter) gets NO
- *     `tools:` key at all. context-bundle-assembler (Task 41),
- *     audit-artifact-writer (Task 42), plan-scribe (Task 44), and
- *     commit-message-author (Task 46) were retired outright and are no
- *     longer on disk.
+ *   - context-bundle-assembler (Task 41), audit-artifact-writer (Task 42),
+ *     plan-scribe (Task 44), plan-linter (Task 45), and commit-message-author
+ *     (Task 46) were retired outright and are no longer on disk.
  *   - No `plugins/synthex/commands/**\/*.md` gains a frontmatter
  *     `description:` key (OQ-2: Codex migrates a described command whose
  *     rendered skill is <= 4,000 bytes into a duplicate skill — D15/Task 6).
@@ -59,16 +57,17 @@ const skillsRoot = join(pluginRoot, 'portable-skills');
 // Phase 5 retired four utility agents: context-bundle-assembler (Task 41,
 // replaced by scripts/assemble-bundle.sh), audit-artifact-writer (Task 42,
 // replaced by scripts/write-audit.mjs), plan-scribe (Task 44, FR-HM26 --
-// the PM now writes and edits the plan in place), and commit-message-author
+// the PM now writes and edits the plan in place), commit-message-author
 // (Task 46, FR-HM27, replaced by a one-sentence rule plus
-// scripts/commit-lint.sh), dropping 28 to 24.
-const TOTAL_AGENT_COUNT = 24;
+// scripts/commit-lint.sh), and plan-linter (Task 45, FR-HM26, replaced by
+// scripts/lint-plan.mjs), dropping 28 to 23.
+const TOTAL_AGENT_COUNT = 23;
 
-// The remaining agents Phase 5 retires (docs/plans/harness-modernization.md)
-// get no tools: allowlist at all per Task 28 step 2. context-bundle-assembler
-// (Task 41), audit-artifact-writer (Task 42), plan-scribe (Task 44), and
+// Every utility agent Phase 5 retires (docs/plans/harness-modernization.md)
+// is gone: context-bundle-assembler (Task 41), audit-artifact-writer
+// (Task 42), plan-scribe (Task 44), plan-linter (Task 45), and
 // commit-message-author (Task 46) are no longer on disk.
-const RETIRING_AGENTS = ['plan-linter'];
+const RETIRING_AGENTS: string[] = [];
 
 // PRD FR-HM14 acceptance criterion: "an allowlist never omits Task/Agent for
 // tech-lead, lead-frontend-engineer, or multi-model-review-orchestrator."

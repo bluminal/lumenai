@@ -573,6 +573,89 @@ function writeAuditNodeGuardFallbackCase(ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// scripts/lint-plan.mjs — Task 45 (FR-HM26). Same shape as write-audit.mjs
+// above: a `#!/usr/bin/env node` shebang and no bash entrypoint, so the
+// happy-path case spawns node directly (mirroring write-implementation
+// -plan.md Step 5.5's `command -v node` guard once it passes) and the
+// "fallback" case proves that CALLING guard itself degrades cleanly with a
+// message when node is absent — the condition under which Step 5.5's prose
+// fallback (self-checking against docs/plan-lint-rubric.md) takes over.
+// ---------------------------------------------------------------------------
+
+const LINT_PLAN_CLEAN_FIXTURE = [
+  '# Implementation Plan: Smoke Fixture',
+  '',
+  '## Overview',
+  'Fixture plan for the script-smoke suite.',
+  '',
+  '## Decisions',
+  '',
+  '| # | Decision | Context | Rationale |',
+  '|---|----------|---------|-----------|',
+  '| D1 | Keep it small. | Smoke test. | Speed. |',
+  '',
+  '## Open Questions',
+  '',
+  '| # | Question | Impact | Status |',
+  '|---|----------|--------|--------|',
+  '| Q1 | None. | None. | Resolved |',
+  '',
+  '## Phase 1: Only Phase',
+  '',
+  '### Milestone 1.1: Only Milestone',
+  '| # | Task | Complexity | Dependencies | Status |',
+  '|---|------|-----------|--------------|--------|',
+  '| 1 | Do the thing. | S | None | done |',
+  '',
+  '**Task 1 Acceptance Criteria:** `[T]` The thing is done.',
+  '',
+  '**Parallelizable:** None.',
+  '**Milestone Value:** Ships the thing.',
+  '',
+].join('\n');
+
+function lintPlanHappyPathCase(ctx) {
+  const pathDir = ctx.buildRestrictedPath(true);
+  const nodeBin = join(pathDir, 'node');
+  const planPath = join(ctx.workDir, 'plan.md');
+  writeFileSync(planPath, LINT_PLAN_CLEAN_FIXTURE);
+  const result = spawnSync(nodeBin, [ctx.scriptAbsPath, planPath], {
+    cwd: ctx.workDir,
+    env: { PATH: pathDir },
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  assert(result.status === 0, `lint-plan.mjs exited ${result.status} on a clean fixture: ${result.stderr}`);
+  const parsed = JSON.parse(result.stdout);
+  assert(parsed.total_findings === 0, `expected a clean fixture to have zero findings, got: ${result.stdout}`);
+  assert(parsed.passed === true, `expected passed: true on a clean fixture, got: ${result.stdout}`);
+}
+
+function lintPlanNodeGuardFallbackCase(ctx) {
+  const pathDir = ctx.buildRestrictedPath(false);
+  const bash = join(pathDir, 'bash');
+  // Mirrors write-implementation-plan.md's Step 5.5 call site verbatim:
+  // guard with `command -v node`, and degrade cleanly (non-zero exit + a
+  // message) when it is absent — the Step 5.5 prose-fallback trigger.
+  const guardScript = [
+    'if command -v node >/dev/null 2>&1; then',
+    `  node "${ctx.scriptAbsPath}" plan.md`,
+    'else',
+    '  echo "lint-plan: node not found; falling back to docs/plan-lint-rubric.md self-check (FR-HM26 node-guard fallback)." >&2',
+    '  exit 3',
+    'fi',
+  ].join('\n');
+  const result = spawnSync(bash, ['-c', guardScript], {
+    cwd: ctx.workDir,
+    env: { PATH: pathDir },
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  assert(result.status === 3, `expected the node-guard fallback to exit 3, got ${result.status}: ${result.stderr}`);
+  assert(/node not found/.test(result.stderr), `expected a node-not-found message, got: ${result.stderr}`);
+}
+
+// ---------------------------------------------------------------------------
 // scripts/assemble-bundle.sh — FR-HM26/FR-HM44 context bundle assembler
 // (replaces the retired `context-bundle-assembler` agent). The happy-path
 // case proves an in-cap file is inlined into `files[]` while an over-cap
@@ -891,6 +974,16 @@ export const SMOKE_CASES = {
     {
       name: 'missing node fallback: the calling `command -v node` guard degrades to a clean non-zero exit with a message',
       run: (ctx) => writeAuditNodeGuardFallbackCase(ctx),
+    },
+  ],
+  'scripts/lint-plan.mjs': [
+    {
+      name: 'happy path: a clean fixture plan yields zero findings and exit 0 (node present)',
+      run: (ctx) => lintPlanHappyPathCase(ctx),
+    },
+    {
+      name: 'missing node fallback: the calling `command -v node` guard degrades to a clean non-zero exit with a message',
+      run: (ctx) => lintPlanNodeGuardFallbackCase(ctx),
     },
   ],
   'scripts/assemble-bundle.sh': [

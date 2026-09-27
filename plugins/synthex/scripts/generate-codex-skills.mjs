@@ -179,8 +179,6 @@ export const AGENT_DESCRIPTIONS = {
     'Adapter that POSTs to a local Ollama server as an external code-review proposer.',
   'performance-engineer':
     'Analyzes full-stack performance: Core Web Vitals, queries, and bundles, with quantified fixes.',
-  'plan-linter':
-    'Runs fast structural checks on a draft implementation plan before expensive reviewers see it.',
   'product-manager':
     'Gathers requirements and turns them into a prioritized, value-driven implementation plan.',
   'quality-engineer':

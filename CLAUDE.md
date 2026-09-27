@@ -149,7 +149,6 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 | Agent | Role | Type |
 |-------|------|------|
 | `findings-consolidator` | Dedup, group, and sort findings from multiple reviewers (preserves attribution) | Utility |
-| `plan-linter` | Structural audit of implementation plan drafts against the template rubric | Utility |
 | `codex-review-prompter` | Haiku-backed; OpenAI Codex CLI adapter for multi-model review (`agentic` tier; family `openai`) | Utility |
 | `gemini-review-prompter` | Haiku-backed; Google Gemini CLI adapter for multi-model review (`agentic` tier; family `google`) | Utility |
 | `ollama-review-prompter` | Haiku-backed; local Ollama HTTP API adapter for multi-model review (`text-only` tier; family `local-<model>`) | Utility |
