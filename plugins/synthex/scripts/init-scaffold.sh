@@ -47,6 +47,8 @@
 #   0 - success (created something, or already up to date — idempotent).
 #   1 - usage error (unrecognized option, or more than one positional arg).
 #   2 - the plugin's config/defaults.yaml source is missing or unreadable.
+#   3 - refused: the config path resolves inside the plugin root (the
+#       plugin's own files, config/defaults.yaml included, are read-only).
 #   5 - writability check failed for the config file's directory or a
 #       document directory (mirrors loop-step.sh's check-writable contract).
 
@@ -104,6 +106,32 @@ case "$CONFIG_REL" in
 esac
 
 DEFAULTS_PATH="$PLUGIN_ROOT/config/defaults.yaml"
+
+# Never write inside the plugin root: an argument-order slip (e.g. the
+# defaults path passed as the destination) must not rewrite the plugin's
+# own template (see the 5505e48 fix that banned `cp` for this step). The
+# destination's directory is resolved physically so `..` and symlinks
+# cannot sneak around the check; a not-yet-existing directory is resolved
+# through its nearest existing ancestor.
+resolve_dir() {
+  r="$1"
+  suffix=""
+  while [ ! -d "$r" ]; do
+    case "$r" in
+      */*) suffix="/${r##*/}$suffix"; r="${r%/*}"; [ -n "$r" ] || r="/" ;;
+      *) suffix="/$r$suffix"; r="." ;;
+    esac
+  done
+  printf '%s%s' "$(cd "$r" 2>/dev/null && pwd -P)" "$suffix"
+}
+CONFIG_DIR_PHYS="$(resolve_dir "${CONFIG_PATH%/*}")"
+PLUGIN_ROOT_PHYS="$(cd "$PLUGIN_ROOT" 2>/dev/null && pwd -P)"
+case "$CONFIG_DIR_PHYS/" in
+  "$PLUGIN_ROOT_PHYS"/*)
+    echo "init-scaffold: refusing to write $CONFIG_REL: it is inside the plugin root ($PLUGIN_ROOT_PHYS), whose files are read-only. Pass a project path such as .synthex/config.yaml." >&2
+    exit 3
+    ;;
+esac
 
 if [ ! -r "$DEFAULTS_PATH" ]; then
   echo "init-scaffold: plugin defaults not found or unreadable: $DEFAULTS_PATH" >&2

@@ -120,6 +120,59 @@ function allDocDirsExist(): boolean {
   return DOC_DIRS.every((d) => existsSync(join(projectDir, d)) && statSync(join(projectDir, d)).isDirectory());
 }
 
+describe('init-scaffold.sh never writes inside the plugin root (5505e48 rule)', () => {
+  // Runs against a throwaway copy of the plugin so a regression can never
+  // touch the repo's real defaults.yaml.
+  let pluginCopy: string;
+  let copyScript: string;
+  let copyDefaults: string;
+
+  beforeEach(() => {
+    pluginCopy = mkdtempSync(join(tmpdir(), 'init-scaffold-plugin-'));
+    execFileSync('cp', ['-R', join(REPO_ROOT, 'plugins', 'synthex', 'scripts'), join(pluginCopy, 'scripts')]);
+    mkdirSync(join(pluginCopy, 'config'));
+    copyDefaults = join(pluginCopy, 'config', 'defaults.yaml');
+    writeFileSync(copyDefaults, DEFAULTS_CONTENT);
+    copyScript = join(pluginCopy, 'scripts', 'init-scaffold.sh');
+  });
+
+  afterEach(() => {
+    rmSync(pluginCopy, { recursive: true, force: true });
+  });
+
+  function runCopy(args: string[]) {
+    return spawnSync('bash', [copyScript, ...args], {
+      cwd: projectDir,
+      env: { PATH: process.env.PATH ?? '/usr/bin:/bin', CLAUDE_PROJECT_DIR: projectDir },
+      encoding: 'utf-8',
+    });
+  }
+
+  it('refuses (exit 3) when the config path is the plugin defaults.yaml, even with --force', () => {
+    const before = statSync(copyDefaults).mtimeMs;
+    const r = runCopy([copyDefaults, '--force']);
+    expect(r.status).toBe(3);
+    expect(r.stderr).toMatch(/inside the plugin root/);
+    expect(readFileSync(copyDefaults).equals(DEFAULTS_CONTENT)).toBe(true);
+    expect(statSync(copyDefaults).mtimeMs).toBe(before);
+  });
+
+  it('refuses a path that reaches the plugin root through ..', () => {
+    const sneaky = join(pluginCopy, 'scripts', '..', 'config', 'new.yaml');
+    const r = runCopy([sneaky]);
+    expect(r.status).toBe(3);
+    expect(existsSync(join(pluginCopy, 'config', 'new.yaml'))).toBe(false);
+  });
+
+  it('leaves defaults.yaml byte-identical and unmodified after a normal --force run', () => {
+    const before = statSync(copyDefaults).mtimeMs;
+    expect(runCopy([]).status).toBe(0);
+    expect(runCopy(['--force']).status).toBe(0);
+    expect(readFileSync(copyDefaults).equals(DEFAULTS_CONTENT)).toBe(true);
+    expect(statSync(copyDefaults).mtimeMs).toBe(before);
+  });
+});
+
 describe('init-scaffold.sh (FR-HM26, Task 39)', () => {
   for (const includeNode of [true, false]) {
     const label = includeNode ? 'node present' : 'node-less (and jq-less) PATH';

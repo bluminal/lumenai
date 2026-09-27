@@ -43,6 +43,8 @@ The script (FR-HM26) does the mechanical work this step and Step 8 used to descr
 
 It checks writability before writing and exits non-zero with a clear message if a target directory can't be written to (e.g. a read-only sandbox). Print its stdout/stderr to the user verbatim — it reports exactly what it created. The plugin's `config/defaults.yaml` stays read-only; the script never writes to it, and never takes it as anything but a read source.
 
+**Fallback (no shell tool, or the script is missing):** use the **Read** tool to load the plugin's `config/defaults.yaml` and the **Write** tool to create `@{config_path}` (skip it if the file exists, unless "reset to defaults" was chosen), then create the Step 8 directories. **Do NOT use `cp`, `cat >`, `sed -i`, `tee`, or any shell command that takes the defaults path as an argument**: Claude Code's permission engine flags both paths of `cp`, and an argument-order slip could overwrite the plugin's template.
+
 ### 3. Configure Concurrent Tasks
 
 Prompt the user to choose how many parallel tasks Synthex should run. This value controls `implementation_plan.concurrent_tasks` and `next_priority.concurrent_tasks` in the config file.
