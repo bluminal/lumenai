@@ -50,7 +50,7 @@ The `app-server` subcommand puts Codex into a JSON-RPC mode where any tool-use a
 ### Pattern 1 — `exec` with read-only sandbox (fallback and `read-only` mode)
 
 ```bash
-codex exec --json --sandbox read-only --approval-mode never <prompt>
+codex exec --json --sandbox read-only --approval-mode never --output-schema agents/_shared/canonical-finding.schema.json <prompt>
 ```
 
 **Sandbox flags (FR-MR26 verbatim):**
@@ -58,6 +58,8 @@ codex exec --json --sandbox read-only --approval-mode never <prompt>
 - `--approval-mode never` — no interactive approvals; the CLI never blocks on a prompt
 
 These flags are mandatory for Pattern 1. The Layer 2 fixture (Task 12) asserts the documented Pattern 1 flag set is a substring of the recorded invocation string.
+
+**`--output-schema` (FR-HM28):** Codex is the one adapter CLI that natively enforces a JSON Schema on its own output, so pass the canonical-finding schema directly via `--output-schema` (Pattern 3's `app-server` accepts the same schema in its request params) instead of relying solely on prompt-embedded instructions — `validate-findings` still re-validates afterward since Codex's own enforcement covers shape, not the finding_id line-number rule.
 
 ### Pattern 2 — `sandbox-yolo` (opt-in)
 
