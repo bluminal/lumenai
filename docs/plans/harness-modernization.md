@@ -241,9 +241,9 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 ### Milestone 4.2: Script Smoke Suite
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 37 | FR-HM18, FR-HM40, NFR-HM4: `tests/compat/lib/script-smoke.mjs` in the offline profile of all 4 images (Codex `workspace-write`) runs each registered script's happy path and its missing-`jq`/missing-node path. Initial cases: `loop-step`, `config-get`, the compact hook, and the 3 existing scripts. | M | Tasks 33, 34, 36 | in progress |
-**Task 37 Acceptance Criteria:** `[T]` Every case passes in each container without `jq`. `[T]` A schema test fails if a runtime script lacks a case.
-**Milestone Value:** Every shipped script is proven portable on every image.
+| 37 | FR-HM18, FR-HM40, NFR-HM4: `tests/compat/lib/script-smoke.mjs` in the offline profile of all 4 images (Codex `workspace-write`) runs each registered script's happy path and its missing-`jq`/missing-node path. Initial cases: `loop-step`, `config-get`, the compact hook, and the 3 existing scripts. | M | Tasks 33, 34, 36 | done |
+**Task 37 Acceptance Criteria:** `[T]` Every case passes in each container without `jq`. `[T]` A schema test fails if a runtime script lacks a case. → done in `9c56b8b`: `tests/compat/lib/script-smoke.mjs` runs 12 cases (happy path + no-jq/no-node fallback for `loop-step.sh`, `lib/config-get.sh`, `compact-recover.sh`, `loop-idle-wait.sh`, `loop-advance-gate.sh`, `upgrade-nudge.sh`) in the offline profile of all 4 images; all 48 pass (claude 2.1.277, codex 0.154.0, gemini 0.39.1, opencode 1.18.15). `tests/schemas/script-smoke-registry.test.ts` "has a script-smoke case registered" fails when a discovered runtime script lacks a case; discovery is shared with `portable-scripts.test.ts` via `tests/compat/lib/script-inventory.mjs`. Note: jq is absent from every compat image, so `loop-advance-gate.sh` exercises only its documented jq-less allow-stop path.
+**Milestone Value:** Every shipped script is proven portable on every image. **Status: complete (2026-09-27)** — Phase 4 complete; suite 169 files / 5236 passed / 8 skipped.
 
 ## Phase 5: Zero-Token Scripts and Utility Retirement (PRD Phase 4)
 
