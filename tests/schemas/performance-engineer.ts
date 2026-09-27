@@ -107,6 +107,26 @@ export function validatePerformanceEngineerOutput(text: string): ValidationResul
     if (!areFindingsSorted(parsed.findings)) {
       warnings.push('Findings are not sorted by severity (expected: CRITICAL > HIGH > MEDIUM > LOW)');
     }
+
+    // FR-HM17 (Task 29, D18): optional "- **Verification:**" line. Present
+    // only under `code_review.verification: prose`; absent under the default
+    // `off`. Never an error — verification never blocks the review.
+    for (const finding of parsed.findings) {
+      if (finding.fields['Verification'] && !finding.verification) {
+        warnings.push(
+          `Finding "${finding.title}" has a Verification field that does not match ` +
+          '"CONFIRMED (lsp|grep) | PLAUSIBLE (none)"'
+        );
+      } else if (finding.verification) {
+        const { status, method } = finding.verification;
+        if (status === 'CONFIRMED' && method === 'none') {
+          warnings.push(`Finding "${finding.title}": CONFIRMED verification should name a method (lsp|grep), not "none"`);
+        }
+        if (status === 'PLAUSIBLE' && method !== 'none') {
+          warnings.push(`Finding "${finding.title}": PLAUSIBLE verification should use method "none"`);
+        }
+      }
+    }
   }
 
   // 5. Verdict consistency (if verdict present)

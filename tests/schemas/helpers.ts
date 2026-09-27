@@ -30,6 +30,15 @@ export interface Finding {
   fields: Record<string, string>;
   hasCodeBlock: boolean;
   cweReference: string | null;
+  // FR-HM17 (Task 29, D18) optional "- **Verification:**" line, present only
+  // when `code_review.verification: prose` is set. null when the line is
+  // absent (the default, `code_review.verification: off`).
+  verification: VerificationResult | null;
+}
+
+export interface VerificationResult {
+  status: 'CONFIRMED' | 'PLAUSIBLE';
+  method: 'lsp' | 'grep' | 'none';
 }
 
 export interface Table {
@@ -140,6 +149,23 @@ const TABLE_SEPARATOR_PATTERN = /^\|[\s\-:|]+\|$/;
 const CODE_BLOCK_PATTERN = /```[\s\S]*?```/;
 const CWE_PATTERN = /CWE-\d+/;
 const FIELD_PATTERN = /^-\s+\*\*([^*]+)\*\*:?\s*(.*)$/;
+
+// FR-HM17 (Task 29, D18): "- **Verification:** CONFIRMED (lsp|grep) | PLAUSIBLE (none)"
+const VERIFICATION_FIELD_PATTERN = /^(CONFIRMED|PLAUSIBLE)\s*\((lsp|grep|none)\)$/i;
+
+/**
+ * Parses a Verification field's value (the text after "- **Verification:**")
+ * into a typed status/method pair. Returns null when the value does not
+ * match the documented `CONFIRMED (lsp|grep) | PLAUSIBLE (none)` shape.
+ */
+export function parseVerificationField(value: string): VerificationResult | null {
+  const match = value.trim().match(VERIFICATION_FIELD_PATTERN);
+  if (!match) return null;
+  return {
+    status: match[1].toUpperCase() as VerificationResult['status'],
+    method: match[2].toLowerCase() as VerificationResult['method'],
+  };
+}
 
 // ── Main Parser ──────────────────────────────────────────────────
 
@@ -324,12 +350,18 @@ function parseFindings(lines: string[]): Finding[] {
     // Extract CWE from the finding block OR from the title
     const allText = title + '\n' + blockText;
 
+    // FR-HM17 (Task 29, D18): optional "- **Verification:**" field, present
+    // only when code_review.verification: prose is set on the caller side.
+    const verificationRaw = fields['Verification'];
+    const verification = verificationRaw ? parseVerificationField(verificationRaw) : null;
+
     findings.push({
       severity,
       title,
       fields,
       hasCodeBlock: CODE_BLOCK_PATTERN.test(blockText),
       cweReference: allText.match(CWE_PATTERN)?.[0] ?? null,
+      verification,
     });
   }
 
