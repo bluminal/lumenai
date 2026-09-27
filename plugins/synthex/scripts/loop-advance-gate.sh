@@ -27,6 +27,14 @@
 #   - No running loop with matching session_id → exit 0.
 #   - Unreadable transcript / empty last message → exit 0.
 #   - Any parsing error → exit 0.
+#
+# Exit codes:
+#   0 - always. The outcome is reported via stdout JSON
+#       ({"decision":"block", reason: "..."} to drive the next iteration, or
+#       no output at all to allow the stop), never via process exit status.
+# jq is required for this hook's logic; when it is absent (see guarantees
+# above) the script exits 0 immediately instead of failing, so a host
+# without jq degrades to "always allow stop" rather than erroring.
 
 set -u
 
