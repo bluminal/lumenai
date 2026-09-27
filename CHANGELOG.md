@@ -5,6 +5,38 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 1.5.0 / synthex-plus 1.5.0] - 2026-09-27
+
+### Added
+
+- (synthex) add headless host recipes, docs/hosts.md, config/hosts.env (Task 35, FR-HM41, FR-HM18)
+- (synthex) add compact SessionStart hook for loop recovery (Task 36, FR-HM20)
+- (synthex) add loop-step.sh portable loop-state engine (Task 34, FR-HM18)
+- (synthex) add config-get.sh portable dotted-key config reader (Task 33, D26)
+- (synthex) add model profiles and resolution paragraph (Task 31, FR-HM15, D29)
+- (synthex) re-tier agent model/effort frontmatter (Task 30, FR-HM14 PR-B, D10)
+- (synthex) add description and tools frontmatter to all agent definitions (Task 28)
+
+### Changed
+
+- (plans) record Task 37 done; Milestone 4.2 and Phase 4 complete
+- (synthex) add Task 37 script-smoke compat suite (FR-HM18, FR-HM40, NFR-HM4)
+- (plans) record Task 35 done; Milestone 4.1 complete; Task 37 in progress
+- (plans) record Task 36 done
+- (plans) record Task 34 done; Tasks 35-36 in progress
+- (plans) record Task 33 done
+- (plans) record Task 32 done; Tasks 33-34 in progress
+- (synthex) add portable-script contract tests for runtime scripts (Task 32, FR-HM40, D19)
+- (plans) mark Task 32 in progress
+- (plans) record Task 31 done; Milestone 3.2 and Phase 3 complete
+- (plans) record Task 30 done with [H] approval; Task 31 in progress
+- (plans) record Task 29 done; Milestone 3.1 complete
+- (verification) insert verification pass section into agent bodies (Task 29, FR-HM17, D18)
+- (plans) record Task 27 done with [H] approval
+- (evals) establish eval baseline infrastructure (Task 27, FR-HM34)
+- (plans) record Task 28 done with [H] approval
+- (verification) implement verification pass infrastructure (Task 29, FR-HM17, D18)
+
 ## [synthex 1.4.1 / synthex-plus 1.4.1] - 2026-09-26
 
 ### Fixed
