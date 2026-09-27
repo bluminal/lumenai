@@ -224,7 +224,7 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 ### Milestone 4.1: Script Contract and `loop-step.sh`
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 32 | FR-HM40 (D19): `portable-scripts.test.ts`; bring the 3 existing scripts into compliance | S | None | pending |
+| 32 | FR-HM40 (D19): `portable-scripts.test.ts`; bring the 3 existing scripts into compliance | S | None | in progress |
 | 33 | D26: `scripts/lib/config-get.sh <dotted.key>` (FR-HM23, FR-HM27, FR-HM40) | M | Task 32 | pending |
 | 34 | FR-HM18: `scripts/loop-step.sh` with `begin`, `advance`, `hold`, `finish`, `archive`, `list`, `cancel [--all]`, `check-writable`, taking over the 7 refusal paths and the archive/list/cancel formats. `list-loops`/`cancel-loop` become one Bash call each; `loop-state-lifecycle.ts` wraps the script; state writers call `check-writable`. | L | Task 32 | pending |
 | 35 | FR-HM41 + FR-HM18: `host-matrix.mjs` adds headless flags, shell caps, `SYNTHEX_LOOP_IDLE_MAX`, and Grok background-poll guidance. The generator emits `docs/hosts.md` and `config/hosts.env`. `check-writable` prints the hint for `$SYNTHEX_HOST` (wrappers set it), or all hints if it is unset. | M | Tasks 20, 34 | pending |
