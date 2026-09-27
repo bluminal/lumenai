@@ -21,6 +21,11 @@ Automatically identify and execute the next highest-priority tasks from the impl
 | `--loop-isolated` | Fresh-subagent isolation mode per iteration. | off (shared-context default) | No |
 | `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
 | `--auto-decide` | Opt-in autonomy directive. When set, the Tech Lead sub-agent takes its own recommended option instead of calling `AskUserQuestion` at decision points where it already has a clear recommendation (high-impact escalations, ambiguous-task clarification) — and records the decision, alternatives, and reasoning in the plan for later review (see Step 9). Does **not** affect `[H]` acceptance-criteria approval, which always requires explicit user sign-off (see Step 7). Propagated to any sub-agent the Tech Lead delegates to. | off | No |
+| `--profile <economy\|balanced\|premium>` | Override `models.profile` for spawned reviewers (see Model Resolution). | `models.profile` config (`balanced`) | No |
+
+### Model Resolution
+
+Each spawned agent's model and effort resolve in this order: `--profile` flag > `models.agents.<name>` > `models.profile` delta > the agent's own frontmatter (FR-HM15, D29). On Claude Code, the resolved values are applied via the Agent tool's per-call `model` override; on every other host, `models`/`hosts.<harness>.models` are advisory only — applied where the host supports per-subagent model selection, otherwise ignored. Standing-pool routing is unaffected: pools never re-spawn, so a profile change reaches only newly spawned agents.
 
 ## Core Responsibilities
 

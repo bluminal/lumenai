@@ -288,14 +288,17 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
     'evidence: today\'s 32+ docs/native-looping.md mentions in commands/ are markdown ' +
       'links, not Read gates; Task 13 added the first 3 real gates in review-code.md, ' +
       'Task 14 (FR-HM5) adds 3 more across performance-audit.md (2) and ' +
-      'write-implementation-plan.md (1)',
+      'write-implementation-plan.md (1); Task 31 (FR-HM15) adds 3 more gates pointing ' +
+      'at docs/model-resolution.md — one each in review-code.md, performance-audit.md, ' +
+      'and write-implementation-plan.md, all three at their Task 13/14 D17 size ' +
+      'budgets with no room to inline the Model Resolution paragraph directly',
     () => {
       const nativeLoopingMentions = files.reduce((count, relFile) => {
         const text = readFileSync(join(ROOT, relFile), 'utf8');
         return count + (text.match(/docs\/native-looping\.md/g) ?? []).length;
       }, 0);
       expect(nativeLoopingMentions).toBeGreaterThanOrEqual(32);
-      expect(allIncludes).toHaveLength(6);
+      expect(allIncludes).toHaveLength(9);
       expect(new Set(allIncludes.map((i) => i.file))).toEqual(
         new Set([
           'plugins/synthex/commands/review-code.md',
@@ -310,6 +313,7 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
           '${CLAUDE_PLUGIN_ROOT}/docs/multi-model-decision.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing-performance-audit.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/plan-multi-model.md',
+          '${CLAUDE_PLUGIN_ROOT}/docs/model-resolution.md',
         ]),
       );
     },

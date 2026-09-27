@@ -13,6 +13,9 @@ Conduct a full-stack performance analysis — quantifying bottlenecks, measuring
 | `scope` | Specific area to audit (e.g., `frontend`, `api`, `database`, `full-stack`) | `full-stack` | No |
 | `url` | URL to audit for frontend performance (Core Web Vitals) | None | No |
 | `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
+| `--profile <economy\|balanced\|premium>` | Override `models.profile` for this run. | `models.profile` config (`balanced`) | No |
+
+**Model Resolution:** Read `${CLAUDE_PLUGIN_ROOT}/docs/model-resolution.md` (D17). Other hosts resolve the plugin root via `.synthex/state.json`.
 
 ## Core Responsibilities
 
@@ -37,13 +40,13 @@ Check for a project configuration file at `@{config_path}`. Load any performance
 
 ### 1b. Standing Pool Discovery and Routing (FR-MMT15)
 
-If `standing_pools.enabled` is true, Read `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing-performance-audit.md` and follow it; otherwise skip to Step 2. On other hosts, resolve the plugin root from `.synthex/state.json`'s `plugin_root` field and read the same file relative to it.
+If `standing_pools.enabled` is true, Read `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing-performance-audit.md` and follow it; otherwise skip to Step 2. On other hosts, resolve the plugin root via `.synthex/state.json`.
 
 ---
 
 ### 1c. Sandbox-Yolo Spawn Confirmation (ADR-003 / D27 / FR-MMT21)
 
-Read `${CLAUDE_PLUGIN_ROOT}/docs/sandbox-yolo.md` (performance-audit variant) and follow it. On other hosts, resolve the plugin root from `.synthex/state.json`'s `plugin_root` field and read the same file relative to it.
+Read `${CLAUDE_PLUGIN_ROOT}/docs/sandbox-yolo.md` (performance-audit variant) and follow it. On other hosts, resolve the plugin root via `.synthex/state.json`.
 
 **When stdin is not a TTY** (CI, scripted invocation, stdin redirected from `/dev/null`), treat as default-N and abort cleanly without prompting. This mirrors the TTY guard documented for the waiting indicator and prevents unbounded CI hangs on the unanswerable prompt. Detect non-TTY stdin before reading the prompt; do NOT block waiting for input that will never arrive.
 
@@ -141,8 +144,7 @@ The Performance Engineer produces a structured audit:
 | # | Optimization | Impact | Effort | Priority |
 |---|-------------|--------|--------|----------|
 | 1 | [optimization] | [high/med/low] | [S/M/L] | [P1/P2/P3] |
-| 2 | [optimization] | [high/med/low] | [S/M/L] | [P1/P2/P3] |
-| 3 | [optimization] | [high/med/low] | [S/M/L] | [P1/P2/P3] |
+| ... | (one row per optimization, ranked) | | | |
 
 ---
 
@@ -196,7 +198,6 @@ Estimated total impact: [quantified improvement potential]
 Top optimizations (by impact/effort ratio):
 1. [Optimization] — est. [impact], effort: [S/M/L]
 2. [Optimization] — est. [impact], effort: [S/M/L]
-3. [Optimization] — est. [impact], effort: [S/M/L]
 
 Full audit written to console.
 ```
