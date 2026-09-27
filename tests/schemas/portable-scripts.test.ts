@@ -23,7 +23,11 @@
  * hook or invoked by an agent at execution time). Because discovery walks
  * the directories rather than naming files, a new script added later is
  * picked up automatically and held to the same contract without any test
- * update.
+ * update. Discovery itself lives in tests/compat/lib/script-inventory.mjs,
+ * shared with the Task 37 in-container smoke suite (tests/compat/lib
+ * /script-smoke.mjs) and its registry-coverage test (tests/schemas/script
+ * -smoke-registry.test.ts), so "which files are runtime scripts" cannot
+ * drift between the contract and the smoke suite.
  *
  * The second describe block ("contract detectors catch violations") proves
  * each detector actually fires on non-compliant inline fixtures, so a
@@ -35,46 +39,19 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, existsSync } from 'fs';
-import { join, relative, extname, dirname } from 'path';
+import { readFileSync, existsSync } from 'fs';
+import { join, relative, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { discoverRuntimeScripts, BUILD_TOOLS } from '../compat/lib/script-inventory.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..');
-const SCRIPTS_ROOT = join(REPO_ROOT, 'plugins', 'synthex', 'scripts');
-const HOOKS_ROOT = join(REPO_ROOT, 'plugins', 'synthex', 'hooks');
+const PLUGIN_ROOT = join(REPO_ROOT, 'plugins', 'synthex');
 
-// Build-time tooling excluded from the FR-HM40 runtime contract (Task 32):
-// these run only when a developer regenerates the Agent Skills wrapper
-// tree, never as a shipped runtime hook or agent-invoked script.
-const BUILD_TOOLS = new Set([
-  join(SCRIPTS_ROOT, 'generate-codex-skills.mjs'),
-  join(SCRIPTS_ROOT, 'lib', 'host-matrix.mjs'),
-]);
-
-const SCRIPT_EXTENSIONS = new Set(['.sh', '.js', '.mjs', '.cjs']);
-
-function discoverScripts(root: string): string[] {
-  if (!existsSync(root)) return [];
-  const out: string[] = [];
-  const walk = (dir: string) => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-      } else if (SCRIPT_EXTENSIONS.has(extname(entry.name))) {
-        out.push(full);
-      }
-    }
-  };
-  walk(root);
-  return out;
-}
-
-const runtimeScripts = [...discoverScripts(SCRIPTS_ROOT), ...discoverScripts(HOOKS_ROOT)]
-  .filter((absPath) => !BUILD_TOOLS.has(absPath))
-  .map((absPath) => ({ absPath, relPath: relative(REPO_ROOT, absPath) }))
-  .sort((a, b) => a.relPath.localeCompare(b.relPath));
+const runtimeScripts = discoverRuntimeScripts(PLUGIN_ROOT).map(({ absPath }) => ({
+  absPath,
+  relPath: relative(REPO_ROOT, absPath),
+}));
 
 // --- Detectors -------------------------------------------------------------
 
@@ -192,8 +169,8 @@ describe('portable-script contract (FR-HM40)', () => {
   });
 
   it('BUILD_TOOLS exclusion list entries exist on disk (guards a stale exclusion list)', () => {
-    for (const absPath of BUILD_TOOLS) {
-      expect(existsSync(absPath)).toBe(true);
+    for (const relPath of BUILD_TOOLS) {
+      expect(existsSync(join(PLUGIN_ROOT, relPath))).toBe(true);
     }
   });
 
