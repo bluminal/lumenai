@@ -64,6 +64,7 @@ When inputs are missing, fall back in this order: explicit override → detected
    - If the change set is empty, return the "No changes" output described below and stop.
 
 2. **Detect the project's commit convention.**
+   - Read `.synthex/facts.md` first; if the fact is missing or stale per its freshness rule, detect as before.
    - Run `git log --pretty=format:'%s%n%b%n---END---' -n 50` (or fewer if the repo is shallow) to sample recent history.
    - Examine subjects for repeated patterns. Look specifically for:
      - **Conventional Commits**: `type(scope): subject` with types like `feat`, `fix`, `chore`, `refactor`, `docs`, `test`, `build`, `ci`, `perf`, `style`, `revert`.
