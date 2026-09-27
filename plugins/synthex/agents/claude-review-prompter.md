@@ -78,18 +78,9 @@ Before invoking the CLI, confirm `claude` is available:
 which claude
 ```
 
-If `which claude` returns non-zero exit, return immediately:
+If `which claude` returns non-zero exit, run `${CLAUDE_PLUGIN_ROOT}/scripts/validate-findings --error cli_missing --message "The 'claude' CLI is not installed or not in PATH. Install with: npm install -g @anthropic-ai/claude-code" --raw-output-path <config.raw_output_path>` (FR-HM28) and return its printed envelope immediately.
 
-```json
-{
-  "status": "failed",
-  "error_code": "cli_missing",
-  "error_message": "The 'claude' CLI is not installed or not in PATH. Install with: npm install -g @anthropic-ai/claude-code",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<config.raw_output_path>"
-}
-```
+On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
 **Safe-name assertion (Task 88 / Phase 11.2):** The binary name `claude` is HARDCODED in the `which claude` invocation above. The adapter does NOT derive the binary name from any config key (e.g., from `multi_model_review.external_permission_mode.<cli-name>`). This prevents an adversarial project config from injecting a path-traversal or shell-metacharacter binary name into the `which` lookup. The Layer 1 schema test `tests/schemas/external-permission-mode-key-validation.test.ts` enforces that only the known safe set `{codex, claude, gemini, bedrock, llm, ollama, default}` may appear as keys in `external_permission_mode`; unknown keys are silently ignored at config-read time. CWE-20 (Improper Input Validation) defense-in-depth.
 
@@ -101,18 +92,7 @@ Verify that the CLI is authenticated via:
 claude auth status --json
 ```
 
-Treat exit 0 as authenticated. If `claude auth status` exits non-zero, return:
-
-```json
-{
-  "status": "failed",
-  "error_code": "cli_auth_failed",
-  "error_message": "Claude CLI is installed but not authenticated. Run `claude auth login` to authenticate.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<config.raw_output_path>"
-}
-```
+Treat exit 0 as authenticated. If `claude auth status` exits non-zero, run `validate-findings --error cli_auth_failed --message "Claude CLI is installed but not authenticated. Run \`claude auth login\` to authenticate." --raw-output-path <config.raw_output_path>` and return its envelope.
 
 **Auth shared with host (Known Gotcha 3):** Because `claude` uses the same credential store as the host Claude Code session, this auth check will typically pass whenever the host session is authenticated. A separate login is not usually required.
 
@@ -196,112 +176,30 @@ claude --model claude-opus-4-5 --output-format json --permission-mode acceptEdit
 
 Write the raw CLI stdout to `config.raw_output_path` immediately upon capture, before any parsing (FR-MR24 §6).
 
-If the CLI exits non-zero, return:
-
-```json
-{
-  "status": "failed",
-  "error_code": "cli_failed",
-  "error_message": "claude CLI exited with status <N>. See raw output at raw_output_path.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<config.raw_output_path>"
-}
-```
+If the CLI exits non-zero, run `validate-findings --error cli_failed --message "claude CLI exited with status <N>. See raw output at raw_output_path." --raw-output-path <config.raw_output_path>` and return its envelope.
 
 ### 5. Output Parsing
 
-Parse the raw CLI stdout as JSON. The `--output-format json` flag causes the Claude CLI to emit a structured JSON envelope. Extract `findings` and `usage` from the parsed object.
-
-See **Known Gotchas** for Claude CLI-specific parsing quirks that MUST be handled before calling `JSON.parse`.
+Pipe the raw CLI stdout (raw, fences and all — see **Known Gotchas** for Claude CLI-specific quirks) into `validate-findings --reviewer-id claude-review-prompter --family "${RESOLVED_FAMILY:-anthropic}" --raw-output-path <config.raw_output_path>` (FR-HM28; same plugin-root script invoked in CLI Presence Check above). The `--output-format json` flag causes the Claude CLI to emit a structured JSON envelope; the script strips fences/trailing commas, joins NDJSON, validates each finding against canonical-finding-schema.md, drops invalid findings, and injects `source`.
 
 ### 6. Retry-Once on Parse Failure
 
-If `JSON.parse` fails after applying all gotcha mitigations:
+If `validate-findings` returns `error_code: parse_failed`:
 
 1. Append a clarification to the original prompt: `"Your previous response could not be parsed as JSON. Respond with ONLY valid JSON, no markdown fences, no prose."`
 2. Re-invoke the CLI once.
-3. Attempt `JSON.parse` again on the new output.
-4. If parsing still fails, return `error_code: "parse_failed"` terminally.
-
-```json
-{
-  "status": "failed",
-  "error_code": "parse_failed",
-  "error_message": "Adapter could not parse claude output as canonical envelope after retry. Raw output preserved at raw_output_path.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<config.raw_output_path>"
-}
-```
+3. Pipe the new output through `validate-findings` again.
+4. If it still reports `error_code: "parse_failed"` terminally, return that printed envelope as-is — "Adapter could not parse claude output as canonical envelope after retry" is exactly what the script's own `error_message` says.
 
 ### 7. Normalize to Canonical Envelope
 
-For each finding in the parsed array, inject source attribution:
+`validate-findings` already did this: every finding carries `source: { "reviewer_id": "claude-review-prompter", "family": "anthropic", "source_type": "external" }` — using `config.family` (per Q5 override) when set — and `finding_id` values containing line numbers were rejected per canonical-finding-schema.md. Any finding that failed validation was dropped, with the drop count folded into `error_message` rather than aborting the whole review.
 
-```json
-{
-  "source": {
-    "reviewer_id": "claude-review-prompter",
-    "family": "anthropic",
-    "source_type": "external"
-  }
-}
-```
-
-If `config.family` is non-null, use that value for `source.family` (per Q5 family override).
-
-Validate that each finding conforms to `canonical-finding-schema.md`. Drop any finding that fails validation and log the failure in `error_message` (do not abort the entire review for a single malformed finding).
-
-Surface usage VERBATIM from the CLI's reported `usage` object (NFR-MR4):
-
-```json
-{
-  "input_tokens": <from cli>,
-  "output_tokens": <from cli>,
-  "model": "<from cli>"
-}
-```
-
-When the Claude CLI does not report usage, set the entire `usage` object to `null`.
+Usage is surfaced VERBATIM from the CLI's reported `usage` object (NFR-MR4); the script sets it to `null` when the Claude CLI does not report one.
 
 ### 8. Return Canonical Envelope
 
-Return the fully assembled output envelope (FR-MR9):
-
-```json
-{
-  "status": "success",
-  "error_code": null,
-  "error_message": null,
-  "findings": [
-    {
-      "finding_id": "...",
-      "severity": "...",
-      "category": "...",
-      "title": "...",
-      "description": "...",
-      "file": "...",
-      "symbol": "...",
-      "line_range": null,
-      "source": {
-        "reviewer_id": "claude-review-prompter",
-        "family": "anthropic",
-        "source_type": "external"
-      },
-      "confidence": "..."
-    }
-  ],
-  "usage": {
-    "input_tokens": 0,
-    "output_tokens": 0,
-    "model": "claude-opus-4-5"
-  },
-  "raw_output_path": "docs/reviews/raw/claude-<uuid>.json"
-}
-```
-
-`usage` is surfaced VERBATIM from the CLI envelope per NFR-MR4. If the Claude CLI does not report usage in its output, set `usage` to `null`.
+Return `validate-findings`'s printed stdout unchanged as your result — it already is the fully assembled FR-MR9 envelope: `{ "status": "success", "error_code": null, "error_message": null, "findings": [...], "usage": {"input_tokens": 0, "output_tokens": 0, "model": "claude-opus-4-5"} | null, "raw_output_path": "docs/reviews/raw/claude-<uuid>.json" }`.
 
 ---
 

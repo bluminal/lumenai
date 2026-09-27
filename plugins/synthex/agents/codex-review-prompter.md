@@ -50,7 +50,7 @@ The `app-server` subcommand puts Codex into a JSON-RPC mode where any tool-use a
 ### Pattern 1 — `exec` with read-only sandbox (fallback and `read-only` mode)
 
 ```bash
-codex exec --json --sandbox read-only --approval-mode never <prompt>
+codex exec --json --sandbox read-only --approval-mode never --output-schema agents/_shared/canonical-finding.schema.json <prompt>
 ```
 
 **Sandbox flags (FR-MR26 verbatim):**
@@ -58,6 +58,8 @@ codex exec --json --sandbox read-only --approval-mode never <prompt>
 - `--approval-mode never` — no interactive approvals; the CLI never blocks on a prompt
 
 These flags are mandatory for Pattern 1. The Layer 2 fixture (Task 12) asserts the documented Pattern 1 flag set is a substring of the recorded invocation string.
+
+**`--output-schema` (FR-HM28):** Codex is the one adapter CLI that natively enforces a JSON Schema on its own output, so pass the canonical-finding schema directly via `--output-schema` (Pattern 3's `app-server` accepts the same schema in its request params) instead of relying solely on prompt-embedded instructions — `validate-findings` still re-validates afterward since Codex's own enforcement covers shape, not the finding_id line-number rule.
 
 ### Pattern 2 — `sandbox-yolo` (opt-in)
 
@@ -169,35 +171,15 @@ You are never user-facing.
 
 ### 1. CLI Presence Check
 
-Run `which codex`. If the binary is not found, return:
+Run `which codex`. If the binary is not found, run `${CLAUDE_PLUGIN_ROOT}/scripts/validate-findings --error cli_missing --message "The 'codex' CLI is not installed. Install: \`npm install -g @openai/codex\` (or see adapter-recipes.md)." --raw-output-path <echoed>` (FR-HM28) and return its printed envelope verbatim as your result — the script owns every failure envelope's JSON shape so it lives in one place instead of six agent files.
 
-```json
-{
-  "status": "failed",
-  "error_code": "cli_missing",
-  "error_message": "The 'codex' CLI is not installed. Install: `npm install -g @openai/codex` (or see adapter-recipes.md).",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<echoed from input>"
-}
-```
+On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
 **Safe-name assertion (Task 88 / Phase 11.2):** The binary name `codex` is HARDCODED in the `which codex` invocation above. The adapter does NOT derive the binary name from any config key (e.g., from `multi_model_review.external_permission_mode.<cli-name>`). This prevents an adversarial project config from injecting a path-traversal or shell-metacharacter binary name into the `which` lookup. The Layer 1 schema test `tests/schemas/external-permission-mode-key-validation.test.ts` enforces that only the known safe set `{codex, claude, gemini, bedrock, llm, ollama, default}` may appear as keys in `external_permission_mode`; unknown keys are silently ignored at config-read time. CWE-20 (Improper Input Validation) defense-in-depth.
 
 ### 2. Auth Check
 
-Run a lightweight auth check (e.g., `codex auth status`). If unauthenticated:
-
-```json
-{
-  "status": "failed",
-  "error_code": "cli_auth_failed",
-  "error_message": "Codex CLI is installed but not authenticated. Run `codex login` to authenticate.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<echoed>"
-}
-```
+Run a lightweight auth check (e.g., `codex auth status`). If unauthenticated, run `validate-findings --error cli_auth_failed --message "Codex CLI is installed but not authenticated. Run \`codex login\` to authenticate." --raw-output-path <echoed>` and return its envelope.
 
 ### 3. Prompt Construction
 
@@ -220,61 +202,27 @@ In all modes, capture stdout (the `--json` envelope or the JSON-RPC stream), std
 
 ### 5. Output Parsing
 
-Parse the `codex exec --json` envelope (Pattern 1) or the terminal `result` JSON-RPC message (Pattern 3) to extract the assistant's findings JSON. Validate against the canonical-finding schema.
+Parse the `codex exec --json` envelope (Pattern 1) or the terminal `result` JSON-RPC message (Pattern 3) to extract the assistant's findings text, then pipe it (raw, fences and all) into `validate-findings --reviewer-id codex-review-prompter --family "${RESOLVED_FAMILY:-openai}" --raw-output-path <config.raw_output_path>` (FR-HM28; same plugin-root script invoked in CLI Presence Check above). The script strips markdown fences and trailing commas, joins NDJSON when the reply is line-delimited, validates each finding against `canonical-finding-schema.md`, drops any finding that fails validation, and injects `source` — steps 6-8 below describe what its output means, not separate work the adapter does by hand.
 
 ### 6. Retry-Once on Parse Failure (FR-MR8 step 3)
 
-If parsing fails (JSON malformed, schema mismatch), retry the CLI call ONCE with an appended clarification:
+If `validate-findings` returns `error_code: parse_failed`, retry the CLI call ONCE with an appended clarification:
 
 ```
 Your previous response did not match the required JSON Schema. Re-emit your findings as a JSON array conforming exactly to the canonical-finding-schema embedded above. Do not include explanatory text outside the JSON.
 ```
 
-If the retry also fails to parse:
-
-```json
-{
-  "status": "failed",
-  "error_code": "parse_failed",
-  "error_message": "Codex output could not be parsed into canonical envelope after retry. Raw output preserved at raw_output_path.",
-  "findings": [],
-  "usage": <token usage if available>,
-  "raw_output_path": "<echoed>"
-}
-```
+Pipe the retry's output through `validate-findings` again (same flags). If it still reports `error_code: parse_failed`, return that printed envelope as-is — "Codex output could not be parsed into canonical envelope after retry" is exactly what the script's own `error_message` says.
 
 ### 7. Normalize to Canonical Envelope
 
-For each parsed finding:
-- Set `source.reviewer_id = "codex-review-prompter"`
-- Set `source.family = config.family ?? "openai"` (use config override or default)
-- Set `source.source_type = "external"`
-- Validate finding_id contains no line numbers (per canonical-finding-schema.md)
+`validate-findings` already did this: every finding in its printed `findings[]` carries `source.reviewer_id = "codex-review-prompter"`, `source.family` = the family you passed it (`config.family` override, else `openai`), and `source.source_type = "external"`; `finding_id` values containing line numbers were rejected per `canonical-finding-schema.md`. Nothing left for the adapter to normalize by hand.
 
-Surface usage VERBATIM from Codex's reported `usage` object (NFR-MR4):
-
-```json
-{
-  "input_tokens": <from codex>,
-  "output_tokens": <from codex>,
-  "model": "<from codex>"
-}
-```
-
-When Codex does not report usage, set the entire `usage` object to `null`.
+Usage is surfaced VERBATIM from Codex's reported `usage` object (NFR-MR4) — pass Codex's own `usage` fields through unmodified (`validate-findings` sets the whole object to `null` when Codex did not report one).
 
 ### 8. Return Canonical Envelope
 
-```json
-{
-  "status": "success",
-  "error_code": null,
-  "error_message": null,
-  "findings": [...],
-  "usage": {...} | null,
-  "raw_output_path": "<echoed>"
-}
-```
+Return `validate-findings`'s printed stdout unchanged as your result — it already is the FR-MR9 `{status, error_code, error_message, findings, usage, raw_output_path}` envelope.
 
 ---
 
@@ -299,11 +247,9 @@ Authenticates via OpenAI account. Token stored in `~/.config/codex/auth.json`.
 ## Known Gotchas
 
 1. **Sandbox flag order (Pattern 1):** `--sandbox` must precede the prompt; reordering can break flag parsing in older CLI versions.
-2. **`--approval-mode never` is required (Pattern 1):** Without it, the CLI may block on file-write approval prompts (which would never come, since we run non-interactive). Approval-mode never makes the CLI fail-fast instead of hanging.
-3. **JSON envelope variations:** Codex may wrap findings in `response.message.content[0].text` rather than emitting them at the top level. Output parsing handles both shapes.
-4. **Auth token expiry:** `auth.json` tokens can expire silently; `codex auth status` exits 0 even when the token is one minute from expiry. Treat 401 from `codex exec` as `cli_auth_failed`.
-5. **`app-server` availability (Pattern 3):** Older Codex CLI builds (pre-app-server) lack the subcommand entirely. The adapter probes `codex app-server --help` and falls back to Pattern 1 when the probe fails. Users on older builds get correct behavior with no manual intervention.
-6. **stdin contention in Pattern 3:** The adapter writes JSON-RPC responses to Codex's stdin. Do NOT also pipe the prompt via stdin in Pattern 3 — pass the prompt as an argument so stdin remains free for the response stream.
+2. **JSON envelope variations:** Codex may wrap findings in `response.message.content[0].text` rather than at the top level; `validate-findings`'s fence-strip/NDJSON-join handles both shapes.
+3. **Auth token expiry:** `auth.json` tokens can expire silently; `codex auth status` exits 0 even one minute from expiry. Treat a 401 from `codex exec` as `cli_auth_failed`.
+4. **stdin contention in Pattern 3:** the adapter writes JSON-RPC responses to Codex's stdin — do NOT also pipe the prompt via stdin in Pattern 3; pass the prompt as an argument instead.
 
 ---
 

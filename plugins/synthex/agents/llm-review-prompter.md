@@ -122,18 +122,9 @@ You are never user-facing.
 
 ### 1. CLI Presence Check
 
-Run `which llm`. If the binary is not found, return:
+Run `which llm`. If the binary is not found, run `${CLAUDE_PLUGIN_ROOT}/scripts/validate-findings --error cli_missing --message "The 'llm' CLI is not installed. Install: \`pip install llm\` (or \`pipx install llm\` for isolated environments). See adapter-recipes.md for provider plugin setup." --raw-output-path <echoed>` (FR-HM28) and return its printed envelope.
 
-```json
-{
-  "status": "failed",
-  "error_code": "cli_missing",
-  "error_message": "The 'llm' CLI is not installed. Install: `pip install llm` (or `pipx install llm` for isolated environments). See adapter-recipes.md for provider plugin setup.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<echoed from input>"
-}
-```
+On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
 **Safe-name assertion (Task 88 / Phase 11.2):** The binary name `llm` is HARDCODED in the `which llm` invocation above. The adapter does NOT derive the binary name from any config key (e.g., from `multi_model_review.external_permission_mode.<cli-name>`). This prevents an adversarial project config from injecting a path-traversal or shell-metacharacter binary name into the `which` lookup. The Layer 1 schema test `tests/schemas/external-permission-mode-key-validation.test.ts` enforces that only the known safe set `{codex, claude, gemini, bedrock, llm, ollama, default}` may appear as keys in `external_permission_mode`; unknown keys are silently ignored at config-read time. CWE-20 (Improper Input Validation) defense-in-depth.
 
@@ -170,88 +161,31 @@ If the model does not support `-s` (older `llm` versions), fall back to embeddin
 llm -m <model> < prompt.txt
 ```
 
-If `llm` exits non-zero, return:
-
-```json
-{
-  "status": "failed",
-  "error_code": "cli_failed",
-  "error_message": "llm CLI exited with status <n>. Check stderr and raw_output_path for details.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<echoed>"
-}
-```
+If `llm` exits non-zero, run `validate-findings --error cli_failed --message "llm CLI exited with status <n>. Check stderr and raw_output_path for details." --raw-output-path <echoed>` and return its envelope.
 
 ### 5. Output Parsing
 
-`llm` returns the assistant's response as plain text (no JSON envelope wrapper). Parse the plain-text stdout as JSON findings:
-
-1. **Strip markdown fences:** If the response begins with ` ```json ` or ` ``` `, strip the opening and closing fence before parsing (same pre-step as Gemini adapter).
-2. **Parse as JSON:** Attempt `JSON.parse` on the stripped response text.
-3. **Validate against canonical-finding-schema:** Validate each entry in the parsed array against the canonical-finding JSON Schema.
-
-If parsing succeeds, proceed to Step 7 (Normalize).
+`llm` returns the assistant's response as plain text (no JSON envelope wrapper — unlike Gemini's `{response, stats}` wrapper, there is nothing to unwrap first). Pipe that text (raw, fences and all) into `validate-findings --reviewer-id llm-review-prompter --family "${RESOLVED_FAMILY:-<derived-from-prefix>}" --raw-output-path <echoed>` (FR-HM28; same plugin-root script invoked in CLI Presence Check above). The script strips markdown fences and trailing commas, joins NDJSON, validates each entry against canonical-finding-schema.md, drops invalid findings, and injects `source`.
 
 ### 6. Retry-Once on Parse Failure (FR-MR8 step 3)
 
-If parsing fails (JSON malformed, schema mismatch), retry the CLI call ONCE with an appended clarification in the prompt:
+If `validate-findings` returns `error_code: parse_failed`, retry the CLI call ONCE with an appended clarification in the prompt:
 
 ```
 Your previous response did not match the required JSON Schema. Re-emit your findings as a JSON array conforming exactly to the canonical-finding-schema embedded above. Do not include explanatory text outside the JSON. Do not wrap the JSON in markdown code fences.
 ```
 
-If the retry also fails to parse:
-
-```json
-{
-  "status": "failed",
-  "error_code": "parse_failed",
-  "error_message": "llm output could not be parsed into canonical envelope after retry. Raw output preserved at raw_output_path.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<echoed>"
-}
-```
+Pipe the retry's response through `validate-findings` again. If it still reports `error_code: parse_failed` terminally, return that printed envelope as-is — "llm output could not be parsed into canonical envelope after retry" is exactly what the script's own `error_message` says.
 
 ### 7. Normalize to Canonical Envelope
 
-For each parsed finding:
-- Set `source.reviewer_id = "llm-review-prompter"`
-- Set `source.family = config.family ?? <derived from model-ID prefix using the mapping table above>` (use config override or derive dynamically)
-- Set `source.source_type = "external"`
-- Validate finding_id contains no line numbers (per canonical-finding-schema.md)
+`validate-findings` already did this: every finding carries `reviewer_id = "llm-review-prompter"`, `family` = the family you passed it (`config.family` override, else derived from the model-ID prefix using the mapping table above), and `source_type: "external"`; `finding_id` values containing line numbers were rejected per canonical-finding-schema.md.
 
-Surface usage when available (NFR-MR4). Usage reporting is plugin-dependent — not all `llm` provider plugins report token counts. When usage is unavailable:
-
-```json
-{
-  "usage": null
-}
-```
-
-When usage is reported (e.g., via `llm --usage` if the provider plugin supports it):
-
-```json
-{
-  "input_tokens": <from llm usage output>,
-  "output_tokens": <from llm usage output>,
-  "model": "<echoed from config.model>"
-}
-```
+Usage is surfaced when available (NFR-MR4). Usage reporting is plugin-dependent — not all `llm` provider plugins report token counts (`usage: null` when unavailable; `{input_tokens, output_tokens, model}` from `llm --usage` when the provider plugin supports it).
 
 ### 8. Return Canonical Envelope
 
-```json
-{
-  "status": "success",
-  "error_code": null,
-  "error_message": null,
-  "findings": [...],
-  "usage": {"input_tokens": ..., "output_tokens": ..., "model": "..."} | null,
-  "raw_output_path": "<echoed>"
-}
-```
+Return `validate-findings`'s printed stdout unchanged as your result — it already is the FR-MR9 `{ "status": "success", "error_code": null, "error_message": null, "findings": [...], "usage": {...} | null, "raw_output_path": "..." }` envelope.
 
 ---
 

@@ -472,12 +472,29 @@ multi_model_review:
 
   # Aggregator (consolidation step) configuration.
   aggregator:
-    # `auto` resolves via FR-MR15 strict-total-order tier table (D17):
+    # `auto` resolves via the FR-MR15 strict-total-order tier table (D17),
+    # single-sourced below as family-keyed rows (FR-HM28) — the orchestrator
+    # (multi-model-review-orchestrator.md Step 2 / 0e) reads `tier_table`
+    # rather than hardcoding the chain, though it also documents the same
+    # order inline for readability:
     # Claude Opus > GPT-5 > Claude Sonnet > Gemini 2.5 Pro > DeepSeek V3 > Qwen 32B.
     # When the strongest configured proposer is also a reviewer, the aggregator
     # invocation is a separate freshly-spawned CLI call with judge-mode prompt.
     # When no flagship matches, falls back to the host Claude session.
     command: auto
+
+    # D17 strict total-order tier table, highest tier first (tier: 1 wins).
+    # `family` matches a proposer's `source.family` (or an external adapter's
+    # `per_reviewer.<adapter>.family` override); `model` is advisory (for
+    # operator readability and future multi-model-per-family resolution).
+    # Override per project to re-rank or add local-model families.
+    tier_table:
+      - { tier: 1, family: anthropic, model: claude-opus-4-7 }
+      - { tier: 2, family: openai, model: gpt-5 }
+      - { tier: 3, family: anthropic, model: claude-sonnet-5 }
+      - { tier: 4, family: google, model: gemini-2.5-pro }
+      - { tier: 5, family: local-deepseek, model: deepseek-v3 }
+      - { tier: 6, family: local-qwen, model: qwen-32b }
 
   # Per-command overrides. Each command can opt in or out independently.
   per_command:

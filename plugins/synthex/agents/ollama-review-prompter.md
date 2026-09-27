@@ -99,31 +99,10 @@ which ollama
 curl -sf http://localhost:11434/api/tags > /dev/null
 ```
 
-If `which ollama` returns non-zero (Ollama binary not installed):
+Either failure is `error_code: cli_missing` via `${CLAUDE_PLUGIN_ROOT}/scripts/validate-findings --error cli_missing --message "<msg>" --raw-output-path <echoed>` (FR-HM28), returning its printed envelope. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from. The two `--message` variants:
 
-```json
-{
-  "status": "failed",
-  "error_code": "cli_missing",
-  "error_message": "The 'ollama' binary is not installed. Install: `curl -fsSL https://ollama.com/install.sh | sh` (or see adapter-recipes.md). Then run `ollama serve` to start the server.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<echoed from input>"
-}
-```
-
-If `ollama` is installed but the HTTP probe to `http://localhost:11434/api/tags` fails (server not reachable):
-
-```json
-{
-  "status": "failed",
-  "error_code": "cli_missing",
-  "error_message": "Ollama binary found but server is not reachable at http://localhost:11434. Run `ollama serve` to start the server (or ensure it is running as a launchd/systemd service).",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<echoed from input>"
-}
-```
+- `which ollama` non-zero (binary not installed): `--message "The 'ollama' binary is not installed. Install: \`curl -fsSL https://ollama.com/install.sh | sh\` (or see adapter-recipes.md). Then run \`ollama serve\` to start the server."`
+- server unreachable at `http://localhost:11434/api/tags`: `--message "Ollama binary found but server is not reachable at http://localhost:11434. Run \`ollama serve\` to start the server (or ensure it is running as a launchd/systemd service)."`
 
 **Safe-name assertion (Task 88 / Phase 11.2):** The binary name `ollama` is HARDCODED in the `which ollama` invocation above. The adapter does NOT derive the binary name from any config key (e.g., from `multi_model_review.external_permission_mode.<cli-name>`). This prevents an adversarial project config from injecting a path-traversal or shell-metacharacter binary name into the `which` lookup. The Layer 1 schema test `tests/schemas/external-permission-mode-key-validation.test.ts` enforces that only the known safe set `{codex, claude, gemini, bedrock, llm, ollama, default}` may appear as keys in `external_permission_mode`; unknown keys are silently ignored at config-read time. CWE-20 (Improper Input Validation) defense-in-depth.
 
@@ -165,75 +144,29 @@ If Ollama returns HTTP 500 with an "out of memory" message in the response body,
 
 ### 5. Output Parsing
 
-Parse the Ollama HTTP response. When using `format: <schema>`, the generated content appears in `response.response` (the string value of the `response` field). Parse this string as JSON and validate against the canonical-finding schema.
+Parse the Ollama HTTP response envelope (`{ "model", "response", "done", "prompt_eval_count", "eval_count" }`). When using `format: <schema>`, the generated findings JSON appears as a string in the `response` field. Map `prompt_eval_count` → `input_tokens` and `eval_count` → `output_tokens` (NFR-MR4; set the whole `usage` object to `null` when Ollama omits them, e.g. older versions).
 
-When Ollama returns HTTP 200, the response shape is:
+Pipe the `response` string (raw) into `${CLAUDE_PLUGIN_ROOT}/scripts/validate-findings --reviewer-id ollama-review-prompter --family "${RESOLVED_FAMILY:-local-<configured-model>}" --raw-output-path <echoed>` (FR-HM28), passing the mapped `usage` object alongside it however your invocation shape supports (or fold it into the same JSON before piping) — the script strips fences/trailing commas, joins NDJSON, validates each finding against canonical-finding-schema.md, injects `source: { reviewer_id: "ollama-review-prompter", family: "local-qwen2.5-coder" (e.g., when model is `qwen2.5-coder:32b`) or your configured override, source_type: "external" }`, and prints the finished envelope.
 
-```json
-{
-  "model": "<model>",
-  "response": "<json-string-of-findings>",
-  "done": true,
-  "prompt_eval_count": 1234,
-  "eval_count": 56
-}
-```
-
-Extract `response`, parse as JSON array of findings, validate each entry against canonical-finding-schema.
+On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
 ### 6. Retry-Once on Parse Failure (FR-MR8 step 3)
 
-If parsing fails (JSON malformed, schema mismatch), retry the HTTP call ONCE with an appended clarification in the prompt:
+If `validate-findings` returns `error_code: parse_failed`, retry the HTTP call ONCE with an appended clarification in the prompt:
 
 ```
 Your previous response did not match the required JSON Schema. Re-emit your findings as a JSON array conforming exactly to the canonical-finding-schema embedded above. Do not include explanatory text outside the JSON.
 ```
 
-If the retry also fails to parse:
-
-```json
-{
-  "status": "failed",
-  "error_code": "parse_failed",
-  "error_message": "Ollama output could not be parsed into canonical envelope after retry. Raw output preserved at raw_output_path.",
-  "findings": [],
-  "usage": <token usage if available>,
-  "raw_output_path": "<echoed>"
-}
-```
+Pipe the retry's `response` through `validate-findings` again. If it still reports `error_code: parse_failed` terminally, return that printed envelope as-is — "Ollama output could not be parsed into canonical envelope after retry" is exactly what the script's own `error_message` says.
 
 ### 7. Normalize to Canonical Envelope
 
-For each parsed finding:
-- Set `source.reviewer_id = "ollama-review-prompter"`
-- Set `source.family = config.family ?? "local-<configured-model>"` (e.g., `"local-qwen2.5-coder"` when model is `qwen2.5-coder:32b`)
-- Set `source.source_type = "external"`
-- Validate finding_id contains no line numbers (per canonical-finding-schema.md)
-
-Surface usage from Ollama's response (NFR-MR4):
-
-```json
-{
-  "input_tokens": <from prompt_eval_count>,
-  "output_tokens": <from eval_count>,
-  "model": "<from response.model>"
-}
-```
-
-Ollama reports `prompt_eval_count` (input tokens) and `eval_count` (output tokens) in its response envelope. Map these verbatim. When these fields are absent (older Ollama versions may omit them), set the entire `usage` object to `null`.
+`validate-findings` already did this (see Step 5): source injection and finding_id line-number validation per canonical-finding-schema.md are the script's job, not the adapter's.
 
 ### 8. Return Canonical Envelope
 
-```json
-{
-  "status": "success",
-  "error_code": null,
-  "error_message": null,
-  "findings": [...],
-  "usage": {"input_tokens": ..., "output_tokens": ..., "model": "..."} | null,
-  "raw_output_path": "<echoed>"
-}
-```
+Return `validate-findings`'s printed stdout unchanged as your result — it already is the FR-MR9 `{status, error_code, error_message, findings, usage, raw_output_path}` envelope.
 
 ---
 

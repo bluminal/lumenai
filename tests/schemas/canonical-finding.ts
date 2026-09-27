@@ -1,16 +1,72 @@
 /**
  * Canonical Finding Schema validator.
- * Source of truth: plugins/synthex/agents/_shared/canonical-finding-schema.md
+ *
+ * Source of truth: plugins/synthex/agents/_shared/canonical-finding.schema.json
+ * (D13, FR-HM28). This validator loads the JSON Schema at import time and
+ * derives its enums, required-field list, and length limits from it — it
+ * does not duplicate those constants — so the JSON file and this validator
+ * cannot drift apart. Prose documentation lives in
+ * plugins/synthex/agents/_shared/canonical-finding-schema.md, which embeds
+ * the same JSON verbatim.
  */
+
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 export interface ValidationResult {
   valid: boolean;
   errors: string[];
 }
 
-export const SEVERITY_VALUES = ['critical', 'high', 'medium', 'low'] as const;
-export const SOURCE_TYPE_VALUES = ['native-team', 'external', 'native-recovery'] as const;
-export const CONFIDENCE_VALUES = ['low', 'medium', 'high'] as const;
+const SCHEMA_JSON_PATH = resolve(
+  __dirname,
+  '../../plugins/synthex/agents/_shared/canonical-finding.schema.json',
+);
+
+interface CanonicalFindingSchema {
+  required: string[];
+  properties: {
+    severity: { enum: readonly string[] };
+    title: { maxLength: number };
+    finding_id: { not: { pattern: string } };
+    source: {
+      properties: {
+        source_type: { enum: readonly string[] };
+      };
+    };
+    confidence: { enum: readonly string[] };
+    raised_by: {
+      items: {
+        properties: {
+          source_type: { enum: readonly string[] };
+        };
+      };
+    };
+  };
+}
+
+const SCHEMA: CanonicalFindingSchema = JSON.parse(readFileSync(SCHEMA_JSON_PATH, 'utf8'));
+
+export const SEVERITY_VALUES = SCHEMA.properties.severity.enum as unknown as readonly [
+  'critical',
+  'high',
+  'medium',
+  'low',
+];
+export const SOURCE_TYPE_VALUES = SCHEMA.properties.source.properties.source_type
+  .enum as unknown as readonly ['native-team', 'external', 'native-recovery'];
+export const CONFIDENCE_VALUES = SCHEMA.properties.confidence.enum as unknown as readonly [
+  'low',
+  'medium',
+  'high',
+];
+
+const REQUIRED_FIELDS = SCHEMA.required;
+const TITLE_MAX_LENGTH = SCHEMA.properties.title.maxLength;
+// The 'i' flag is an implementation nicety (catches "LINE_42" as well as
+// "line_42"); every pattern in the schema already matches the tested cases
+// case-sensitively.
+const LINE_NUMBER_RE = new RegExp(SCHEMA.properties.finding_id.not.pattern, 'i');
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -19,8 +75,6 @@ function isObject(v: unknown): v is Record<string, unknown> {
 function isNonEmptyString(v: unknown): boolean {
   return typeof v === 'string' && v.length > 0;
 }
-
-const LINE_NUMBER_RE = /:\d+|L\d+|line[-_]\d+/i;
 
 export function validateCanonicalFinding(obj: unknown): ValidationResult {
   const errors: string[] = [];
@@ -42,11 +96,13 @@ export function validateCanonicalFinding(obj: unknown): ValidationResult {
   }
 
   // Required: category
-  if (!('category' in obj) || !isNonEmptyString(obj.category)) errors.push('Missing or empty "category"');
+  if (REQUIRED_FIELDS.includes('category') && (!('category' in obj) || !isNonEmptyString(obj.category))) {
+    errors.push('Missing or empty "category"');
+  }
 
-  // Required: title (max 200 chars)
+  // Required: title (max chars per schema)
   if (!('title' in obj) || !isNonEmptyString(obj.title)) errors.push('Missing or empty "title"');
-  else if ((obj.title as string).length > 200) errors.push('"title" exceeds 200 chars');
+  else if ((obj.title as string).length > TITLE_MAX_LENGTH) errors.push(`"title" exceeds ${TITLE_MAX_LENGTH} chars`);
 
   // Required: description
   if (!('description' in obj) || !isNonEmptyString(obj.description)) errors.push('Missing or empty "description"');
