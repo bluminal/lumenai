@@ -1,5 +1,6 @@
 ---
 model: sonnet
+effort: medium
 description: "Leads frontend delivery: UI implementation, UX quality, accessibility, and design-system use."
 tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Task
 ---

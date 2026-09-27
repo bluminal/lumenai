@@ -1,5 +1,6 @@
 ---
 model: sonnet
+effort: medium
 description: "Designs test strategy, writes test suites, and analyzes coverage gaps across the codebase."
 tools: Read, Write, Edit, Grep, Glob, Bash
 ---
