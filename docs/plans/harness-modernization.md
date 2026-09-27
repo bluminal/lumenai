@@ -250,12 +250,12 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 ### Milestone 5.1: State, Scaffold, and Facts
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 38 | FR-HM26: `scripts/state-flag.sh <flag>` (`upgrade-nudge.sh` field preservation), used by `dismiss-upgrade-nudge` and `star` (`star` keeps its interactive question) | S | Task 37 | in progress |
-| 39 | FR-HM26: `scripts/init-scaffold.sh` replaces `init` Step 2 | S | Task 37 | in progress |
-| 40 | FR-HM29: `init` writes `.synthex/facts.md` (4 facts with anchors; D12). Consumers read it first and keep detection as the fallback. | M | Task 39 | pending |
+| 38 | FR-HM26: `scripts/state-flag.sh <flag>` (`upgrade-nudge.sh` field preservation), used by `dismiss-upgrade-nudge` and `star` (`star` keeps its interactive question) | S | Task 37 | done |
+| 39 | FR-HM26: `scripts/init-scaffold.sh` replaces `init` Step 2 | S | Task 37 | done |
+| 40 | FR-HM29: `init` writes `.synthex/facts.md` (4 facts with anchors; D12). Consumers read it first and keep detection as the fallback. | M | Task 39 | in progress |
 
-**Task 38 Acceptance Criteria:** `[T]` `state-flag-behavioral.test.ts`: fields preserved, atomic write. `[T]` `dismiss-upgrade-nudge.test.ts:95-133` repointed; statePath, `"dismissed": true`, `last_seen_version`, and "Do NOT use `AskUserQuestion`" still hold.
-**Task 39 Acceptance Criteria:** `[T]` `init-multimodel-md.test.ts:277-310` ordering passes; the output is byte-identical to `defaults.yaml`.
+**Task 38 Acceptance Criteria:** `[T]` `state-flag-behavioral.test.ts`: fields preserved, atomic write. `[T]` `dismiss-upgrade-nudge.test.ts:95-133` repointed; statePath, `"dismissed": true`, `last_seen_version`, and "Do NOT use `AskUserQuestion`" still hold. → done in `e17a875` + `9b57312`: `tests/schemas/state-flag-behavioral.test.ts` — "preserves existing known fields", "preserves a field this script has never heard of", "atomic write" block (no tmp left; no partial file on a read-only dir), jq-less and node-less PATH blocks; `dismiss-upgrade-nudge.test.ts` "delegates the write to state-flag.sh", "sets dismissed: true", "preserves last_seen_version when present"; "Do NOT use AskUserQuestion" still asserted. `star` keeps its single question. Orchestrator added a no-shell Write-tool fallback to both commands (FR-HM3). A missing `last_seen_version` is seeded by the upgrade-nudge hook on the next session, preserving the flags.
+**Task 39 Acceptance Criteria:** `[T]` `init-multimodel-md.test.ts:277-310` ordering passes; the output is byte-identical to `defaults.yaml`. → done in `bd213f6` + `77ddb23`: `init-multimodel-md.test.ts` ordering passes; `tests/schemas/init-scaffold-behavioral.test.ts` "writes .synthex/config.yaml byte-identical to plugins/synthex/config/defaults.yaml", "creates all seven document directories", "is idempotent…", node and node-less PATHs. The script also absorbs Step 8's directories. Orchestrator follow-up: the script refuses (exit 3) any destination inside the plugin root, tested with the defaults path and a `..` path, and init.md regains the Read/Write fallback with the 5505e48 ban on `cp` of the defaults path.
 **Task 40 Acceptance Criteria:** `[T]` `facts.test.ts`: 4 facts with freshness rules, a fallback sentence per consumer, `.gitignore` includes `facts.md`, and `init.md` prints `Wrote <N> facts to .synthex/facts.md`. `init-multimodel-md` passes.
 
 **Parallelizable:** {38, 39} → 40.
