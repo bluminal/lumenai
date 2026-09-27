@@ -18,6 +18,11 @@ Improve a Product Requirements Document (PRD) by running it through a multi-agen
 | `--max-iterations <int>` | Iteration cap. Hard ceiling 200. | `20` | No |
 | `--loop-isolated` | Fresh-subagent isolation mode per iteration. | off (shared-context default) | No |
 | `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
+| `--profile <economy\|balanced\|premium>` | Override `models.profile` for spawned reviewers (see Model Resolution). | `models.profile` config (`balanced`) | No |
+
+### Model Resolution
+
+Each spawned agent's model and effort resolve in this order: `--profile` flag > `models.agents.<name>` > `models.profile` delta > the agent's own frontmatter (FR-HM15, D29). On Claude Code, the resolved values are applied via the Agent tool's per-call `model` override; on every other host, `models`/`hosts.<harness>.models` are advisory only — applied where the host supports per-subagent model selection, otherwise ignored. Standing-pool routing is unaffected: pools never re-spawn, so a profile change reaches only newly spawned agents.
 
 ## Core Responsibilities
 

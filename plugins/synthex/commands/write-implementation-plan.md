@@ -20,6 +20,9 @@ Transform a Product Requirements Document (PRD) into a prioritized, value-driven
 | `--max-iterations <int>` | Iteration cap. Hard ceiling 200. | `20` | No |
 | `--loop-isolated` | Fresh-subagent isolation mode per iteration. | off (shared-context default) | No |
 | `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
+| `--profile <economy\|balanced\|premium>` | Override `models.profile` for spawned reviewers. | `models.profile` config (`balanced`) | No |
+
+**Model Resolution:** Read `${CLAUDE_PLUGIN_ROOT}/docs/model-resolution.md` (D17). Other hosts resolve the plugin root via `.synthex/state.json`.
 
 ## Core Responsibilities
 
@@ -341,9 +344,9 @@ implementation_plan:
   # Sub-agents that review the draft implementation plan
   # Each reviewer provides structured feedback that the Product Manager addresses
   reviewers:
-    - agent: architect          # Sub-agent to invoke
-      enabled: true             # Set to false to skip this reviewer
-      focus: "..."              # What this reviewer should focus on
+    - agent: architect
+      enabled: true
+      focus: "..."
 
   # Per-command override: higher max_cycles for high-stakes plans
   review_loops:
