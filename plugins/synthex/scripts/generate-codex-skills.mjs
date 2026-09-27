@@ -23,6 +23,9 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   HERMES_READ_FILE_NOTE,
+  HOST_IDS,
+  renderHostsEnv,
+  renderHostsTable,
   renderToolMapTable,
   RULE_ADOPT_INLINE,
   RULE_SKIP_UNAVAILABLE_TOOL,
@@ -398,11 +401,32 @@ ${HERMES_READ_FILE_NOTE}
 `;
 }
 
+// FR-HM41 / FR-HM18 (Task 35): the shared headless-recipe doc and the
+// runtime env file `loop-step.sh check-writable` reads, both rendered from
+// host-matrix.mjs and both covered by `--check` (D9).
+const HOSTS_DOCS_RELATIVE_PATH = 'docs/hosts.md';
+const HOSTS_DOCS_PATH = join(pluginRoot, 'docs', 'hosts.md');
+const HOSTS_ENV_PATH = join(pluginRoot, 'config', 'hosts.env');
+
+function hostsDocContents() {
+  return `${GENERATED_MARKER}
+
+# Synthex headless host recipes (FR-HM41, FR-HM18)
+
+Every wrapper's SYNTHEX_HOST step reads this file. For each harness it names the approval flag a headless run needs so state writes succeed, the ceiling on one shell-tool call, and the \`SYNTHEX_LOOP_IDLE_MAX\` to export so \`loop-idle-wait.sh\` stays under that ceiling. Single-sourced from \`scripts/lib/host-matrix.mjs\`; \`config/hosts.env\` carries the same values for scripts.
+
+${renderHostsTable()}
+
+Set \`SYNTHEX_HOST=<id>\` before running any \`scripts/*.sh\` so \`loop-step.sh check-writable\` prints that host's hint; when it is unset the script prints every host's hint.
+`;
+}
+
 function skillContents(entry) {
   const skillDir = join(skillsRoot, entry.slug);
   const sourcePath = resolve(pluginRoot, entry.manifestPath);
   const canonicalPath = relative(skillDir, sourcePath).split(sep).join('/');
   const toolMapPath = relative(skillDir, TOOL_MAP_DOCS_PATH).split(sep).join('/');
+  const hostsDocPath = relative(skillDir, HOSTS_DOCS_PATH).split(sep).join('/');
   const isCommand = entry.kind === 'command';
   const description = isCommand
     ? commandDescription(entry.slug).description
@@ -441,6 +465,7 @@ This is the shared Agent Skills entrypoint for the canonical Synthex ${entry.kin
 5. ${RULE_SKIP_UNAVAILABLE_TOOL}
 6. ${RULE_ADOPT_INLINE}
 7. Keep provider-specific behavior only where the canonical workflow genuinely targets that provider. Do not edit the canonical definition merely to adapt it at runtime.
+8. Before running any \`scripts/*.sh\`, export \`SYNTHEX_HOST=<id>\` for the current host (${HOST_IDS.filter((id) => id !== 'claude').map((id) => `\`${id}\``).join(', ')}); [\`${HOSTS_DOCS_RELATIVE_PATH}\`](${hostsDocPath}) lists each host's headless approval flag, shell-call cap, and \`SYNTHEX_LOOP_IDLE_MAX\`.
 `;
 }
 
@@ -464,6 +489,22 @@ function main() {
   } else {
     mkdirSync(dirname(TOOL_MAP_DOCS_PATH), { recursive: true });
     writeFileSync(TOOL_MAP_DOCS_PATH, expectedToolMapDoc);
+  }
+
+  // FR-HM41 (Task 35): docs/hosts.md and config/hosts.env, same --check
+  // contract as docs/tool-map.md above.
+  for (const [path, expectedContents] of [
+    [HOSTS_DOCS_PATH, hostsDocContents()],
+    [HOSTS_ENV_PATH, renderHostsEnv()],
+  ]) {
+    if (checkOnly) {
+      if (!existsSync(path) || readFileSync(path, 'utf8') !== expectedContents) {
+        mismatches.push(relative(pluginRoot, path));
+      }
+    } else {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, expectedContents);
+    }
   }
 
   for (const entry of entries) {

@@ -90,6 +90,13 @@ function skipListEntries(value) {
  *   sentence (FR-HM24 / D11) printed by `start-review-team`,
  *   `stop-review-team`, and `list-teams` when a tool is absent. Populated by
  *   Task 47; left `null` until then.
+ * - `headless`: FR-HM41 / FR-HM18 headless recipe (Task 35): the approval
+ *   flag a headless run needs so state writes succeed, the host's shell-call
+ *   ceiling in seconds, the `SYNTHEX_LOOP_IDLE_MAX` each host should export
+ *   (ceiling minus a margin), the hint `loop-step.sh check-writable` prints
+ *   under `$SYNTHEX_HOST`, and Grok's background-poll guidance (null where
+ *   the in-turn wait is the only option). Rendered by the generator into
+ *   `docs/hosts.md` and runtime `config/hosts.env` (D9).
  * - `hookAllowlist`: placeholder for this host's hook allowlist (Task 46,
  *   D25 -- e.g. Codex's generated `hooks/codex-hooks.json`, commit-lint
  *   only, Codex matcher). Populated by Task 46; left `null` until then.
@@ -113,6 +120,14 @@ export const HOSTS = Object.freeze({
     gapMessages: null,
     // TODO(Task 46, D25): populate the hook allowlist once Task 46 lands.
     hookAllowlist: null,
+    // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM18 (600 s Bash ceiling); loop-idle-wait.sh default 540 s.
+    headless: Object.freeze({
+      approvalFlag: '`--dangerously-skip-permissions` (or `--permission-mode bypassPermissions`)',
+      shellCapSeconds: 600,
+      idleMaxSeconds: 540,
+      writabilityHint: 'Claude Code: run with `--dangerously-skip-permissions` (or allow Write and Bash in settings) and check the sandbox\'s writable roots.',
+      backgroundPoll: null,
+    }),
   }),
 
   codex: Object.freeze({
@@ -133,6 +148,14 @@ export const HOSTS = Object.freeze({
     gapMessages: null,
     // TODO(Task 46, D25): populate the hook allowlist once Task 46 lands.
     hookAllowlist: null,
+    // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM32 recipe; PRD §1 'two to five minutes' shell cap (120 s lower bound assumed).
+    headless: Object.freeze({
+      approvalFlag: '`codex exec --sandbox workspace-write -a never`',
+      shellCapSeconds: 120,
+      idleMaxSeconds: 90,
+      writabilityHint: 'Codex: run `codex exec --sandbox workspace-write -a never`; the default `read-only` sandbox blocks state writes.',
+      backgroundPoll: null,
+    }),
   }),
 
   gemini: Object.freeze({
@@ -152,6 +175,14 @@ export const HOSTS = Object.freeze({
     gapMessages: null,
     // TODO(Task 46, D25): populate the hook allowlist once Task 46 lands.
     hookAllowlist: null,
+    // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM32 recipe; PRD FR-HM18 'Gemini CLI at most 240 s (5-minute hard cap)'.
+    headless: Object.freeze({
+      approvalFlag: '`--approval-mode yolo` (headless `default` denies writes)',
+      shellCapSeconds: 300,
+      idleMaxSeconds: 240,
+      writabilityHint: 'Gemini CLI: run with `--approval-mode yolo` or a policy file that allows `write_file` and `run_shell_command`.',
+      backgroundPoll: null,
+    }),
   }),
 
   opencode: Object.freeze({
@@ -171,6 +202,14 @@ export const HOSTS = Object.freeze({
     gapMessages: null,
     // TODO(Task 46, D25): populate the hook allowlist once Task 46 lands.
     hookAllowlist: null,
+    // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM32 recipe; PRD FR-HM18 'Grok Build and OpenCode at most 90 s (120 s default)'.
+    headless: Object.freeze({
+      approvalFlag: '`opencode run --command <slug> --auto` (`run` without `--auto` is read-only)',
+      shellCapSeconds: 120,
+      idleMaxSeconds: 90,
+      writabilityHint: 'OpenCode: run `opencode run --command <slug> --auto`; `run` without `--auto` cannot write state.',
+      backgroundPoll: null,
+    }),
   }),
 
   grok: Object.freeze({
@@ -190,6 +229,14 @@ export const HOSTS = Object.freeze({
     gapMessages: null,
     // TODO(Task 46, D25): populate the hook allowlist once Task 46 lands.
     hookAllowlist: null,
+    // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM32 recipe; PRD FR-HM18 90 s / 120 s default and background-poll bullet.
+    headless: Object.freeze({
+      approvalFlag: '`grok -p ... --yolo --max-turns N` (never `/loop` or `scheduler_create`)',
+      shellCapSeconds: 120,
+      idleMaxSeconds: 90,
+      writabilityHint: 'Grok Build: run `grok -p "/synthex:..." --yolo`; never `/loop` or `scheduler_create` (detached depth-1 subagents).',
+      backgroundPoll: 'Run the idle wait with `background: true` and poll `get_command_or_subagent_output` (up to one hour) instead of a foreground sleep.',
+    }),
   }),
 
   hermes: Object.freeze({
@@ -209,6 +256,14 @@ export const HOSTS = Object.freeze({
     gapMessages: null,
     // TODO(Task 46, D25): populate the hook allowlist once Task 46 lands.
     hookAllowlist: null,
+    // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM32 recipe and spikes.md Task 8; PRD FR-HM18 'Hermes no cap known' (Claude values reused).
+    headless: Object.freeze({
+      approvalFlag: '`hermes -z "/<slug> ..."` after `hermes skills trust`; wrap in `timeout` (headless `clarify` hangs)',
+      shellCapSeconds: 600,
+      idleMaxSeconds: 540,
+      writabilityHint: 'Hermes: run from a trusted, writable project (`hermes skills trust`); Skills Guard quarantines untrusted trees.',
+      backgroundPoll: null,
+    }),
   }),
 });
 
@@ -281,4 +336,71 @@ export function renderToolMapTable() {
   return [header, divider, readEditWriteRow, bashRow, agentTaskRow, askUserQuestionRow, skipListRow].join(
     '\n',
   );
+}
+
+/**
+ * Task 35 (FR-HM41, FR-HM18): the headless recipe table rendered into the
+ * shared `docs/hosts.md` (one row per host, Claude Code included) that every
+ * wrapper's SYNTHEX_HOST step and `/synthex:schedule` (Task 62) point at.
+ *
+ * @returns {string} the table, as Markdown, with no leading/trailing blank lines.
+ */
+export function renderHostsTable() {
+  const rows = HOST_IDS.map((id) => {
+    const h = HOSTS[id];
+    const poll = h.headless.backgroundPoll ?? 'in-turn wait only';
+    return `| ${h.displayName} (\`${id}\`) | ${h.headless.approvalFlag} | ${h.headless.shellCapSeconds} | ${h.headless.idleMaxSeconds} | ${poll} |`;
+  });
+  return [
+    '| Host (`SYNTHEX_HOST`) | Headless approval flag | Shell-call cap (s) | `SYNTHEX_LOOP_IDLE_MAX` | Idle wait |',
+    '|------|------------------------|--------------------|-------------------------|-----------|',
+    ...rows,
+  ].join('\n');
+}
+
+/** Upper-snake env-var stem for a host id (`opencode` -> `OPENCODE`). */
+function envStem(id) {
+  return id.toUpperCase().replace(/-/g, '_');
+}
+
+function shQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * Task 35 (FR-HM41): the POSIX-sh-sourceable `config/hosts.env` that
+ * `loop-step.sh check-writable` reads at runtime to print a host-specific
+ * hint for `$SYNTHEX_HOST` (or every host's hint when it is unset). Values
+ * never contain tabs or newlines (asserted here) because
+ * `SYNTHEX_HOST_HINTS` is a tab-separated `id<TAB>hint` list, one per line,
+ * that the script walks with plain `read`.
+ *
+ * @returns {string} file contents, trailing newline included.
+ */
+export function renderHostsEnv() {
+  const lines = [
+    '# Generated by scripts/generate-codex-skills.mjs; do not edit.',
+    '# Source: scripts/lib/host-matrix.mjs (Task 35, FR-HM41 / FR-HM18). POSIX sh; source it.',
+    `SYNTHEX_HOST_IDS=${shQuote(HOST_IDS.join(' '))}`,
+  ];
+  const hintLines = [];
+  for (const id of HOST_IDS) {
+    const h = HOSTS[id];
+    for (const [key, value] of Object.entries(h.headless)) {
+      if (typeof value === 'string' && /[\t\n]/.test(value)) {
+        throw new Error(`host "${id}" headless.${key} must not contain tabs or newlines`);
+      }
+    }
+    const stem = envStem(id);
+    lines.push(
+      `SYNTHEX_HOST_${stem}_NAME=${shQuote(h.displayName)}`,
+      `SYNTHEX_HOST_${stem}_APPROVAL_FLAG=${shQuote(h.headless.approvalFlag)}`,
+      `SYNTHEX_HOST_${stem}_SHELL_CAP=${h.headless.shellCapSeconds}`,
+      `SYNTHEX_HOST_${stem}_IDLE_MAX=${h.headless.idleMaxSeconds}`,
+      `SYNTHEX_HOST_${stem}_HINT=${shQuote(h.headless.writabilityHint)}`,
+    );
+    hintLines.push(`${id}\t${h.headless.writabilityHint}`);
+  }
+  lines.push(`SYNTHEX_HOST_HINTS=${shQuote(hintLines.join('\n'))}`);
+  return `${lines.join('\n')}\n`;
 }

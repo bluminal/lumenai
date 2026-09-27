@@ -82,12 +82,32 @@ command -v node >/dev/null 2>&1 && HAS_NODE=1
 # check-writable — the FR-HM18 writability preflight, reused internally by
 # every state-writing operation below. Task 35 extends the failure hint with
 # host-specific guidance (Codex --sandbox workspace-write, Gemini
-# --approval-mode yolo, OpenCode --auto); writability_hint() is the hook.
+# --approval-mode yolo, OpenCode --auto); writability_hint() reads them from
+# config/hosts.env keyed by $SYNTHEX_HOST (Task 35, FR-HM41).
 # --------------------------------------------------------------------------
 
 writability_hint() {
-  # Placeholder for Task 35 (FR-HM41): read config/hosts.env + $SYNTHEX_HOST
-  # here and return a host-specific flag/hint instead of this generic line.
+  # Task 35 (FR-HM41): config/hosts.env (generated from host-matrix.mjs) maps
+  # each host id to the flag/hint that makes state writes succeed headless.
+  # With $SYNTHEX_HOST set (wrappers export it) print that host's hint; when
+  # it is unset or unknown print every host's hint so the user can pick theirs.
+  script_dir="${0%/*}"
+  [ "$script_dir" = "$0" ] && script_dir=.
+  env_file="$script_dir/../config/hosts.env"
+  if [ -r "$env_file" ]; then
+    # shellcheck disable=SC1090
+    . "$env_file"
+    want="${SYNTHEX_HOST:-}"
+    all=""
+    while IFS="$(printf '\t')" read -r hid hint; do
+      [ -n "$hid" ] || continue
+      if [ "$hid" = "$want" ]; then printf '%s' "$hint"; return 0; fi
+      all="${all}${all:+ | }${hint}"
+    done <<EOF
+${SYNTHEX_HOST_HINTS:-}
+EOF
+    if [ -n "$all" ]; then printf '%s' "$all"; return 0; fi
+  fi
   printf '%s' "Check directory permissions, or the host sandbox mode (e.g. a read-only default sandbox)."
 }
 
