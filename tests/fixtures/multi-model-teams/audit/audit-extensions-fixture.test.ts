@@ -9,7 +9,9 @@
  * Source requirements:
  *   - FR-MMT30  (Sections 8, 9, 10 — team_metadata, pool_routing, recovery)
  *   - FR-MMT30a (Section 11 — finding_attribution_telemetry config flag)
- *   - Task 59   (extended audit-artifact-writer.md with Sections 8–10)
+ *   - Task 59   (extended the audit writer with Sections 8–10; originally
+ *                audit-artifact-writer.md, now scripts/write-audit.mjs
+ *                after Task 42 retired the agent)
  *   - Task 60   (Section 11 + record_finding_attribution_telemetry flag)
  *   - Task 61   (validator helpers: expectTeamMetadata, expectPoolRouting,
  *                expectRecovery, expectAttributionTelemetry)

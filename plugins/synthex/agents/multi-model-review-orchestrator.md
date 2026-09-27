@@ -413,6 +413,31 @@ The self-preference warning (Step 0c) fires when the aggregator family equals th
 
 Return the consolidated envelope. The `findings[]` array now contains CONSOLIDATED findings (post-Stages 1, 2, 4, 5, 5b, 6) with `raised_by[]` populated for every finding. The `per_reviewer_results` table still contains per-reviewer raw counts (for audit traceability — these counts reflect pre-consolidation findings from each proposer).
 
+#### Audit artifact write (FR-MR24, FR-HM26, FR-HM44)
+
+Before returning the envelope, write the per-invocation audit artifact. `audit-artifact-writer` (the Haiku sub-agent this used to describe) is retired — it had no invocation site (FR-HM44); `plugins/synthex/scripts/write-audit.mjs` now owns the write and reproduces its file path, filename pattern, and all 7 required + up to 4 optional markdown sections exactly (Task 42). Run it as ONE Bash call, guarded with `command -v node`:
+
+```bash
+if command -v node >/dev/null 2>&1; then
+  node "${CLAUDE_PLUGIN_ROOT}/scripts/write-audit.mjs" <<'EOF'
+{ "command": "...", "invocation_metadata": {...}, "config_snapshot": {...},
+  "preflight_result": {...}, "unified_envelope": {...}, "audit_config": {...},
+  "team_metadata": {...}, "pool_routing": {...}, "recovery": {...} }
+EOF
+else
+  : # node unavailable — FR-HM26 node-guard fallback: render the SAME
+    # markdown yourself with your own Write tool (all 7 required sections;
+    # the 4 optional sections whenever their input block is present), at
+    # "<audit.output_path>/<YYYY-MM-DD>-<command>-<short-hash>.md" — the
+    # exact filename and section structure write-audit.mjs's own header
+    # comment documents. This is the documented prose fallback.
+fi
+```
+
+On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
+
+No file is written, on either path, when `multi_model_review.audit.enabled` is false — both write-audit.mjs and the prose fallback implement the same FR-MR24 skip-write rule. Both paths produce byte-for-byte the same section structure; only the writer differs.
+
 ---
 
 ## Behavioral Rules
@@ -430,7 +455,7 @@ Return the consolidated envelope. The `findings[]` array now contains CONSOLIDAT
 
 ## Source Authority
 
-FR-MR9 (adapter envelope, Task 4), FR-MR11 (Sonnet orchestrator), FR-MR12 (single-batch fan-out, Step 3), FR-MR14 (Stages 1/2/4, Steps 8a/8b/8c; Stage 5b, Step 8e), FR-MR14a (Stage 5, Step 8d), FR-MR14b (Stage 6, Step 8f), FR-MR15 (aggregator tier-table + bias mitigation, Step 8g), FR-MR17 (native-only continuation, cloud-surface remediation), FR-MR20 (preflight, Step 0), FR-MR28 (context bundle role), D5 (single source of truth for bundle), D6 (single parallel Task batch), D17 (aggregator tier table, Step 2/0e/8g), D18 (Stage 4 bound, Step 8c), D21 (path-and-reason header regex, Step 7), D23 (Stage 3 embedding fallback, Step 8b-2), NFR-MR2 (cloud-surface remediation, Step 6), `multi_model_review.consolidation.{stage2_jaccard_threshold, stage3_embedding_threshold, stage3_stage4_floor, stage4.max_calls_per_consolidation}` (consolidation config keys), Task 5 (`context-bundle-assembler`, Step 1), Task 4 (adapter contract, Step 3), Task 1 (canonical finding schema).
+FR-MR9 (adapter envelope, Task 4), FR-MR11 (Sonnet orchestrator), FR-MR12 (single-batch fan-out, Step 3), FR-MR14 (Stages 1/2/4, Steps 8a/8b/8c; Stage 5b, Step 8e), FR-MR14a (Stage 5, Step 8d), FR-MR14b (Stage 6, Step 8f), FR-MR15 (aggregator tier-table + bias mitigation, Step 8g), FR-MR17 (native-only continuation, cloud-surface remediation), FR-MR20 (preflight, Step 0), FR-MR28 (context bundle role), D5 (single source of truth for bundle), D6 (single parallel Task batch), D17 (aggregator tier table, Step 2/0e/8g), D18 (Stage 4 bound, Step 8c), D21 (path-and-reason header regex, Step 7), D23 (Stage 3 embedding fallback, Step 8b-2), NFR-MR2 (cloud-surface remediation, Step 6), `multi_model_review.consolidation.{stage2_jaccard_threshold, stage3_embedding_threshold, stage3_stage4_floor, stage4.max_calls_per_consolidation}` (consolidation config keys), Task 5 (`context-bundle-assembler`, Step 1), Task 4 (adapter contract, Step 3), Task 1 (canonical finding schema), FR-MR24 (audit artifact requirements, Step 9), FR-HM26 (script replaces `audit-artifact-writer`, Step 9), FR-HM44 (latent defect: the agent had no invocation site), Task 42 (`write-audit.mjs`, Step 9).
 
 ---
 
@@ -438,4 +463,4 @@ FR-MR9 (adapter envelope, Task 4), FR-MR11 (Sonnet orchestrator), FR-MR12 (singl
 
 All consolidation stages are implemented above: ~~Stage 5 — Severity reconciliation (Task 28).~~ DONE (Step 8d, FR-MR14a). ~~Stage 5b — Contradiction scan / CoVe (Tasks 29a/29b).~~ DONE (Step 8e). ~~Stage 6 — Minority-of-one detection (Task 30).~~ DONE (Step 8f, FR-MR14b). ~~Aggregator bias-mitigation (Task 31).~~ DONE (Step 8g, FR-MR15) — Q3 inline-vs-separate aggregator-prompt partially resolved: D17 takes precedence (external adapter path documented); inline host-fallback documented for v1. ~~Stages 1+2 land in Task 24+25 (Milestone 3.2).~~ DONE (Steps 8a/8b). ~~Stage 4 in Task 26.~~ DONE (Step 8c). ~~Preflight is added inline in Task 21.~~ DONE (Step 0). ~~Stage 3 deferred to Phase 7.~~ DONE (Step 8b-2, D23).
 
-Still pending: audit-artifact-writer (Milestone 4.0, Task 39).
+~~audit-artifact-writer (Milestone 4.0, Task 39).~~ DONE (Step 9, Task 42, FR-HM26/FR-HM44) — the agent is retired; `scripts/write-audit.mjs` writes the audit artifact directly, guarded with `command -v node` and a documented prose fallback.

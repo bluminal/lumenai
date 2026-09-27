@@ -7,7 +7,6 @@
   },
   "agents": [
     "./agents/architect.md",
-    "./agents/audit-artifact-writer.md",
     "./agents/bedrock-review-prompter.md",
     "./agents/claude-review-prompter.md",
     "./agents/code-reviewer.md",

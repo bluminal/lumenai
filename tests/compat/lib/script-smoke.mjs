@@ -491,6 +491,80 @@ function initScaffoldIdempotentCase(ctx, includeNode) {
 }
 
 // ---------------------------------------------------------------------------
+// scripts/write-audit.mjs — Task 42 (FR-HM26, FR-HM44). Unlike every other
+// registered script, this one has a `#!/usr/bin/env node` shebang and no
+// bash entrypoint at all, so it cannot be exercised through runScript()'s
+// bash-only invocation. The happy-path case spawns node directly (as the
+// orchestrator's Step 9 call site does once its `command -v node` guard
+// passes). The "fallback" case does NOT try to run the node script under a
+// node-less PATH (impossible by construction); per the Task 37 registry's
+// documented allowance for a node-shebang script, it instead proves the
+// CALLING guard itself — the exact `command -v node` pattern
+// multi-model-review-orchestrator.md's Step 9 documents — degrades to a
+// clean non-zero exit with a message when node is absent, which is the
+// condition under which the orchestrator's prose fallback (rendering the
+// same markdown itself via its Write tool) takes over.
+// ---------------------------------------------------------------------------
+
+function writeAuditEnvelopeFixture() {
+  return {
+    command: 'review-code',
+    invocation_metadata: { target: 'staged changes', timestamp: '2026-04-28T10:00:00Z', short_hash: 'c7d8e9f' },
+    config_snapshot: { enabled: true, reviewers: ['codex-review-prompter'] },
+    preflight_result: { summary: '1 reviewer configured, 1 available, 1 family, aggregator: codex-review-prompter' },
+    unified_envelope: {
+      per_reviewer_results: [
+        { reviewer_id: 'code-reviewer', source_type: 'native-team', family: 'anthropic', status: 'success', findings_count: 0, error_code: null, usage: null },
+      ],
+      findings: [],
+      aggregator_resolution: { name: 'codex-review-prompter', source: 'configured' },
+      continuation_event: null,
+    },
+    audit_config: { enabled: true, output_path: 'docs/reviews/' },
+  };
+}
+
+function writeAuditHappyPathCase(ctx) {
+  const pathDir = ctx.buildRestrictedPath(true);
+  const nodeBin = join(pathDir, 'node');
+  const result = spawnSync(nodeBin, [ctx.scriptAbsPath], {
+    cwd: ctx.workDir,
+    env: { PATH: pathDir, CLAUDE_PROJECT_DIR: ctx.workDir },
+    input: JSON.stringify(writeAuditEnvelopeFixture()),
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  assert(result.status === 0, `write-audit.mjs exited ${result.status}: ${result.stderr}`);
+  const parsed = JSON.parse(result.stdout);
+  assert(parsed.status === 'written', `expected status "written", got: ${result.stdout}`);
+  assert(existsSync(parsed.path), `write-audit.mjs reported ${parsed.path} but it does not exist`);
+}
+
+function writeAuditNodeGuardFallbackCase(ctx) {
+  const pathDir = ctx.buildRestrictedPath(false);
+  const bash = join(pathDir, 'bash');
+  // Mirrors multi-model-review-orchestrator.md's Step 9 call site verbatim:
+  // guard with `command -v node`, and degrade cleanly (non-zero exit + a
+  // message) when it is absent — the orchestrator's prose-fallback trigger.
+  const guardScript = [
+    'if command -v node >/dev/null 2>&1; then',
+    `  node "${ctx.scriptAbsPath}"`,
+    'else',
+    '  echo "write-audit: node not found; falling back to prose render (FR-HM26 node-guard fallback)." >&2',
+    '  exit 3',
+    'fi',
+  ].join('\n');
+  const result = spawnSync(bash, ['-c', guardScript], {
+    cwd: ctx.workDir,
+    env: { PATH: pathDir, CLAUDE_PROJECT_DIR: ctx.workDir },
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  assert(result.status === 3, `expected the node-guard fallback to exit 3, got ${result.status}: ${result.stderr}`);
+  assert(/node not found/.test(result.stderr), `expected a node-not-found message, got: ${result.stderr}`);
+}
+
+// ---------------------------------------------------------------------------
 // Registry — SMOKE_CASES keys are relPath as produced by
 // discoverRuntimeScripts() (relative to pluginRoot, e.g. "scripts/loop-step
 // .sh"). tests/schemas/script-smoke-registry.test.ts fails if a discovered
@@ -576,6 +650,16 @@ export const SMOKE_CASES = {
     {
       name: 'missing jq/node fallback: same scaffold plus an idempotent no-op second run',
       run: (ctx) => initScaffoldIdempotentCase(ctx, false),
+    },
+  ],
+  'scripts/write-audit.mjs': [
+    {
+      name: 'happy path: writes the audit markdown and reports status: "written" (node present)',
+      run: (ctx) => writeAuditHappyPathCase(ctx),
+    },
+    {
+      name: 'missing node fallback: the calling `command -v node` guard degrades to a clean non-zero exit with a message',
+      run: (ctx) => writeAuditNodeGuardFallbackCase(ctx),
     },
   ],
 };

@@ -121,4 +121,29 @@ describe('Task 19: multi-model-review-orchestrator.md', () => {
       expect(content).toContain('10 invocations');
     });
   });
+
+  describe('Task 42 (FR-HM26, FR-HM44): Step 9 write-audit.mjs call site + node fallback', () => {
+    it('Step 9 documents the write-audit.mjs call site', () => {
+      expect(content).toContain('scripts/write-audit.mjs');
+    });
+
+    it('guards the call with `command -v node`', () => {
+      expect(content).toMatch(/command -v node/);
+    });
+
+    it('documents the node-unavailable prose fallback (FR-HM26 node-guard fallback)', () => {
+      expect(content).toMatch(/node unavailable/i);
+      expect(content).toMatch(/prose fallback/i);
+    });
+
+    it('states no file is written on either path when audit.enabled is false', () => {
+      expect(content).toMatch(/multi_model_review\.audit\.enabled.*false/);
+    });
+
+    it('references the retired audit-artifact-writer agent and FR-MR24', () => {
+      expect(content).toContain('audit-artifact-writer');
+      expect(content).toMatch(/retired/i);
+      expect(content).toContain('FR-MR24');
+    });
+  });
 });

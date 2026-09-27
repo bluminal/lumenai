@@ -12,7 +12,6 @@ import {
   RULE_ADOPT_INLINE,
   RULE_SKIP_UNAVAILABLE_TOOL,
 } from '../../plugins/synthex/scripts/lib/host-matrix.mjs';
-import { WRAPPER_COUNT } from '../compat/lib/inventory.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const pluginRoot = resolve(repoRoot, 'plugins/synthex');
@@ -56,9 +55,9 @@ function frontmatterBlock(contents: string): string {
 }
 
 describe('wrapper catalog diet (Task 19, FR-HM9/FR-HM10)', () => {
-  it('has a COMMAND_DESCRIPTIONS entry for all 18 commands and an AGENT_DESCRIPTIONS entry for all 28 agents', () => {
+  it('has a COMMAND_DESCRIPTIONS entry for all 18 commands and an AGENT_DESCRIPTIONS entry for all 27 agents', () => {
     expect(Object.keys(COMMAND_DESCRIPTIONS)).toHaveLength(18);
-    expect(Object.keys(AGENT_DESCRIPTIONS)).toHaveLength(28);
+    expect(Object.keys(AGENT_DESCRIPTIONS)).toHaveLength(27);
   });
 
   it('keeps every command wrapper description at or under 120 characters and equal to its COMMAND_DESCRIPTIONS entry', () => {
@@ -122,6 +121,19 @@ describe('wrapper catalog diet (Task 19, FR-HM9/FR-HM10)', () => {
   });
 });
 
+// The two captures below are a FROZEN point-in-time snapshot of the wrapper
+// catalog "before" the Task 19 description diet (see
+// tests/compat/baselines/README.md) — Task 22's activation-budget
+// assertions divide by this fixed denominator. They must stay pinned to
+// the wrapper count AT CAPTURE TIME (46 = 18 commands + 28 agents), not to
+// the live tests/compat/lib/inventory.mjs WRAPPER_COUNT: that constant
+// changes as agents are added or retired (Task 42 retires
+// audit-artifact-writer, dropping the live count to 45), while these
+// files are historical evidence that is never re-captured for that. The
+// two numbers happened to be equal from Task 19 until Task 42 only because
+// no net agent count change landed in between.
+const PRE_TASK19_WRAPPER_COUNT = 46;
+
 describe('wrapper catalog baseline captures (Task 19)', () => {
   it('records a pre-diet Codex skills/list catalog whose synthex:* count matches the generated wrapper count and has no source-command- name', () => {
     const baseline = JSON.parse(
@@ -129,8 +141,8 @@ describe('wrapper catalog baseline captures (Task 19)', () => {
     );
 
     expect(baseline.harness).toBe('codex');
-    expect(baseline.synthexCount).toBe(WRAPPER_COUNT);
-    expect(baseline.skills).toHaveLength(WRAPPER_COUNT);
+    expect(baseline.synthexCount).toBe(PRE_TASK19_WRAPPER_COUNT);
+    expect(baseline.skills).toHaveLength(PRE_TASK19_WRAPPER_COUNT);
     expect(baseline.sourceCommandSkillNames).toEqual([]);
     for (const name of baseline.skills.map((skill: { name: string }) => skill.name)) {
       expect(name).not.toMatch(/source-command-/);
@@ -143,7 +155,7 @@ describe('wrapper catalog baseline captures (Task 19)', () => {
     );
 
     expect(baseline.harness).toBe('opencode');
-    expect(baseline.skillCount).toBe(WRAPPER_COUNT);
+    expect(baseline.skillCount).toBe(PRE_TASK19_WRAPPER_COUNT);
     expect(baseline.availableSkillsBlockFound).toBe(true);
     expect(typeof baseline.availableSkillsBlockBytes).toBe('number');
     expect(baseline.availableSkillsBlockBytes).toBeGreaterThan(0);
