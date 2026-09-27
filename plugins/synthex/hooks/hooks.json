@@ -8,6 +8,15 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/upgrade-nudge.sh"
           }
         ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/compact-recover.sh"
+          }
+        ]
       }
     ],
     "Stop": [

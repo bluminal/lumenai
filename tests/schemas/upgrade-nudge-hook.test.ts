@@ -100,6 +100,47 @@ describe.each(variants)(
   }
 );
 
+describe('synthex hooks.json — compact entry (FR-HM20, Task 36)', () => {
+  const hooksJsonPath = join(REPO_ROOT, 'plugins', 'synthex', 'hooks', 'hooks.json');
+  const scriptPath = join(REPO_ROOT, 'plugins', 'synthex', 'scripts', 'compact-recover.sh');
+  let hooksJson: any;
+
+  beforeAll(() => {
+    hooksJson = JSON.parse(readFileSync(hooksJsonPath, 'utf-8'));
+  });
+
+  it('keeps the original (unmatched) SessionStart entry pointing at upgrade-nudge.sh', () => {
+    const sessionStart = hooksJson.hooks.SessionStart;
+    expect(Array.isArray(sessionStart)).toBe(true);
+    expect(sessionStart[0].matcher).toBeUndefined();
+    expect(sessionStart[0].hooks[0].command).toBe('${CLAUDE_PLUGIN_ROOT}/scripts/upgrade-nudge.sh');
+  });
+
+  it('adds a second SessionStart entry matching "compact"', () => {
+    const sessionStart = hooksJson.hooks.SessionStart;
+    const compactEntry = sessionStart.find((e: any) => e.matcher === 'compact');
+    expect(compactEntry).toBeTruthy();
+    expect(compactEntry.hooks[0].type).toBe('command');
+    expect(compactEntry.hooks[0].command).toBe('${CLAUDE_PLUGIN_ROOT}/scripts/compact-recover.sh');
+  });
+
+  it('script file exists, is executable, and has an allowed shebang', () => {
+    expect(existsSync(scriptPath)).toBe(true);
+    const mode = statSync(scriptPath).mode;
+    expect(mode & 0o111).toBeGreaterThan(0);
+    const head = readFileSync(scriptPath, 'utf-8').split('\n')[0];
+    expect(head).toMatch(/^#!\/usr\/bin\/env\s+sh\s*$/);
+  });
+
+  it('documents its exit codes and never invokes python', () => {
+    const content = readFileSync(scriptPath, 'utf-8');
+    expect(content).toMatch(/^#\s*Exit codes:\s*$/m);
+    // Comment lines may legitimately say "no python"; only code counts.
+    const code = content.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+    expect(code).not.toMatch(/(^|[\s;&|`(])python3?\b/m);
+  });
+});
+
 describe('synthex-plus hooks.json — TaskCompleted + TeammateIdle preserved', () => {
   it('preserves TaskCompleted and TeammateIdle alongside SessionStart (Task 14)', () => {
     const path = join(
