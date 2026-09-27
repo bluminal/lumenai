@@ -28,6 +28,8 @@ Run `plugins/synthex/scripts/state-flag.sh dismissed` (resolved from the install
 
 The script atomically sets `"dismissed": true` in `state_file`, reusing `upgrade-nudge.sh`'s field-preservation rules: every other existing field — including `last_seen_version` and `plugin_root` (both written by the upgrade-nudge hook) — is preserved untouched. Preserve `last_seen_version` from existing state if available; do not regress it (the user may have last-seen an older version; preserving that history is harmless). If `state.json` does not exist yet, or fails to parse (malformed JSON, FR-UO18), the script treats it as missing and creates a fresh document (`schema_version: 1`, `"dismissed": true`, `updated_at`) instead — idempotent either way.
 
+**Fallback (no shell tool, or the script is missing):** use the **Write** tool to write `state_file` yourself: keep every existing field, set `"dismissed": true` and `updated_at` to the current UTC ISO 8601 time, and start from `{"schema_version": 1}` if the file is missing or malformed.
+
 Interpret the script's exit code:
 - `0` — success. Proceed to step 4.
 - `2` — `.synthex/` does not exist (step 2 should already have caught this). Print the step 2 message.

@@ -71,6 +71,8 @@ Options:
 
 3. Set `starred: true` in `state_file` (FR-HM18 — one Bash call). Run `plugins/synthex/scripts/state-flag.sh starred` (resolved from the installed plugin root — Claude Code: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/state-flag.sh" starred`). On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
+   **Fallback (no shell tool, or the script is missing):** use the **Write** tool to write `state_file` yourself: keep every existing field, set `"starred": true` and `updated_at` to the current UTC ISO 8601 time, and start from `{"schema_version": 1}` if the file is missing or malformed.
+
    The script atomically sets `"starred": true`, reusing `upgrade-nudge.sh`'s field-preservation rules: every other existing field — `last_seen_version`, `dismissed`, `star_dismissed`, `plugin_root` — is preserved untouched.
 
    Interpret the exit code: `0` — success, proceed. `2` — `.synthex/` does not exist (already caught by step 1). `5` — the state directory was not writable; print `Could not write .synthex/state.json — check directory permissions.` and stop (the URL is already printed, so this is non-fatal to the user's ability to star manually).
@@ -94,6 +96,8 @@ Do NOT write state. The upgrade-nudge hook will surface this prompt again on the
    ```
 
 2. Set `star_dismissed: true` in `state_file` (FR-HM18 — one Bash call). Run `plugins/synthex/scripts/state-flag.sh star_dismissed` (resolved from the installed plugin root — Claude Code: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/state-flag.sh" star_dismissed`). On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
+
+   **Fallback (no shell tool, or the script is missing):** use the **Write** tool to write `state_file` yourself: keep every existing field, set `"star_dismissed": true` and `updated_at` to the current UTC ISO 8601 time, and start from `{"schema_version": 1}` if the file is missing or malformed.
 
    The script atomically sets `"star_dismissed": true`, preserving every other existing field (`last_seen_version`, `dismissed`, `starred`, `plugin_root`) untouched.
 
