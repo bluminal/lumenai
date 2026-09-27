@@ -56,9 +56,9 @@ function frontmatterBlock(contents: string): string {
 }
 
 describe('wrapper catalog diet (Task 19, FR-HM9/FR-HM10)', () => {
-  it('has a COMMAND_DESCRIPTIONS entry for all 18 commands and an AGENT_DESCRIPTIONS entry for all 28 agents', () => {
+  it('has a COMMAND_DESCRIPTIONS entry for all 18 commands and an AGENT_DESCRIPTIONS entry for all 27 agents', () => {
     expect(Object.keys(COMMAND_DESCRIPTIONS)).toHaveLength(18);
-    expect(Object.keys(AGENT_DESCRIPTIONS)).toHaveLength(28);
+    expect(Object.keys(AGENT_DESCRIPTIONS)).toHaveLength(27);
   });
 
   it('keeps every command wrapper description at or under 120 characters and equal to its COMMAND_DESCRIPTIONS entry', () => {

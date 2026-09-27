@@ -421,7 +421,8 @@ multi_model_review:
   per_reviewer_timeout_seconds: 180
 
   # Context bundle assembly (D5, FR-MR28). The orchestrator assembles this
-  # bundle ONCE per invocation via `context-bundle-assembler` and delivers it
+  # bundle ONCE per invocation via `scripts/assemble-bundle.sh` (FR-HM26;
+  # replaces the retired `context-bundle-assembler` agent) and delivers it
   # identically to every proposer (native and external) so no reviewer sees a
   # different artifact, conventions, or specs than the others.
   context:
