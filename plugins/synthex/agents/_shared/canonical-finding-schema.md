@@ -7,25 +7,28 @@
 ## Source authority
 
 - FR-MR13 (multi-model-review.md)
+- D13 / FR-HM28 (`canonical-finding.schema.json` is the machine-readable source of truth; this document mirrors it in prose)
 - D17 (aggregator tier table — uses `family` field)
 - D18 (Stage 4 — uses `finding_id` for fingerprint dedup)
 
 ## JSON Schema
+
+The canonical, machine-readable copy of this schema lives at [`canonical-finding.schema.json`](./canonical-finding.schema.json) (D13). `tests/schemas/canonical-finding.ts` and `plugins/synthex/scripts/validate-findings` both load that file directly — neither hand-duplicates its enums or limits — so this document and the runtime validators cannot drift apart. The block below is a verbatim copy, kept for readability inline with the field semantics and examples that follow.
 
 ```json
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://synthex.bluminal.dev/schemas/canonical-finding.json",
   "title": "Canonical Finding",
+  "description": "Normative contract for every finding flowing through the multi-model review orchestrator (FR-MR13, D13). Single source of truth: this file. tests/schemas/canonical-finding.ts loads it at runtime and derives its enums, required-field list, and length limits from it, and plugins/synthex/scripts/validate-findings loads it to validate findings before printing the adapter envelope (FR-HM28), so neither can drift from this file. Prose mirror (field semantics, examples): plugins/synthex/agents/_shared/canonical-finding-schema.md.",
   "type": "object",
   "required": ["finding_id", "severity", "category", "title", "description", "file", "source"],
-  "additionalProperties": false,
   "properties": {
     "finding_id": {
       "type": "string",
+      "minLength": 1,
       "description": "Stable identifier for fingerprint dedup (Stage 1). MUST NOT contain line numbers — line numbers shift across edits and would break dedup.",
-      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
-      "not": { "pattern": ":\\d+|L\\d+|line[-_]\\d+" }
+      "not": { "pattern": ":\\d+|[Ll]\\d+|line[-_]\\d+" }
     },
     "severity": {
       "type": "string",
@@ -33,6 +36,7 @@
     },
     "category": {
       "type": "string",
+      "minLength": 1,
       "description": "e.g. security, correctness, performance, style, maintainability, reliability"
     },
     "title": { "type": "string", "minLength": 1, "maxLength": 200 },
@@ -52,7 +56,11 @@
       "required": ["reviewer_id", "family", "source_type"],
       "properties": {
         "reviewer_id": { "type": "string", "minLength": 1 },
-        "family": { "type": "string", "minLength": 1, "description": "openai | google | anthropic | local-<model> | etc." },
+        "family": {
+          "type": "string",
+          "minLength": 1,
+          "description": "openai | google | anthropic | local-<model> | etc."
+        },
         "source_type": {
           "type": "string",
           "enum": ["native-team", "external", "native-recovery"]
@@ -70,9 +78,12 @@
         "type": "object",
         "required": ["reviewer_id", "family", "source_type"],
         "properties": {
-          "reviewer_id": { "type": "string" },
-          "family": { "type": "string" },
-          "source_type": { "type": "string", "enum": ["native-team", "external", "native-recovery"] }
+          "reviewer_id": { "type": "string", "minLength": 1 },
+          "family": { "type": "string", "minLength": 1 },
+          "source_type": {
+            "type": "string",
+            "enum": ["native-team", "external", "native-recovery"]
+          }
         }
       }
     },

@@ -12,9 +12,13 @@
 //     discovered runtime script has no smoke case registered.
 //
 // Discovery walks <pluginRoot>/scripts/** and <pluginRoot>/hooks/** for
-// .sh/.js/.mjs/.cjs files, minus BUILD_TOOLS (dev-only tooling that is
-// never shipped as a runtime hook or invoked by an agent at execution
-// time: the Agent Skills wrapper generator and its data-table library).
+// .sh/.js/.mjs/.cjs files, PLUS extensionless files that start with an
+// allowed shebang (FR-HM28: `scripts/validate-findings` ships without an
+// extension, CLI-binary style — it is still a runtime script and must be
+// held to the same portable-script contract), minus BUILD_TOOLS (dev-only
+// tooling that is never shipped as a runtime hook or invoked by an agent
+// at execution time: the Agent Skills wrapper generator and its
+// data-table library).
 //
 // `pluginRoot` is caller-supplied and BUILD_TOOLS is kept root-relative
 // (not baked to an absolute repo path) so the exact same walk works
@@ -23,16 +27,31 @@
 // /workspace/marketplace/plugins/synthex, /workspace/staged-synthex,
 // /workspace/.agents — see each tests/compat/scenarios/*-offline.mjs).
 
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
 
 const SCRIPT_EXTENSIONS = new Set(['.sh', '.js', '.mjs', '.cjs']);
+
+/** Matches the same shebangs portable-scripts.test.ts's SHEBANG_ALLOWLIST accepts. */
+const SHEBANG_RE = /^#!(\/bin\/(sh|bash)|\/usr\/bin\/env (sh|bash|node))(\s|$)/;
 
 /** Relative to <pluginRoot>. */
 export const BUILD_TOOLS = Object.freeze([
   join('scripts', 'generate-codex-skills.mjs'),
   join('scripts', 'lib', 'host-matrix.mjs'),
 ]);
+
+function hasAllowedShebang(absPath) {
+  let firstLine;
+  try {
+    // First line only; a script's shebang is always well within 512 bytes.
+    const buf = readFileSync(absPath, { encoding: 'utf8', flag: 'r' }).slice(0, 512);
+    firstLine = buf.split('\n', 1)[0];
+  } catch {
+    return false;
+  }
+  return SHEBANG_RE.test(firstLine);
+}
 
 function walk(dir, out) {
   if (!existsSync(dir)) return;
@@ -41,6 +60,8 @@ function walk(dir, out) {
     if (entry.isDirectory()) {
       walk(full, out);
     } else if (SCRIPT_EXTENSIONS.has(extname(entry.name))) {
+      out.push(full);
+    } else if (extname(entry.name) === '' && hasAllowedShebang(full)) {
       out.push(full);
     }
   }

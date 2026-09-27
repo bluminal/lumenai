@@ -491,6 +491,65 @@ function initScaffoldIdempotentCase(ctx, includeNode) {
 }
 
 // ---------------------------------------------------------------------------
+// scripts/validate-findings — FR-HM28 adapter-output normalizer. Node is
+// preferred; when node is absent this script falls back to jq, but jq is
+// NEVER on PATH in these restricted-PATH scenarios either (see the module
+// header), so the "missing jq/node fallback" case below exercises the
+// script's third branch: the dependency-free `unknown_error` envelope it
+// prints when NEITHER interpreter is reachable, rather than silently
+// producing nothing.
+// ---------------------------------------------------------------------------
+
+const VALIDATE_FINDINGS_STDIN = '```json\n' + JSON.stringify({
+  findings: [
+    {
+      finding_id: 'security.handleLogin.missing-csrf-check',
+      severity: 'high',
+      category: 'security',
+      title: 'Missing CSRF check in handleLogin',
+      description: 'The handleLogin function does not validate CSRF tokens.',
+      file: 'src/auth/handleLogin.ts',
+    },
+  ],
+  usage: { input_tokens: 100, output_tokens: 20, model: 'gpt-5' },
+}) + '\n```';
+
+function validateFindingsHappyPathCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const result = runScript(
+    ctx.scriptAbsPath,
+    ['--reviewer-id', 'codex-review-prompter', '--family', 'openai'],
+    { pathDir, cwd: ctx.workDir, stdin: VALIDATE_FINDINGS_STDIN },
+  );
+  assert(result.code === 0, `validate-findings exited ${result.code}: ${result.stderr}`);
+  const envelope = JSON.parse(result.stdout);
+  assert(envelope.status === 'success', `expected status success, got: ${result.stdout}`);
+  assert(envelope.findings.length === 1, `expected 1 finding, got: ${result.stdout}`);
+  assert(
+    envelope.findings[0].source.reviewer_id === 'codex-review-prompter'
+      && envelope.findings[0].source.family === 'openai'
+      && envelope.findings[0].source.source_type === 'external',
+    `source was not injected correctly: ${result.stdout}`,
+  );
+}
+
+function validateFindingsFallbackCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const result = runScript(
+    ctx.scriptAbsPath,
+    ['--reviewer-id', 'codex-review-prompter', '--family', 'openai'],
+    { pathDir, cwd: ctx.workDir, stdin: VALIDATE_FINDINGS_STDIN },
+  );
+  assert(result.code === 0, `validate-findings exited ${result.code}: ${result.stderr}`);
+  const envelope = JSON.parse(result.stdout);
+  assert(
+    envelope.status === 'failed' && envelope.error_code === 'unknown_error',
+    `expected the dependency-free unknown_error envelope, got: ${result.stdout}`,
+  );
+  assert(Array.isArray(envelope.findings) && envelope.findings.length === 0, `findings should be empty: ${result.stdout}`);
+}
+
+// ---------------------------------------------------------------------------
 // Registry — SMOKE_CASES keys are relPath as produced by
 // discoverRuntimeScripts() (relative to pluginRoot, e.g. "scripts/loop-step
 // .sh"). tests/schemas/script-smoke-registry.test.ts fails if a discovered
@@ -576,6 +635,16 @@ export const SMOKE_CASES = {
     {
       name: 'missing jq/node fallback: same scaffold plus an idempotent no-op second run',
       run: (ctx) => initScaffoldIdempotentCase(ctx, false),
+    },
+  ],
+  'scripts/validate-findings': [
+    {
+      name: 'happy path: fence-stripped JSON envelope normalized with source injected (node present)',
+      run: (ctx) => validateFindingsHappyPathCase(ctx, true),
+    },
+    {
+      name: 'missing jq/node fallback: dependency-free unknown_error envelope printed on stdout',
+      run: (ctx) => validateFindingsFallbackCase(ctx, false),
     },
   ],
 };
