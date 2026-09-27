@@ -10,6 +10,7 @@ import {
   validateSkillTree,
 } from '../lib/contract.mjs';
 import { emit, parseLastJsonLine, runCommand } from '../lib/scenario-helpers.mjs';
+import { runScriptSmoke } from '../lib/script-smoke.mjs';
 
 const harness = 'codex';
 const startedAt = Date.now();
@@ -102,6 +103,34 @@ try {
     throw new Error(`Codex skill inventory is incomplete: ${inventory.missing.join(', ')}`);
   }
   emit(harness, 'references', { ok: true, checked: entries.length });
+
+  // Task 37 (FR-HM18, FR-HM40, NFR-HM4): every registered runtime script's
+  // happy path and missing-jq/missing-node fallback path, run against this
+  // harness's own installed copy of the plugin before it is torn down.
+  // Cases invoke `bash` directly (see script-smoke.mjs), the same way every
+  // other Layer 2 behavioral fixture for these scripts does, rather than
+  // going through `codex exec`; the container's own filesystem policy
+  // (read-only fixture mount, writable /workspace tmpfs — see run-suite.mjs)
+  // already matches what Codex's `workspace-write` sandbox mode would grant
+  // an agent-driven invocation.
+  const smoke = await runScriptSmoke({
+    pluginRoot: installedFixture,
+    onCase: (script, name, result) =>
+      emit(harness, 'script-smoke', {
+        ok: result.ok,
+        script,
+        case: name,
+        ...(result.error ? { error: result.error } : {}),
+      }),
+  });
+  if (!smoke.ok) {
+    const failed = smoke.results.filter((r) => !r.ok);
+    throw new Error(
+      `Script smoke suite failed (${failed.length}/${smoke.results.length}): ${failed
+        .map((f) => `${f.relPath} :: ${f.name}: ${f.error}`)
+        .join('; ')}`,
+    );
+  }
 
   parseLastJsonLine(
     runCommand('codex', ['plugin', 'remove', selector, '--json']).stdout,

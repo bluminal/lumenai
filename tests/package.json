@@ -22,7 +22,11 @@
     "test:compat:activation:opencode": "node compat/scripts/run-suite.mjs --profile activation --harness opencode",
     "snapshots:generate": "node helpers/generate-snapshots.js",
     "snapshots:update": "node helpers/generate-snapshots.js --update",
-    "cache:clear": "rm -rf .cache/"
+    "cache:clear": "rm -rf .cache/",
+    "eval:generate": "node scripts/generate-evals.mjs",
+    "eval:generate:check": "node scripts/generate-evals.mjs --check",
+    "eval:run": "node scripts/run-evals.mjs --threshold 0.67",
+    "eval:cache:clear": "rm -rf .eval-cache/"
   },
   "devDependencies": {
     "vitest": "^4.0.16",

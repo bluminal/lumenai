@@ -1,5 +1,8 @@
 ---
 model: sonnet
+effort: high
+description: "Primary coding and orchestration agent; implements features and delegates to specialists."
+tools: Read, Write, Edit, Bash, Grep, Glob, Agent, Task
 ---
 
 # Tech Lead

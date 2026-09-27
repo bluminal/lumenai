@@ -257,6 +257,8 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 |---------|---------|-------------|
 | `review_loops.max_cycles` | 2 | Global max review loop iterations for all commands |
 | `review_loops.min_severity_to_address` | high | Global minimum severity that must be resolved |
+| `models.profile` | `balanced` | Active model tier (`economy`\|`balanced`\|`premium`); `balanced` is the shipped frontmatter, `economy`/`premium` are per-agent deltas over it (D29) |
+| `models.agents.<name>` | `{}` | Named per-agent `{model, effort}` override; highest-priority resolution step below the `--profile` flag |
 | `refine_requirements.reviewers` | product-manager, tech-lead, design-system-agent | Sub-agents that review PRD for clarity |
 | `implementation_plan.reviewers` | architect, design-system-agent, tech-lead | Sub-agents that review draft implementation plans |
 | `implementation_plan.concurrent_tasks` | 3 | Max parallelizable tasks per milestone in the plan |
@@ -265,6 +267,7 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 | `code_review.max_diff_lines` | 300 | Warn when diff exceeds this size |
 | `code_review.spec_paths` | `[docs/specs]` | Specifications for compliance checking |
 | `code_review.spec_inline_bytes` | 65536 | Size gate for inline spec scan in Step 2 (above this, only the first 50 lines of each spec are scanned) |
+| `code_review.verification` | `off` | FR-HM17 prose verification pass (D18) for code-reviewer/security-reviewer/performance-engineer; `prose` verifies top-5 CRITICAL/HIGH findings via LSP or grep, `off` skips it |
 | `quality.coverage_thresholds` | line: 80, branch: 70, function: 80 | Coverage thresholds |
 | `quality.test_runner` | vitest | Test runner for coverage reports |
 | `architecture.decisions_path` | `docs/specs/decisions` | ADR storage |

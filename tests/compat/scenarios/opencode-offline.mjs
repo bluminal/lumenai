@@ -9,6 +9,7 @@ import {
   readExpectedEntrypoints,
   validateSkillTree,
 } from '../lib/contract.mjs';
+import { runScriptSmoke } from '../lib/script-smoke.mjs';
 
 const startedAt = Date.now();
 const fixtureRoot = '/fixture/synthex';
@@ -138,6 +139,28 @@ try {
     if (!skill || !source) throw new Error(`Empty entrypoint: ${entry.id}`);
   }
   emit('references', { ok: true, checked: entries.length });
+
+  // Task 37 (FR-HM18, FR-HM40, NFR-HM4): every registered runtime script's
+  // happy path and missing-jq/missing-node fallback path, run against this
+  // harness's own installed copy of the plugin before it is torn down.
+  const smoke = await runScriptSmoke({
+    pluginRoot: installedRoot,
+    onCase: (script, name, result) =>
+      emit('script-smoke', {
+        ok: result.ok,
+        script,
+        case: name,
+        ...(result.error ? { error: result.error } : {}),
+      }),
+  });
+  if (!smoke.ok) {
+    const failed = smoke.results.filter((r) => !r.ok);
+    throw new Error(
+      `Script smoke suite failed (${failed.length}/${smoke.results.length}): ${failed
+        .map((f) => `${f.relPath} :: ${f.name}: ${f.error}`)
+        .join('; ')}`,
+    );
+  }
 
   rmSync(installedRoot, { recursive: true, force: true });
   const uninstallResult = spawnSync('opencode', ['debug', 'skill'], {

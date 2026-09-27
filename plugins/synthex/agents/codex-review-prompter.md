@@ -1,5 +1,7 @@
 ---
 model: haiku
+description: "Adapter that invokes the OpenAI Codex CLI as an external proposer in multi-model review."
+tools: Bash, Read, Write, SendMessage
 ---
 
 # Codex Review Prompter

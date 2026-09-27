@@ -23,6 +23,9 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   HERMES_READ_FILE_NOTE,
+  HOST_IDS,
+  renderHostsEnv,
+  renderHostsTable,
   renderToolMapTable,
   RULE_ADOPT_INLINE,
   RULE_SKIP_UNAVAILABLE_TOOL,
@@ -138,11 +141,14 @@ export const COMMAND_DESCRIPTIONS = {
 
 // FR-HM10: agent wrappers are model-invocable, not user-invocable, and stay
 // off the Codex catalog budget's implicit-invocation path (see the
-// `agents/openai.yaml` sibling this generator also writes). Descriptions
-// live in this table today; Task 28 repoints `agentDescription()` at each
-// agent's own frontmatter `description:` field once PR-A lands, without
-// touching any other call site. Each entry must be <= 120 characters and a
-// concrete one-line summary of what the agent does.
+// `agents/openai.yaml` sibling this generator also writes). Task 28 (PR-A,
+// D10) landed the frontmatter `description:` on all 28 agents, sourced
+// verbatim from this table so wrapper text and frontmatter text agree; the
+// table itself is now only a fallback `agentDescription()` reaches for if a
+// canonical agent file is somehow missing its own frontmatter `description:`
+// (see the Layer-1 guard in tests/schemas/agent-frontmatter.test.ts, which
+// asserts that fallback path is never exercised). Each entry must be <= 120
+// characters and a concrete one-line summary of what the agent does.
 export const AGENT_DESCRIPTIONS = {
   architect:
     'Reviews system architecture, feasibility, and technical trade-offs; writes ADRs and RFC sections.',
@@ -257,6 +263,42 @@ export function extractTitle(source) {
   return stripFrontmatter(source).match(/^#\s+(.+)$/m)?.[1]?.trim();
 }
 
+/**
+ * Extracts the single-line `description:` frontmatter value from a
+ * canonical agent definition (Task 28, FR-HM14 PR-A, D10). Every agent's
+ * frontmatter renders the value as a single-line JSON string (matching how
+ * `skillContents` below renders wrapper descriptions), so scanning line by
+ * line for `description: "..."` and `JSON.parse`-ing the remainder is
+ * sufficient; no YAML parser is needed. Scoped to lines before the closing
+ * `---` fence so a body that happens to contain a `description:`-looking
+ * line (prose, a table, a code sample) is never picked up.
+ *
+ * @param {string} source
+ * @returns {string | undefined}
+ */
+export function extractFrontmatterDescription(source) {
+  if (!source.startsWith(`${FRONTMATTER_FENCE}\n`)) return undefined;
+
+  const lines = source.split('\n');
+  for (let i = 1; i < lines.length; i += 1) {
+    if (lines[i] === FRONTMATTER_FENCE) return undefined;
+
+    const match = lines[i].match(/^description:\s*(.*)$/);
+    if (!match) continue;
+
+    try {
+      return JSON.parse(match[1]);
+    } catch {
+      // Not a JSON-quoted scalar; fall back to the raw trimmed text rather
+      // than throwing, since a hand-edited unquoted description: value is
+      // still a valid single-line description.
+      return match[1].trim();
+    }
+  }
+
+  return undefined;
+}
+
 function sourceEntries(kind) {
   const entries = claudeManifest[`${kind}s`];
   if (!Array.isArray(entries)) {
@@ -301,19 +343,31 @@ function commandDescription(slug) {
 }
 
 /**
- * Looks up an agent wrapper's description. This is the one function Task
- * 28 repoints at the agent's own frontmatter `description:` field once
- * PR-A lands; every other reference to an agent wrapper's description goes
- * through this function so that change has a single call site.
+ * Looks up an agent wrapper's description. Task 28 (PR-A, D10) repointed
+ * this at the agent's own canonical frontmatter `description:` field;
+ * every other reference to an agent wrapper's description goes through
+ * this function so that change has a single call site. The
+ * `AGENT_DESCRIPTIONS` table is consulted only as a fallback for an agent
+ * whose canonical file is missing a frontmatter `description:` — Layer 1
+ * (tests/schemas/agent-frontmatter.test.ts) asserts every one of the 28
+ * agents has one, so this fallback should never actually fire.
  *
  * @param {string} slug
  */
 function agentDescription(slug) {
-  const description = AGENT_DESCRIPTIONS[slug];
-  if (!description) {
-    throw new Error(`Missing AGENT_DESCRIPTIONS entry for agent: ${slug}`);
+  const sourcePath = join(pluginRoot, 'agents', `${slug}.md`);
+  const frontmatterDescription = existsSync(sourcePath)
+    ? extractFrontmatterDescription(readFileSync(sourcePath, 'utf8'))
+    : undefined;
+  if (frontmatterDescription) return frontmatterDescription;
+
+  const fallback = AGENT_DESCRIPTIONS[slug];
+  if (!fallback) {
+    throw new Error(
+      `Missing description for agent: ${slug} (no frontmatter description: and no AGENT_DESCRIPTIONS fallback)`,
+    );
   }
-  return description;
+  return fallback;
 }
 
 // FR-HM12 (Task 20): rendered once from the single-sourced host-matrix.mjs
@@ -347,11 +401,32 @@ ${HERMES_READ_FILE_NOTE}
 `;
 }
 
+// FR-HM41 / FR-HM18 (Task 35): the shared headless-recipe doc and the
+// runtime env file `loop-step.sh check-writable` reads, both rendered from
+// host-matrix.mjs and both covered by `--check` (D9).
+const HOSTS_DOCS_RELATIVE_PATH = 'docs/hosts.md';
+const HOSTS_DOCS_PATH = join(pluginRoot, 'docs', 'hosts.md');
+const HOSTS_ENV_PATH = join(pluginRoot, 'config', 'hosts.env');
+
+function hostsDocContents() {
+  return `${GENERATED_MARKER}
+
+# Synthex headless host recipes (FR-HM41, FR-HM18)
+
+Every wrapper's SYNTHEX_HOST step reads this file. For each harness it names the approval flag a headless run needs so state writes succeed, the ceiling on one shell-tool call, and the \`SYNTHEX_LOOP_IDLE_MAX\` to export so \`loop-idle-wait.sh\` stays under that ceiling. Single-sourced from \`scripts/lib/host-matrix.mjs\`; \`config/hosts.env\` carries the same values for scripts.
+
+${renderHostsTable()}
+
+Set \`SYNTHEX_HOST=<id>\` before running any \`scripts/*.sh\` so \`loop-step.sh check-writable\` prints that host's hint; when it is unset the script prints every host's hint.
+`;
+}
+
 function skillContents(entry) {
   const skillDir = join(skillsRoot, entry.slug);
   const sourcePath = resolve(pluginRoot, entry.manifestPath);
   const canonicalPath = relative(skillDir, sourcePath).split(sep).join('/');
   const toolMapPath = relative(skillDir, TOOL_MAP_DOCS_PATH).split(sep).join('/');
+  const hostsDocPath = relative(skillDir, HOSTS_DOCS_PATH).split(sep).join('/');
   const isCommand = entry.kind === 'command';
   const description = isCommand
     ? commandDescription(entry.slug).description
@@ -390,6 +465,7 @@ This is the shared Agent Skills entrypoint for the canonical Synthex ${entry.kin
 5. ${RULE_SKIP_UNAVAILABLE_TOOL}
 6. ${RULE_ADOPT_INLINE}
 7. Keep provider-specific behavior only where the canonical workflow genuinely targets that provider. Do not edit the canonical definition merely to adapt it at runtime.
+8. Before running any \`scripts/*.sh\`, export \`SYNTHEX_HOST=<id>\` for the current host (${HOST_IDS.filter((id) => id !== 'claude').map((id) => `\`${id}\``).join(', ')}); [\`${HOSTS_DOCS_RELATIVE_PATH}\`](${hostsDocPath}) lists each host's headless approval flag, shell-call cap, and \`SYNTHEX_LOOP_IDLE_MAX\`.
 `;
 }
 
@@ -413,6 +489,22 @@ function main() {
   } else {
     mkdirSync(dirname(TOOL_MAP_DOCS_PATH), { recursive: true });
     writeFileSync(TOOL_MAP_DOCS_PATH, expectedToolMapDoc);
+  }
+
+  // FR-HM41 (Task 35): docs/hosts.md and config/hosts.env, same --check
+  // contract as docs/tool-map.md above.
+  for (const [path, expectedContents] of [
+    [HOSTS_DOCS_PATH, hostsDocContents()],
+    [HOSTS_ENV_PATH, renderHostsEnv()],
+  ]) {
+    if (checkOnly) {
+      if (!existsSync(path) || readFileSync(path, 'utf8') !== expectedContents) {
+        mismatches.push(relative(pluginRoot, path));
+      }
+    } else {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, expectedContents);
+    }
   }
 
   for (const entry of entries) {

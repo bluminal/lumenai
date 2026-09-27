@@ -86,12 +86,12 @@ When any loop command touches `.synthex/loops/`, it MUST scan the directory once
 
 #### Which commands run the archive scan
 
-The archive scan fires at the **start** of every invocation of:
+FR-HM18: this scan is implemented by `plugins/synthex/scripts/loop-step.sh archive`, and every subcommand below that "runs the scan" does so by calling that same shared function internally — a command never reimplements it. The scan fires on every invocation of:
 
-- `/synthex:loop` — fresh start, resume, or `--resume-last`.
-- `/synthex:list-loops` — enumeration. (Archive runs even though the list excludes archived loops; this keeps the active directory tight.)
-- `/synthex:cancel-loop` — single-loop cancel only. `--all` runs the scan **after** mutating running loops to cancelled, so newly-cancelled state files are NOT immediately archived in the same invocation (they'll archive on the next touch).
-- Any `--loop`-bearing command on its first iteration when it lazily creates `.synthex/loops/`.
+- `/synthex:loop` (`loop-step.sh begin`) — fresh start, resume, or `--resume-last`.
+- `/synthex:list-loops` (`loop-step.sh list`) — enumeration. It runs at the **end**, after this invocation's RUNNING/COMPLETED buckets are already gathered and printed — a loop that just went terminal is still shown once here (the list excludes only loops already sitting in `.archive/` from an earlier run) before being tidied away for the next command that touches the directory.
+- `/synthex:cancel-loop` (`loop-step.sh cancel`) — both the single-loop and `--all` paths run the scan **after** mutating, and both exclude the loop-id(s) this same invocation just cancelled, so a loop cancelled once is still visible to an immediately-following idempotent re-cancel or `list-loops` call (FR-NL29) — it archives on a later, different command's touch, not this one's.
+- Any `--loop`-bearing command on its first iteration, via its own `begin` call, when it lazily creates `.synthex/loops/`.
 
 The scan is best-effort: it does not block on filesystem errors, and individual archive failures are logged as warnings but never abort the calling command.
 
@@ -141,6 +141,8 @@ This is safe at any time — the active directory is unaffected, and loop-id col
 
 ## <a id="loop-id"></a>Loop-id assignment rules
 
+FR-HM18: `loop-step.sh begin` implements every rule below (validation, auto-generation, and collision handling); a command never assigns a loop-id by hand.
+
 - If `--name <slug>` is supplied at loop start: the slug becomes the loop-id verbatim. Slugs must match `^[a-z0-9][a-z0-9-]{0,63}$` (lowercase, hyphens, ≤ 64 chars). Reject invalid slugs with an error that names the offending characters.
 - If `--name` is omitted: auto-generate as `<command-slug>-<4-char-hex>`. The hex suffix derives from `/dev/urandom` (2 bytes, hex-encoded) with a timestamp-derived hash fallback.
 
@@ -174,22 +176,24 @@ This is the **default** isolation mode (D-NL1). The looping command runs as a si
 
 Each `--loop`-bearing command authors a concrete adaptation of this flow. The structure below is shared across all commands.
 
-1. **Initialize or restore.** Read `.synthex/loops/<loop-id>.json` if it exists. Otherwise create it with `iteration: 0`, `status: "running"`, and the fields from CLI args.
-2. **Iteration boundary check.**
-   - If `status != "running"`: exit immediately. Print one line: `Loop "<loop-id>" is <status> — nothing to do`.
-   - If `iteration >= max_iterations`: set `status: "max-iterations-reached"`, `exited_at`, `exit_reason: "Reached max_iterations=<N> without completion promise"`, write state, exit. Print the resume hint per FR-NL21.
-3. **Increment iteration counter and persist** (D-NL13 durability boundary). Write `iteration += 1` and `last_updated` to the state file **before** doing iteration work. A crash mid-iteration costs one iteration of work but the counter remains accurate.
-4. **Print iteration marker.** See `markers` anchor.
+FR-HM18: steps 1–4 collapse into a SINGLE Bash call, `plugins/synthex/scripts/loop-step.sh advance <loop-id>` — it performs the boundary check, the increment, the atomic persist, AND prints the marker, in that order, then exits non-zero on a cancelled or exhausted loop (so the cancellation check in step 7 has no separate work left to do: it's just "the next `advance` call will fail"). A decision-wait or idle-wait re-entry that must NOT consume an iteration calls `loop-step.sh hold <loop-id>` instead (D30) — same validation, no increment.
+
+1. **Initialize or restore.** `loop-step.sh begin` reads `.synthex/loops/<loop-id>.json` if it exists (resume) or creates it with `iteration: 0`, `status: "running"`, and the fields from CLI args (fresh start).
+2. **Iteration boundary check** (`loop-step.sh advance`, part 1 of 3).
+   - If `status != "running"`: exit immediately. Prints one line: `Loop "<loop-id>" is <status> — nothing to do`.
+   - If `iteration >= max_iterations`: sets `status: "max-iterations-reached"`, `exited_at`, `exit_reason: "Reached max_iterations=<N> without completion promise"`, writes state, exits non-zero. Prints the resume hint per FR-NL21.
+3. **Increment iteration counter and persist** (`loop-step.sh advance`, part 2 of 3 — D-NL13 durability boundary). Writes `iteration += 1` and `last_updated` to the state file **before** doing iteration work. A crash mid-iteration costs one iteration of work but the counter remains accurate.
+4. **Print iteration marker** (`loop-step.sh advance`, part 3 of 3 — its stdout on exit 0). See `markers` anchor.
 5. **Execute the command's normal workflow.** This is the existing body of `next-priority`, `team-implement`, etc., or the user's prompt for `/synthex:loop`.
-6. **Promise detection.** After the workflow's final response, scan that response for the literal regex `<promise>\s*<completion_promise_text>\s*</promise>`. If matched, set `status: "completed"`, `exit_reason: "completion-promise-emitted"`, `exited_at`, write state, exit.
-7. **Cancellation check.** Re-read the state file. If `status == "cancelled"` (set by another session via `/synthex:cancel-loop`), exit immediately.
+6. **Promise detection.** After the workflow's final response, scan that response for the literal regex `<promise>\s*<completion_promise_text>\s*</promise>`. If matched, run `loop-step.sh finish <loop-id> completed` (sets `status: "completed"`, `exit_reason: "completion-promise-emitted"`, `exited_at`, writes state), exit.
+7. **Cancellation check.** Subsumed by step 2 on the NEXT iteration: if another session set `status: "cancelled"` (via `/synthex:cancel-loop`, i.e. `loop-step.sh cancel`), the next `advance` (or `hold`) call exits non-zero and the command stops. No separate re-read is needed.
 8. **Loop back to step 2.**
 
 ### Stay in-turn; the Stop hook is the safety net
 
 Keep iterating inside the same assistant turn. Synthex's [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook re-drives the next iteration whenever you end a turn while the loop is still `running` and you have not emitted the completion promise, so ending a turn mid-loop is **recovered, not fatal** (ADR-003). But every turn-end is visible: Claude Code prints the gate's block reason as a "Stop hook error" line, and other tools' Stop hooks (e.g. Orca's "agent finished" notification) fire on every Stop event. They run in parallel with the gate and cannot know it is about to block. So the gate is the recovery path, not the driver.
 
-**Idle iterations wait in-turn.** When an iteration finds nothing to do, run `scripts/loop-idle-wait.sh <loop-id> [watch-path …]` as one Bash call (`timeout: 600000`) instead of ending the turn or immediately re-running the workflow. It returns when a watch path changes, when the loop leaves `running`, or after a backoff limit (60s → 120s → 300s → 540s over consecutive idle iterations). See [loop-advance-gate § Idle iterations](../hooks/loop-advance-gate.md#idle-iterations).
+**Idle iterations wait in-turn.** When an iteration finds nothing to do, run `scripts/loop-idle-wait.sh <loop-id> [watch-path …]` as one Bash call (`timeout: 600000`) instead of ending the turn or immediately re-running the workflow. It returns when a watch path changes, when the loop leaves `running`, or after a backoff limit (60s → 120s → 300s → 540s over consecutive idle iterations). See [loop-advance-gate § Idle iterations](../hooks/loop-advance-gate.md#idle-iterations). Afterward, re-validate with `loop-step.sh hold <loop-id>` (one Bash call, D30) rather than `advance` — the wait was not iteration work, so it must not consume an iteration; `hold` still exits non-zero if the loop went `cancelled` during the wait.
 
 **Non-Claude hosts.** Codex, Grok, Gemini CLI, and OpenCode run these same instructions through the `skills/` wrappers, but they register no Stop hook. There, staying in-turn is what keeps the loop alive, not just a way to cut noise. Resolve the idle-wait script from the installed plugin root (`plugins/synthex/scripts/loop-idle-wait.sh`), and fit the wait to the host's shell timeout with `SYNTHEX_LOOP_IDLE_MAX`. The gate bounds runaway with a progress-aware counter (`consecutive_stop_blocks`) capped below Claude Code's 8-consecutive-block override: if you genuinely cannot advance, it relinquishes after a few no-progress turns rather than forcing you forever, and it steps aside for a pending `AskUserQuestion` (the `[H]`-approval escape).
 

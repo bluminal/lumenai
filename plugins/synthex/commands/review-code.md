@@ -17,6 +17,9 @@ Comprehensive, multi-perspective code review combining craftsmanship review, sec
 | `--max-iterations <int>` | Iteration cap. Hard ceiling 200. | `20` | No |
 | `--loop-isolated` | Fresh-subagent isolation mode per iteration. | off (shared-context default) | No |
 | `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
+| `--profile <economy\|balanced\|premium>` | Override `models.profile` for spawned reviewers. | `models.profile` config (`balanced`) | No |
+
+**Model Resolution:** Read `${CLAUDE_PLUGIN_ROOT}/docs/model-resolution.md` (D17). Other hosts resolve the plugin root via `.synthex/state.json`.
 
 ## Core Responsibilities
 
@@ -219,27 +222,22 @@ Present the final consolidated report to the user. If the verdict is FAIL or WAR
 ```yaml
 # .synthex/config.yaml (code_review section)
 code_review:
-  # Reviewers to run in parallel
-  reviewers:
-    - code-reviewer       # Craftsmanship review (always recommended)
-    - security-reviewer   # Security review (always recommended)
-    # - performance-engineer  # Uncomment for performance-critical code
+  reviewers:              # Run in parallel
+    - code-reviewer
+    - security-reviewer
+    # - performance-engineer
 
-  # Maximum diff size before warning
-  max_diff_lines: 300
+  max_diff_lines: 300      # Warn above this many lines
 
-  # Files to read for project conventions
   convention_sources:
     - CLAUDE.md
     - .eslintrc
     - .prettierrc
 
-  # Specification paths for compliance checking (used by Code Reviewer)
-  spec_paths:
+  spec_paths:               # Compliance checking (Code Reviewer)
     - docs/specs
 
-  # Additional specialist reviewers (optional)
-  # specialists: []
+  # specialists: []         # Additional specialist reviewers (optional)
 ```
 
 ---
@@ -261,7 +259,7 @@ Note: `--loop` here wraps the **entire `/synthex:review-code` invocation** — d
 
 ### Iteration Body
 
-When `--loop` is set, this command's existing workflow runs once per iteration. The agent follows the iteration loop body documented at [`shared-iter`](../docs/native-looping.md#shared-iter) by default (D-NL1 shared-context), or [`subagent-iter`](../docs/native-looping.md#subagent-iter) when `--loop-isolated` is passed: boundary check → increment counter → print marker → execute workflow → scan for promise → cancellation check → loop. State lives in `.synthex/loops/<loop-id>.json` per [FR-NL8](../docs/native-looping.md#state). Auto-compaction is safe because iteration state and work output both live on disk.
+When `--loop` is set, this workflow runs once per iteration, gated by ONE Bash call: `loop-step.sh advance <loop-id>` (FR-HM18 durability boundary; non-zero exit means stop). See [`shared-iter`](../docs/native-looping.md#shared-iter) / [`subagent-iter`](../docs/native-looping.md#subagent-iter) (`--loop-isolated`) for the call and cross-host resolution. On promise match run `loop-step.sh finish <loop-id> completed`; else loop back. State: `.synthex/loops/<loop-id>.json` ([FR-NL8](../docs/native-looping.md#state)); auto-compaction-safe since state and output live on disk.
 
 The iteration marker (`[loop <loop-id> iteration <N>/<max>]`) prints to stdout before each iteration's workflow runs. See [`markers`](../docs/native-looping.md#markers).
 

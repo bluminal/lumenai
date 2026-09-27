@@ -23,7 +23,7 @@
  *   5. The agent's raw output is written to stdout for promptfoo to assert against
  */
 
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { createHash } from 'crypto';
@@ -70,6 +70,40 @@ function getCacheKey(agentContent, fixtureContent, model = 'default') {
   hash.update(fixtureContent);
   hash.update(model);
   return hash.digest('hex').substring(0, 16);
+}
+
+// ---------------------------------------------------------------------------
+// System prompt construction (FR-HM34 prerequisite fix)
+//
+// Mirrors tests/helpers/invoke-agent.ts's stripFrontmatter/buildInvokeArgs:
+// this provider previously passed the agent's file PATH as the literal
+// `--system-prompt` value. `claude --help` documents `--system-prompt
+// <prompt>` as prompt TEXT, not a path — there is no `--system-prompt-file`
+// flag — so no promptfoo run ever actually loaded an agent's prompt. Both
+// functions are exported (in addition to being used by main()) so Layer 1
+// tests can assert on the constructed argv without invoking the CLI.
+// ---------------------------------------------------------------------------
+
+/** Matches a leading `---\n ... \n---` YAML frontmatter block. */
+const FRONTMATTER_BLOCK_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+
+/** Strip a leading frontmatter block (if present), returning only the body. */
+export function stripFrontmatter(agentContent) {
+  return agentContent.replace(FRONTMATTER_BLOCK_RE, '');
+}
+
+/**
+ * Build the full `claude` argv (everything after the binary name) for
+ * invoking an agent as the session's system prompt.
+ */
+export function buildClaudeArgs({ agentContent, model, maxTurns }) {
+  return [
+    '-p',
+    '--output-format', 'text',
+    '--max-turns', String(maxTurns),
+    '--model', model,
+    '--system-prompt', stripFrontmatter(agentContent),
+  ];
 }
 
 function getCached(key) {
@@ -207,22 +241,19 @@ async function main() {
 
   process.stderr.write(`[cache miss] Invoking ${agentName} via claude -p (model=${model}, maxTurns=${maxTurns})...\n`);
 
-  // Build claude CLI command
-  const cmd = [
-    CLAUDE_BIN,
-    '-p',
-    '--output-format', 'text',
-    '--max-turns', String(maxTurns),
-    '--model', model,
-    '--system-prompt', `"${agentPath}"`,
-  ].join(' ');
+  // Build claude CLI argv. Passed as an array via execFileSync (no shell),
+  // not a joined command string via execSync: agent bodies are arbitrary
+  // markdown that can contain quotes, backticks, `$(...)`, and other shell
+  // metacharacters, which a shell-interpreted command string would mangle
+  // or, worse, execute.
+  const args = buildClaudeArgs({ agentContent, model, maxTurns });
 
   // Remove CLAUDECODE from env so we don't hit the "nested session" guard
   const env = { ...process.env };
   delete env.CLAUDECODE;
 
   try {
-    const result = execSync(cmd, {
+    const result = execFileSync(CLAUDE_BIN, args, {
       input,
       env,
       encoding: 'utf-8',

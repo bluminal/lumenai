@@ -15,7 +15,7 @@
  * agent (see `getCacheKey` in ./cache.ts).
  */
 
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { getCacheKey, getCached, setCache } from './cache.js';
@@ -79,6 +79,18 @@ export function parseAgentFrontmatter(agentContent: string): AgentFrontmatter {
   return result;
 }
 
+/**
+ * Strip a leading frontmatter block (if present) from an agent's markdown,
+ * returning only the body (identity, mission, behavioral rules, etc.) that
+ * should actually become the model's system prompt. The frontmatter is
+ * harness config (`model:`, `effort:`, `description:`, `tools:`), not part
+ * of the agent's persona, so it is read via `parseAgentFrontmatter` but
+ * never sent to the model as prompt text.
+ */
+export function stripFrontmatter(agentContent: string): string {
+  return agentContent.replace(FRONTMATTER_BLOCK_RE, '');
+}
+
 // ---------------------------------------------------------------------------
 // Effort CLI flag
 // ---------------------------------------------------------------------------
@@ -100,6 +112,46 @@ export function parseAgentFrontmatter(agentContent: string): AgentFrontmatter {
 export function buildEffortArgs(effort: string | undefined): string[] {
   if (!effort) return [];
   return ['--effort', effort];
+}
+
+// ---------------------------------------------------------------------------
+// argv construction (FR-HM34 prerequisite fix)
+// ---------------------------------------------------------------------------
+
+export interface BuildInvokeArgsOptions {
+  /** Full agent markdown content, frontmatter included (it is stripped here). */
+  agentContent: string;
+  model: string;
+  effort?: string;
+  maxTurns: number;
+}
+
+/**
+ * Build the full `claude` argv (everything after the `claude` binary name)
+ * for invoking an agent as the session's system prompt.
+ *
+ * Exported as a pure function (no subprocess call) so Layer 1 tests can
+ * assert on the constructed argv directly — see
+ * tests/schemas/invoke-agent-system-prompt.test.ts.
+ *
+ * FR-HM34 prerequisite fix: this previously passed the agent's file PATH
+ * as the literal `--system-prompt` value. `claude --help` documents
+ * `--system-prompt <prompt>` as "System prompt to use for the session" —
+ * it takes prompt TEXT, not a path (there is no `--system-prompt-file`
+ * flag on this CLI). So no Layer 2 run ever actually loaded an agent's
+ * prompt; the model ran with no custom system prompt at all. This now
+ * passes the agent's own body content (frontmatter stripped, see
+ * `stripFrontmatter`) as the `--system-prompt` value itself.
+ */
+export function buildInvokeArgs(opts: BuildInvokeArgsOptions): string[] {
+  return [
+    '-p',
+    '--output-format', 'text',
+    '--max-turns', String(opts.maxTurns),
+    '--model', opts.model,
+    ...buildEffortArgs(opts.effort),
+    '--system-prompt', stripFrontmatter(opts.agentContent),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -145,8 +197,9 @@ export interface InvokeResult {
 /**
  * Invoke an Synthex agent via the Claude CLI.
  *
- * The agent's markdown file is passed as the system prompt. The input is
- * piped through stdin. The raw output and its parsed form are returned.
+ * The agent's markdown content (frontmatter stripped) is passed as the
+ * session's `--system-prompt`. The input is piped through stdin. The raw
+ * output and its parsed form are returned.
  *
  * Results are cached by default so that repeated test runs with the same
  * agent + input + model combination do not incur additional LLM costs.
@@ -167,7 +220,7 @@ export async function invokeAgent(opts: InvokeOptions): Promise<InvokeResult> {
     }
   }
 
-  // Build the Claude CLI command.
+  // Build the Claude CLI argv.
   //
   // `claude -p` runs in non-interactive (pipe) mode:
   //   - reads input from stdin
@@ -176,33 +229,21 @@ export async function invokeAgent(opts: InvokeOptions): Promise<InvokeResult> {
   //   - --max-turns N         limits agentic loop iterations
   //   - --model               selects the model
   //   - --effort              selects the effort tier (see buildEffortArgs)
+  //   - --system-prompt       the agent's own content (frontmatter
+  //                           stripped) — see buildInvokeArgs
   //
-  // The system prompt is provided via --system-prompt flag with the agent
-  // markdown file contents. We write it to a temp approach using cat to
-  // avoid shell escaping issues with large markdown documents.
+  // Passed as an argv array via execFileSync (no shell), not a joined
+  // command string via execSync: agent bodies are arbitrary markdown that
+  // can contain quotes, backticks, `$(...)`, and other shell metacharacters,
+  // which a shell-interpreted command string would mangle or, worse,
+  // execute.
   const maxTurns = opts.maxTurns ?? 1;
   const timeout = opts.timeout ?? 120_000;
 
-  // Use a heredoc-safe approach: pass agent path to cat inside the command
-  // to avoid any escaping issues with the agent markdown content.
-  const cmd = [
-    'claude',
-    '-p',
-    '--output-format', 'text',
-    '--max-turns', String(maxTurns),
-    '--model', model,
-    ...buildEffortArgs(effort),
-    '--system-prompt', agentPath,
-  ].join(' ');
-
-  // NOTE: The exact CLI flags may need adjustment as the Claude Code CLI
-  // evolves. The key contract is:
-  //   - stdin  = user input / fixture content
-  //   - stdout = agent response text
-  //   - system prompt loaded from the agent .md file
+  const args = buildInvokeArgs({ agentContent, model, effort, maxTurns });
 
   try {
-    const result = execSync(cmd, {
+    const result = execFileSync('claude', args, {
       input: opts.input,
       encoding: 'utf-8',
       timeout,

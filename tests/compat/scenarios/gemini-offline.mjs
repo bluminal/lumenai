@@ -13,6 +13,7 @@ import {
   idsMentionedInOutput,
   runCommand,
 } from '../lib/scenario-helpers.mjs';
+import { runScriptSmoke } from '../lib/script-smoke.mjs';
 
 const harness = 'gemini';
 const startedAt = Date.now();
@@ -78,6 +79,30 @@ try {
     throw new Error(`Gemini installed tree is invalid: ${JSON.stringify(installedValidation)}`);
   }
   emit(harness, 'references', { ok: true, checked: entries.length });
+
+  // Task 37 (FR-HM18, FR-HM40, NFR-HM4): every registered runtime script's
+  // happy path and missing-jq/missing-node fallback path, run against
+  // stagingRoot (the full cpSync of fixtureRoot, still intact — unlike
+  // workspaceSupportRoot, which only carries a partial support-file copy
+  // without .claude-plugin/) before it is torn down below.
+  const smoke = await runScriptSmoke({
+    pluginRoot: stagingRoot,
+    onCase: (script, name, result) =>
+      emit(harness, 'script-smoke', {
+        ok: result.ok,
+        script,
+        case: name,
+        ...(result.error ? { error: result.error } : {}),
+      }),
+  });
+  if (!smoke.ok) {
+    const failed = smoke.results.filter((r) => !r.ok);
+    throw new Error(
+      `Script smoke suite failed (${failed.length}/${smoke.results.length}): ${failed
+        .map((f) => `${f.relPath} :: ${f.name}: ${f.error}`)
+        .join('; ')}`,
+    );
+  }
 
   for (const entry of entries) {
     runCommand('gemini', [

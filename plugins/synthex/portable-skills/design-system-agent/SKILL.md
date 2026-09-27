@@ -17,3 +17,4 @@ This is the shared Agent Skills entrypoint for the canonical Synthex agent defin
 5. If a named tool does not exist, skip that step once and continue; never retry it.
 6. If the host refuses a nested subagent, adopt the role inline: read the `agents/` file and perform it in this session.
 7. Keep provider-specific behavior only where the canonical workflow genuinely targets that provider. Do not edit the canonical definition merely to adapt it at runtime.
+8. Before running any `scripts/*.sh`, export `SYNTHEX_HOST=<id>` for the current host (`codex`, `gemini`, `opencode`, `grok`, `hermes`); [`docs/hosts.md`](../../docs/hosts.md) lists each host's headless approval flag, shell-call cap, and `SYNTHEX_LOOP_IDLE_MAX`.

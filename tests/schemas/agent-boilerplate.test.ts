@@ -23,6 +23,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { stripFrontmatter } from '../../plugins/synthex/scripts/generate-codex-skills.mjs';
 
 const AGENTS_DIR = join(__dirname, '..', '..', 'plugins', 'synthex', 'agents');
 const FIXTURES_DIR = join(__dirname, '..', 'fixtures', 'agent-boilerplate');
@@ -38,6 +39,37 @@ interface AgentSizeRecord {
 }
 
 const MIN_REDUCTION_BYTES = 1536; // 1.5 KB
+
+// Task 29 (FR-HM17, D18): code-reviewer, security-reviewer, and
+// performance-engineer each gained an opt-in "## Verification Pass
+// (CRITICAL/HIGH only, top 5)" section after this Task 16 floor was set.
+// That section is new functional prose (gated behind `code_review.verification:
+// prose|off`, default `off`), not leftover boilerplate Task 16 was measuring —
+// so its bytes are excluded from the shrink-floor comparison below. Decision:
+// A.J. Brown, Task 29 follow-up. The canonical section text lives in
+// tests/fixtures/verification-pass/section.md (shared with
+// verification-pass.test.ts, which enforces byte-identity of the section
+// across the three agents); MIN_REDUCTION_BYTES and the recorded
+// `before_bytes` are unchanged.
+const VERIFICATION_SECTION_PATH = join(
+  __dirname,
+  '..',
+  'fixtures',
+  'verification-pass',
+  'section.md'
+);
+const VERIFICATION_SECTION_TEXT = readFileSync(VERIFICATION_SECTION_PATH, 'utf8');
+const VERIFICATION_SECTION_BYTES = Buffer.byteLength(VERIFICATION_SECTION_TEXT, 'utf8');
+
+/**
+ * Returns the byte length of the shared Verification Pass section if it is
+ * present, byte-identical, in `content` — otherwise 0. Locating it requires
+ * an exact substring match against the canonical section text, so a
+ * non-identical or partial insertion does not qualify for the exclusion.
+ */
+function verificationPassSectionBytes(content: string): number {
+  return content.includes(VERIFICATION_SECTION_TEXT) ? VERIFICATION_SECTION_BYTES : 0;
+}
 
 /**
  * Extracts a `## Output Format` section's body: from the heading through the
@@ -130,11 +162,33 @@ describe('Task 16 (FR-HM6): specialist agent boilerplate diet', () => {
 
         it(`shrank by at least ${MIN_REDUCTION_BYTES} bytes`, () => {
           const before = sizesBefore[agent].before_bytes;
-          const after = Buffer.byteLength(content, 'utf8');
+          // Compare against the body below the frontmatter fence, not the
+          // whole file (Task 28, FR-HM14 PR-A): `before_bytes` was captured
+          // pre-Task-16 when every agent's frontmatter was a fixed, minimal
+          // `---\nmodel: <tier>\n---\n` block. Task 28 added a per-agent
+          // `description:` line (and, for most agents, a `tools:`
+          // allowlist line) to every frontmatter block, growing it by
+          // anywhere from ~90 to ~300+ bytes depending on the allowlist
+          // length. Several specialists' Task 16 reduction margin over the
+          // 1,536-byte floor was under 30 bytes (e.g. metrics-analyst: 5
+          // bytes; technical-writer: 28 bytes), so comparing whole-file
+          // sizes would fail this test purely from Task 28's frontmatter
+          // growth -- a false failure unrelated to whether Task 16's
+          // boilerplate diet held. Stripping frontmatter from `after` here
+          // isolates the check to the body-diet Task 16 actually performed,
+          // which no later frontmatter-only task should be able to
+          // perturb.
+          // Task 29 (FR-HM17, D18): exclude the shared Verification Pass
+          // section's bytes — new opt-in functional prose added after this
+          // floor was set, not boilerplate this test measures the removal
+          // of. See the VERIFICATION_SECTION_* comment above.
+          const after =
+            Buffer.byteLength(stripFrontmatter(content), 'utf8') -
+            verificationPassSectionBytes(content);
           const reduction = before - after;
           expect(
             reduction,
-            `expected ${agent}.md to shrink by >= ${MIN_REDUCTION_BYTES} bytes ` +
+            `expected ${agent}.md body (below frontmatter) to shrink by >= ${MIN_REDUCTION_BYTES} bytes ` +
               `(before=${before}, after=${after}, reduction=${reduction})`
           ).toBeGreaterThanOrEqual(MIN_REDUCTION_BYTES);
         });

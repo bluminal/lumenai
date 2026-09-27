@@ -29,6 +29,10 @@
 #
 # Prints exactly one line:
 #   idle-wait <loop-id>: <reason> after <N>s (idle streak <S>, limit <L>s)
+#
+# Exit codes:
+#   0 - always. The outcome ("changed" / "not-running" / "timeout") is
+#       reported via the printed line above, never via process exit status.
 
 set -u
 

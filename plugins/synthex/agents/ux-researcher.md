@@ -1,5 +1,8 @@
 ---
-model: opus
+model: sonnet
+effort: high
+description: "Designs research plans and produces personas, journey maps, and Opportunity Solution Trees."
+tools: Read, Write, Grep, Glob, WebSearch, WebFetch
 ---
 
 # UX Researcher

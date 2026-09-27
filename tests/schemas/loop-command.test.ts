@@ -8,7 +8,16 @@
  *   - resume-logic anchors (FR-NL26, FR-NL27)
  *   - cross-reference to native-looping.md
  *
- * Plan: docs/plans/native-looping.md Task 28.
+ * Rewritten for harness-modernization Task 34 (FR-HM18): the seven refusal
+ * paths and the state-file mechanics move into
+ * plugins/synthex/scripts/loop-step.sh. The prompt-source refusals (FR-NL38,
+ * FR-NL39, E11) stay in this command's own prose since the script never
+ * sees prompt content; the rest are the script's own refusals, quoted here
+ * verbatim so this suite still locks their exact wording. New assertions
+ * below confirm the one-script-call delegation actually replaced the old
+ * inline step-by-step algorithm.
+ *
+ * Plan: docs/plans/native-looping.md Task 28; docs/plans/harness-modernization.md Task 34.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -126,6 +135,29 @@ describe('/synthex:loop (loop.md) — Task 28 structural validation', () => {
 
     it('do NOT emit promise in thinking text', () => {
       expect(content).toMatch(/Do NOT emit `<promise>\.\.\.<\/promise>` in thinking text/);
+    });
+  });
+
+  describe('FR-HM18 script delegation (Task 34)', () => {
+    it('calls loop-step.sh begin to resolve or create the loop-id', () => {
+      expect(content).toMatch(/loop-step\.sh begin/);
+    });
+
+    it('calls loop-step.sh advance exactly once per iteration boundary', () => {
+      expect(content).toMatch(/loop-step\.sh advance <loop-id>/);
+      expect(content).toMatch(/one Bash call, the durability boundary/i);
+    });
+
+    it('calls loop-step.sh finish on promise emission', () => {
+      expect(content).toMatch(/loop-step\.sh finish <loop-id> completed/);
+    });
+
+    it('calls loop-step.sh hold after an idle wait (D30), not advance', () => {
+      expect(content).toMatch(/loop-step\.sh hold <loop-id>/);
+    });
+
+    it('no longer documents a separate cancellation-check step (subsumed by the next advance/hold call)', () => {
+      expect(content).toMatch(/catches cancellation and the max-iterations cap/i);
     });
   });
 });

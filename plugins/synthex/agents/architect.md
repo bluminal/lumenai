@@ -1,5 +1,8 @@
 ---
 model: opus
+effort: high
+description: "Reviews system architecture, feasibility, and technical trade-offs; writes ADRs and RFC sections."
+tools: Read, Write, Edit, Grep, Glob
 ---
 
 # Architect

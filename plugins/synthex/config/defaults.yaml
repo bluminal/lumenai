@@ -31,6 +31,98 @@ review_loops:
   min_severity_to_address: high
 
 # -------------------------------------------------------------------
+# Model Profiles (FR-HM15, D29)
+# Resolution order (documented once per agent-spawning command in its
+# "Model Resolution" paragraph): --profile flag > models.agents.<name>
+# > models.profile delta > the agent's own frontmatter — which IS the
+# "balanced" tier (Task 30, FR-HM14 PR-B, pinned it there directly).
+# Applied via the Agent tool's per-call `model` override on Claude
+# Code; advisory only on other hosts (see hosts.<harness>.models
+# below). Standing-pool routing is unaffected: pools never re-spawn,
+# so a profile change reaches only freshly spawned agents.
+# -------------------------------------------------------------------
+models:
+
+  # Active tier. Options: economy | balanced | premium. "balanced"
+  # applies no delta at all — it IS the shipped frontmatter.
+  profile: balanced
+
+  # Named per-agent overrides — the highest-priority resolution step
+  # below the --profile flag. Empty by default. Example:
+  #   agents:
+  #     code-reviewer:
+  #       model: opus
+  #       effort: high
+  agents: {}
+
+  # economy/premium deltas over the balanced (frontmatter) tier (D29).
+  # Only agents that actually change are listed; every agent omitted
+  # here keeps its own frontmatter model/effort under either profile.
+  profiles:
+
+    # Cost-optimized tier. Every non-Haiku agent is already sonnet at
+    # the balanced tier except product-manager/architect (opus); those
+    # two stay on opus — downgrading them to sonnet would undercut the
+    # exact reasoning quality Task 30 (FR-HM14 PR-B) exists to protect
+    # — but drop from effort: high to effort: medium. Haiku-backed
+    # utilities are unchanged: they carry no effort key today (Task 7:
+    # Claude Code silently ignores effort on Haiku 4.5).
+    economy:
+      product-manager:
+        model: opus     # unchanged
+        effort: medium  # was: high
+      architect:
+        model: opus     # unchanged
+        effort: medium  # was: high
+
+    # Quality-optimized tier. product-manager and architect move to
+    # Fable ("fable" is the latest-release model alias — Fable 5.1 as
+    # of this writing, confirmed directly against `claude --help`'s
+    # model-alias table, so the full id `claude-fable-5-1` is not
+    # required) at effort: xhigh. security-reviewer stays on sonnet
+    # but moves to effort: xhigh for maximum scrutiny on the security
+    # gate.
+    premium:
+      product-manager:
+        model: fable    # was: opus
+        effort: xhigh   # was: high
+      architect:
+        model: fable    # was: opus
+        effort: xhigh   # was: high
+      security-reviewer:
+        model: sonnet   # unchanged
+        effort: xhigh   # was: high
+
+  # Advisory outside Claude Code (FR-HM15). Claude Code applies
+  # models.agents/models.profile directly via the Agent tool's
+  # per-call model override and ignores this map entirely. A host
+  # that exposes its own per-subagent model selection MAY translate a
+  # tier name to a host-native model id via this table; a host that
+  # does not just runs every subagent on the session's default model.
+  hosts:
+    opencode:
+      # `provider/model` form (OpenCode's own model-selection syntax).
+      models:
+        economy: anthropic/claude-haiku-5
+        balanced: anthropic/claude-sonnet-5
+        premium: anthropic/claude-opus-5-5
+    gemini:
+      # Gemini CLI tiers: flash | pro | inherit (leave the session
+      # model untouched).
+      models:
+        economy: flash
+        balanced: inherit
+        premium: pro
+    codex:
+      # GPT ids or inherit; no Codex model id is verified against a
+      # live Codex CLI as of this writing, so every tier inherits the
+      # session model rather than guessing an id.
+      models:
+        economy: inherit
+        balanced: inherit
+        premium: inherit
+
+# -------------------------------------------------------------------
 # Implementation Plan Settings
 # Used by the `write-implementation-plan` command
 # -------------------------------------------------------------------
@@ -129,6 +221,14 @@ code_review:
   # Replaces a "spawn a sub-agent" step, which is dead when code-reviewer itself
   # runs as a subagent (subagents cannot spawn subagents on Claude Code).
   spec_inline_bytes: 65536
+
+  # FR-HM17 prose verification pass (D18): code-reviewer, security-reviewer, and
+  # performance-engineer each gain a "Verification pass (CRITICAL/HIGH only, top
+  # 5)" step that uses an LSP tool (or grep, as a fallback) to check the top 5
+  # CRITICAL/HIGH findings before rendering a `- **Verification:**` line in the
+  # finding block. Opt-in and off by default (NFR-HM1, NFR-HM3): it changes
+  # zero-config output and adds tool calls. Options: prose | off.
+  verification: off
 
   # Additional specialist reviewers (optional).
   # Example: Add a domain-specific reviewer for regulated industries.

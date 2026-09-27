@@ -1,5 +1,8 @@
 ---
 model: sonnet
+effort: medium
+description: "Owns the design token registry and component library; audits frontend design-system compliance."
+tools: Read, Write, Edit, Grep, Glob
 ---
 
 # Design System Agent

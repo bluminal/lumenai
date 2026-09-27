@@ -11,7 +11,11 @@
 #      the Lumenai marketplace nor explicitly dismissed the request.
 #
 # State is per-project in .synthex/state.json. Idempotent. Never blocks
-# the session. Exit code: always 0. Never reads stdin. Never prompts.
+# the session. Never reads stdin. Never prompts.
+#
+# Exit codes:
+#   0 - always. Nudge text (if any) goes to stdout; state-write failures are
+#       swallowed (best-effort) rather than surfaced via exit status.
 #
 # See: docs/plans/upgrade-onboarding.md (Task 8, FR-UO7..FR-UO21).
 #

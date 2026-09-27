@@ -1,5 +1,6 @@
 ---
 model: haiku
+description: "Assembles the shared context bundle (files, diffs, conventions) delivered to review proposers."
 ---
 
 # Context Bundle Assembler

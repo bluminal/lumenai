@@ -6,7 +6,15 @@
  *   - output-format anchors (FR-NL32: RUNNING (N), COMPLETED (M) headers)
  *   - missing-directory path prints "No loops in this project." (E15)
  *
- * Plan: docs/plans/native-looping.md Task 29.
+ * Rewritten for harness-modernization Task 34 (FR-HM18): the enumeration,
+ * bucketing, sort, truncation, and WARNINGS logic move into
+ * plugins/synthex/scripts/loop-step.sh list (`list-loops` becomes one Bash
+ * call). The format assertions below still hold — they now document what
+ * the script implements rather than a step-by-step algorithm this command
+ * performs itself. Real behavioral coverage of the format lives in
+ * tests/schemas/loop-step-behavioral.test.ts.
+ *
+ * Plan: docs/plans/native-looping.md Task 29; docs/plans/harness-modernization.md Task 34.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -112,6 +120,17 @@ describe('/synthex:list-loops (list-loops.md) — Task 29 structural validation'
 
     it('does NOT recurse into .archive/', () => {
       expect(content).toMatch(/Do NOT recurse into `\.archive\/`/i);
+    });
+  });
+
+  describe('FR-HM18 script delegation (Task 34)', () => {
+    it('delegates to loop-step.sh list as ONE Bash call', () => {
+      expect(content).toMatch(/loop-step\.sh list/);
+      expect(content).toMatch(/ONE Bash call/);
+    });
+
+    it('documents the archive scan runs AFTER gathering/printing this invocation\'s buckets', () => {
+      expect(content).toMatch(/AFTER gathering and printing/);
     });
   });
 });
