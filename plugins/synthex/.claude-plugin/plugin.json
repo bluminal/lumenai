@@ -21,7 +21,6 @@
     "./agents/multi-model-review-orchestrator.md",
     "./agents/ollama-review-prompter.md",
     "./agents/performance-engineer.md",
-    "./agents/plan-linter.md",
     "./agents/product-manager.md",
     "./agents/quality-engineer.md",
     "./agents/retrospective-facilitator.md",

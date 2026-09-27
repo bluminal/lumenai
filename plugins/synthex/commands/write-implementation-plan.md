@@ -28,7 +28,7 @@ Transform a Product Requirements Document (PRD) into a prioritized, value-driven
 
 You orchestrate the creation of a high-quality implementation plan through:
 1. Invoking the **Product Manager sub-agent** to gather requirements and draft the plan
-2. Running a cheap **structural audit** via the Plan Linter sub-agent (Haiku) to catch template violations before invoking expensive reviewers
+2. Running a cheap **structural audit** via the zero-token `lint-plan.mjs` script (FR-HM26) to catch template violations before invoking expensive reviewers
 3. Running a **peer review loop** where specialist sub-agents provide structured feedback, with findings deduplicated and grouped by the Findings Consolidator sub-agent (Haiku) before the PM consumes them
 4. Iterating until the plan is clear, complete, and compact enough for efficient agent consumption
 
@@ -123,19 +123,17 @@ The Product Manager produces an initial implementation plan draft following the 
 
 ### 5.5. Structural Lint Pass
 
-Before sending the draft to expensive peer reviewers, run a fast structural audit with the **Plan Linter** sub-agent (Haiku-backed). This catches template violations, missing typed acceptance criteria, malformed task tables, and broken dependency references cheaply -- so the expensive reviewers (Architect, Tech Lead, Design System Agent) can spend their tokens on substantive concerns instead of structural nits.
+Before peer review, run a fast structural audit (FR-HM26, zero-token). Run `plugins/synthex/scripts/lint-plan.mjs "@{plan_path}"` (resolved from the installed plugin root — Claude Code: `node "${CLAUDE_PLUGIN_ROOT}/scripts/lint-plan.mjs" "@{plan_path}"`) as ONE Bash call, guarded with `command -v node`. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from. Without node, Read `${CLAUDE_PLUGIN_ROOT}/docs/plan-lint-rubric.md` and self-check the draft by hand instead, producing the same CRITICAL/HIGH/MEDIUM shape.
 
 **Process:**
 
-1. Invoke the **plan-linter** sub-agent with the draft plan.
-2. Plan Linter returns a structured report of structural findings, each tagged CRITICAL / HIGH / MEDIUM.
-3. Hand the linter report back to the Product Manager.
-4. PM addresses all CRITICAL and HIGH findings from the linter. MEDIUM findings are addressed at PM's discretion.
-5. Proceed to Step 6 with the linter-clean draft.
+1. The script prints a JSON report (exit 0 clean, exit 2 = CRITICAL/HIGH) -- hand it to the PM as-is.
+2. PM addresses all CRITICAL/HIGH findings; MEDIUM at PM's discretion.
+3. Proceed to Step 6 with the lint-clean draft.
 
-Plan Linter runs exactly once per draft cycle. It is not re-invoked between review cycles -- by that point the structural issues are resolved and further linting adds no value.
+Runs exactly once per draft cycle -- not re-invoked between review cycles.
 
-> **plan-linter (pre-review structural check) is UNAFFECTED by multi-model.** The plan-linter runs BEFORE the orchestrator (or before the native-only review path) — its sole job is structural validation of the draft plan markdown (sections present, well-formed tables, etc.). It does not consume reviewer findings and is not part of the orchestrator's reviewer set.
+> **UNAFFECTED by multi-model.** It runs BEFORE the orchestrator (or the native-only path) — its sole job is structural validation of the draft markdown. It does not consume reviewer findings and is not part of the orchestrator's reviewer set.
 
 ### 6. Peer Review Loop
 
@@ -143,7 +141,7 @@ This is the core quality mechanism. The draft plan is reviewed by specialist sub
 
 **Process:**
 
-1. **Plan Linter** (pre-review, Haiku-backed) — runs ONCE per draft (Step 5.5); PM addresses structural findings.
+1. **Structural Lint** (`lint-plan.mjs`, zero-token) — runs ONCE per draft (Step 5.5); PM addresses structural findings.
 2. **Peer Review** (all reviewers) — spawn FRESH reviewers IN PARALLEL; each is a new sub-agent, never resumed from a prior cycle.
 3. **Findings Consolidator** (Haiku-backed) — dedups/groups/sorts N reviewer outputs into a single attributed list.
 4. **PM Addresses Feedback** — PM addresses all CRITICAL and HIGH findings; PM has final say on requirements and asks the user for help when unsure.

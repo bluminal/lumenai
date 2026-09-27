@@ -55,9 +55,9 @@ function frontmatterBlock(contents: string): string {
 }
 
 describe('wrapper catalog diet (Task 19, FR-HM9/FR-HM10)', () => {
-  it('has a COMMAND_DESCRIPTIONS entry for all 18 commands and an AGENT_DESCRIPTIONS entry for all 25 agents', () => {
+  it('has a COMMAND_DESCRIPTIONS entry for all 18 commands and an AGENT_DESCRIPTIONS entry for all 24 agents', () => {
     expect(Object.keys(COMMAND_DESCRIPTIONS)).toHaveLength(18);
-    expect(Object.keys(AGENT_DESCRIPTIONS)).toHaveLength(25);
+    expect(Object.keys(AGENT_DESCRIPTIONS)).toHaveLength(24);
   });
 
   it('keeps every command wrapper description at or under 120 characters and equal to its COMMAND_DESCRIPTIONS entry', () => {
@@ -129,10 +129,10 @@ describe('wrapper catalog diet (Task 19, FR-HM9/FR-HM10)', () => {
 // the live tests/compat/lib/inventory.mjs WRAPPER_COUNT: that constant
 // changes as agents are added or retired (Task 42 retired
 // audit-artifact-writer, dropping the live count to 45; Task 44 retired
-// plan-scribe, dropping it to 43), while these files are historical
-// evidence that is never re-captured for that. The two numbers happened to
-// be equal from Task 19 until Task 42 only because no net agent count
-// change landed in between.
+// plan-scribe, dropping it to 43; Task 45 retired plan-linter, dropping it
+// to 42), while these files are historical evidence that is never
+// re-captured for that. The two numbers happened to be equal from Task 19
+// until Task 42 only because no net agent count change landed in between.
 const PRE_TASK19_WRAPPER_COUNT = 46;
 
 describe('wrapper catalog baseline captures (Task 19)', () => {
