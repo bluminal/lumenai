@@ -15,34 +15,30 @@ Idempotent — running this command twice on the same loop is safe. Cancel of a 
 | `loop_id` | Loop-id slug to cancel (positional). | — | Required unless `--all` |
 | `--all` | Cancel every running loop in `<project>/.synthex/loops/`. Mutually exclusive with `loop_id`. | off | — |
 
-## Workflow
+## Workflow (FR-HM18 — one Bash call)
 
-### 1. Resolve project root and loops directory
+Run `plugins/synthex/scripts/loop-step.sh cancel <loop_id>` or `... cancel --all` (resolved from the installed plugin root — Claude Code: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/loop-step.sh" cancel ...`) as ONE Bash call. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from. Print its stdout/stderr to the user verbatim. That single call implements everything the rest of this section documents: the refusal paths, the single-loop and `--all` mutation logic, and the atomic write contract.
 
-`project_root` = `$CLAUDE_PROJECT_DIR` if set, else `pwd`. `loops_dir` = `<project_root>/.synthex/loops`.
-
-### 2. Refusal paths
-
-Apply these refusals **in order**. Each prints one line to stderr and exits non-zero.
+### Refusal paths (both live in the script)
 
 - **Neither `loop_id` nor `--all` supplied** — refuse: `Usage: /synthex:cancel-loop <loop-id> | --all`.
 - **Both `loop_id` and `--all` supplied** — refuse: `loop_id and --all are mutually exclusive.`
 - **`loops_dir` does not exist** — print exactly: `No loops in this project.` and exit 0. (Not a refusal; mirrors FR-NL30 / E16 idempotency.)
 
-### 3. Single-loop cancel path (`loop_id` supplied)
+### Single-loop cancel path (`loop_id` supplied)
 
-1. Path = `<loops_dir>/<loop_id>.json`. If it does not exist, refuse with: `No loop found: <loop_id>. Run /synthex:list-loops to see loops in this project.` (FR-NL40 analog)
-2. Read and parse the file. Validate against the FR-NL8 schema (use `tests/schemas/loop-state-file.ts` informally — refuse with a clear error if the file is corrupt or has an unknown `schema_version`).
-3. Inspect `status`:
-   - If `status == "running"`: mutate to `status: "cancelled"`, `exited_at: <UTC ISO 8601 now>`, `exit_reason: "Cancelled by /synthex:cancel-loop"`, `last_updated` updated. Write atomically (`<state-file>.tmp.<pid>` + `mv -f`). Print: `Cancelled loop "<loop_id>" (was at iteration <iteration>/<max_iterations>).` Exit 0.
-   - If `status` is already terminal (`completed`, `cancelled`, `max-iterations-reached`, `crashed`): do NOT mutate. Print: `Loop "<loop_id>" is already <status> — nothing to do.` Exit 0 (FR-NL29 idempotency).
+1. If `<loops_dir>/<loop_id>.json` does not exist, refuse with: `No loop found: <loop_id>. Run /synthex:list-loops to see loops in this project.` (FR-NL40 analog)
+2. The file is validated against the FR-NL8 schema (the same contract `tests/schemas/loop-state-file.ts` checks) — a corrupt file or an unknown `schema_version` refuses with a clear error.
+3. `status` is inspected:
+   - If `status == "running"`: mutate to `status: "cancelled"`, `exited_at: <UTC ISO 8601 now>`, `exit_reason: "Cancelled by /synthex:cancel-loop"`, `last_updated` updated. Written atomically (`<state-file>.tmp.<pid>` + `mv -f`). Prints: `Cancelled loop "<loop_id>" (was at iteration <iteration>/<max_iterations>).` Exits 0.
+   - If `status` is already terminal (`completed`, `cancelled`, `max-iterations-reached`, `crashed`): does NOT mutate. Prints: `Loop "<loop_id>" is already <status> — nothing to do.` Exit 0 (FR-NL29 idempotency). The loop just cancelled by THIS invocation, or a previously-terminal one being re-targeted, is excluded from this same invocation's archive scan so repeated cancels of the same id stay idempotent rather than racing the archive hygiene pass.
 
-### 4. Cancel-all path (`--all` supplied)
+### Cancel-all path (`--all` supplied)
 
-1. Enumerate `<loops_dir>/*.json` (skip `.archive/`). For each file:
-   - Parse. Skip silently if corrupt (the next list-loops invocation will surface the warning).
-   - If `status == "running"`: mutate as in step 3 above. Collect the loop-id and the iteration progress for the summary.
-2. After processing all files, print one line per cancelled loop:
+1. Enumerates `<loops_dir>/*.json` (skips `.archive/`). For each file:
+   - Parses. Skips silently if corrupt (the next `list-loops` invocation surfaces the warning).
+   - If `status == "running"`: mutates as in the single-loop path above. Collects the loop-id and the iteration progress for the summary.
+2. After processing all files, prints one line per cancelled loop:
 
 ```
 Cancelled (<N>):
@@ -51,22 +47,22 @@ Cancelled (<N>):
   …
 ```
 
-3. If no loops were cancelled (zero running), print exactly: `No running loops to cancel.` Exit 0 (E16 / FR-NL30 idempotency).
+3. If no loops were cancelled (zero running), prints exactly: `No running loops to cancel.` Exits 0 (E16 / FR-NL30 idempotency).
 
-### 5. Effect on in-flight iterations
+### Effect on in-flight iterations
 
-Cancellation does NOT interrupt an iteration that is currently executing. The looping command's iteration body checks `status` at the next iteration boundary (FR-NL14 step 7) and exits when it sees `cancelled`. The user sees the loop stop within at most one more iteration's worth of work.
+Cancellation does NOT interrupt an iteration that is currently executing. The looping command's next call to `loop-step.sh advance` (or `hold`) sees `status: "cancelled"` and exits non-zero, so the loop's iteration loop stops. The user sees the loop stop within at most one more iteration's worth of work.
 
-## Atomic write contract
+## Atomic write contract (implemented by loop-step.sh)
 
-Every state-file mutation MUST be atomic to avoid corrupting state in flight:
+Every state-file mutation is atomic, so it cannot corrupt state in flight:
 
 1. Read the current state file into memory.
 2. Apply the field-level mutations in memory (`status`, `exited_at`, `exit_reason`, `last_updated`).
 3. Write the new JSON to `<state-file>.tmp.<pid>`.
 4. `mv -f <state-file>.tmp.<pid> <state-file>` (POSIX-atomic rename).
 
-If the atomic rename fails (e.g., filesystem error), refuse with the underlying error and exit non-zero. Do NOT leave a partial `.tmp.<pid>` file (best-effort cleanup).
+If the atomic rename fails (e.g., filesystem error), the script refuses with the underlying error and exits non-zero. It does NOT leave a partial `.tmp.<pid>` file (best-effort cleanup).
 
 ## Anti-patterns
 

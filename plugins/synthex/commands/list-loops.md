@@ -10,36 +10,24 @@ Loops in `.synthex/loops/.archive/` are excluded by default — they are histori
 
 This command takes no arguments. It is read-only — it does NOT mutate any state file.
 
-## Workflow
+## Workflow (FR-HM18 — one Bash call)
 
-### 1. Resolve project root
+Run `plugins/synthex/scripts/loop-step.sh list` (resolved from the installed plugin root — Claude Code: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/loop-step.sh" list`) as ONE Bash call. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from. Print its stdout to the user verbatim — do NOT reformat, re-sort, or summarize it. That single call performs everything Steps 1–6 used to describe by hand: resolving `.synthex/loops/`, enumerating and bucketing state files, sorting, truncating, and formatting the `WARNINGS` block. The subsections below are the format the script implements — read them to understand what you're printing, not as steps to perform yourself.
 
-`project_root` = `$CLAUDE_PROJECT_DIR` if set, else `pwd`. `loops_dir` = `<project_root>/.synthex/loops`.
+The script exits 0 in every case (missing directory, empty directory, malformed files) — there is no refusal path to handle here.
 
-### 2. Handle missing directory
+### Enumeration and bucketing (implemented by `loop-step.sh list`)
 
-If `<loops_dir>` does not exist, print exactly:
-
-```
-No loops in this project.
-```
-
-Exit 0 (E15).
-
-### 3. Enumerate state files
-
-List every `*.json` directly under `<loops_dir>` (do NOT recurse; the `.archive/` subdirectory is intentionally skipped). Skip any file that cannot be parsed as JSON (corrupt file — surface it in a `WARNINGS` block at the bottom; never abort).
-
-### 4. Bucket and sort
+List every `*.json` directly under `<loops_dir>` (never recurses; the `.archive/` subdirectory is intentionally skipped). A file that cannot be parsed as JSON is skipped and surfaced in the `WARNINGS` block instead of aborting.
 
 Bucket each parsed state file by `status`:
 
 - **RUNNING** — `status == "running"`. Sort by `last_updated` descending (most-recently-touched first).
 - **TERMINAL** — `status` in `{"completed", "cancelled", "max-iterations-reached", "crashed"}`. Sort by `exited_at` descending (most-recently-finished first). Cap at the 20 most recent (FR-NL33); if more exist, note the truncation count.
 
-### 5. Format and print
+The script also runs the [archive scan](../docs/native-looping.md#state) — but only AFTER gathering and printing this invocation's RUNNING/COMPLETED buckets, so a loop that just went terminal is still shown here once before being tidied into `.archive/` on this same touch of the directory.
 
-Use this exact output shape (matching FR-NL32):
+### Output format (FR-NL32)
 
 ```
 RUNNING (<N>):
@@ -61,7 +49,7 @@ Rules:
 - If both blocks are empty (directory exists but is empty), print `No loops in this project.` and exit 0.
 - If TERMINAL was truncated to 20, append a final line: `… and <truncated> more terminal loops (see .synthex/loops/.archive/).` (FR-NL33)
 
-### 6. Optional: WARNINGS block
+### WARNINGS block (optional)
 
 If any state files failed to parse OR are missing required fields (use the schema validator at `tests/schemas/loop-state-file.ts` informally — list the file as malformed without erroring), print after the main output:
 

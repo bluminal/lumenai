@@ -148,6 +148,34 @@ function isWaiter(content: string): boolean {
   return false;
 }
 
+/**
+ * FR-HM18 / FR-HM26: "each state-writing script calls the FR-HM18
+ * writability check." A "full state writer" is fingerprinted by the
+ * combined presence of an atomic `mv -f` rename AND all three of the
+ * literal JSON field names that only a script constructing the WHOLE
+ * native-looping state object (not merely patching one or two fields —
+ * loop-idle-wait.sh's idle_streak touch-up and loop-advance-gate.sh's
+ * gate-counter merge do not qualify) would ever emit: "schema_version",
+ * "completion_promise", and "exit_reason". This is deliberately narrower
+ * than "writes anything under .synthex/loops" so it does not sweep up
+ * every future auxiliary bookkeeping script into a contract that's really
+ * about the FR-HM18 script that owns the full lifecycle.
+ */
+function isFullStateWriter(content: string): boolean {
+  return (
+    /\bmv\s+-f\b/.test(content) &&
+    content.includes('"schema_version"') &&
+    content.includes('"completion_promise"') &&
+    content.includes('"exit_reason"')
+  );
+}
+
+/** The FR-HM18 writability check, called as `check_writable_dir` (the shared
+ * internal function) or a literal `check-writable` invocation/subcommand. */
+function callsCheckWritable(content: string): boolean {
+  return /check_writable|check-writable/.test(content);
+}
+
 // --- Contract: every discovered runtime script ------------------------------
 
 describe('portable-script contract (FR-HM40)', () => {
@@ -157,6 +185,7 @@ describe('portable-script contract (FR-HM40)', () => {
       expect.arrayContaining([
         'plugins/synthex/scripts/loop-advance-gate.sh',
         'plugins/synthex/scripts/loop-idle-wait.sh',
+        'plugins/synthex/scripts/loop-step.sh',
         'plugins/synthex/scripts/upgrade-nudge.sh',
       ]),
     );
@@ -193,6 +222,12 @@ describe('portable-script contract (FR-HM40)', () => {
     it('honors SYNTHEX_LOOP_IDLE_MAX if it is a waiter', () => {
       if (isWaiter(content)) {
         expect(content.includes('SYNTHEX_LOOP_IDLE_MAX')).toBe(true);
+      }
+    });
+
+    it('calls the FR-HM18 writability check if it is a full state writer', () => {
+      if (isFullStateWriter(content)) {
+        expect(callsCheckWritable(content)).toBe(true);
       }
     });
   });
@@ -268,5 +303,44 @@ describe('contract detectors catch violations (fixtures)', () => {
     ].join('\n');
     expect(isWaiter(fixture)).toBe(true);
     expect(fixture.includes('SYNTHEX_LOOP_IDLE_MAX')).toBe(true);
+  });
+
+  it('flags a full state writer that never calls the writability check', () => {
+    const fixture = [
+      '#!/bin/bash',
+      '# Exit codes:',
+      '#   0 - always',
+      'mv -f "$tmp" "$target"',
+      'printf \'{"schema_version": 1, "completion_promise": "%s", "exit_reason": null}\' "$p" > "$tmp"',
+    ].join('\n');
+    expect(isFullStateWriter(fixture)).toBe(true);
+    expect(callsCheckWritable(fixture)).toBe(false);
+  });
+
+  it('accepts a full state writer that calls check_writable_dir before writing', () => {
+    const fixture = [
+      '#!/bin/bash',
+      '# Exit codes:',
+      '#   0 - always',
+      'check_writable_dir "$d" || exit 5',
+      'mv -f "$tmp" "$target"',
+      'printf \'{"schema_version": 1, "completion_promise": "%s", "exit_reason": null}\' "$p" > "$tmp"',
+    ].join('\n');
+    expect(isFullStateWriter(fixture)).toBe(true);
+    expect(callsCheckWritable(fixture)).toBe(true);
+  });
+
+  it('does not flag a script that merely patches one or two fields of an existing state file', () => {
+    // Mirrors loop-idle-wait.sh / loop-advance-gate.sh: a jq merge of a
+    // couple of fields, never constructing schema_version/completion_promise/
+    // exit_reason from scratch.
+    const fixture = [
+      '#!/bin/bash',
+      '# Exit codes:',
+      '#   0 - always',
+      'mv -f "$TMP" "$STATE_FILE"',
+      "jq '.idle_streak = $s | .last_idle_iteration = $it' \"$STATE_FILE\" > \"$TMP\"",
+    ].join('\n');
+    expect(isFullStateWriter(fixture)).toBe(false);
   });
 });

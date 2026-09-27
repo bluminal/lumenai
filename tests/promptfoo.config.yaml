@@ -1000,3 +1000,48 @@ tests:
         value: "${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md"
       - type: not-icontains
         value: "DECOY-PROJECT-DOCS-MARKER"
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # NATIVE LOOPING — ONE loop-step.sh advance CALL PER ITERATION (Task 34, FR-HM18)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  #
+  # NOT RUN. This suite's provider (tests/helpers/claude-provider.js) wraps
+  # `claude -p` for a single agent turn against a text fixture; it has no
+  # mechanism to drive an actual multi-iteration --loop session or to
+  # inspect the resulting Bash tool-call trace, and doing so live would
+  # require a real Claude Code session with a live filesystem loop state
+  # (out of scope for a deterministic CI assertion). Task 34's Layer 1
+  # substitute — a static-prose check that each looping command's
+  # per-iteration protocol directs exactly one `loop-step.sh advance`
+  # invocation instead of the old multi-step boundary-check/increment/
+  # marker-print breakdown — lives in
+  # tests/schemas/native-looping-wiring.test.ts (describe block "one
+  # loop-step.sh advance Bash call per iteration (Task 34, FR-HM18)").
+  #
+  # This case is left here, commented out, as the case that WOULD prove it
+  # end-to-end once a harness exists to run a real --loop session and
+  # capture its tool-call trace (e.g. a `tests/compat` canary that greps a
+  # transcript for consecutive Bash invocations per iteration marker):
+  #
+  # - description: "NL-B-advance-once: exactly one Bash call to loop-step.sh advance per iteration"
+  #   vars:
+  #     agent: next-priority
+  #     input_file: tests/fixtures/native-looping/single-iteration-loop.txt
+  #   assert:
+  #     - type: javascript
+  #       value: |
+  #         // Count Bash tool_use blocks whose command matches
+  #         // `loop-step.sh advance <loop-id>` in the transcript for ONE
+  #         // iteration; fail unless the count is exactly 1 and no other
+  #         // Bash call performs a manual `.synthex/loops/*.json` write.
+  #         const bashCalls = context.transcript.filter(
+  #           (m) => m.type === 'tool_use' && m.name === 'Bash'
+  #         );
+  #         const advanceCalls = bashCalls.filter((m) =>
+  #           /loop-step\.sh advance [\w-]+/.test(m.input?.command ?? '')
+  #         );
+  #         const manualStateWrites = bashCalls.filter((m) =>
+  #           /\.synthex\/loops\/.*\.json/.test(m.input?.command ?? '') &&
+  #           !/loop-step\.sh/.test(m.input?.command ?? '')
+  #         );
+  #         return advanceCalls.length === 1 && manualStateWrites.length === 0;
