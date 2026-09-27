@@ -92,3 +92,57 @@ describe.each(FR_NL1_COMMANDS)(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// Task 34 (FR-HM18): "Layer 2 shows 1 Bash call per iteration" — Layer 2
+// requires a live LLM run to actually count tool calls, which this suite does
+// not trigger (see the promptfoo NOT-RUN case documented in
+// tests/promptfoo.config.yaml). This Layer 1 assertion is the substitute: it
+// checks that each looping command's per-iteration protocol prose DIRECTS
+// exactly one `loop-step.sh advance` Bash call per iteration, rather than
+// the old multi-step (boundary check + increment + marker-print) breakdown.
+//
+// Scoped to the 4 synthex commands actually rewritten for FR-HM18 (plus
+// /synthex:loop itself, asserted separately in loop-command.test.ts). The
+// synthex-plus team commands are untouched by Task 34 (synthex-plus is
+// being phased out) and are not asserted here.
+// ---------------------------------------------------------------------------
+
+const ADVANCE_REWRITTEN_COMMANDS = FR_NL1_COMMANDS.filter((c) => !c.isTeam);
+
+describe.each(ADVANCE_REWRITTEN_COMMANDS)(
+  '$plugin/$label — one loop-step.sh advance Bash call per iteration (Task 34, FR-HM18)',
+  ({ plugin, filename }) => {
+    const cmdPath = join(REPO_ROOT, 'plugins', plugin, 'commands', filename);
+    let content: string;
+
+    beforeAll(() => {
+      content = readFileSync(cmdPath, 'utf-8');
+    });
+
+    it('directs the per-iteration `loop-step.sh advance <loop-id>` call', () => {
+      expect(content).toMatch(/loop-step\.sh advance <loop-id>/);
+    });
+
+    it('names it as ONE Bash call', () => {
+      expect(content).toMatch(/ONE Bash call/);
+    });
+
+    it('the iteration-body prose calls `advance` from exactly one step (not once per some other loop construct)', () => {
+      // The intro sentence may restate the call for context; what matters is
+      // that the actual numbered protocol only performs it from a single
+      // step. Heuristic: no two DIFFERENT numbered list items ("1. **...**"
+      // style) both invoke advance — i.e. it is not re-invoked mid-iteration.
+      const numberedStepsInvokingAdvance = (
+        content.match(/^\d+\.\s+\*\*[^*]*\*\*[^\n]*loop-step\.sh advance/gm) || []
+      ).length;
+      expect(numberedStepsInvokingAdvance).toBeLessThanOrEqual(1);
+    });
+
+    it('no longer documents the old separate boundary-check + increment + marker-print steps', () => {
+      expect(content).not.toMatch(
+        /boundary check → increment counter → print marker → execute workflow → scan for promise → cancellation check → loop/,
+      );
+    });
+  },
+);

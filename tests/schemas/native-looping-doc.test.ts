@@ -127,4 +127,18 @@ describe('native-looping.md framework spec — Task 32 structural validation', (
       expect(matches.length).toBeGreaterThanOrEqual(3);
     });
   });
+
+  describe('FR-HM18 script implementation pointers (harness-modernization Task 34)', () => {
+    it('references loop-step.sh as the implementation of the archive scan, loop-id rules, and advance/hold', () => {
+      expect(content).toMatch(/loop-step\.sh archive/);
+      expect(content).toMatch(/loop-step\.sh begin/);
+      expect(content).toMatch(/loop-step\.sh advance/);
+      expect(content).toMatch(/loop-step\.sh hold/);
+    });
+
+    it('still documents the Archive and Retention sections (kept per Task 34 acceptance criteria)', () => {
+      expect(content).toMatch(/### Archive/);
+      expect(content).toMatch(/#### Retention/);
+    });
+  });
 });

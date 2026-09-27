@@ -2,10 +2,13 @@
  * Layer 2: Behavioral fixtures for the native-looping state-file lifecycle.
  *
  * Tasks 34, 35, 36, 37 of native-looping plan (Phase 6 Milestone 6.2).
- * Tests the reference implementation at tests/helpers/loop-state-lifecycle.ts
- * which mirrors the spec exactly. Since the looping commands are pure
- * markdown instructions (no executable script), the helper IS the testable
- * surface — any agent following the markdown must satisfy these invariants.
+ *
+ * FR-HM18 (harness-modernization Task 34): the helper at
+ * tests/helpers/loop-state-lifecycle.ts is no longer a parallel
+ * reimplementation of the spec — it is a thin wrapper that shells out to
+ * plugins/synthex/scripts/loop-step.sh for every mutation, so this suite now
+ * exercises the real portable script (the two cannot drift). Reads still go
+ * through the loop-state-file.ts validator directly.
  *
  * Sub-fixtures (Task 34): create, increment, complete, cancel, max-iter,
  * crash-recover. Plus Task 35 concurrent-sessions, Task 36 resume-flow,
@@ -15,7 +18,11 @@
  * behavioral.test.ts precedent from upgrade-onboarding Phase 5.2).
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+// Each case spawns several bash subprocesses; the 5 s default times out on
+// loaded hosts and slow CI runners even though a single call takes ~40 ms.
+vi.setConfig({ testTimeout: 30_000 });
 import { mkdtempSync, rmSync, readdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -414,7 +421,7 @@ describe('native-looping state-file lifecycle — Layer 2 behavioral fixtures', 
   // ──────────────────────────────────────────────────────────
 
   describe('Timing budget (NFR-NL1)', () => {
-    it('state-file read + increment + write stays within its harness-adjusted p95 budget over 30 iterations', () => {
+    it('one `loop-step.sh advance` call stays within its harness-adjusted p95 budget over 30 iterations', () => {
       createState(loopsDir, {
         loop_id: 'timing',
         session_id: null,
@@ -422,6 +429,9 @@ describe('native-looping state-file lifecycle — Layer 2 behavioral fixtures', 
         args: '',
         prompt_file: null,
         completion_promise: 'OK',
+        // advance() now enforces the max_iterations ceiling itself (FR-HM18);
+        // give the 30-sample loop enough headroom that it never hits it.
+        max_iterations: 200,
       });
       const samples: number[] = [];
       for (let i = 0; i < 30; i++) {
@@ -432,12 +442,14 @@ describe('native-looping state-file lifecycle — Layer 2 behavioral fixtures', 
       }
       samples.sort((a, b) => a - b);
       const p95 = samples[Math.floor(30 * 0.95)];
-      // NFR-NL1 target is 200ms for the FULL iteration boundary (incl. marker print);
-      // the state-file operations alone are bounded much tighter.
-      // A hosted runner can have noisy filesystem scheduling. Keep the tighter
-      // developer-machine regression signal while allowing the full NFR-NL1
-      // 200ms iteration budget to remain meaningful in CI.
-      const p95BudgetMs = process.env.CI ? 150 : 75;
+      // NFR-NL1's 200ms target is for the FULL iteration boundary as the
+      // model experiences it (one Bash tool call). Since Task 34 (FR-HM18)
+      // this measures an actual `bash loop-step.sh advance` subprocess spawn
+      // per iteration — real process-spawn + shell-startup cost, not an
+      // in-memory op — so the budget is the NFR-NL1 target itself rather
+      // than the old sub-millisecond in-process figure. CI runners get a
+      // wider allowance for noisy scheduling.
+      const p95BudgetMs = process.env.CI ? 400 : 200;
       expect(p95).toBeLessThan(p95BudgetMs);
     });
   });

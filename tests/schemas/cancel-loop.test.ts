@@ -8,7 +8,14 @@
  *   - atomic state-file write contract
  *   - cancellation is polled at iteration boundary (FR-NL31)
  *
- * Plan: docs/plans/native-looping.md Task 30.
+ * Rewritten for harness-modernization Task 34 (FR-HM18): the refusal paths,
+ * the single-loop and --all mutation logic, and the atomic write contract
+ * move into plugins/synthex/scripts/loop-step.sh cancel (`cancel-loop`
+ * becomes one Bash call). Real behavioral coverage (including the FR-NL29
+ * idempotency-vs-archive-scan interaction) lives in
+ * tests/schemas/loop-step-behavioral.test.ts.
+ *
+ * Plan: docs/plans/native-looping.md Task 30; docs/plans/harness-modernization.md Task 34.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -146,6 +153,17 @@ describe('/synthex:cancel-loop (cancel-loop.md) — Task 30 structural validatio
 
     it('does NOT prompt the user', () => {
       expect(content).toMatch(/Do NOT prompt the user/i);
+    });
+  });
+
+  describe('FR-HM18 script delegation (Task 34)', () => {
+    it('delegates to loop-step.sh cancel as ONE Bash call', () => {
+      expect(content).toMatch(/loop-step\.sh cancel/);
+      expect(content).toMatch(/ONE Bash call/);
+    });
+
+    it('documents the same-invocation archive-scan exclusion that keeps re-cancel idempotent', () => {
+      expect(content).toMatch(/excluded from this same invocation's archive scan/);
     });
   });
 });
