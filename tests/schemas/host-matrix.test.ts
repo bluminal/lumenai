@@ -112,10 +112,26 @@ describe('host-matrix.mjs scaffold', () => {
     expect(HOSTS.grok.toolMap.Workflow).toContain("never use Grok's /workflow");
   });
 
-  it('has GAP_MESSAGES and hook allowlist placeholders for every host, not wired up yet', () => {
+  it('has GAP_MESSAGES placeholders for every host, not wired up yet', () => {
     for (const host of Object.values(HOSTS)) {
       expect(host.gapMessages).toBeNull();
+    }
+  });
+
+  // Task 46 (D25/FR-HM27): Codex is the only host with a wired-up hook
+  // allowlist so far (commit-lint via the generated hooks/codex-hooks.json);
+  // every other host stays a placeholder until its own task lands.
+  it('leaves hookAllowlist null for every host except codex', () => {
+    for (const [hostId, host] of Object.entries(HOSTS)) {
+      if (hostId === 'codex') continue;
       expect(host.hookAllowlist).toBeNull();
     }
+  });
+
+  it("wires codex's hookAllowlist to commit-lint only, matcher = its own Bash tool name", () => {
+    expect(HOSTS.codex.hookAllowlist).toEqual({
+      matcher: HOSTS.codex.toolMap.Bash,
+      events: ['PreToolUse'],
+    });
   });
 });

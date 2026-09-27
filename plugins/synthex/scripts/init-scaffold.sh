@@ -43,6 +43,18 @@
 # run actually created; a fully idempotent re-run (nothing new) prints
 # nothing and still exits 0.
 #
+# FR-HM27 (D24): every run (not gated by the idempotency above — history
+# can grow between `init` invocations) also samples up to 50 commits via
+# `git log` and majority-votes (>=60%) the subject pattern into one of
+# `conventional`, `issue-key`, `gitmoji`, `plain`, or `auto` (no clear
+# majority). The result overwrites the `commit_convention` line under the
+# config file's `git:` block (a plain line-anchored `sed` substitution —
+# the key name is unique in defaults.yaml, so no YAML parser is needed) and
+# is printed as `Detected commit convention: <value> (from <N> commits)`.
+# No `git`, no commit history, or a config file that hasn't been created
+# yet (writability check above failed) all degrade to `auto`/0 rather than
+# failing the script — this step never changes the exit code.
+#
 # Exit codes:
 #   0 - success (created something, or already up to date — idempotent).
 #   1 - usage error (unrecognized option, or more than one positional arg).
@@ -199,5 +211,58 @@ for doc_dir in $DOC_DIRS; do
   check_writable_dir "$doc_dir_abs" || fail_writability "$doc_dir_abs"
   echo "Created ${doc_dir}/"
 done
+
+# --------------------------------------------------------------------------
+# 3. Commit convention detection (FR-HM27, D24) — every run, not gated by
+#    the config-file idempotency above: history can grow between runs.
+#    No node is used here either; git log + POSIX grep/awk only.
+# --------------------------------------------------------------------------
+
+DETECTED_CONVENTION="auto"
+DETECTED_TOTAL=0
+
+if command -v git >/dev/null 2>&1; then
+  SUBJECTS="$(cd "$PROJECT_ROOT_DIR" 2>/dev/null && git log --no-merges -n 50 --pretty=format:'%s' 2>/dev/null)"
+  if [ -n "$SUBJECTS" ]; then
+    TOTAL=$(printf '%s\n' "$SUBJECTS" | grep -c '.')
+    # Same recognized-type set as .github/workflows/release.yml's CHANGELOG
+    # classification regex (kept in sync by tests/schemas/commit-lint-hook
+    # -behavioral.test.ts, which also pins scripts/commit-lint.sh's copy).
+    CONV=$(printf '%s\n' "$SUBJECTS" | grep -Ec '^(feat|fix|perf|refactor|revert|build|ci|chore|docs|style|test)(\([^)]+\))?!?:')
+    ISSUE=$(printf '%s\n' "$SUBJECTS" | grep -Ec '^(\[[A-Za-z][A-Za-z0-9]*-[0-9]+\]|[A-Za-z][A-Za-z0-9]*-[0-9]+:)')
+    GITMOJI=$(printf '%s\n' "$SUBJECTS" | grep -Ec '^:[a-z0-9_+-]+:')
+    PLAIN=$((TOTAL - CONV - ISSUE - GITMOJI))
+    [ "$PLAIN" -ge 0 ] || PLAIN=0
+
+    DETECTED_TOTAL="$TOTAL"
+    if [ "$TOTAL" -gt 0 ]; then
+      if [ $((CONV * 100)) -ge $((TOTAL * 60)) ]; then
+        DETECTED_CONVENTION="conventional"
+      elif [ $((ISSUE * 100)) -ge $((TOTAL * 60)) ]; then
+        DETECTED_CONVENTION="issue-key"
+      elif [ $((GITMOJI * 100)) -ge $((TOTAL * 60)) ]; then
+        DETECTED_CONVENTION="gitmoji"
+      elif [ $((PLAIN * 100)) -ge $((TOTAL * 60)) ]; then
+        DETECTED_CONVENTION="plain"
+      fi
+    fi
+  fi
+fi
+
+# Overwrite the `commit_convention:` line in the config file in place.
+# `commit_convention` is a unique key name across defaults.yaml (one `git:`
+# block), so a plain line-anchored substitution is safe without a YAML
+# parser. Best-effort: a write failure here never changes the exit code —
+# the detected value is still printed below either way.
+if [ -f "$CONFIG_PATH" ]; then
+  GCC_TMP="$CONFIG_PATH.gcc.tmp.$$"
+  if sed -E "s/^([[:space:]]*commit_convention:).*/\\1 $DETECTED_CONVENTION/" "$CONFIG_PATH" > "$GCC_TMP" 2>/dev/null; then
+    mv -f "$GCC_TMP" "$CONFIG_PATH" 2>/dev/null || rm -f "$GCC_TMP" 2>/dev/null
+  else
+    rm -f "$GCC_TMP" 2>/dev/null
+  fi
+fi
+
+echo "Detected commit convention: $DETECTED_CONVENTION (from $DETECTED_TOTAL commits)"
 
 exit 0

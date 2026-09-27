@@ -619,3 +619,18 @@ multi_model_review:
   # Override per project to harden or relax. Flags are applied in
   # order; first match wins for overlapping mounts.
   sandbox_bwrap_flags: "--ro-bind / / --bind /tmp /tmp --proc /proc --dev /dev"
+
+# -------------------------------------------------------------------
+# Git Settings (FR-HM27, D24)
+# Read by scripts/commit-lint.sh, a fail-open PreToolUse hook that lints
+# `git commit` subjects on Claude Code and Codex (hooks/codex-hooks.json).
+# -------------------------------------------------------------------
+git:
+
+  # One of: conventional | issue-key | gitmoji | plain | auto.
+  # `auto` (the shipped default) means "not yet sampled, or no single
+  # pattern reached a 60% majority" — commit-lint.sh NEVER lints in that
+  # case (NFR-HM1: never block on an unconfigured project). `/synthex:init`
+  # overwrites this with an explicit value detected from `git log` on every
+  # run (FR-HM27); only `conventional` turns linting on.
+  commit_convention: auto

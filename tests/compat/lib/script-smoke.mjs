@@ -481,9 +481,17 @@ function initScaffoldIdempotentCase(ctx, includeNode) {
 
   const second = runScript(ctx.scriptAbsPath, [], opts);
   assert(second.code === 0, `init-scaffold second run exited ${second.code}: ${second.stderr}`);
+  // FR-HM27 (Task 46): the config file and doc dirs are still fully
+  // idempotent (no "Created" line), but the commit-convention detection
+  // (D24) re-samples and prints on every run by design, so the second run
+  // is not entirely silent any more.
   assert(
-    second.stdout.trim() === '',
-    `init-scaffold second run should be a silent no-op, got: ${JSON.stringify(second.stdout)}`,
+    !second.stdout.includes('Created'),
+    `init-scaffold second run should not re-create anything, got: ${JSON.stringify(second.stdout)}`,
+  );
+  assert(
+    second.stdout.includes('Detected commit convention:'),
+    `init-scaffold second run should still print the commit-convention detection line, got: ${JSON.stringify(second.stdout)}`,
   );
   for (const d of INIT_SCAFFOLD_DOC_DIRS) {
     assert(existsSync(join(ctx.workDir, d)), `init-scaffold lost ${d} on the second run`);
@@ -665,6 +673,60 @@ function assembleBundleFallbackCase(ctx, includeNode) {
 }
 
 // ---------------------------------------------------------------------------
+// scripts/commit-lint.sh — FR-HM27 (D24, Task 46) fail-open PreToolUse(Bash)
+// hook that lints `git commit` subjects against Conventional Commits, but
+// only when the project's git.commit_convention key is explicitly
+// "conventional". Node does the actual JSON/command parsing; the happy
+// path proves a bad subject is blocked, the fallback proves the
+// `command -v node` guard fails OPEN (allows) rather than erroring.
+// ---------------------------------------------------------------------------
+
+function commitLintBadSubjectStdin() {
+  return JSON.stringify({
+    tool_name: 'Bash',
+    tool_input: { command: 'git commit -m "not a conventional subject"' },
+    cwd: '.',
+  });
+}
+
+function commitLintHappyPathCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const synthexDir = join(ctx.workDir, '.synthex');
+  mkdirSync(synthexDir, { recursive: true });
+  writeFileSync(join(synthexDir, 'config.yaml'), 'git:\n  commit_convention: conventional\n');
+
+  const result = runScript(ctx.scriptAbsPath, [], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+    stdin: commitLintBadSubjectStdin(),
+  });
+  assert(result.code === 2, `expected exit 2 (blocked), got ${result.code}: ${result.stderr}`);
+  assert(
+    result.stderr.includes('does not match Conventional Commits'),
+    `expected a fix hint on stderr, got: ${result.stderr}`,
+  );
+}
+
+function commitLintFallbackCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const synthexDir = join(ctx.workDir, '.synthex');
+  mkdirSync(synthexDir, { recursive: true });
+  // Same "conventional" config and same bad subject as the happy path —
+  // the only difference is node's absence, proving the guard fails open
+  // (allows) rather than blocking or erroring without node to parse JSON.
+  writeFileSync(join(synthexDir, 'config.yaml'), 'git:\n  commit_convention: conventional\n');
+
+  const result = runScript(ctx.scriptAbsPath, [], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+    stdin: commitLintBadSubjectStdin(),
+  });
+  assert(result.code === 0, `expected exit 0 (fail open without node), got ${result.code}: ${result.stderr}`);
+}
+
+// ---------------------------------------------------------------------------
 // scripts/validate-findings — FR-HM28 adapter-output normalizer. Node is
 // preferred; when node is absent this script falls back to jq, but jq is
 // NEVER on PATH in these restricted-PATH scenarios either (see the module
@@ -799,6 +861,16 @@ export const SMOKE_CASES = {
     {
       name: 'missing jq/node fallback: seeds a fresh file and sets the flag via the sed/awk path',
       run: (ctx) => stateFlagFallbackCase(ctx, false),
+    },
+  ],
+  'scripts/commit-lint.sh': [
+    {
+      name: 'happy path: blocks a bad -m subject with a fix hint when git.commit_convention is "conventional" (node present)',
+      run: (ctx) => commitLintHappyPathCase(ctx, true),
+    },
+    {
+      name: 'missing node fallback: the command -v node guard fails open (allows) the same bad subject',
+      run: (ctx) => commitLintFallbackCase(ctx, false),
     },
   ],
   'scripts/init-scaffold.sh': [

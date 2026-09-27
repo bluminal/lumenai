@@ -38,11 +38,14 @@ const FACTS = [
 
 // Every consumer that currently re-detects one of the facts above, and the
 // file it lives in. Each must carry the fallback sentence verbatim.
+//
+// commit_convention (Task 46, FR-HM27): its former consumer,
+// commit-message-author.md, was retired — init.md's Step 2a now reads the
+// value straight from the `git.commit_convention` key scripts/init
+// -scaffold.sh just wrote to the project config (D24), rather than a
+// separate agent re-detecting it with its own fallback heuristic. No
+// consumer entry remains for this fact.
 const CONSUMERS = [
-  {
-    label: 'commit-message-author.md (commit_convention)',
-    path: join(AGENTS_DIR, 'commit-message-author.md'),
-  },
   {
     label: 'test-coverage-analysis.md (test_runner)',
     path: join(COMMANDS_DIR, 'test-coverage-analysis.md'),

@@ -203,7 +203,11 @@ describe('init-scaffold.sh (FR-HM26, Task 39)', () => {
         }
       });
 
-      it('is idempotent: a second run makes no changes and prints nothing', () => {
+      it('is idempotent for the config file and doc dirs: a second run makes no changes to them and prints no "Created" line', () => {
+        // FR-HM27 (Task 46): the commit-convention detection line (below)
+        // is NOT gated by this idempotency -- it re-samples and prints on
+        // every run, by design, since history can grow between runs. The
+        // config file and document directories are still fully idempotent.
         const pathDir = restrictedPath(includeNode);
         const first = run([], pathDir);
         expect(first.status).toBe(0);
@@ -212,7 +216,8 @@ describe('init-scaffold.sh (FR-HM26, Task 39)', () => {
 
         const second = run([], pathDir);
         expect(second.status, `stderr: ${second.stderr}`).toBe(0);
-        expect(second.stdout.trim()).toBe('');
+        expect(second.stdout).not.toContain('Created');
+        expect(second.stdout).toContain('Detected commit convention:');
 
         const afterConfig = readFileSync(join(projectDir, '.synthex', 'config.yaml'));
         expect(afterConfig.equals(beforeConfig)).toBe(true);
@@ -283,5 +288,119 @@ describe('init-scaffold.sh (FR-HM26, Task 39)', () => {
   it('documents its exit codes in a header comment (Task 32 contract)', () => {
     const content = readFileSync(SCRIPT, 'utf-8');
     expect(content).toMatch(/^#\s*Exit codes:\s*$/m);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-HM27 (Task 46, D24): commit-convention detection. init-scaffold.sh
+// samples up to 50 commits from `git log` and majority-votes (>=60%) the
+// subject pattern into git.commit_convention, printing
+// `Detected commit convention: <value> (from <N> commits)` on every run
+// (not gated by the config-file idempotency above).
+// ---------------------------------------------------------------------------
+
+function buildGitRestrictedPath(): string {
+  const bin = mkdtempSync(join(tmpdir(), 'init-scaffold-bin-git-'));
+  const tools = ['bash', 'sh', 'cat', 'mv', 'mkdir', 'rm', 'sed', 'grep', 'git'];
+  for (const tool of tools) {
+    const result = spawnSync('bash', ['-c', `command -v ${tool}`], { encoding: 'utf-8' });
+    const src = result.stdout.trim();
+    if (src) symlinkSync(src, join(bin, tool));
+  }
+  return bin;
+}
+
+function commitAll(dir: string, subjects: string[]) {
+  const env = {
+    ...process.env,
+    GIT_AUTHOR_NAME: 'Test',
+    GIT_AUTHOR_EMAIL: 'test@example.com',
+    GIT_COMMITTER_NAME: 'Test',
+    GIT_COMMITTER_EMAIL: 'test@example.com',
+  };
+  execFileSync('git', ['init', '-q'], { cwd: dir, env });
+  for (const subject of subjects) {
+    execFileSync('git', ['commit', '-q', '--allow-empty', '-m', subject], { cwd: dir, env });
+  }
+}
+
+describe('init-scaffold.sh commit-convention detection (FR-HM27, D24, Task 46)', () => {
+  let gitBin: string;
+
+  beforeEach(() => {
+    gitBin = buildGitRestrictedPath();
+  });
+
+  afterEach(() => {
+    rmSync(gitBin, { recursive: true, force: true });
+  });
+
+  function runWithGit(): RunResult {
+    const bashBin = join(gitBin, 'bash');
+    const result = spawnSync(bashBin, [SCRIPT], {
+      cwd: projectDir,
+      env: { PATH: gitBin, CLAUDE_PROJECT_DIR: projectDir },
+      encoding: 'utf-8',
+    });
+    return { stdout: result.stdout ?? '', stderr: result.stderr ?? '', status: result.status ?? 1 };
+  }
+
+  it('detects a >=60% Conventional Commits majority and writes "conventional"', () => {
+    commitAll(projectDir, [
+      'feat: add x',
+      'fix: correct y',
+      'feat(scope): add z',
+      'docs: update readme',
+      'random subject with no prefix',
+    ]);
+    const result = runWithGit();
+    expect(result.status, `stderr: ${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain('Detected commit convention: conventional (from 5 commits)');
+    const config = readFileSync(join(projectDir, '.synthex', 'config.yaml'), 'utf-8');
+    expect(config).toMatch(/^\s*commit_convention:\s*conventional\s*$/m);
+  });
+
+  it('detects a >=60% plain (no-prefix) majority and writes "plain"', () => {
+    commitAll(projectDir, ['add feature x', 'fix the bug', 'update docs', 'feat: one conventional one']);
+    const result = runWithGit();
+    expect(result.status, `stderr: ${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain('Detected commit convention: plain (from 4 commits)');
+    const config = readFileSync(join(projectDir, '.synthex', 'config.yaml'), 'utf-8');
+    expect(config).toMatch(/^\s*commit_convention:\s*plain\s*$/m);
+  });
+
+  it('falls back to "auto" when no single pattern reaches a 60% majority', () => {
+    commitAll(projectDir, ['feat: a', 'fix: b', 'plain subject c', 'PROJ-1: d', ':sparkles: e']);
+    const result = runWithGit();
+    expect(result.status, `stderr: ${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain('Detected commit convention: auto (from 5 commits)');
+    const config = readFileSync(join(projectDir, '.synthex', 'config.yaml'), 'utf-8');
+    expect(config).toMatch(/^\s*commit_convention:\s*auto\s*$/m);
+  });
+
+  it('prints "auto (from 0 commits)" and leaves the shipped default when there is no git history', () => {
+    // No `git init` in this project dir at all.
+    const result = runWithGit();
+    expect(result.status, `stderr: ${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain('Detected commit convention: auto (from 0 commits)');
+    const config = readFileSync(join(projectDir, '.synthex', 'config.yaml'));
+    expect(config.equals(DEFAULTS_CONTENT)).toBe(true);
+  });
+
+  it('re-detects on every run (not gated by config-file idempotency)', () => {
+    commitAll(projectDir, ['random one', 'random two', 'random three']);
+    const first = runWithGit();
+    expect(first.stdout).toContain('Detected commit convention: plain (from 3 commits)');
+
+    // 3 pre-existing plain commits + 5 new conventional ones = 5/8 = 62.5%,
+    // clearing the 60% majority threshold.
+    for (const subject of ['feat: a', 'fix: b', 'chore: c', 'docs: d', 'refactor: e']) {
+      execFileSync('git', ['commit', '-q', '--allow-empty', '-m', subject], { cwd: projectDir });
+    }
+
+    const second = runWithGit();
+    expect(second.stdout).toContain('Detected commit convention: conventional (from 8 commits)');
+    const config = readFileSync(join(projectDir, '.synthex', 'config.yaml'), 'utf-8');
+    expect(config).toMatch(/^\s*commit_convention:\s*conventional\s*$/m);
   });
 });
