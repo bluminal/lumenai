@@ -377,6 +377,63 @@ function upgradeNudgeFeatureCase(ctx, includeNode) {
 }
 
 // ---------------------------------------------------------------------------
+// scripts/state-flag.sh — generic boolean-flag writer for .synthex/state
+// .json (FR-HM26, Task 38). The happy-path case proves the node-preferred
+// JSON.parse/stringify branch preserves an unrelated pre-existing field
+// (plugin_root) while setting a new flag; the fallback case proves the
+// sed/awk-only reader+writer does the same with neither jq nor node on
+// PATH.
+// ---------------------------------------------------------------------------
+
+function stateFlagHappyPathCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const synthexDir = join(ctx.workDir, '.synthex');
+  mkdirSync(synthexDir, { recursive: true });
+  writeFileSync(
+    join(synthexDir, 'state.json'),
+    JSON.stringify({
+      schema_version: 1,
+      last_seen_version: '0.5.0',
+      plugin_root: '/opt/synthex',
+      dismissed: false,
+    }),
+  );
+  const result = runScript(ctx.scriptAbsPath, ['dismissed'], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+  });
+  assert(result.code === 0, `state-flag exited ${result.code}: ${result.stderr}`);
+  const state = JSON.parse(readFileSync(join(synthexDir, 'state.json'), 'utf8'));
+  assert(state.dismissed === true, `dismissed was not set: ${JSON.stringify(state)}`);
+  assert(
+    state.plugin_root === '/opt/synthex',
+    `plugin_root was not preserved: ${JSON.stringify(state)}`,
+  );
+  assert(
+    state.last_seen_version === '0.5.0',
+    `last_seen_version was not preserved: ${JSON.stringify(state)}`,
+  );
+}
+
+function stateFlagFallbackCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const synthexDir = join(ctx.workDir, '.synthex');
+  mkdirSync(synthexDir, { recursive: true });
+  // No pre-existing state.json — proves the fallback path also handles the
+  // "seed a fresh file" case, not only field preservation.
+  const result = runScript(ctx.scriptAbsPath, ['starred'], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+  });
+  assert(result.code === 0, `state-flag exited ${result.code}: ${result.stderr}`);
+  const state = JSON.parse(readFileSync(join(synthexDir, 'state.json'), 'utf8'));
+  assert(state.starred === true, `starred was not set: ${JSON.stringify(state)}`);
+  assert(state.schema_version === 1, `schema_version missing: ${JSON.stringify(state)}`);
+}
+
+// ---------------------------------------------------------------------------
 // Registry — SMOKE_CASES keys are relPath as produced by
 // discoverRuntimeScripts() (relative to pluginRoot, e.g. "scripts/loop-step
 // .sh"). tests/schemas/script-smoke-registry.test.ts fails if a discovered
@@ -442,6 +499,16 @@ export const SMOKE_CASES = {
     {
       name: 'missing jq/node fallback: upgrade across the threshold prints both nudges',
       run: (ctx) => upgradeNudgeFeatureCase(ctx, false),
+    },
+  ],
+  'scripts/state-flag.sh': [
+    {
+      name: 'happy path: sets a flag and preserves unrelated existing fields (node present)',
+      run: (ctx) => stateFlagHappyPathCase(ctx, true),
+    },
+    {
+      name: 'missing jq/node fallback: seeds a fresh file and sets the flag via the sed/awk path',
+      run: (ctx) => stateFlagFallbackCase(ctx, false),
     },
   ],
 };

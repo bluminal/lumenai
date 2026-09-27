@@ -8,9 +8,16 @@
  *   - sets dismissed: true
  *   - idempotent re-creation logic documented (creates state if missing)
  *
- * Both commands are tested in parallel since they mirror each other.
+ * Both commands are tested in parallel since they mirror each other. The
+ * synthex variant was repointed at scripts/state-flag.sh (Task 38,
+ * FR-HM26): it no longer writes state.json inline via the Write tool, so
+ * its "State file write" / "Idempotent re-creation" assertions check the
+ * new script-delegation prose instead — see the `usesScript` branch below.
+ * synthex-plus is untouched (still writes state.json inline) and keeps the
+ * original assertions.
  *
- * Plan: docs/plans/upgrade-onboarding.md Task 20.
+ * Plan: docs/plans/upgrade-onboarding.md Task 20; docs/plans/harness
+ * -modernization.md Task 38.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -40,24 +47,32 @@ const SYNTHEX_PLUS_DISMISS = join(
   'dismiss-upgrade-nudge.md'
 );
 
-const variants: { label: string; path: string; statePath: string; siblingCommand: string }[] = [
+const variants: {
+  label: string;
+  path: string;
+  statePath: string;
+  siblingCommand: string;
+  usesScript: boolean;
+}[] = [
   {
     label: 'synthex',
     path: SYNTHEX_DISMISS,
     statePath: '.synthex/state.json',
     siblingCommand: '/synthex:configure-multi-model',
+    usesScript: true,
   },
   {
     label: 'synthex-plus',
     path: SYNTHEX_PLUS_DISMISS,
     statePath: '.synthex-plus/state.json',
     siblingCommand: '/synthex-plus:configure-teams',
+    usesScript: false,
   },
 ];
 
 describe.each(variants)(
   'dismiss-upgrade-nudge.md ($label) — Task 20 structural validation',
-  ({ path, statePath, siblingCommand }) => {
+  ({ path, statePath, siblingCommand, usesScript }) => {
     let content: string;
 
     beforeAll(() => {
@@ -95,29 +110,62 @@ describe.each(variants)(
         expect(content).toContain(statePath);
       });
 
-      it('sets dismissed: true', () => {
-        expect(content).toMatch(/"dismissed":\s*true/);
-        expect(content).toMatch(/Always set\s+`dismissed:\s*true`/);
-      });
+      if (usesScript) {
+        // Task 38 (FR-HM26): the write itself is delegated to
+        // scripts/state-flag.sh — the command's prose documents what the
+        // script does rather than performing the write itself.
 
-      it('preserves last_seen_version when present', () => {
-        expect(content).toMatch(/Preserve\s+`last_seen_version`/i);
-      });
+        it('delegates the write to state-flag.sh', () => {
+          expect(content).toMatch(/state-flag\.sh\s+dismissed/);
+          expect(content).toMatch(/CLAUDE_PLUGIN_ROOT/);
+        });
 
-      it('updates updated_at timestamp', () => {
-        expect(content).toMatch(/updated_at/);
-        expect(content).toMatch(/Always update\s+`updated_at`/i);
-      });
+        it('sets dismissed: true', () => {
+          expect(content).toMatch(/"dismissed":\s*true/);
+          expect(content).toMatch(/atomically sets\s+`"dismissed":\s*true`/);
+        });
+
+        it('preserves last_seen_version when present', () => {
+          expect(content).toMatch(/Preserve\s+`last_seen_version`/i);
+          expect(content).toMatch(/field-preservation rules/i);
+        });
+
+        it('mentions updated_at', () => {
+          expect(content).toMatch(/updated_at/);
+        });
+      } else {
+        it('sets dismissed: true', () => {
+          expect(content).toMatch(/"dismissed":\s*true/);
+          expect(content).toMatch(/Always set\s+`dismissed:\s*true`/);
+        });
+
+        it('preserves last_seen_version when present', () => {
+          expect(content).toMatch(/Preserve\s+`last_seen_version`/i);
+        });
+
+        it('updates updated_at timestamp', () => {
+          expect(content).toMatch(/updated_at/);
+          expect(content).toMatch(/Always update\s+`updated_at`/i);
+        });
+      }
     });
 
     describe('Idempotent re-creation', () => {
-      it('handles missing state file by creating a fresh state', () => {
-        expect(content).toMatch(/file does not exist[\s\S]*defaults?\s+to\s+`current_version`/i);
-      });
+      if (usesScript) {
+        it('handles a missing or malformed state file by creating a fresh state (FR-UO18)', () => {
+          expect(content).toMatch(
+            /does not exist yet, or fails to parse[\s\S]*treats it as missing[\s\S]*creates a fresh document/i,
+          );
+        });
+      } else {
+        it('handles missing state file by creating a fresh state', () => {
+          expect(content).toMatch(/file does not exist[\s\S]*defaults?\s+to\s+`current_version`/i);
+        });
 
-      it('handles malformed state file by overwriting (FR-UO18)', () => {
-        expect(content).toMatch(/parse fails[\s\S]*overwrite/i);
-      });
+        it('handles malformed state file by overwriting (FR-UO18)', () => {
+          expect(content).toMatch(/parse fails[\s\S]*overwrite/i);
+        });
+      }
 
       it('explicitly states idempotency', () => {
         expect(content).toMatch(/idempotent/i);
