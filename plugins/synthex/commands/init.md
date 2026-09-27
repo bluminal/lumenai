@@ -34,13 +34,16 @@ Check if `@{config_path}` already exists.
 
 ### 2. Create Configuration File
 
-Read the default configuration template from the plugin's `config/defaults.yaml` file (located relative to this command at `../config/defaults.yaml`) using the **Read** tool. Then create the directory `.synthex/` in the project root if it doesn't exist, and write the template content to `@{config_path}` using the **Write** tool.
+Run `plugins/synthex/scripts/init-scaffold.sh` (resolved from the installed plugin root — Claude Code: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/init-scaffold.sh" "@{config_path}"`) as ONE Bash call. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
-**Implementation rules — strict:**
+The script (FR-HM26) does the mechanical work this step and Step 8 used to describe by hand, in one call:
 
-- Use the **Read** tool to load `defaults.yaml`. Use the **Write** tool to create the project config. **Do NOT use `cp`, `cat >`, `sed -i`, `tee`, or any shell command that takes the defaults path as an argument.** Shell commands trigger Claude Code's sensitive-file permission prompt (which flags both source and destination of `cp`) and risk argument-order bugs that could overwrite the plugin's defaults.
-- The plugin's `defaults.yaml` is **read-only**. Never write to it, never pass it as a destination argument to any tool, never edit it. It is a template, not project state.
-- The destination `@{config_path}` (default `.synthex/config.yaml`) is the only file this step creates.
+- Copies the plugin's `config/defaults.yaml` to `@{config_path}` (default `.synthex/config.yaml`) byte-for-byte — no transformation. **Idempotent:** an existing config file is left untouched by this call. If Step 1's "reset to defaults" choice was picked, re-run with a trailing `--force` to overwrite it.
+- Creates the standard document directories from Step 8 if they don't already exist.
+
+It checks writability before writing and exits non-zero with a clear message if a target directory can't be written to (e.g. a read-only sandbox). Print its stdout/stderr to the user verbatim — it reports exactly what it created. The plugin's `config/defaults.yaml` stays read-only; the script never writes to it, and never takes it as anything but a read source.
+
+**Fallback (no shell tool, or the script is missing):** use the **Read** tool to load the plugin's `config/defaults.yaml` and the **Write** tool to create `@{config_path}` (skip it if the file exists, unless "reset to defaults" was chosen), then create the Step 8 directories. **Do NOT use `cp`, `cat >`, `sed -i`, `tee`, or any shell command that takes the defaults path as an argument**: Claude Code's permission engine flags both paths of `cp`, and an argument-order slip could overwrite the plugin's template.
 
 ### 3. Configure Concurrent Tasks
 
@@ -164,7 +167,7 @@ Delegate to the `/synthex:star` command at `plugins/synthex/commands/star.md`. R
 
 ### 8. Create Document Directories
 
-Create the following directories if they don't already exist:
+Already done — the Step 2 script call (`init-scaffold.sh`) created these directories if they didn't already exist:
 - `docs/reqs/` — Product requirements documents
 - `docs/plans/` — Implementation plans
 - `docs/specs/` — Technical specifications
@@ -173,7 +176,7 @@ Create the following directories if they don't already exist:
 - `docs/runbooks/` — Operational runbooks
 - `docs/retros/` — Retrospective documents
 
-Do NOT create any files inside these directories — just the directories.
+No action needed here; this step is a no-op kept for numbering continuity with Step 9's confirmation output. Do NOT create any files inside these directories — just the directories, and only via the Step 2 script (never ad hoc).
 
 ### 9. Confirm and Guide
 

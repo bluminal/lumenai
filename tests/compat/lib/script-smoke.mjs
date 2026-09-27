@@ -39,6 +39,7 @@
 
 import { spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -434,6 +435,62 @@ function stateFlagFallbackCase(ctx, includeNode) {
 }
 
 // ---------------------------------------------------------------------------
+// scripts/init-scaffold.sh — FR-HM26 config + doc-directory scaffold for
+// `/synthex:init` Steps 2/8. No jq/node dependency at all; the fallback
+// case additionally proves the idempotent no-op second run.
+// ---------------------------------------------------------------------------
+
+const INIT_SCAFFOLD_DOC_DIRS = [
+  'docs/reqs',
+  'docs/plans',
+  'docs/specs',
+  'docs/specs/decisions',
+  'docs/specs/rfcs',
+  'docs/runbooks',
+  'docs/retros',
+];
+
+function initScaffoldFreshCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const result = runScript(ctx.scriptAbsPath, [], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+  });
+  assert(result.code === 0, `init-scaffold exited ${result.code}: ${result.stderr}`);
+  assert(
+    result.stdout.includes('Created .synthex/config.yaml'),
+    `init-scaffold did not report the config file: ${JSON.stringify(result.stdout)}`,
+  );
+  const written = readFileSync(join(ctx.workDir, '.synthex', 'config.yaml'));
+  const defaults = readFileSync(join(ctx.pluginRoot, 'config', 'defaults.yaml'));
+  assert(
+    written.equals(defaults),
+    'init-scaffold: written config.yaml is not byte-identical to config/defaults.yaml',
+  );
+  for (const d of INIT_SCAFFOLD_DOC_DIRS) {
+    assert(existsSync(join(ctx.workDir, d)), `init-scaffold did not create ${d}`);
+  }
+}
+
+function initScaffoldIdempotentCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const opts = { pathDir, cwd: ctx.workDir, env: { CLAUDE_PROJECT_DIR: ctx.workDir } };
+  const first = runScript(ctx.scriptAbsPath, [], opts);
+  assert(first.code === 0, `init-scaffold first run exited ${first.code}: ${first.stderr}`);
+
+  const second = runScript(ctx.scriptAbsPath, [], opts);
+  assert(second.code === 0, `init-scaffold second run exited ${second.code}: ${second.stderr}`);
+  assert(
+    second.stdout.trim() === '',
+    `init-scaffold second run should be a silent no-op, got: ${JSON.stringify(second.stdout)}`,
+  );
+  for (const d of INIT_SCAFFOLD_DOC_DIRS) {
+    assert(existsSync(join(ctx.workDir, d)), `init-scaffold lost ${d} on the second run`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Registry — SMOKE_CASES keys are relPath as produced by
 // discoverRuntimeScripts() (relative to pluginRoot, e.g. "scripts/loop-step
 // .sh"). tests/schemas/script-smoke-registry.test.ts fails if a discovered
@@ -509,6 +566,16 @@ export const SMOKE_CASES = {
     {
       name: 'missing jq/node fallback: seeds a fresh file and sets the flag via the sed/awk path',
       run: (ctx) => stateFlagFallbackCase(ctx, false),
+    },
+  ],
+  'scripts/init-scaffold.sh': [
+    {
+      name: 'happy path: fresh project gets a byte-identical config.yaml and all doc dirs (node present)',
+      run: (ctx) => initScaffoldFreshCase(ctx, true),
+    },
+    {
+      name: 'missing jq/node fallback: same scaffold plus an idempotent no-op second run',
+      run: (ctx) => initScaffoldIdempotentCase(ctx, false),
     },
   ],
 };

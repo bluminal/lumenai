@@ -246,7 +246,7 @@ const SCRIPT_CALL_FILES = [
 
 describe('Task 18: other-hosts guidance follows every ${CLAUDE_PLUGIN_ROOT}/scripts call (FR-HM13)', () => {
   describe('discovery: known script-call sites', () => {
-    it('finds exactly the 6 known sites (harness-modernization Task 34 added list-loops.md and cancel-loop.md; Task 38/FR-HM26 added dismiss-upgrade-nudge.md and star.md as state-flag.sh one-Bash-call sites)', () => {
+    it('finds exactly the 7 known sites (harness-modernization Task 34 added list-loops.md and cancel-loop.md; Task 38/FR-HM26 added dismiss-upgrade-nudge.md and star.md as state-flag.sh one-Bash-call sites; Task 39/FR-HM26 added init.md)', () => {
       const sites = SCRIPT_CALL_FILES.filter(
         (f) => findScriptCallLines(readFileSync(f, 'utf8')).length > 0
       ).map((f) => f.replace(ROOT + '/', ''));
@@ -258,6 +258,7 @@ describe('Task 18: other-hosts guidance follows every ${CLAUDE_PLUGIN_ROOT}/scri
           'plugins/synthex/commands/cancel-loop.md',
           'plugins/synthex/commands/dismiss-upgrade-nudge.md',
           'plugins/synthex/commands/star.md',
+          'plugins/synthex/commands/init.md',
         ].sort()
       );
     });
