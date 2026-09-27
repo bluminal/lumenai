@@ -37,6 +37,8 @@ When performing tasks yourself, seek implementation advice from the relevant fra
 
 ### Framework Detection
 
+Read `.synthex/facts.md` first; if the fact is missing or stale per its freshness rule, detect as before.
+
 Detect the project's frontend framework using the following priority order:
 
 1. **Caller specifies directly** or via provided context
