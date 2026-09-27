@@ -19,7 +19,7 @@ The `llm` CLI is a universal escape-hatch adapter: it supports 50+ providers via
 - **capability_tier:** `text-only`
 - **default family:** `dynamic` — derived from model-ID prefix at invocation time (see table below)
 
-The `text-only` tier means `llm` receives ONLY what is in the context bundle — there is no autonomous file reading. The bundle assembled by `context-bundle-assembler` is the ONLY context `llm` sees. This is a key distinction from `agentic` adapters (codex, gemini) that can read files inside their sandboxes.
+The `text-only` tier means `llm` receives ONLY what is in the context bundle — there is no autonomous file reading. The bundle assembled by `scripts/assemble-bundle.sh` is the ONLY context `llm` sees. This is a key distinction from `agentic` adapters (codex, gemini) that can read files inside their sandboxes.
 
 The `default family` is DYNAMIC, not static. It is derived per invocation from the configured model ID using the prefix mapping table below:
 
@@ -150,7 +150,7 @@ Build the review prompt from the input envelope's `command` and `context_bundle`
 - For `command: "review-code"`: prompt asks for a craftsmanship/security/correctness review of the diff with structured JSON output matching the canonical finding schema
 - For `command: "write-implementation-plan"`: prompt asks for review of the draft plan
 
-Because this adapter is `text-only` tier, the `context_bundle` assembled by `context-bundle-assembler` is the ONLY context `llm` sees. The `llm` CLI cannot autonomously read files from the repository.
+Because this adapter is `text-only` tier, the `context_bundle` assembled by `scripts/assemble-bundle.sh` is the ONLY context `llm` sees. The `llm` CLI cannot autonomously read files from the repository.
 
 Embed the `canonical-finding-schema.md` JSON Schema in the prompt body and instruct the model to emit its findings as a JSON array conforming exactly to that schema. Write the constructed prompt to a temporary file at `<raw_output_path>.prompt.tmp` for the stdin invocation pattern.
 

@@ -17,10 +17,10 @@
  *     Haiku 4.5 silently ignores `effort:` on Claude Code 2.1.281 — D15
  *     fallback); wherever an `effort:` key is present, its value is one of
  *     `low|medium|high|xhigh|max`.
- *   - The remaining agents Phase 5 retires (context-bundle-assembler,
- *     plan-scribe, plan-linter, commit-message-author) get NO `tools:` key
- *     at all. audit-artifact-writer was retired outright in Task 42 and is
- *     no longer present on disk.
+ *   - The 3 still-present agents Phase 5 retires (plan-scribe,
+ *     plan-linter, commit-message-author) get NO `tools:` key at all.
+ *     context-bundle-assembler (Task 41) and audit-artifact-writer
+ *     (Task 42) were retired outright and are no longer on disk.
  *   - No `plugins/synthex/commands/**\/*.md` gains a frontmatter
  *     `description:` key (OQ-2: Codex migrates a described command whose
  *     rendered skill is <= 4,000 bytes into a duplicate skill — D15/Task 6).
@@ -55,14 +55,15 @@ const agentsRoot = join(pluginRoot, 'agents');
 const commandsRoot = join(pluginRoot, 'commands');
 const skillsRoot = join(pluginRoot, 'portable-skills');
 
-const TOTAL_AGENT_COUNT = 27;
+// Phase 5 retired two utility agents: context-bundle-assembler (Task 41,
+// replaced by scripts/assemble-bundle.sh) and audit-artifact-writer
+// (Task 42, replaced by scripts/write-audit.mjs), dropping 28 to 26.
+const TOTAL_AGENT_COUNT = 26;
 
 // The remaining agents Phase 5 retires (docs/plans/harness-modernization.md)
-// get no tools: allowlist at all per Task 28 step 2. audit-artifact-writer
-// was retired outright in Task 42 (scripts/write-audit.mjs replaces it) and
-// is no longer on disk, so it is dropped from this list rather than
-// entered here with no tools: key to check.
-const RETIRING_AGENTS = ['context-bundle-assembler', 'plan-scribe', 'plan-linter', 'commit-message-author'];
+// get no tools: allowlist at all per Task 28 step 2. context-bundle-assembler
+// (Task 41) and audit-artifact-writer (Task 42) are no longer on disk.
+const RETIRING_AGENTS = ['plan-scribe', 'plan-linter', 'commit-message-author'];
 
 // PRD FR-HM14 acceptance criterion: "an allowlist never omits Task/Agent for
 // tech-lead, lead-frontend-engineer, or multi-model-review-orchestrator."

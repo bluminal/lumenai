@@ -16,12 +16,15 @@ describe('Task 6: synthex plugin.json registration', () => {
   it('plugin.json exists', () => expect(existsSync(PLUGIN_JSON)).toBe(true));
   it('parses as valid JSON', () => expect(parsed).toBeTruthy());
   it('has agents array', () => expect(Array.isArray(parsed.agents)).toBe(true));
-  it('agents array contains context-bundle-assembler entry', () => {
-    expect(parsed.agents).toContain('./agents/context-bundle-assembler.md');
+  // Task 41 (FR-HM26): context-bundle-assembler is retired — replaced by
+  // scripts/assemble-bundle.sh. Neither the registration nor the agent
+  // file survives.
+  it('agents array does not contain context-bundle-assembler entry (retired, Task 41)', () => {
+    expect(parsed.agents).not.toContain('./agents/context-bundle-assembler.md');
   });
-  it('the registered agent file actually exists', () => {
+  it('the retired agent file no longer exists on disk', () => {
     const agentPath = join(AGENTS_DIR, 'context-bundle-assembler.md');
-    expect(existsSync(agentPath)).toBe(true);
+    expect(existsSync(agentPath)).toBe(false);
   });
 });
 
@@ -58,12 +61,12 @@ describe('Tasks 10/14/17: synthex plugin.json adapter registrations', () => {
     expect(existsSync(join(AGENTS_DIR, 'ollama-review-prompter.md'))).toBe(true);
   });
 
-  // Non-regression: Task 6 entry must still be present
-  it('agents array still contains context-bundle-assembler (no regression)', () => {
-    expect(parsed.agents).toContain('./agents/context-bundle-assembler.md');
+  // Task 41 (FR-HM26): the Task 6 entry was retired, not a regression.
+  it('agents array no longer contains context-bundle-assembler (retired, Task 41)', () => {
+    expect(parsed.agents).not.toContain('./agents/context-bundle-assembler.md');
   });
-  it('context-bundle-assembler.md still exists on disk', () => {
-    expect(existsSync(join(AGENTS_DIR, 'context-bundle-assembler.md'))).toBe(true);
+  it('context-bundle-assembler.md no longer exists on disk', () => {
+    expect(existsSync(join(AGENTS_DIR, 'context-bundle-assembler.md'))).toBe(false);
   });
 });
 
@@ -105,8 +108,9 @@ describe('Task 60: fast-follow adapter registrations', () => {
     expect(parsed.agents).toContain('./agents/multi-model-review-orchestrator.md');
   });
 
-  it('agents array still contains context-bundle-assembler (non-regression)', () => {
-    expect(parsed.agents).toContain('./agents/context-bundle-assembler.md');
+  // Task 41 (FR-HM26): context-bundle-assembler is retired, not a regression.
+  it('agents array no longer contains context-bundle-assembler (retired, Task 41)', () => {
+    expect(parsed.agents).not.toContain('./agents/context-bundle-assembler.md');
   });
 
   it('agents array still contains codex-review-prompter (non-regression)', () => {
@@ -138,8 +142,9 @@ describe('Task 20: orchestrator registration', () => {
   });
 
   // Non-regression: prior 4 entries must still be present
-  it('agents array still contains context-bundle-assembler (non-regression)', () => {
-    expect(parsed.agents).toContain('./agents/context-bundle-assembler.md');
+  // Task 41 (FR-HM26): context-bundle-assembler is retired, not a regression.
+  it('agents array no longer contains context-bundle-assembler (retired, Task 41)', () => {
+    expect(parsed.agents).not.toContain('./agents/context-bundle-assembler.md');
   });
   it('agents array still contains codex-review-prompter (non-regression)', () => {
     expect(parsed.agents).toContain('./agents/codex-review-prompter.md');

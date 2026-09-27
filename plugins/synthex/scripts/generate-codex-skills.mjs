@@ -162,8 +162,6 @@ export const AGENT_DESCRIPTIONS = {
     'Adapter that invokes the OpenAI Codex CLI as an external proposer in multi-model review.',
   'commit-message-author':
     'Writes a Conventional-Commits-style commit message from a staged or specified change set.',
-  'context-bundle-assembler':
-    'Assembles the shared context bundle (files, diffs, conventions) delivered to review proposers.',
   'design-system-agent':
     'Owns the design token registry and component library; audits frontend design-system compliance.',
   'findings-consolidator':

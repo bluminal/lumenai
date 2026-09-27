@@ -24,8 +24,11 @@ describe('Task 53: CLAUDE.md agent table + command table updates', () => {
       expect(content).toContain('multi-model-review-orchestrator');
     });
 
-    it('contains context-bundle-assembler', () => {
-      expect(content).toContain('context-bundle-assembler');
+    // Task 41 (FR-HM26): context-bundle-assembler is retired (replaced by
+    // scripts/assemble-bundle.sh) and no longer appears in the Utility
+    // Layer table.
+    it('does not contain context-bundle-assembler (retired, Task 41)', () => {
+      expect(content).not.toContain('context-bundle-assembler');
     });
 
     it('does not contain audit-artifact-writer (retired Task 42, FR-HM26/FR-HM44 — scripts/write-audit.mjs replaces it)', () => {

@@ -565,6 +565,106 @@ function writeAuditNodeGuardFallbackCase(ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// scripts/assemble-bundle.sh — FR-HM26/FR-HM44 context bundle assembler
+// (replaces the retired `context-bundle-assembler` agent). The happy-path
+// case proves an in-cap file is inlined into `files[]` while an over-cap
+// file is routed to `needs_summary[]` instead, and that `.synthex/tmp/`
+// gets a self-ignoring `.gitignore`; the fallback case proves the same
+// routing works with neither jq nor node on PATH (the script never shells
+// out to either, so both paths are identical by construction — this still
+// proves the sed/awk-only implementation is the ONLY implementation, not a
+// node-preferred one silently masking a broken fallback).
+// ---------------------------------------------------------------------------
+
+function assembleBundleHappyPathCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const artifactPath = join(ctx.workDir, 'artifact.ts');
+  const smallPath = join(ctx.workDir, 'small.ts');
+  const bigPath = join(ctx.workDir, 'big.ts');
+  writeFileSync(artifactPath, 'artifact content\n');
+  writeFileSync(smallPath, 'small\n');
+  writeFileSync(bigPath, 'x'.repeat(90_000));
+
+  const result = runScript(
+    ctx.scriptAbsPath,
+    [
+      'assemble',
+      '--artifact', artifactPath,
+      '--touched', artifactPath,
+      '--touched', smallPath,
+      '--touched', bigPath,
+    ],
+    { pathDir, cwd: ctx.workDir, env: { CLAUDE_PROJECT_DIR: ctx.workDir } },
+  );
+  assert(result.code === 0, `assemble-bundle exited ${result.code}: ${result.stderr}`);
+  const bundlePath = result.stdout.trim();
+  assert(existsSync(bundlePath), `assemble-bundle did not print an existing bundle path: ${JSON.stringify(result.stdout)}`);
+
+  const bundle = JSON.parse(readFileSync(bundlePath, 'utf8'));
+  assert(bundle.status === 'success', `expected status success, got ${JSON.stringify(bundle.status)}`);
+  assert(bundle.manifest.artifact.inlined === true, 'artifact must be inlined');
+  const filePaths = bundle.files.map((f) => f.path);
+  assert(filePaths.includes(smallPath), `small.ts should be inlined: ${JSON.stringify(filePaths)}`);
+  assert(!filePaths.includes(bigPath), `big.ts should NOT be inlined: ${JSON.stringify(filePaths)}`);
+  const needsSummaryPaths = bundle.needs_summary.map((f) => f.path);
+  assert(needsSummaryPaths.includes(bigPath), `big.ts should be in needs_summary: ${JSON.stringify(needsSummaryPaths)}`);
+
+  const gitignorePath = join(ctx.workDir, '.synthex', 'tmp', '.gitignore');
+  assert(existsSync(gitignorePath), '.synthex/tmp/.gitignore was not created');
+  assert(
+    readFileSync(gitignorePath, 'utf8').trim() === '*',
+    `.gitignore should contain "*", got ${JSON.stringify(readFileSync(gitignorePath, 'utf8'))}`,
+  );
+}
+
+function assembleBundleFallbackCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const synthexDir = join(ctx.workDir, '.synthex');
+  mkdirSync(synthexDir, { recursive: true });
+  writeFileSync(
+    join(synthexDir, 'config.yaml'),
+    'multi_model_review:\n  context:\n    max_bundle_bytes: 100000\n    max_file_bytes: 10\n',
+  );
+  const artifactPath = join(ctx.workDir, 'artifact.ts');
+  writeFileSync(artifactPath, 'over ten bytes of artifact content\n');
+
+  const result = runScript(
+    ctx.scriptAbsPath,
+    ['assemble', '--artifact', artifactPath],
+    { pathDir, cwd: ctx.workDir, env: { CLAUDE_PROJECT_DIR: ctx.workDir } },
+  );
+  assert(result.code === 0, `assemble-bundle exited ${result.code}: ${result.stderr}`);
+  const bundlePath = result.stdout.trim();
+  const bundle = JSON.parse(readFileSync(bundlePath, 'utf8'));
+  assert(bundle.status === 'success', `expected status success, got ${JSON.stringify(bundle.status)}`);
+  // The artifact is exempt from max_file_bytes routing (Behavioral Rule 1):
+  // even at 36 bytes > max_file_bytes (10), it stays inlined, never
+  // demoted to needs_summary, because it can never be summarized.
+  assert(bundle.manifest.artifact.inlined === true, 'artifact must stay inlined despite exceeding max_file_bytes');
+  assert(bundle.needs_summary.length === 0, `artifact must not appear in needs_summary: ${JSON.stringify(bundle.needs_summary)}`);
+
+  // A second run with the project's max_bundle_bytes lowered below the
+  // artifact's own size proves the narrow_scope_required error path.
+  writeFileSync(
+    join(synthexDir, 'config.yaml'),
+    'multi_model_review:\n  context:\n    max_bundle_bytes: 10\n    max_file_bytes: 100000\n',
+  );
+  const errorResult = runScript(
+    ctx.scriptAbsPath,
+    ['assemble', '--artifact', artifactPath],
+    { pathDir, cwd: ctx.workDir, env: { CLAUDE_PROJECT_DIR: ctx.workDir } },
+  );
+  assert(errorResult.code === 2, `expected exit 2 (narrow_scope_required), got ${errorResult.code}: ${errorResult.stderr}`);
+  const errorBundle = JSON.parse(readFileSync(errorResult.stdout.trim(), 'utf8'));
+  assert(errorBundle.status === 'error', `expected status error, got ${JSON.stringify(errorBundle.status)}`);
+  assert(
+    errorBundle.error_code === 'narrow_scope_required',
+    `expected narrow_scope_required, got ${JSON.stringify(errorBundle.error_code)}`,
+  );
+  assert(errorBundle.manifest === null, 'error bundle manifest must be null');
+}
+
+// ---------------------------------------------------------------------------
 // Registry — SMOKE_CASES keys are relPath as produced by
 // discoverRuntimeScripts() (relative to pluginRoot, e.g. "scripts/loop-step
 // .sh"). tests/schemas/script-smoke-registry.test.ts fails if a discovered
@@ -660,6 +760,16 @@ export const SMOKE_CASES = {
     {
       name: 'missing node fallback: the calling `command -v node` guard degrades to a clean non-zero exit with a message',
       run: (ctx) => writeAuditNodeGuardFallbackCase(ctx),
+    },
+  ],
+  'scripts/assemble-bundle.sh': [
+    {
+      name: 'happy path: in-cap file inlined, over-cap file routed to needs_summary, .gitignore self-ignores (node present)',
+      run: (ctx) => assembleBundleHappyPathCase(ctx, true),
+    },
+    {
+      name: 'missing jq/node fallback: artifact exemption plus narrow_scope_required error path',
+      run: (ctx) => assembleBundleFallbackCase(ctx, false),
     },
   ],
 };

@@ -104,16 +104,19 @@ The summary is emitted regardless of warnings; blocked errors prevent the summar
 
 ### Step 1 — Bundle Assembly (D5, FR-MR28)
 
-Invoke the `context-bundle-assembler` agent ONCE with:
-- `artifact_path` (from input)
-- `touched_files` (from input)
-- `conventions` (from `config.multi_model_review.context.convention_paths` if set, else default `[CLAUDE.md, .eslintrc, .prettierrc]`)
-- `spec_paths` (from `config.multi_model_review.context.spec_paths` if set)
-- `config.max_bundle_bytes` and `config.max_file_bytes` (from `config.multi_model_review.context`)
+Run `scripts/assemble-bundle.sh assemble` ONCE (Bash) — this replaces the retired `context-bundle-assembler` agent (FR-HM26): a mechanical script performs the byte-cap routing so it never re-emits the whole bundle through an LLM. Pass:
+- `--artifact <artifact_path>` (from input)
+- `--touched <path>` for each entry in `touched_files` (from input)
+- `--convention <path>` for each entry in `config.multi_model_review.context.convention_paths` if set, else the default `[CLAUDE.md, .eslintrc, .prettierrc]`
+- `--spec <path>` for each file under `config.multi_model_review.context.spec_paths` whose filename contains a substring of the artifact's filename or parent directory (OQ-8 filename-substring heuristic). The script performs no matching itself — resolving WHICH spec files qualify stays this step's job; the script only receives already-resolved concrete paths.
 
-If the assembler returns `status: "error"` with `error_code: "narrow_scope_required"`, surface that error to the caller and stop. The caller decides whether to retry with a narrower scope.
+The script reads `multi_model_review.context.max_file_bytes` / `.max_bundle_bytes` itself (via `scripts/lib/config-get.sh`), writes `.synthex/tmp/bundle-<hash>.json`, and prints that path on stdout.
 
-If success: hold the assembled bundle for delivery to all proposers. The bundle is **identical for every proposer** per D5.
+If the script exits `2` (`error_code: "narrow_scope_required"` — the artifact alone exceeds `max_bundle_bytes`), surface that error to the caller and stop. The caller decides whether to retry with a narrower scope.
+
+On success (exit `0`): read the written bundle JSON. The artifact and every conventions/touched/spec file at or under `max_file_bytes` are already inlined verbatim in `files[]` — no LLM call needed for those. For each entry in `needs_summary[]` (a file over `max_file_bytes` the script deliberately did NOT read or summarize), issue one Haiku `effort: low` summarization call per entry (focus: shape and structure relevant to the artifact under review), then merge the resulting summary text into `files[]` for that path and flip its manifest entry's `inlined` flag to `true`. This is the only LLM cost bundle assembly incurs — the "no 200 KB Haiku re-emission" saving FR-HM26 exists for. The artifact itself is NEVER in `needs_summary` (Behavioral Rule 1, carried over from the retired agent) and is always inlined verbatim by the script.
+
+Hold the assembled bundle for delivery to all proposers. The bundle is **identical for every proposer** per D5. After consolidation finishes, remove the bundle file by running `scripts/assemble-bundle.sh cleanup <bundle-path>` ("at run end" per the FR-HM26 acceptance criteria); the script also self-sweeps every bundle older than 24h on its next `assemble` run as a backstop for crashed/incomplete invocations.
 
 ### Step 2 — Aggregator Resolution (D17, FR-MR15)
 
