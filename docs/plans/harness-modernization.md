@@ -250,8 +250,8 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 ### Milestone 5.1: State, Scaffold, and Facts
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 38 | FR-HM26: `scripts/state-flag.sh <flag>` (`upgrade-nudge.sh` field preservation), used by `dismiss-upgrade-nudge` and `star` (`star` keeps its interactive question) | S | Task 37 | pending |
-| 39 | FR-HM26: `scripts/init-scaffold.sh` replaces `init` Step 2 | S | Task 37 | pending |
+| 38 | FR-HM26: `scripts/state-flag.sh <flag>` (`upgrade-nudge.sh` field preservation), used by `dismiss-upgrade-nudge` and `star` (`star` keeps its interactive question) | S | Task 37 | in progress |
+| 39 | FR-HM26: `scripts/init-scaffold.sh` replaces `init` Step 2 | S | Task 37 | in progress |
 | 40 | FR-HM29: `init` writes `.synthex/facts.md` (4 facts with anchors; D12). Consumers read it first and keep detection as the fallback. | M | Task 39 | pending |
 
 **Task 38 Acceptance Criteria:** `[T]` `state-flag-behavioral.test.ts`: fields preserved, atomic write. `[T]` `dismiss-upgrade-nudge.test.ts:95-133` repointed; statePath, `"dismissed": true`, `last_seen_version`, and "Do NOT use `AskUserQuestion`" still hold.
