@@ -98,35 +98,15 @@ You are never user-facing.
 
 ### 1. CLI Presence Check
 
-Run `which aws`. If the binary is not found, return:
+Run `which aws`. If the binary is not found, run `${CLAUDE_PLUGIN_ROOT}/scripts/validate-findings --error cli_missing --message "The 'aws' CLI is not installed. Install: \`pip install awscli\` (or \`brew install awscli\` on macOS). See adapter-recipes.md for details." --raw-output-path <echoed>` (FR-HM28) and return its printed envelope.
 
-```json
-{
-  "status": "failed",
-  "error_code": "cli_missing",
-  "error_message": "The 'aws' CLI is not installed. Install: `pip install awscli` (or `brew install awscli` on macOS). See adapter-recipes.md for details.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<echoed from input>"
-}
-```
+On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
 **Safe-name assertion (Task 88 / Phase 11.2):** The binary name `aws` is HARDCODED in the `which aws` invocation above (note: `aws`, not `bedrock` — the bedrock adapter wraps the AWS CLI's `bedrock-runtime` subcommand). The adapter does NOT derive the binary name from any config key (e.g., from `multi_model_review.external_permission_mode.<cli-name>`). This prevents an adversarial project config from injecting a path-traversal or shell-metacharacter binary name into the `which` lookup. The Layer 1 schema test `tests/schemas/external-permission-mode-key-validation.test.ts` enforces that only the known safe set `{codex, claude, gemini, bedrock, llm, ollama, default}` may appear as keys in `external_permission_mode`; unknown keys are silently ignored at config-read time. CWE-20 (Improper Input Validation) defense-in-depth.
 
 ### 2. Auth Check
 
-Run `aws sts get-caller-identity`. This command exits 0 if AWS credentials are configured (via env vars, `~/.aws/credentials`, or an IAM role). Any non-zero exit means credentials are not configured or are invalid:
-
-```json
-{
-  "status": "failed",
-  "error_code": "cli_auth_failed",
-  "error_message": "AWS credentials are not configured or are invalid. Ensure AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY env vars are set, or ~/.aws/credentials is populated, or an IAM role is attached. Run `aws sts get-caller-identity` to verify.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<echoed>"
-}
-```
+Run `aws sts get-caller-identity`. This command exits 0 if AWS credentials are configured (via env vars, `~/.aws/credentials`, or an IAM role). Any non-zero exit means credentials are not configured or are invalid — run `validate-findings --error cli_auth_failed --message "AWS credentials are not configured or are invalid. Ensure AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY env vars are set, or ~/.aws/credentials is populated, or an IAM role is attached. Run \`aws sts get-caller-identity\` to verify." --raw-output-path <echoed>` and return its envelope.
 
 Treat exit 0 from `aws sts get-caller-identity` as authenticated regardless of any advisory output in stderr. Do NOT attempt to parse the returned identity — only the exit code matters.
 
@@ -229,68 +209,25 @@ Parse the Bedrock response JSON from `/tmp/bedrock-output-<uuid>.json`. Extract 
 - **Amazon Nova:** `response.output.message.content[0].text`
 - **AI21:** `response.completions[0].data.text`
 
-Parse the extracted text as a JSON array of findings. Validate each entry against the canonical-finding schema.
+Pipe the extracted text (raw) into `validate-findings --reviewer-id bedrock-review-prompter --family "${RESOLVED_FAMILY:-<derived-from-model-id>}" --raw-output-path <echoed>` (FR-HM28; same plugin-root script invoked in CLI Presence Check above). Also extract usage per-family (NFR-MR4) — **Anthropic:** `response.usage.input_tokens`/`output_tokens`; **Meta:** `response.prompt_token_count`/`generation_token_count`; **Mistral:** `response.usage.prompt_tokens`/`completion_tokens`; **Cohere:** `response.meta.tokens.input_tokens`/`output_tokens`; **Amazon (Titan/Nova):** not always present, `null` if absent; **AI21:** `response.prompt.tokens`/`response.completions[0].finishReason.length` (approximate) — and pass it alongside the findings text so it lands in the printed envelope's `usage` field (set to `null` when the family does not report it).
 
 ### 6. Retry-Once on Parse Failure (FR-MR8 step 3)
 
-If parsing fails (JSON malformed, schema mismatch), retry the CLI call ONCE with an appended clarification in the prompt:
+If `validate-findings` returns `error_code: parse_failed`, retry the CLI call ONCE with an appended clarification in the prompt:
 
 ```
 Your previous response did not match the required JSON Schema. Re-emit your findings as a JSON array conforming exactly to the canonical-finding-schema embedded above. Do not include explanatory text outside the JSON.
 ```
 
-If the retry also fails to parse:
-
-```json
-{
-  "status": "failed",
-  "error_code": "parse_failed",
-  "error_message": "Bedrock output could not be parsed into canonical envelope after retry. Raw output preserved at raw_output_path.",
-  "findings": [],
-  "usage": "<token usage if available>",
-  "raw_output_path": "<echoed>"
-}
-```
+Pipe the retry's extracted text through `validate-findings` again. If it still reports `error_code: parse_failed` terminally, return that printed envelope as-is — "Bedrock output could not be parsed into canonical envelope after retry" is exactly what the script's own `error_message` says.
 
 ### 7. Normalize to Canonical Envelope
 
-For each parsed finding:
-- Set `source.reviewer_id = "bedrock-review-prompter"`
-- Set `source.family = config.family ?? <derived from Bedrock model ID prefix>` (use config override or derive from model ID)
-- Set `source.source_type = "external"`
-- Validate finding_id contains no line numbers (per canonical-finding-schema.md)
-
-Surface usage from Bedrock's response `usage` block (NFR-MR4). Per-family extraction:
-
-- **Anthropic:** `response.usage.input_tokens`, `response.usage.output_tokens`
-- **Meta:** `response.prompt_token_count`, `response.generation_token_count`
-- **Mistral:** `response.usage.prompt_tokens`, `response.usage.completion_tokens`
-- **Cohere:** `response.meta.tokens.input_tokens`, `response.meta.tokens.output_tokens`
-- **Amazon (Titan/Nova):** usage not always present; set to `null` if absent
-- **AI21:** `response.prompt.tokens`, `response.completions[0].finishReason.length` (approximate)
-
-```json
-{
-  "input_tokens": <from Bedrock usage block>,
-  "output_tokens": <from Bedrock usage block>,
-  "model": "<config.model echoed>"
-}
-```
-
-When Bedrock does not report usage for the given model family, set the entire `usage` object to `null`.
+`validate-findings` already did this: every finding carries `reviewer_id = "bedrock-review-prompter"`, `family` = the family you passed it (`config.family` override, else derived from the Bedrock model ID prefix), and `source_type: "external"`; `finding_id` values containing line numbers were rejected per canonical-finding-schema.md.
 
 ### 8. Return Canonical Envelope
 
-```json
-{
-  "status": "success",
-  "error_code": null,
-  "error_message": null,
-  "findings": [...],
-  "usage": {"input_tokens": ..., "output_tokens": ..., "model": "..."} | null,
-  "raw_output_path": "<echoed>"
-}
-```
+Return `validate-findings`'s printed stdout unchanged as your result — it already is the FR-MR9 `{ "status": "success", "error_code": null, "error_message": null, "findings": [...], "usage": {...} | null, "raw_output_path": "..." }` envelope.
 
 ---
 

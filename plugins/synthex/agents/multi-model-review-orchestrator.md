@@ -120,7 +120,7 @@ If success: hold the assembled bundle for delivery to all proposers. The bundle 
 Resolve `config.multi_model_review.aggregator.command`:
 
 - If a concrete adapter name (e.g., `codex-review-prompter`): use it.
-- If `auto`: walk the **D17 strict total-order tier table** against the configured proposer set:
+- If `auto`: walk the **D17 strict total-order tier table** against the configured proposer set. The table is single-sourced in `config/defaults.yaml` (`multi_model_review.aggregator.tier_table`, family-keyed rows, FR-HM28) — the strict order it encodes is:
   ```
   Claude Opus > GPT-5 > Claude Sonnet > Gemini 2.5 Pro > DeepSeek V3 > Qwen 32B
   ```
@@ -132,7 +132,9 @@ The resolved aggregator name and source ("configured" | "tier-table" | "host-fal
 
 **FR-MR12 verbatim:** "Native and external proposers run in a single parallel Task batch."
 
-If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Build, and Hermes), perform the role inline in this session, then continue.
+If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Build, and Hermes), perform the role inline in this session, then continue. Concretely: instead of spawning the `*-review-prompter` adapter agents, invoke each configured external CLI directly via Bash and pipe its raw stdout through `${CLAUDE_PLUGIN_ROOT}/scripts/validate-findings --reviewer-id <adapter> --family <family> --raw-output-path <path>` (FR-HM28) to get the same FR-MR9 envelope the adapter agent would have returned — the depth-1 rule is a call-shape substitution, not a feature loss.
+
+On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
 Issue ONE parallel Task batch containing:
 

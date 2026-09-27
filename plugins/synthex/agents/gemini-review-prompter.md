@@ -112,18 +112,9 @@ Before invoking the CLI, confirm `gemini` is available:
 which gemini
 ```
 
-If `which gemini` returns non-zero exit, return immediately:
+If `which gemini` returns non-zero exit, run `${CLAUDE_PLUGIN_ROOT}/scripts/validate-findings --error cli_missing --message "The 'gemini' CLI is not installed or not in PATH. Install with: npm install -g @google/gemini-cli" --raw-output-path <config.raw_output_path>` (FR-HM28) and return its printed envelope as your result.
 
-```json
-{
-  "status": "failed",
-  "error_code": "cli_missing",
-  "error_message": "The 'gemini' CLI is not installed or not in PATH. Install with: npm install -g @google/gemini-cli",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<config.raw_output_path>"
-}
-```
+On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
 **Safe-name assertion (Task 88 / Phase 11.2):** The binary name `gemini` is HARDCODED in the `which gemini` invocation above. The adapter does NOT derive the binary name from any config key (e.g., from `multi_model_review.external_permission_mode.<cli-name>`). This prevents an adversarial project config from injecting a path-traversal or shell-metacharacter binary name into the `which` lookup. The Layer 1 schema test `tests/schemas/external-permission-mode-key-validation.test.ts` enforces that only the known safe set `{codex, claude, gemini, bedrock, llm, ollama, default}` may appear as keys in `external_permission_mode`; unknown keys are silently ignored at config-read time. CWE-20 (Improper Input Validation) defense-in-depth.
 
@@ -143,18 +134,7 @@ If either `GEMINI_API_KEY` or `GOOGLE_API_KEY` is set to a non-empty value, trea
 gcloud auth list
 ```
 
-Treat exit 0 with **non-empty output** (at least one account listed) as authenticated. If `gcloud auth list` exits non-zero OR produces empty output, return:
-
-```json
-{
-  "status": "failed",
-  "error_code": "cli_auth_failed",
-  "error_message": "No Gemini credentials found. Set GEMINI_API_KEY (or GOOGLE_API_KEY) for API-key auth, or run: gcloud auth login for Code Assist / OAuth auth.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<config.raw_output_path>"
-}
-```
+Treat exit 0 with **non-empty output** (at least one account listed) as authenticated. If `gcloud auth list` exits non-zero OR produces empty output, run `validate-findings --error cli_auth_failed --message "No Gemini credentials found. Set GEMINI_API_KEY (or GOOGLE_API_KEY) for API-key auth, or run: gcloud auth login for Code Assist / OAuth auth." --raw-output-path <config.raw_output_path>` and return its envelope.
 
 **Advisory stderr:** `gcloud auth list` may emit advisory text to stderr (e.g., deprecation warnings, credential helper messages). Per FR-MR19 D22 conventions, treat stderr output as advisory only; do not fail on stderr unless exit code is non-zero.
 
@@ -234,18 +214,7 @@ Read-only enforcement instead comes from `--approval-mode default` itself: headl
 
 #### 4b. sandbox_violation detection
 
-If, during output parsing (Step 5), the adapter observes evidence in Gemini's output that a write-tool was invoked despite `--approval-mode default` — for example, an `events` or `tool_calls` field describing a `write_file`, `shell_exec`, `web_fetch` (with side-effecting method), or any other state-mutating tool — treat this as a `sandbox_violation` and abort with:
-
-```json
-{
-  "status": "failed",
-  "error_code": "sandbox_violation",
-  "error_message": "Gemini emitted evidence of a write-tool invocation despite --approval-mode default. The CLI may be ignoring the approval mode. Inspect raw output at raw_output_path. Consider upgrading the Gemini CLI or escalating the issue.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<config.raw_output_path>"
-}
-```
+If, during output parsing (Step 5), the adapter observes evidence in Gemini's output that a write-tool was invoked despite `--approval-mode default` — for example, an `events` or `tool_calls` field describing a `write_file`, `shell_exec`, `web_fetch` (with side-effecting method), or any other state-mutating tool — treat this as `error_code: sandbox_violation` and run `validate-findings --error sandbox_violation --message "Gemini emitted evidence of a write-tool invocation despite --approval-mode default. The CLI may be ignoring the approval mode. Inspect raw output at raw_output_path. Consider upgrading the Gemini CLI or escalating the issue." --raw-output-path <config.raw_output_path>`, returning its envelope.
 
 This detection is best-effort — it depends on Gemini emitting structured tool-call evidence in its output. Absence of such evidence does NOT prove no write-tool was attempted; it only proves no observable violation was recorded in the parsed response.
 
@@ -257,107 +226,37 @@ gemini -p "<prompt>" --approval-mode default --output-format json --model gemini
 
 Write the raw CLI stdout to `config.raw_output_path` immediately upon capture, before any parsing (FR-MR24 §6).
 
-If the CLI exits non-zero, return:
-
-```json
-{
-  "status": "failed",
-  "error_code": "cli_failed",
-  "error_message": "gemini CLI exited with status <N>. See raw output at raw_output_path.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<config.raw_output_path>"
-}
-```
+If the CLI exits non-zero, run `validate-findings --error cli_failed --message "gemini CLI exited with status <N>. See raw output at raw_output_path." --raw-output-path <config.raw_output_path>` and return its envelope.
 
 ### 5. Output Parsing
 
-**Outer CLI envelope unwrap (Task 25 — FR-HM44 fix):** With `--output-format json`, the Gemini CLI's own stdout is a JSON object shaped `{ "response": "<Gemini's reply, as a string>", "stats": { ... }, "error"?: "<string, present on CLI-level failure>" }`. This outer envelope is the CLI's wrapper, not the adapter's `{ findings, usage }` payload. Parse the raw stdout as JSON and:
+**Outer CLI envelope unwrap (Task 25 — FR-HM44 fix):** With `--output-format json`, the Gemini CLI's own stdout is a JSON object shaped `{ "response": "<Gemini's reply, as a string>", "stats": { ... }, "error"?: "<string, present on CLI-level failure>" }`. This outer envelope is the CLI's wrapper, not the adapter's `{ findings, usage }` payload. Parse the raw stdout as JSON:
 
-1. If the parsed object has a non-null `error` field, treat this as a CLI-level failure and return `error_code: "cli_failed"` with that `error` string folded into `error_message` (in addition to the non-zero-exit-code check in Step 4a).
-2. Otherwise, take the `.response` string — this is Gemini's actual reply to the constructed prompt. Apply the **Known Gotchas** parsing quirks (markdown-fence stripping, NDJSON decomposition, trailing-comma stripping) to `.response`, THEN call `JSON.parse` on the result to obtain the `{ findings, usage }` object.
+1. If the parsed object has a non-null `error` field, treat this as a CLI-level failure and return `error_code: "cli_failed"` (via `validate-findings --error cli_failed`) with that `error` string folded into the `--message` (in addition to the non-zero-exit-code check in Step 4a).
+2. Otherwise, take the `.response` string — this is Gemini's actual reply — and pipe it (raw) into `validate-findings --reviewer-id gemini-review-prompter --family "${RESOLVED_FAMILY:-google}" --raw-output-path <config.raw_output_path>` (FR-HM28; same plugin-root script invoked in CLI Presence Check above). The script applies the **Known Gotchas** parsing quirks below (markdown-fence stripping, NDJSON decomposition, trailing-comma stripping, null-findings normalization) so the adapter no longer hand-rolls `JSON.parse` gotcha handling.
 
 `stream-json` output-format is not used by this adapter (`--output-format json` is always passed — see Step 4a); if a future revision adopts `stream-json`, the equivalent per-event field is `result` rather than `response` (per `gemini --help`'s `-o/--output-format` choices: `text`, `json`, `stream-json`).
 
-Extract `findings` and `usage` from the parsed object.
-
-**Null normalization (FR-MR8):** If the parsed object contains `"findings": null`, treat it as `"findings": []`. Gemini may emit `null` instead of `[]` when no issues are found.
+**Null normalization (FR-MR8):** `validate-findings` treats `"findings": null` as `"findings": []` — Gemini may emit `null` instead of `[]` when no issues are found.
 
 ### 6. Retry-Once on Parse Failure
 
-If `JSON.parse` fails after applying all gotcha mitigations:
+If `validate-findings` returns `error_code: parse_failed`:
 
 1. Append a clarification to the original prompt: `"Your previous response could not be parsed as JSON. Respond with ONLY valid JSON, no markdown fences, no prose."`
 2. Re-invoke the CLI once.
-3. Attempt the outer-envelope unwrap (Step 5) and `JSON.parse` again on the new output.
-4. If parsing still fails, return `error_code: "parse_failed"` terminally.
-
-```json
-{
-  "status": "failed",
-  "error_code": "parse_failed",
-  "error_message": "Adapter could not parse gemini output as canonical envelope after retry. Raw output preserved at raw_output_path.",
-  "findings": [],
-  "usage": null,
-  "raw_output_path": "<config.raw_output_path>"
-}
-```
+3. Repeat the Step 5 outer-envelope unwrap and pipe the new `.response` through `validate-findings` again.
+4. If it still reports `error_code: "parse_failed"` terminally, return that printed envelope as-is — "Adapter could not parse gemini output as canonical envelope after retry" is exactly what the script's own `error_message` says.
 
 ### 7. Normalize to Canonical Envelope
 
-For each finding in the parsed array, inject source attribution:
-
-```json
-{
-  "source": {
-    "reviewer_id": "gemini-review-prompter",
-    "family": "google",
-    "source_type": "external"
-  }
-}
-```
-
-If `config.family` is non-null, use that value for `source.family` (per Q5 family override).
-
-Validate that each finding conforms to `canonical-finding-schema.md`. Drop any finding that fails validation and log the failure in `error_message` (do not abort the entire review for a single malformed finding).
+`validate-findings` already injected source attribution into every finding — `reviewer_id: "gemini-review-prompter"`, `family` = the family you passed it (`config.family` override per Q5, else `google`), `source_type: "external"` — and dropped any finding that failed `canonical-finding-schema.md` validation, folding the drop count into `error_message` rather than aborting the whole review over one malformed finding.
 
 ### 8. Return Canonical Envelope
 
-Return the fully assembled output envelope (FR-MR9):
+Return `validate-findings`'s printed stdout unchanged as your result — it already is the fully assembled FR-MR9 envelope: `{ "status": "success", "error_code": null, "error_message": null, "findings": [...], "usage": {...} | null, "raw_output_path": "docs/reviews/raw/gemini-<uuid>.json" }`.
 
-```json
-{
-  "status": "success",
-  "error_code": null,
-  "error_message": null,
-  "findings": [
-    {
-      "finding_id": "...",
-      "severity": "...",
-      "category": "...",
-      "title": "...",
-      "description": "...",
-      "file": "...",
-      "symbol": "...",
-      "line_range": null,
-      "source": {
-        "reviewer_id": "gemini-review-prompter",
-        "family": "google",
-        "source_type": "external"
-      },
-      "confidence": "..."
-    }
-  ],
-  "usage": {
-    "input_tokens": 0,
-    "output_tokens": 0,
-    "model": "gemini-2.5-pro"
-  },
-  "raw_output_path": "docs/reviews/raw/gemini-<uuid>.json"
-}
-```
-
-`usage` is surfaced VERBATIM from the CLI envelope per NFR-MR4. If Gemini does not report usage in its output, set `usage` to `null`.
+`usage` is surfaced VERBATIM from the CLI envelope per NFR-MR4. If Gemini does not report usage in its output, `validate-findings` sets `usage` to `null`.
 
 ---
 
