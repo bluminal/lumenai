@@ -1,5 +1,6 @@
 ---
 model: opus
+effort: high
 description: "Gathers requirements and turns them into a prioritized, value-driven implementation plan."
 tools: Read, Write, Edit, Grep, Glob, AskUserQuestion, Agent, Task
 ---

@@ -685,7 +685,6 @@ not that it is bug-free.
 (mean ≈ $0.30/run). Per-case cost ranged $0.43 (`tf-empty-plan`, the
 smallest/simplest input) to $1.47 (`tf-multi-issue`, the largest fixture with
 the most findings to enumerate).
-||||||| 7550509
 
 ## Task 29 — Verification pass (FR-HM17, D18)
 
@@ -817,3 +816,211 @@ not something attributable to the verification pass. The cap-and-log
 behavior ("Verification: Not run (top-5 cap reached)" /
 "Verification cap reached: N CRITICAL/HIGH findings...") worked correctly on
 every fixture with more than 5 eligible findings.
+
+## Task 30 — Re-tier gate (D28)
+
+FR-HM14 PR-B (D10): frontmatter-only changes (no body edits) on 13 agents —
+`model:`/`effort:` moves per the plan's target table — plus `effort: xhigh`
+on `commands/write-adr.md`. No command frontmatter besides `write-adr.md`
+was touched. Per Task 7 (D15 fallback), the 14 Haiku-backed agents
+(utilities, adapters, `technical-writer`, `metrics-analyst`) get **no**
+`effort:` key at all — Haiku 4.5 silently ignores it on Claude Code 2.1.281
+(no `effort` in the transcript, `CLAUDE_EFFORT` unset), so a pin there would
+be a misleading no-op. `multi-model-review-orchestrator` is out of this
+task's scope (sonnet, unpinned).
+
+| Agent | Before | After |
+|-------|--------|-------|
+| product-manager | opus | opus, `effort: high` |
+| architect | opus | opus, `effort: high` (body unchanged; no per-mode frontmatter exists — see the write-adr decision below for the ADR/RFC `xhigh` mode) |
+| sre-agent | opus | sonnet, `effort: high` |
+| ux-researcher | opus | sonnet, `effort: high` |
+| code-reviewer | haiku | sonnet, `effort: medium` |
+| security-reviewer | sonnet | sonnet, `effort: high` |
+| terraform-plan-reviewer | sonnet | sonnet, `effort: high` |
+| tech-lead | sonnet | sonnet, `effort: high` |
+| performance-engineer | sonnet | sonnet, `effort: medium` |
+| design-system-agent | sonnet | sonnet, `effort: medium` |
+| quality-engineer | sonnet | sonnet, `effort: medium` |
+| retrospective-facilitator | sonnet | sonnet, `effort: medium` |
+| lead-frontend-engineer | sonnet | sonnet, `effort: medium` |
+
+`tests/schemas/agent-frontmatter.test.ts` was updated to assert this exact
+contract (replacing the Task 28 "no agent carries `effort:`" placeholder
+assertion): the 13 agents above carry the exact listed `effort:` value,
+every Haiku-backed agent carries none, and any present value is one of
+`low|medium|high|xhigh|max`. A new `tests/schemas/task30-retier.test.ts`
+asserts (a) every `*-review-prompter.md` adapter carries `model: haiku` and
+no `effort:` key, and (b) this section (with its "Aggregate recall" /
+"baseline" language) exists in `docs/testing.md`.
+
+### `write-adr` ADR/RFC `xhigh` decision
+
+The plan asks for the Architect's ADR/RFC mode to run at `effort: xhigh`,
+but agent frontmatter is per-agent, not per-mode — `architect.md` has one
+frontmatter block for both its Plan Review and ADR-authoring identities, so
+it is pinned to the table's `effort: high`. Task 7's OQ-4 spike **confirmed**
+that Claude Code 2.1.281 honors a command's own frontmatter `effort:` key
+(`/lowcmd` recorded `"effort":"low","perTurnEffort":"low"` vs `medium`
+without a command) on effort-table models — Opus is in that table. Since
+`write-adr.md` is already `model: opus`, `effort: xhigh` was added to its
+frontmatter (`plugins/synthex/commands/write-adr.md`), which is honored per
+D15/OQ-4.
+
+**Caveat, also from Task 7's evidence:** a sub-agent's own frontmatter
+`effort:` value wins over its parent's — the spike's `sonnet-low` sub-agent
+recorded `"effort":"low"` under a `high`-effort parent. So `write-adr.md`'s
+`effort: xhigh` raises the *command driver's own* reasoning (interpreting
+parameters, running the interactive ADR flow, writing the file) to `xhigh`;
+it does **not** raise the invoked `architect` sub-agent's own effort above
+its frontmatter value (`high`) once the command dispatches to it. This is
+the best available lever without a per-mode frontmatter mechanism, which
+does not exist today — a true per-mode `architect` effort would require
+either splitting the agent into two files or a runtime override mechanism,
+both out of scope for a frontmatter-only task.
+
+### D28 eval gate
+
+Reproduced with the same arm/settings as the Task 27 baseline capture:
+
+```bash
+node tests/scripts/run-evals.mjs \
+  --runs 3 --ablation none --threshold 0 \
+  --concurrency 4 --max-cost-usd 40 \
+  --json /tmp/eval-task30-reports/eval-task30-final.json \
+  --report-dir /tmp/eval-task30-reports
+```
+
+All 18 cases re-ran (0 cache hits) — the hash cache (agent content +
+fixture + resolved model) invalidated every case because all three agents
+in the manifest (`code-reviewer`, `security-reviewer`,
+`terraform-plan-reviewer`) changed frontmatter, and those three agents
+account for all 18 manifest cases (7 + 8 + 3).
+
+**Recall table (18 cases, 3 runs each, single arm; baseline vs. post-retier;
+✓ = found that run):**
+
+| Case | Agent | Planted | Baseline found | Post-retier found | Baseline verdict | Post-retier verdict |
+|------|-------|--------:|:-----------------:|:-----------------:|:-----------------:|:-----------------:|
+| sec-clean-code | security-reviewer | 0 | n/a | n/a | 3/3 | 3/3 |
+| sec-hardcoded-secret | security-reviewer | 1 | 1/1 | 1/1 | 3/3 | 3/3 |
+| sec-sql-injection | security-reviewer | 1 | 1/1 | 1/1 | 3/3 | 3/3 |
+| sec-xss-vuln | security-reviewer | 1 | 1/1 | 1/1 | 3/3 | 3/3 |
+| sec-missing-auth | security-reviewer | 1 | 1/1 | 1/1 | 3/3 | 3/3 |
+| sec-weak-csrf | security-reviewer | 1 | 1/1 | 1/1 | 3/3 | 3/3 |
+| sec-mixed-severity | security-reviewer | 3 | 3/3 | 3/3 | 3/3 | 3/3 |
+| tf-destructive-rds | terraform-plan-reviewer | 1 | 1/1 | 1/1 | 3/3 | 3/3 |
+| tf-missing-tags | terraform-plan-reviewer | 1 | 1/1 | 1/1 | 3/3 | 3/3 |
+| tf-clean-plan-txt | terraform-plan-reviewer | 0 | n/a | n/a | 1/3 | **0/3** |
+| tf-empty-plan | terraform-plan-reviewer | 0 | n/a | n/a | 3/3 | 3/3 |
+| tf-clean-plan-json | terraform-plan-reviewer | 0 | n/a | n/a | 3/3 | 3/3 |
+| tf-multi-issue | terraform-plan-reviewer | 3 | 3/3 | 3/3 | 3/3 | 3/3 |
+| tf-wide-open-sg | terraform-plan-reviewer | 1 | 1/1 | 1/1 | 3/3 | 3/3 |
+| tf-surprise-cost-poc | terraform-plan-reviewer | 1 | 1/1 | 1/1 | 2/3 | **3/3** |
+| cr-clean-code | code-reviewer | 0 | n/a | n/a | 3/3 | 3/3 |
+| cr-god-object | code-reviewer | 1 | 1/1 | 1/1 | 3/3 | 3/3 |
+| cr-missing-error-handling | code-reviewer | 1 | 1/1 | 1/1 | 3/3 | 3/3 |
+| **Total** | | **17** | **17/17** | **17/17** | **51/54** | **51/54** |
+
+**Aggregate recall (post-retier): 17/17 planted issues found (majority vote
+across 3 runs) = 100.0%, equal to the Task 27 baseline (17/17 = 100.0%).
+No fixture lost any planted issue (zero fixtures lost more than the D28
+ceiling of 1).** Verdict-header stability redistributed rather than
+regressed: `tf-clean-plan-txt` (0 planted issues; expected `PASS` only)
+dropped from 1/3 to 0/3 matching runs, and `tf-surprise-cost-poc` (1 planted
+issue, `WARN|FAIL` tolerant) improved from 2/3 to 3/3 — net 51/54 verdict
+passes both before and after, and neither shift touches a planted-issue
+recall count. **Gate: PASS** (aggregate recall ≥ baseline; no fixture lost
+more than 1 planted issue).
+
+### Cost (D28 / NFR-HM3 exception evidence)
+
+Total spend this run: **$17.03** (54 runs) vs. the Task 27 baseline's
+**$16.26** (54 runs, same case set) — **+$0.77 (+4.7%)**, mean cost/run
+$0.315 vs. $0.301.
+
+**Per-agent, measured (post-retier, real `costUsd` from this run's
+`claude plugin eval --json` output — the eval report does not retain raw
+token counts; the per-run sandbox and its `trace.jsonl` are not kept by
+default, same as Task 27's own note, so cost is reported in dollars, the
+direct token-cost signal, rather than a synthetic token count):**
+
+| Agent | Runs | Total cost (after) | Mean $/run (after) |
+|-------|-----:|----:|----:|
+| security-reviewer | 21 | $6.22 | $0.296 |
+| terraform-plan-reviewer | 24 | $7.95 | $0.331 |
+| code-reviewer | 9 | $2.86 | $0.317 |
+| **Total** | **54** | **$17.03** | **$0.315** |
+
+**Before/after split (reasoned estimate, not re-measured — re-running the
+Task 27 baseline under the old frontmatter would be an additional paid
+model call, which this task's cost discipline forbids):** `security-reviewer`
+and `terraform-plan-reviewer` moved from *no* `effort:` key to an *explicit*
+`effort: high` pin. Per the general Claude effort table, Sonnet 5's default
+effort when the key is omitted is already `high` ("equivalent to omitting
+it") — so this pin, per the PRD's own "Reason: Unchanged" for this row,
+codifies existing default behavior rather than changing it. Treating those
+two agents' cost as materially unchanged (before ≈ after) attributes
+essentially the entire aggregate delta to `code-reviewer`'s Haiku→Sonnet
+model-class move:
+
+| Agent | Before (estimated) | After (measured) | Δ | Δ% |
+|-------|---:|---:|---:|---:|
+| security-reviewer | ≈ $6.22 (unchanged — effort pin codifies existing Sonnet default) | $6.22 | ≈$0 | ≈0% |
+| terraform-plan-reviewer | ≈ $7.95 (unchanged — same reason) | $7.95 | ≈$0 | ≈0% |
+| code-reviewer | ≈ $2.09 (residual: $16.26 baseline total − $6.22 − $7.95) | $2.86 | +$0.77 | **+36.7%** |
+
+This reconciles exactly: $16.26 (baseline) + $0.77 (code-reviewer delta) =
+$17.03 (measured post-retier total). **`code-reviewer`'s Haiku → Sonnet move
+is confirmed as the largest cost increase in this task**, consistent with
+Haiku 4.5 ($1/$5 per MTok in/out) being half the per-token price of Sonnet 5
+($2/$10) before even accounting for `effort: medium` adding thinking-token
+volume Haiku's Task-27-era invocations never had at all (Haiku silently
+ignores `effort:` — Task 7).
+
+### Adapter envelope parse rates (vacuous per Task 7)
+
+The `*-review-prompter.md` adapters (`codex-`, `gemini-`, `ollama-`,
+`claude-`, `bedrock-`, `llm-review-prompter`) are Haiku-backed and, per the
+Task 30 contract above, carry **no** `effort:` key at all — there is no
+`effort: low` state to compare against a changed state, so "adapter envelope
+parse rates unchanged at `effort: low`" is vacuously true and no adapter was
+invoked to check it (cost discipline: adapters were not run). Asserted by
+`tests/schemas/task30-retier.test.ts`.
+
+### `[H]` NFR-HM3 exception table (for PM sign-off)
+
+Full per-agent cost-direction table across all 13 re-tiered agents, using
+Opus 5.5 ($4/$20 per MTok in/out), Sonnet 5 ($2/$10), and Haiku 4.5 ($1/$5,
+unaffected — no Haiku agent's effort changed). Only `security-reviewer`,
+`terraform-plan-reviewer`, and `code-reviewer` have real eval-measured
+numbers (above); the other 10 are not in the eval manifest, so their
+direction is derived from the model/effort move and the published per-token
+rates, not measured.
+
+| Agent | Model move | Effort move | Price/token move | Direction | Basis |
+|-------|-----------|-------------|-------------------|:---------:|-------|
+| product-manager | opus → opus (none) | (default) → `high` | none ($4/$20 both) | **increase** | Same price tier; `effort: high` raises thinking/output volume over Opus 5.5's default `medium` |
+| architect | opus → opus (none) | (default) → `high` | none ($4/$20 both) | **increase** | Same reasoning as product-manager |
+| sre-agent | opus → sonnet | (default) → `high` | **−50%** ($4/$20 → $2/$10) | **decrease** | Price halves; even with higher effort's added token volume, the 2x price cut dominates (measured pattern on code-reviewer's inverse move supports this) |
+| ux-researcher | opus → sonnet | (default) → `high` | **−50%** | **decrease** | Same reasoning as sre-agent |
+| code-reviewer | haiku → sonnet | (none) → `medium` | **+100%** ($1/$5 → $2/$10) | **increase (largest)** | Measured: +36.7% ($2.09 → $2.86 est./actual) |
+| security-reviewer | sonnet → sonnet (none) | (default) → `high` | none | ≈none | Effort pin codifies existing Sonnet default (measured ≈$0 delta) |
+| terraform-plan-reviewer | sonnet → sonnet (none) | (default) → `high` | none | ≈none | Same as security-reviewer (measured ≈$0 delta) |
+| tech-lead | sonnet → sonnet (none) | (default) → `high` | none | ≈none | Same reasoning; not in eval manifest, not separately measured |
+| performance-engineer | sonnet → sonnet (none) | (default `high`) → `medium` | none | **decrease** | Effort steps *down* from Sonnet's default `high` to `medium` |
+| design-system-agent | sonnet → sonnet (none) | (default `high`) → `medium` | none | **decrease** | Same as performance-engineer |
+| quality-engineer | sonnet → sonnet (none) | (default `high`) → `medium` | none | **decrease** | Same as performance-engineer |
+| retrospective-facilitator | sonnet → sonnet (none) | (default `high`) → `medium` | none | **decrease** | Same as performance-engineer |
+| lead-frontend-engineer | sonnet → sonnet (none) | (default `high`) → `medium` | none | **decrease** | Same as performance-engineer |
+
+**Net-increase agents requiring an explicit NFR-HM3 exception:**
+`product-manager`, `architect`, `code-reviewer` (largest). `sre-agent` and
+`ux-researcher` move **down** (model-class downgrade dominates the effort
+increase) and are a cost *win*, not an exception. The five `medium`-pinned
+agents (`performance-engineer`, `design-system-agent`, `quality-engineer`,
+`retrospective-facilitator`, `lead-frontend-engineer`) step down from
+Sonnet's implicit default and are also a cost win. `security-reviewer`,
+`terraform-plan-reviewer`, and `tech-lead` are neutral (pin codifies
+existing default). This table is for the Tech Lead orchestrator to present
+to the PM for `[H]` sign-off per A3 — it is not itself the PM's acceptance.

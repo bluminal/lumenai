@@ -1,5 +1,6 @@
 ---
 model: opus
+effort: xhigh
 ---
 
 # Write ADR

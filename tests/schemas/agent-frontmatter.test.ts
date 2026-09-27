@@ -10,8 +10,13 @@
  *   - Every surviving agent's `tools:` allowlist is a superset of the tool
  *     names its own body actually names (see "Prose tool-name scan" below
  *     for why this is a backtick-quoted-token scan, not a raw word scan).
- *   - No agent frontmatter carries an `effort:` key (Task 30 owns tier/effort
- *     changes; Task 28 must not add one).
+ *   - Task 30 (FR-HM14 PR-B, D10) `effort:` contract: the 13 re-tiered agents
+ *     carry the exact `effort:` value the plan's target table specifies;
+ *     every Haiku-backed agent (utilities, adapters, `technical-writer`,
+ *     `metrics-analyst`) carries NO `effort:` key at all (Task 7 spike:
+ *     Haiku 4.5 silently ignores `effort:` on Claude Code 2.1.281 — D15
+ *     fallback); wherever an `effort:` key is present, its value is one of
+ *     `low|medium|high|xhigh|max`.
  *   - The 5 agents Phase 5 retires (context-bundle-assembler,
  *     audit-artifact-writer, plan-scribe, plan-linter, commit-message-author)
  *     get NO `tools:` key at all.
@@ -64,6 +69,38 @@ const RETIRING_AGENTS = [
 // PRD FR-HM14 acceptance criterion: "an allowlist never omits Task/Agent for
 // tech-lead, lead-frontend-engineer, or multi-model-review-orchestrator."
 const DELEGATING_AGENTS = ['tech-lead', 'lead-frontend-engineer', 'multi-model-review-orchestrator'];
+
+// Task 30 (FR-HM14 PR-B, D10) re-tier target table. Every other agent not
+// listed here either keeps no effort: key (the 14 Haiku-backed agents, per
+// Task 7's D15 fallback) or is out of this task's scope
+// (multi-model-review-orchestrator: sonnet, no effort pin).
+const EXPECTED_EFFORT: Record<string, string> = {
+  'product-manager': 'high',
+  architect: 'high',
+  'sre-agent': 'high',
+  'ux-researcher': 'high',
+  'code-reviewer': 'medium',
+  'security-reviewer': 'high',
+  'terraform-plan-reviewer': 'high',
+  'tech-lead': 'high',
+  'performance-engineer': 'medium',
+  'design-system-agent': 'medium',
+  'quality-engineer': 'medium',
+  'retrospective-facilitator': 'medium',
+  'lead-frontend-engineer': 'medium',
+};
+
+const VALID_EFFORT_VALUES = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+function modelValue(block: string): string | undefined {
+  const match = block.match(/^model:\s*(.*)$/m);
+  return match ? match[1].trim() : undefined;
+}
+
+function effortValue(block: string): string | undefined {
+  const match = block.match(/^effort:\s*(.*)$/m);
+  return match ? match[1].trim() : undefined;
+}
 
 // Every tool name a Synthex agent frontmatter could plausibly reference,
 // used only to filter the backtick-quoted-token prose scan (see file
@@ -161,8 +198,22 @@ describe('Task 28 (FR-HM14 PR-A, D10): agent description + tools allowlist front
       expect(block).toMatch(/^description: ".*"$/m);
     });
 
-    it('has no effort: key (Task 30 owns effort/tier changes)', () => {
-      expect(block).not.toMatch(/^effort:/m);
+    it('Task 30 effort: contract (present + exact value on listed agents, absent on Haiku)', () => {
+      const model = modelValue(block);
+      const effort = effortValue(block);
+
+      if (model === 'haiku') {
+        expect(effort, `${slug}.md is Haiku-backed but carries an effort: key (Task 7: Haiku 4.5 ignores it)`).toBeUndefined();
+        return;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(EXPECTED_EFFORT, slug)) {
+        expect(effort).toBe(EXPECTED_EFFORT[slug]);
+      }
+
+      if (effort !== undefined) {
+        expect(VALID_EFFORT_VALUES).toContain(effort);
+      }
     });
 
     if (RETIRING_AGENTS.includes(slug)) {
@@ -203,6 +254,24 @@ describe('Task 28 (FR-HM14 PR-A, D10): agent description + tools allowlist front
       const description = extractFrontmatterDescription(content);
       expect(wrapperDescription(readSkill(slug))).toBe(description);
     });
+  });
+
+  it('Task 30: EXPECTED_EFFORT keys are all real agent slugs (typo guard)', () => {
+    for (const slug of Object.keys(EXPECTED_EFFORT)) {
+      expect(agentSlugs, `EXPECTED_EFFORT names "${slug}" but no such agent file exists`).toContain(slug);
+    }
+  });
+
+  it('Task 30: exactly 13 agents carry an effort: key, and every one is Haiku-free', () => {
+    const withEffort = agentSlugs.filter((slug) => {
+      const block = frontmatterBlock(readAgent(slug));
+      return effortValue(block) !== undefined;
+    });
+    expect(withEffort.sort()).toEqual(Object.keys(EXPECTED_EFFORT).sort());
+    for (const slug of withEffort) {
+      const block = frontmatterBlock(readAgent(slug));
+      expect(modelValue(block)).not.toBe('haiku');
+    }
   });
 
   it('never gives a canonical command definition a frontmatter description: key (OQ-2 guard)', () => {

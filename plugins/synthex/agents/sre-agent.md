@@ -1,5 +1,6 @@
 ---
-model: opus
+model: sonnet
+effort: high
 description: "Defines SLOs, designs observability, writes runbooks, and assesses deployment risk."
 tools: Read, Write, Grep, Glob
 ---
