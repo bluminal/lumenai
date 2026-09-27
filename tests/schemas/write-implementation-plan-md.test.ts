@@ -186,7 +186,9 @@ describe('write-implementation-plan.md — Task 44: plan-scribe retired (FR-HM26
   });
 
   it('[T] agent inventory drops by one (26 -> 25)', () => {
-    expect(AGENT_COUNT).toBe(25);
+    // Upper bound, not equality: later Phase 5 retirements (Tasks 45, 46)
+    // lower it further; inventory.mjs pins the exact current count.
+    expect(AGENT_COUNT).toBeLessThanOrEqual(25);
   });
 
 });
