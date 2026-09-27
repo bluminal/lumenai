@@ -112,7 +112,7 @@ The PM asks questions in small batches (3-5 at a time) using `AskUserQuestion`, 
 
 ### 5. Draft the Implementation Plan
 
-The Product Manager produces an initial implementation plan draft following the standard template (see Output section below). The draft must include:
+The Product Manager produces an initial implementation plan draft following the standard template (see Output below) and writes it directly to `@{plan_path}` with a `<!-- DRAFT: pending peer review (write-implementation-plan Step 6) -->` marker after the title. The draft must include:
 - Phased milestones delivering incremental value
 - Specific, executable tasks with complexity grades (S/M/L)
 - Typed acceptance criteria for every task — each criterion tagged `[T]`, `[H]`, or `[O]` per the Acceptance Criteria Types section above
@@ -231,7 +231,7 @@ The Product Manager receives the consolidated findings (from the orchestrator en
 4. **Asks the user** for guidance when unsure how to handle feedback — especially architectural trade-offs, scope questions, or conflicting reviewer opinions
 5. Documents how each CRITICAL/HIGH finding was addressed (accepted, modified, or rejected with reasoning)
 
-**PM's decision-and-revision flow is UNCHANGED by multi-model.** The `plan-scribe` still applies edits to the plan document. Multi-model only changes who contributes findings and how they are consolidated before the PM receives them — downstream PM behavior is identical whether the findings arrived from the orchestrator or from the native-only findings-consolidator.
+**PM's decision-and-revision flow is UNCHANGED by multi-model.** The PM applies accepted findings directly to `@{plan_path}` with its own edit tool — `plan-scribe` is retired (FR-HM26). An edit that adds or removes a task or milestone renumbers the affected items and updates every cross-reference in the same edit. Multi-model only changes who contributes findings, not PM's downstream behavior.
 
 **Step 6e: Re-review if Needed**
 
@@ -251,9 +251,9 @@ After the peer review loop completes, the Product Manager does a final compactne
 
 **Rule of thumb:** If a section can be 30% shorter without losing meaning, make it shorter.
 
-### 8. Write the Plan
+### 8. Finalize the Plan
 
-Write the finalized implementation plan to `@{plan_path}`.
+Remove the `<!-- DRAFT -->` marker from `@{plan_path}` to finalize.
 
 ### 9. Update Project Files
 

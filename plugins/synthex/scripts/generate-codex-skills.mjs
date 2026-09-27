@@ -182,8 +182,6 @@ export const AGENT_DESCRIPTIONS = {
     'Analyzes full-stack performance: Core Web Vitals, queries, and bundles, with quantified fixes.',
   'plan-linter':
     'Runs fast structural checks on a draft implementation plan before expensive reviewers see it.',
-  'plan-scribe':
-    "Applies the Product Manager's decided edits to an implementation plan document mechanically.",
   'product-manager':
     'Gathers requirements and turns them into a prioritized, value-driven implementation plan.',
   'quality-engineer':
