@@ -14,10 +14,12 @@ import { readExpectedEntrypoints } from './contract.mjs';
  * use `diffInventoryAgainstManifest()` in a test to catch that drift.
  */
 export const COMMAND_COUNT = 18;
-// Phase 5 retired two utility agents: context-bundle-assembler (Task 41,
-// replaced by scripts/assemble-bundle.sh) and audit-artifact-writer
-// (Task 42, replaced by scripts/write-audit.mjs), dropping 28 to 26.
-export const AGENT_COUNT = 26;
+// Phase 5 retires utility agents: context-bundle-assembler (Task 41,
+// replaced by scripts/assemble-bundle.sh), audit-artifact-writer (Task 42,
+// replaced by scripts/write-audit.mjs), and commit-message-author (Task 46,
+// FR-HM27, replaced by a one-sentence rule in tech-lead/lead-frontend
+// -engineer/next-priority plus scripts/commit-lint.sh), dropping 28 to 25.
+export const AGENT_COUNT = 25;
 
 /** Wrappers = every generated portable skill, one per command + agent. */
 export const WRAPPER_COUNT = COMMAND_COUNT + AGENT_COUNT;

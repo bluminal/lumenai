@@ -70,6 +70,21 @@ describe('Tasks 10/14/17: synthex plugin.json adapter registrations', () => {
   });
 });
 
+describe('Task 46 (FR-HM27): commit-message-author retired', () => {
+  let parsed: any;
+  beforeAll(() => {
+    const raw = readFileSync(PLUGIN_JSON, 'utf8');
+    parsed = JSON.parse(raw);
+  });
+
+  it('agents array does not contain commit-message-author entry', () => {
+    expect(parsed.agents).not.toContain('./agents/commit-message-author.md');
+  });
+  it('the retired agent file no longer exists on disk', () => {
+    expect(existsSync(join(AGENTS_DIR, 'commit-message-author.md'))).toBe(false);
+  });
+});
+
 describe('Task 60: fast-follow adapter registrations', () => {
   let parsed: any;
   beforeAll(() => {

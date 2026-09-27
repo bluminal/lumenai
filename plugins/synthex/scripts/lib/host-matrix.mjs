@@ -97,9 +97,17 @@ function skipListEntries(value) {
  *   under `$SYNTHEX_HOST`, and Grok's background-poll guidance (null where
  *   the in-turn wait is the only option). Rendered by the generator into
  *   `docs/hosts.md` and runtime `config/hosts.env` (D9).
- * - `hookAllowlist`: placeholder for this host's hook allowlist (Task 46,
- *   D25 -- e.g. Codex's generated `hooks/codex-hooks.json`, commit-lint
- *   only, Codex matcher). Populated by Task 46; left `null` until then.
+ * - `hookAllowlist`: this host's hook allowlist (Task 46, D25/FR-HM27).
+ *   `null` means the host gets no generated hook manifest at all (Claude
+ *   Code's own `hooks/hooks.json` is hand-authored, not generated from
+ *   here; the other four hosts have no hook support Synthex targets yet).
+ *   Codex is the only non-null entry: `{ matcher, events }` where
+ *   `matcher` is this host's Bash-equivalent tool name (i.e. `toolMap.Bash`
+ *   above, repeated here as a plain string so `generate-codex-skills.mjs`
+ *   does not need to re-derive it) and `events` lists the PreToolUse-style
+ *   event names this host actually gets (commit-lint only -- never `Stop`,
+ *   `SessionStart`, `TaskCompleted`, or `TeammateIdle`, so Codex never
+ *   inherits the native-looping Stop gate).
  */
 export const HOSTS = Object.freeze({
   claude: Object.freeze({
@@ -146,8 +154,14 @@ export const HOSTS = Object.freeze({
     }),
     // TODO(Task 47, D11): populate GAP_MESSAGES once FR-HM24 lands.
     gapMessages: null,
-    // TODO(Task 46, D25): populate the hook allowlist once Task 46 lands.
-    hookAllowlist: null,
+    // D25/FR-HM27: commit-lint only, matcher = this host's own Bash tool
+    // name (toolMap.Bash above). Rendered into hooks/codex-hooks.json by
+    // generate-codex-skills.mjs; never Stop/SessionStart/TaskCompleted/
+    // TeammateIdle.
+    hookAllowlist: Object.freeze({
+      matcher: 'shell',
+      events: Object.freeze(['PreToolUse']),
+    }),
     // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM32 recipe; PRD §1 'two to five minutes' shell cap (120 s lower bound assumed).
     headless: Object.freeze({
       approvalFlag: '`codex exec --sandbox workspace-write -a never`',

@@ -11,7 +11,6 @@
     "./agents/claude-review-prompter.md",
     "./agents/code-reviewer.md",
     "./agents/codex-review-prompter.md",
-    "./agents/commit-message-author.md",
     "./agents/design-system-agent.md",
     "./agents/findings-consolidator.md",
     "./agents/gemini-review-prompter.md",

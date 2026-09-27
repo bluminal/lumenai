@@ -88,7 +88,7 @@ If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Buil
 - Git workflow instructions:
   - Work in the assigned worktree
   - Commit changes with descriptive messages using `git commit --no-gpg-sign`
-  - **Author the commit message via the `commit-message-author` utility agent** (Haiku) rather than writing it inline. Pass the staged diff, any task-level issue key (only if known with certainty — e.g., a Jira key embedded in the worktree branch name or supplied to you), and a breaking-change flag if applicable. The agent detects the project's commit convention from `git log` and defaults to Conventional Commits 1.0.0. Pipe its returned message into `git commit -F -`.
+  - **Write the commit message yourself** (FR-HM27): follow the project's convention (`git.commit_convention` — Conventional Commits when it is `conventional`, otherwise match `git log`), carrying any task-level issue key (only if known with certainty — e.g., a Jira key embedded in the worktree branch name or supplied to you) verbatim, then pipe it into `git commit -F -`.
   - Do NOT merge — merging is handled by this command after completion
   - Respect pre-commit hooks and address all failures
 - **Autonomy directive — only when `--auto-decide` is set:**

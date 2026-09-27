@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { spawnSync } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { assertIsolatedEnvironment } from '../lib/assert-isolated.mjs';
@@ -74,6 +75,64 @@ try {
   parseLastJsonLine(runCommand('codex', ['plugin', 'marketplace', 'add', marketplaceRoot, '--json']).stdout);
   parseLastJsonLine(runCommand('codex', ['plugin', 'add', selector, '--json']).stdout);
   emit(harness, 'install', { ok: true, profile, selector, count: entries.length });
+
+  // Task 46 (FR-HM27, D25): commit-lint canary. Confirms the manifest's
+  // `hooks` key really does resolve, through the installed fixture, to a
+  // script that blocks a bad `git commit -m` subject the same way Codex's
+  // own PreToolUse dispatch would drive it (`features.hooks` on) -- without
+  // requiring a live Codex model call, which the actual dispatch path
+  // would need. Reads hooks/codex-hooks.json from the INSTALLED fixture
+  // (not the source tree) so drift between the two would fail this case,
+  // and builds the exact hook JSON payload shape Codex sends on stdin
+  // (Claude JSON shape per docs/reqs/harness-modernization.md's Codex
+  // host notes), using the manifest's own matcher (its Bash-equivalent
+  // tool name, "shell") rather than assuming Claude's "Bash".
+  {
+    const codexHooks = JSON.parse(
+      readFileSync(join(installedFixture, 'hooks', 'codex-hooks.json'), 'utf8'),
+    );
+    const preToolUse = codexHooks.hooks?.PreToolUse?.[0];
+    if (!preToolUse) throw new Error('codex-hooks.json has no PreToolUse entry to canary');
+    const scriptRelPath = preToolUse.hooks[0].command.replace('${CLAUDE_PLUGIN_ROOT}', installedFixture);
+
+    const commitLintProjectRoot = '/workspace/probe/commit-lint';
+    mkdirSync(join(commitLintProjectRoot, '.synthex'), { recursive: true });
+    writeFileSync(
+      join(commitLintProjectRoot, '.synthex', 'config.yaml'),
+      'git:\n  commit_convention: conventional\n',
+    );
+
+    const runCommitLint = (command) =>
+      spawnSync('bash', [scriptRelPath], {
+        cwd: commitLintProjectRoot,
+        input: JSON.stringify({
+          tool_name: preToolUse.matcher,
+          tool_input: { command },
+          cwd: commitLintProjectRoot,
+        }),
+        encoding: 'utf8',
+        timeout: 20_000,
+      });
+
+    const blocked = runCommitLint('git commit -m "not a conventional subject"');
+    if (blocked.status !== 2) {
+      throw new Error(
+        `commit-lint canary: expected exit 2 for a bad subject under matcher "${preToolUse.matcher}", got ${blocked.status}: ${blocked.stderr}`,
+      );
+    }
+    if (!blocked.stderr.includes('does not match Conventional Commits')) {
+      throw new Error(`commit-lint canary: missing fix hint on stderr: ${blocked.stderr}`);
+    }
+
+    const allowed = runCommitLint('git commit -m "feat: add x"');
+    if (allowed.status !== 0) {
+      throw new Error(
+        `commit-lint canary: expected exit 0 for a good subject, got ${allowed.status}: ${allowed.stderr}`,
+      );
+    }
+
+    emit(harness, 'commit-lint', { ok: true, profile, matcher: preToolUse.matcher, blockedExit: blocked.status });
+  }
 
   const skills = await listCodexSkills('/workspace');
   const synthexSkills = skills.filter(({ name }) => name.startsWith('synthex:'));

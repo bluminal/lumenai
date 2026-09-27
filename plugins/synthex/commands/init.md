@@ -40,10 +40,11 @@ The script (FR-HM26) does the mechanical work this step and Step 8 used to descr
 
 - Copies the plugin's `config/defaults.yaml` to `@{config_path}` (default `.synthex/config.yaml`) byte-for-byte — no transformation. **Idempotent:** an existing config file is left untouched by this call. If Step 1's "reset to defaults" choice was picked, re-run with a trailing `--force` to overwrite it.
 - Creates the standard document directories from Step 8 if they don't already exist.
+- FR-HM27 (D24): samples up to 50 commits (`git log`) and writes the majority-vote result to `git.commit_convention` in `@{config_path}` (one of `conventional`, `issue-key`, `gitmoji`, `plain`, or `auto` when no pattern reaches a 60% majority). Prints `Detected commit convention: <value> (from <N> commits)`. This runs on every invocation (not gated by idempotency), so re-running `init` re-samples history. The `scripts/commit-lint.sh` `PreToolUse` hook only lints when this key is explicitly `conventional`.
 
 It checks writability before writing and exits non-zero with a clear message if a target directory can't be written to (e.g. a read-only sandbox). Print its stdout/stderr to the user verbatim — it reports exactly what it created. The plugin's `config/defaults.yaml` stays read-only; the script never writes to it, and never takes it as anything but a read source.
 
-**Fallback (no shell tool, or the script is missing):** use the **Read** tool to load the plugin's `config/defaults.yaml` and the **Write** tool to create `@{config_path}` (skip it if the file exists, unless "reset to defaults" was chosen), then create the Step 8 directories. **Do NOT use `cp`, `cat >`, `sed -i`, `tee`, or any shell command that takes the defaults path as an argument**: Claude Code's permission engine flags both paths of `cp`, and an argument-order slip could overwrite the plugin's template.
+**Fallback (no shell tool, or the script is missing):** use the **Read** tool to load the plugin's `config/defaults.yaml` and the **Write** tool to create `@{config_path}` (skip it if the file exists, unless "reset to defaults" was chosen), then create the Step 8 directories. For the commit-convention detection, read up to 50 subjects from `git log` (whatever tool the host offers for running `git`), classify each against Conventional Commits (`^(feat|fix|perf|refactor|revert|build|ci|chore|docs|style|test)(\([^)]+\))?!?:`), an issue-key prefix (e.g. `PROJ-1234: ...` or `[PROJ-1234] ...`), or a gitmoji shortcode (`^:[a-z0-9_+-]+:`); if one category reaches 60% or more, write that value to `git.commit_convention`, otherwise write `auto`. Print the same `Detected commit convention: <value> (from <N> commits)` line. **Do NOT use `cp`, `cat >`, `sed -i`, `tee`, or any shell command that takes the defaults path as an argument**: Claude Code's permission engine flags both paths of `cp`, and an argument-order slip could overwrite the plugin's template.
 
 #### 2a. Detect and Write Project Facts
 
@@ -51,7 +52,7 @@ FR-HM29 (D12): detect the four project facts below and write them to `.synthex/f
 
 | Fact | Anchor | Freshness rule | How to detect |
 |------|--------|-----------------|----------------|
-| `commit_convention` | `#commit-convention` | Re-verify when HEAD has moved more than 50 commits past `recorded_sha` | Sample `git log -n 50` and majority-vote the subject pattern (same heuristic `commit-message-author` Step 2 uses) |
+| `commit_convention` | `#commit-convention` | Re-verify when HEAD has moved more than 50 commits past `recorded_sha` | Read the `git.commit_convention` value Step 2 just wrote to `@{config_path}` (FR-HM27) |
 | `test_runner` (+ coverage command) | `#test-runner` | Re-verify when `package.json` or `pytest.ini` mtime is newer than `recorded_at` | Inspect `package.json` scripts/devDependencies, `pytest.ini`, `vitest.config.*`, `jest.config.*` |
 | `frontend_framework` | `#frontend-framework` | Same rule as `test_runner` | Inspect `package.json` dependencies for React/Vue/Angular/Svelte, or `@docs/specs/frontend.md` |
 | `spec_index` (path glob to spec file map) | `#spec-index` | Re-verify when `docs/specs` mtime is newer than `recorded_at` | Glob `docs/specs/**/*.md` and record a path → title map |
@@ -68,7 +69,7 @@ directly, the same way they did before this file existed.
 ## commit_convention {#commit-convention}
 <!-- freshness: re-verify when HEAD is >50 commits past recorded_sha -->
 recorded_sha: <sha>
-value: conventional | issue-key | gitmoji | plain | none
+value: conventional | issue-key | gitmoji | plain | auto
 
 ## test_runner {#test-runner}
 <!-- freshness: re-verify when package.json or pytest.ini mtime > recorded_at -->

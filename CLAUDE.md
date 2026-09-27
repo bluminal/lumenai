@@ -96,7 +96,7 @@ The agent always opens a **draft** PR — a human reviews and merges. If the age
 
 Implications for contributors:
 
-- Use Conventional Commit subjects on every commit that lands on `main` (the `commit-message-author` agent does this by default).
+- Use Conventional Commit subjects on every commit that lands on `main` (the Tech Lead / Lead Frontend Engineer / `next-priority` command write these directly, per FR-HM27; a fail-open `PreToolUse` hook — `scripts/commit-lint.sh` — lints them when `git.commit_convention` is explicitly `conventional`).
 - Mark breaking changes with `<type>!:` or a `BREAKING CHANGE:` footer — getting this wrong means a major change ships as a minor.
 - The bot pushes the release commit and tag using `GITHUB_TOKEN`, which by GitHub policy does not re-trigger workflows, so there's no release loop.
 
@@ -148,7 +148,6 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 
 | Agent | Role | Type |
 |-------|------|------|
-| `commit-message-author` | Authors a single commit message from a change set; detects project convention from `git log`, defaults to Conventional Commits 1.0.0 | Utility |
 | `findings-consolidator` | Dedup, group, and sort findings from multiple reviewers (preserves attribution) | Utility |
 | `plan-linter` | Structural audit of implementation plan drafts against the template rubric | Utility |
 | `plan-scribe` | Applies Product Manager's decided edits to the plan document mechanically | Utility |
