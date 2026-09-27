@@ -38,6 +38,13 @@ set -u
 INPUT="$(cat 2>/dev/null || true)"
 [ -z "$INPUT" ] && exit 0
 
+# Fast path: this hook runs on every shell call. Skip anything that is not
+# plausibly a git commit before spawning config-get or node.
+case "$INPUT" in
+  *git*commit*) ;;
+  *) exit 0 ;;
+esac
+
 command -v node >/dev/null 2>&1 || exit 0
 
 SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
