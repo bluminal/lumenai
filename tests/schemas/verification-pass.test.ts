@@ -7,31 +7,18 @@
  *      without it present.
  *   2. security-reviewer rule 8 ("never approve code with CRITICAL findings")
  *      and the D21 header regex are unchanged.
- *   3. The shared section text (once it lands in the three agent bodies) must
- *      be byte-identical across code-reviewer.md, security-reviewer.md, and
- *      performance-engineer.md.
+ *   3. The shared section text is byte-identical across code-reviewer.md,
+ *      security-reviewer.md, and performance-engineer.md.
  *
- * BLOCKED SUB-ITEM (documented per the Task 29 instruction to "keep the
- * section under ~900 bytes or tell me the numbers and stop rather than
- * weakening the test"): inserting the shared section into the three agent
- * bodies breaks tests/schemas/agent-boilerplate.test.ts's per-agent shrink
- * floor (MIN_REDUCTION_BYTES = 1536, measured against the pre-Task-16
- * `before_bytes`). Current headroom before that floor breaks, as of this
- * task:
- *   - code-reviewer.md:        149 bytes
- *   - security-reviewer.md:     90 bytes
- *   - performance-engineer.md: 170 bytes
- * Even the terse form of the required section text (gate description +
- * LSP/grep instruction + non-blocking rule + cap-logging + render format) is
- * ~340 bytes, well over the smallest (security-reviewer) margin. Per
- * instruction, the section is NOT inserted into the three agent bodies in
- * this task; the plumbing below (config, parser, validators, fixtures) is
- * complete and ready for whichever of the following a maintainer picks:
- *   (a) trim additional unrelated prose from the three agents to make room, or
- *   (b) deliberately revisit the per-agent floor in agent-boilerplate.test.ts.
- * The "byte-identical copies" test below documents this: it currently
- * confirms consistent ABSENCE (not a partial rollout), and separately
- * confirms byte-identity IF a maintainer adds the section to all three.
+ * RESOLVED (Task 29 follow-up, A.J. Brown decision): the section text is the
+ * single source of truth at tests/fixtures/verification-pass/section.md,
+ * consumed both here (to enforce cross-agent byte-identity) and by
+ * agent-boilerplate.test.ts (to exclude the section's bytes from the Task 16
+ * shrink-floor comparison — see that file's VERIFICATION_SECTION_* comment).
+ * The section text is byte-identical to what was injected into the system
+ * prompt during the Task 29 Layer 2 `prose`-config runs recorded in
+ * docs/testing.md (the Layer 2 harness wrapped it with blank-line splice
+ * separators that are not part of the canonical section itself).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -52,6 +39,8 @@ const FIXTURES_DIR = join(import.meta.dirname, '..', 'fixtures', 'verification-p
 function loadFixture(name: string): string {
   return readFileSync(join(FIXTURES_DIR, name), 'utf8');
 }
+
+const CANONICAL_SECTION_TEXT = readFileSync(join(FIXTURES_DIR, 'section.md'), 'utf8');
 
 // ── 1. helpers.ts: parseVerificationField ─────────────────────────
 
@@ -226,45 +215,42 @@ Fix it.
   });
 });
 
-// ── 5. Shared section text: byte-identical across the three agents ──
-//     (see BLOCKED SUB-ITEM note at the top of this file)
+// ── 5. Shared section text: present and byte-identical across the three agents ──
 
-describe('Task 29 (FR-HM17, D18): shared "Verification pass" section byte-identical across agents', () => {
+describe('Task 29 (FR-HM17, D18): shared "Verification pass" section present and byte-identical across agents', () => {
   const AGENT_FILES = ['code-reviewer.md', 'security-reviewer.md', 'performance-engineer.md'];
-  const SECTION_HEADING_PATTERN = /^#{2,4}\s+Verification [Pp]ass \(CRITICAL\/HIGH only, top 5\)\s*$/m;
 
-  function extractSection(content: string): string | null {
-    const match = content.match(SECTION_HEADING_PATTERN);
-    if (!match || match.index === undefined) return null;
-    const rest = content.slice(match.index);
-    const lines = rest.split('\n');
-    let end = lines.length;
-    for (let i = 1; i < lines.length; i++) {
-      if (/^#{1,4}\s/.test(lines[i])) {
-        end = i;
-        break;
-      }
-    }
-    return lines.slice(0, end).join('\n').trim();
-  }
+  const contents = AGENT_FILES.map((f) => readFileSync(join(AGENTS_DIR, f), 'utf8'));
 
-  const sections = AGENT_FILES.map((f) => extractSection(readFileSync(join(AGENTS_DIR, f), 'utf8')));
-
-  it('is consistently present or consistently absent across all three (never a partial rollout)', () => {
-    const presentCount = sections.filter((s) => s !== null).length;
-    expect([0, AGENT_FILES.length]).toContain(presentCount);
+  it.each(AGENT_FILES)('%s contains the canonical section text, byte-for-byte', (file) => {
+    const content = readFileSync(join(AGENTS_DIR, file), 'utf8');
+    expect(content).toContain(CANONICAL_SECTION_TEXT);
   });
 
-  it('is byte-identical across all three when present', () => {
-    const present = sections.filter((s): s is string => s !== null);
-    if (present.length === 0) {
-      // Documented blocker (see file header): not yet inserted into the
-      // agent bodies pending a byte-budget resolution. Vacuously true.
-      return;
+  it('the canonical section text is byte-identical across all three agents (trivially true — same fixture)', () => {
+    // Each agent is checked above against the same CANONICAL_SECTION_TEXT
+    // constant, so cross-agent identity follows by construction. This test
+    // also guards against the fixture accidentally changing shape (e.g.
+    // losing its trailing newline) without anyone noticing.
+    expect(Buffer.byteLength(CANONICAL_SECTION_TEXT, 'utf8')).toBeGreaterThan(0);
+    for (const content of contents) {
+      expect(content).toContain(CANONICAL_SECTION_TEXT);
     }
-    for (const s of present.slice(1)) {
-      expect(Buffer.byteLength(s, 'utf8')).toBe(Buffer.byteLength(present[0], 'utf8'));
-      expect(s).toBe(present[0]);
+  });
+
+  it('the section sits before "## Output Format" and does not touch it', () => {
+    for (const content of contents) {
+      const sectionIdx = content.indexOf(CANONICAL_SECTION_TEXT);
+      const outputFormatIdx = content.indexOf('## Output Format');
+      expect(sectionIdx).toBeGreaterThan(-1);
+      expect(outputFormatIdx).toBeGreaterThan(sectionIdx);
+    }
+  });
+
+  it('is gated on code_review.verification (prose|off) in every agent', () => {
+    for (const content of contents) {
+      expect(content).toContain('code_review.verification: prose|off');
+      expect(content).toContain('default `off`');
     }
   });
 });
