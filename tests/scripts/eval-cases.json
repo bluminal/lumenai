@@ -1,0 +1,306 @@
+{
+  "$schema": "N/A \u2014 internal manifest, no external schema",
+  "description": "Canonical manifest of the 18 planted-issue eval cases for plugins/synthex/evals/ (FR-HM34, Task 27). Single source of truth consumed by: (1) plugins/synthex/scripts/generate-evals.mjs, which materializes each case's prompt.md + graders/*.md; (2) tests/scripts/run-evals.mjs, the hash-keyed skip wrapper around `claude plugin eval`; (3) tests/schemas/evals-config.test.ts, which validates the generated case directories against this manifest. Regenerate cases after editing this file: node plugins/synthex/scripts/generate-evals.mjs",
+  "verdictHeadings": {
+    "security-reviewer": "Security Review Verdict",
+    "terraform-plan-reviewer": "Terraform Plan Review Verdict",
+    "code-reviewer": "Code Review Verdict"
+  },
+  "cases": [
+    {
+      "id": "sec-clean-code",
+      "agent": "security-reviewer",
+      "fixture": "tests/fixtures/security/clean-code.diff",
+      "fixtureType": "diff",
+      "plantedIssues": [],
+      "expectedVerdictWords": [
+        "PASS",
+        "WARN"
+      ]
+    },
+    {
+      "id": "sec-hardcoded-secret",
+      "agent": "security-reviewer",
+      "fixture": "tests/fixtures/security/hardcoded-secret.diff",
+      "fixtureType": "diff",
+      "plantedIssues": [
+        {
+          "label": "hardcoded-aws-key",
+          "pattern": "AKIA[0-9A-Z]{0,16}|AKIA",
+          "flags": ""
+        }
+      ],
+      "expectedVerdictWords": [
+        "FAIL"
+      ]
+    },
+    {
+      "id": "sec-sql-injection",
+      "agent": "security-reviewer",
+      "fixture": "tests/fixtures/security/sql-injection.diff",
+      "fixtureType": "diff",
+      "plantedIssues": [
+        {
+          "label": "sql-injection",
+          "pattern": "CWE-89|SQL injection",
+          "flags": "i"
+        }
+      ],
+      "expectedVerdictWords": [
+        "FAIL"
+      ]
+    },
+    {
+      "id": "sec-xss-vuln",
+      "agent": "security-reviewer",
+      "fixture": "tests/fixtures/security/xss-vuln.diff",
+      "fixtureType": "diff",
+      "plantedIssues": [
+        {
+          "label": "stored-xss",
+          "pattern": "CWE-79|dangerouslySetInnerHTML",
+          "flags": "i"
+        }
+      ],
+      "expectedVerdictWords": [
+        "FAIL",
+        "WARN"
+      ]
+    },
+    {
+      "id": "sec-missing-auth",
+      "agent": "security-reviewer",
+      "fixture": "tests/fixtures/security/missing-auth.diff",
+      "fixtureType": "diff",
+      "plantedIssues": [
+        {
+          "label": "missing-authorization",
+          "pattern": "CWE-862|CWE-306|missing author|broken access control|no authoriz",
+          "flags": "i"
+        }
+      ],
+      "expectedVerdictWords": [
+        "FAIL",
+        "WARN"
+      ]
+    },
+    {
+      "id": "sec-weak-csrf",
+      "agent": "security-reviewer",
+      "fixture": "tests/fixtures/security/weak-csrf.diff",
+      "fixtureType": "diff",
+      "plantedIssues": [
+        {
+          "label": "csrf",
+          "pattern": "CWE-352|CSRF|cross-site request forgery|SameSite",
+          "flags": "i"
+        }
+      ],
+      "expectedVerdictWords": [
+        "FAIL",
+        "WARN"
+      ]
+    },
+    {
+      "id": "sec-mixed-severity",
+      "agent": "security-reviewer",
+      "fixture": "tests/fixtures/security/mixed-severity.diff",
+      "fixtureType": "diff",
+      "plantedIssues": [
+        {
+          "label": "hardcoded-stripe-secret",
+          "pattern": "sk_live|hardcoded.{0,20}(secret|key)",
+          "flags": "i"
+        },
+        {
+          "label": "error-info-disclosure",
+          "pattern": "stack trace|information disclosure|error.{0,20}disclos",
+          "flags": "i"
+        },
+        {
+          "label": "tabnabbing",
+          "pattern": "noopener|tabnabbing|reverse tabnabbing",
+          "flags": "i"
+        }
+      ],
+      "expectedVerdictWords": [
+        "FAIL"
+      ]
+    },
+    {
+      "id": "tf-destructive-rds",
+      "agent": "terraform-plan-reviewer",
+      "fixture": "tests/fixtures/terraform/destructive-rds.txt",
+      "fixtureType": "text",
+      "extraContext": "This is a production database for user data. Project: acme-saas.",
+      "plantedIssues": [
+        {
+          "label": "destroy-without-final-snapshot",
+          "pattern": "skip_final_snapshot",
+          "flags": "i"
+        }
+      ],
+      "expectedVerdictWords": [
+        "FAIL"
+      ]
+    },
+    {
+      "id": "tf-missing-tags",
+      "agent": "terraform-plan-reviewer",
+      "fixture": "tests/fixtures/terraform/missing-tags.txt",
+      "fixtureType": "text",
+      "extraContext": "Project: acme-analytics. Environment: production.",
+      "plantedIssues": [
+        {
+          "label": "missing-tags",
+          "pattern": "tag",
+          "flags": "i"
+        }
+      ],
+      "expectedVerdictWords": [
+        "WARN",
+        "FAIL"
+      ]
+    },
+    {
+      "id": "tf-clean-plan-txt",
+      "agent": "terraform-plan-reviewer",
+      "fixture": "tests/fixtures/terraform/clean-plan.txt",
+      "fixtureType": "text",
+      "extraContext": "Project: acme-data. Environment: production.",
+      "plantedIssues": [],
+      "expectedVerdictWords": [
+        "PASS"
+      ]
+    },
+    {
+      "id": "tf-empty-plan",
+      "agent": "terraform-plan-reviewer",
+      "fixture": "tests/fixtures/terraform/empty-plan.txt",
+      "fixtureType": "text",
+      "plantedIssues": [],
+      "expectedVerdictWords": [
+        "PASS"
+      ]
+    },
+    {
+      "id": "tf-clean-plan-json",
+      "agent": "terraform-plan-reviewer",
+      "fixture": "tests/fixtures/terraform/clean-plan.json",
+      "fixtureType": "json",
+      "extraContext": "Project: analytics-platform.",
+      "plantedIssues": [],
+      "expectedVerdictWords": [
+        "PASS",
+        "WARN"
+      ]
+    },
+    {
+      "id": "tf-multi-issue",
+      "agent": "terraform-plan-reviewer",
+      "fixture": "tests/fixtures/terraform/multi-issue.json",
+      "fixtureType": "json",
+      "extraContext": "Project: data-platform. Environment: production.",
+      "plantedIssues": [
+        {
+          "label": "publicly-accessible-rds",
+          "pattern": "publicly_accessible|publicly accessible",
+          "flags": "i"
+        },
+        {
+          "label": "unencrypted-rds-storage",
+          "pattern": "storage_encrypted|unencrypted storage|not encrypted",
+          "flags": "i"
+        },
+        {
+          "label": "wildcard-iam-policy",
+          "pattern": "Action\"?:\\s*\"\\*\"|wildcard|full.{0,10}access.{0,10}polic|overly permissive",
+          "flags": "i"
+        }
+      ],
+      "expectedVerdictWords": [
+        "FAIL"
+      ]
+    },
+    {
+      "id": "tf-wide-open-sg",
+      "agent": "terraform-plan-reviewer",
+      "fixture": "tests/fixtures/terraform/wide-open-sg.txt",
+      "fixtureType": "text",
+      "extraContext": "Project: web-platform. Environment: production.",
+      "plantedIssues": [
+        {
+          "label": "ssh-open-to-world",
+          "pattern": "0\\.0\\.0\\.0/0",
+          "flags": ""
+        }
+      ],
+      "expectedVerdictWords": [
+        "FAIL"
+      ]
+    },
+    {
+      "id": "tf-surprise-cost-poc",
+      "agent": "terraform-plan-reviewer",
+      "fixture": "tests/fixtures/terraform/surprise-cost-poc.txt",
+      "fixtureType": "text",
+      "extraContext": "Quick proof of concept for demo next week.",
+      "plantedIssues": [
+        {
+          "label": "surprise-cost",
+          "pattern": "cost alert|surprise|unexpected|disproportionate|expensive",
+          "flags": "i"
+        }
+      ],
+      "expectedVerdictWords": [
+        "WARN",
+        "FAIL"
+      ]
+    },
+    {
+      "id": "cr-clean-code",
+      "agent": "code-reviewer",
+      "fixture": "tests/fixtures/code-reviewer/clean-code.diff",
+      "fixtureType": "diff",
+      "plantedIssues": [],
+      "expectedVerdictWords": [
+        "WARN",
+        "FAIL"
+      ],
+      "notes": "Empirically, this fixture has a latent bug (ConflictError used but never imported) that a correctly-functioning code-reviewer catches (matches docs/testing.md Task 16 finding: post-Task-16 runs gave FAIL, FAIL). Despite the fixture name, PASS is not the expected verdict for the code-reviewer case; the fixture name reflects that it plants no SECURITY issues (used by security-reviewer too), not that it is bug-free from a code-quality lens."
+    },
+    {
+      "id": "cr-god-object",
+      "agent": "code-reviewer",
+      "fixture": "tests/fixtures/code-reviewer/god-object.diff",
+      "fixtureType": "diff",
+      "plantedIssues": [
+        {
+          "label": "god-object-srp",
+          "pattern": "single responsibility|god object|too many responsibilities|separation of concerns|cohesion",
+          "flags": "i"
+        }
+      ],
+      "expectedVerdictWords": [
+        "WARN",
+        "FAIL"
+      ]
+    },
+    {
+      "id": "cr-missing-error-handling",
+      "agent": "code-reviewer",
+      "fixture": "tests/fixtures/code-reviewer/missing-error-handling.diff",
+      "fixtureType": "diff",
+      "plantedIssues": [
+        {
+          "label": "missing-error-handling",
+          "pattern": "error handling|try/catch|try-catch|unhandled|null check",
+          "flags": "i"
+        }
+      ],
+      "expectedVerdictWords": [
+        "FAIL"
+      ]
+    }
+  ]
+}

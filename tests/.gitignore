@@ -1,6 +1,9 @@
 # LLM output cache — regenerated on demand, not version-controlled
 .cache/
 
+# claude plugin eval results cache (hash-keyed skip wrapper; FR-HM34, Task 27)
+.eval-cache/
+
 # Build artifacts
 dist/
 node_modules/

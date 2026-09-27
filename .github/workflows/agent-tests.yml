@@ -29,6 +29,10 @@ on:
         description: 'Run semantic evaluation (Layer 3, LLM-as-judge)'
         type: boolean
         default: false
+      run_plugin_eval:
+        description: 'Run the plugin eval suite (FR-HM34, claude plugin eval)'
+        type: boolean
+        default: false
 
 # Cancel in-progress runs for the same branch
 concurrency:
@@ -209,3 +213,69 @@ jobs:
         run: npx promptfoo eval --config promptfoo.config.yaml
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  # ─────────────────────────────────────────────────────────────────
+  # Plugin Eval Suite (manual trigger only; FR-HM34, Task 27)
+  #
+  # `claude plugin eval` runs the 18 planted-issue cases under
+  # plugins/synthex/evals/ (direct-agent dispatch via the Agent tool,
+  # deterministic regex/tool_used graders only — no LLM or baseline
+  # grader ever gates, per FR-HM34). tests/scripts/run-evals.mjs is a
+  # hash-keyed skip wrapper: it only pays for a case whose agent
+  # prompt or fixture actually changed since the last run in the
+  # restored tests/.eval-cache/.
+  # ─────────────────────────────────────────────────────────────────
+  plugin-eval:
+    name: "Plugin Eval Suite (FR-HM34)"
+    needs: schema-validation
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.run_plugin_eval == 'true'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install test dependencies
+        working-directory: tests
+        run: npm ci
+
+      - name: Install Claude Code CLI
+        run: |
+          npm install -g @anthropic-ai/claude-code@latest
+          claude --version
+
+      # Restore the wrapper's hash-keyed results cache from previous runs.
+      # A case is only re-run (and re-billed) when its agent prompt or
+      # fixture content has changed since the cache entry was written.
+      - name: Restore eval results cache
+        uses: actions/cache@v5
+        with:
+          path: tests/.eval-cache
+          key: eval-cache-${{ hashFiles('plugins/synthex/agents/**', 'tests/fixtures/**', 'tests/scripts/eval-cases.json') }}
+          restore-keys: |
+            eval-cache-
+
+      - name: Verify generated eval cases are up to date
+        run: node tests/scripts/generate-evals.mjs --check
+
+      - name: Run plugin eval suite
+        run: node tests/scripts/run-evals.mjs --threshold 0.67
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthex-plugin-eval-report
+          path: |
+            tests/.eval-cache/reports/
+            plugins/synthex/evals/results/
+          if-no-files-found: warn
