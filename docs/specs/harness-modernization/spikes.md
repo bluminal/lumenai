@@ -530,6 +530,61 @@ PROMPT_SNAPSHOT systemPrompt total chars= 15050 sha= 6b31f7ecb389 first 160: '# 
 - No live compaction was forced.
 - Whether an agent-file `effort:` pin is honored for Agent-tool teammates was not exercised (the code-reviewer file has none).
 
+## Task 51 — live-compaction sub-check (FR-HM22)
+
+**Verdict:** confirmed — a `synthex:<agent>` subagent's `agentType`, model, effort, and byte-identical system prompt survive a real, observed compaction of the driver session that spawns it. **Fallback fired:** no. This closes Task 11's "compaction unverified" gap; ADR-plus-002 deletes read-on-spawn, the FR-MMT5b per-task identity re-read, and the D26 per-task overlay re-paste on this evidence.
+
+### Result
+
+Three tiny headless `claude -p` invocations against the same resumed session (`48e33a4d-ad50-43ad-b1e8-20497cf7d661`):
+
+1. Spawned a named `synthex:code-reviewer` subagent (`probe-reviewer-1`), one-line prompt, one-line reply. Captured its `agentType`, model attachment, effort, and `prompt_snapshot` system prompt (12,786-char core block starting `# Code Reviewer\n\n## Identity`, sha256[:12]=`0c9d2a513de5`).
+2. Resumed the same session with the literal prompt `/compact`. The stream-json output shows a `system` event with `subtype: "compact_boundary"` — a real compaction fired on the driver session, not a no-op.
+3. Resumed the now-compacted session and spawned a second named `synthex:code-reviewer` subagent (`probe-reviewer-2`), same tiny shape. Captured the same fields.
+
+Comparison: `agentType` `"synthex:code-reviewer"` both times; model `claude-sonnet-5` both times (matches the current agent file's `model: sonnet` pin — this file now pins `sonnet`, not the `haiku` pin Task 11 observed on an earlier agent-file revision); `effort: medium` both times (matches the agent file's `effort: medium`); system-prompt core block byte-identical, same 12,786-char length, same sha256[:12]=`0c9d2a513de5` pre- and post-compaction. Every identity-bearing field the compaction could plausibly have evicted came back unchanged.
+
+### Evidence
+
+```
+pre-compact  meta:  {"agentType":"synthex:code-reviewer","name":"probe-reviewer-1", ...}
+pre-compact  MODEL ATTACHMENT: {"identity":{"modelId":"claude-sonnet-5","marketingName":"Sonnet 5", ...}}
+pre-compact  ASSISTANT model=claude-sonnet-5 effort=medium
+pre-compact  PROMPT_SNAPSHOT core_len=12786 sha=0c9d2a513de5 first120='# Code Reviewer\n\n## Identity\n\nYou are a **Senior Code Reviewer** ...'
+
+inv2 (resume + "/compact"): SYSTEM subtype=compact_boundary   <- compaction confirmed, not assumed
+
+post-compact meta:  {"agentType":"synthex:code-reviewer","name":"probe-reviewer-2", ...}
+post-compact MODEL ATTACHMENT: {"identity":{"modelId":"claude-sonnet-5","marketingName":"Sonnet 5", ...}}
+post-compact ASSISTANT model=claude-sonnet-5 effort=medium
+post-compact PROMPT_SNAPSHOT core_len=12786 sha=0c9d2a513de5 (identical to pre-compact)
+```
+
+### Method
+
+Reused Task 11's method with a compaction step inserted. Scratch project `$SCRATCH/spikes/task51/projD` (outside the repo, removed after the spike), `env -u ANTHROPIC_API_KEY` confirmed unset before running (subscription auth, not usage-billed) via `timeout 180`, stdin `/dev/null`:
+
+```
+claude -p "Spawn exactly one subagent with subagent_type 'synthex:code-reviewer' ..." \
+  --plugin-dir "<worktree>/plugins/synthex" --output-format stream-json --verbose \
+  --dangerously-skip-permissions
+
+claude --resume <session-id> -p "/compact" \
+  --plugin-dir "<worktree>/plugins/synthex" --output-format stream-json --verbose \
+  --dangerously-skip-permissions
+
+claude --resume <session-id> -p "Spawn exactly one subagent with subagent_type 'synthex:code-reviewer' ..." \
+  --plugin-dir "<worktree>/plugins/synthex" --output-format stream-json --verbose \
+  --dangerously-skip-permissions
+```
+
+3 invocations total (the ≤3 budget in the task brief), no loops, each prompt one or two sentences. `~/.claude/projects/<encoded>/<session>/subagents/agent-*.jsonl` and `.meta.json` inspected for both the pre- and post-compaction subagent.
+
+### Unknowns
+
+- This compacts the **driver** session that issues the `Agent` spawn calls, not a long-lived pool teammate's own accumulated multi-task context (a standing pool reviewer processing dozens of tasks over hours). Forcing that specific scenario cheaply in ≤3 invocations was not attempted — it would require accumulating tens of thousands of tokens of real task context first. The architectural argument from Task 11 (identity is a spawn-time attachment re-emitted per request, not conversation-history content) applies equally to that case, since Agent Teams' teammate spawning uses the same `agentType` resolution mechanism as the Agent-tool subagent spawning exercised here; this spike adds a real, observed compaction event to that argument rather than relying on it alone.
+- Whether the Teammate API's `spawnTeam` call accepts an `agentType` parameter with identical semantics to the Agent tool's `subagent_type` was not directly exercised (no Agent-Teams-flagged session was spawned in this spike, to keep it to 3 invocations). `docs/specs/decisions/ADR-plus-002-teammate-identity-via-subagent-type.md` records this as a residual assumption and names the fallback if it proves false.
+
 ## Task 12 — D17 expansion (FR-HM43, D17, FR-HM13)
 
 **Verdict:** confirmed — `${CLAUDE_PLUGIN_ROOT}` does **not** expand in Bash-tool command prose during a headless `claude -p` session; it is documented for hooks only, so command-prose Read gates need the D17 fallback. **Fallback fired:** yes — `plugin_root` is now written to `.synthex/state.json` by `upgrade-nudge.sh` for command prose to read on hosts/contexts where the variable is unexpanded (this task).

@@ -18,26 +18,25 @@
 | Performance | `plugins/synthex/agents/performance-engineer.md` | No | Mailbox: sends findings to Lead on task completion. Task list: claims the performance review task, produces findings in standard Synthex performance-engineer output format. Only spawned when explicitly requested via command flag or when `review.include_performance` is enabled in project config. |
 | Design | `plugins/synthex/agents/design-system-agent.md` | No | Mailbox: sends findings to Lead on task completion; messages Craftsmanship directly (SendMessage, type: "message") when design violations overlap with code structure (e.g., hardcoded values that should use design tokens). Task list: claims the design review task, produces findings in standard Synthex design-system-agent output format. Automatically included when the changeset includes frontend files (`.tsx`, `.jsx`, `.css`, `.scss`). |
 
-### Spawn Pattern (read-on-spawn)
+### Spawn Pattern (`synthex:<agent>` agent type)
 
-Each teammate's spawn prompt follows this structure:
+Per ADR-plus-002 (reversing ADR-plus-001), each reviewer teammate is spawned with its `agentType` set to `synthex:<agent-name>` (e.g. `synthex:code-reviewer`) instead of being told to read its agent file as a first action. The agent's model, effort, and full system prompt are resolved from `plugins/synthex/agents/<agent-name>.md` at spawn time and re-attached on every request outside the conversation-history message stream -- this is what makes identity durable across compaction (Task 11, Task 51 spike; FR-HM22). The Lead role has no Synthex agent file (it is the command orchestrator) and keeps a prompt-based identity.
 
-1. **Identity:** "Read your full agent definition at `{agent file path}` and adopt it as your identity"
-   - The teammate reads the complete Synthex agent markdown file as its first action
-   - This gives the teammate full behavioral fidelity: expertise, output format, severity frameworks, behavioral rules
-   - No condensed summaries or inline identities -- the canonical agent file IS the identity
+Each teammate's spawn still carries two more things beyond the agent-type identity:
 
-2. **Overlay:** Team-specific behavioral instructions from the overlay column above
+1. **Overlay:** Team-specific behavioral instructions from the overlay column above
    - Mailbox usage conventions (when to send messages, to whom, expected format)
    - Task list conventions (how to claim tasks, report completion, flag blockers)
    - Communication patterns (who this role coordinates with directly, reporting cadence)
    - These overlay instructions layer ON TOP of the base agent identity -- they do not replace it
 
-3. **Context:** Review-specific context
+2. **Context:** Review-specific context
    - CLAUDE.md and project-level conventions
    - The diff or changeset under review (files, line ranges, commit range)
    - Relevant specifications and design documents referenced by the changed code
    - Any reviewer-specific focus instructions the lead provides at task creation time
+
+**Fallback (ADR-plus-002):** If a host's teammate-spawn primitive does not accept an `agentType`/`subagent_type` parameter, or `ListAgents` shows a spawned teammate's `agentType` as empty or mismatched, treat that as the ADR's static-argument assumption not holding for this host: fall back to the ADR-plus-001 read-on-spawn instruction ("Read your full agent definition at `plugins/synthex/agents/<agent-name>.md` and adopt it as your identity") for that pool, and note the fallback in the pool's spawn confirmation.
 
 ## Communication Patterns
 
@@ -115,42 +114,6 @@ standard markdown report only (byte-identical behavior preserved). The `findings
 canonical finding schema from `multi-model-review.md` FR-MR13 — no new shape introduced here.
 Agent definition files (`plugins/synthex/agents/*.md`) are NOT modified; this is a template-only
 change (D5).
-
----
-
-### Standing Pool Identity Confirm Overlay (apply when standing=true)
-
-> **Composition note (D22):** There is no rendering engine. This overlay is a labeled prose section.
-> Commands compose pool teammate spawn prompts by reading this file and including this overlay
-> verbatim (raw inclusion) when `standing=true` resolves for the pool. The host model interprets
-> conditional inclusion via command workflow markdown. This overlay fires **per task claim** (on
-> each transition from idle → active), NOT once at pool spawn — include it at the per-task
-> workflow point in the command's spawn prompt.
-
-This overlay is included verbatim into each pool teammate's spawn prompt when `standing: true`.
-It implements the idle-hour identity drift mitigation defined in FR-MMT5b.
-
-#### Identity Confirm Step (FR-MMT5b)
-
-Include the following instruction verbatim in each pool teammate's per-task workflow when standing=true:
-
-Read-on-spawn (preserved per §8 Assumptions) means a pool teammate adopts its full Synthex agent
-identity once at pool spawn and holds it for the pool's entire lifetime. For pools that idle for
-hours (default `ttl_minutes: 60`; user-configurable up to `0` for indefinite), Claude Code
-auto-compaction may evict portions of the teammate's context, including the agent definition itself.
-To detect this without complicating the spawn path:
-
-- Each pool teammate **unconditionally re-reads** its own agent file (e.g., `plugins/synthex/agents/code-reviewer.md`) before beginning review work on each newly-claimed task (transition from `idle` → `active`). No comparison is performed against the teammate's "current" understanding of its identity — post-compaction the teammate may not even retain a stable reference to compare against. The re-read itself is the fix: after compaction-evicted context is reloaded by the Read call, the teammate's effective agent definition is current. This is a single Read call; cost is negligible vs. a code review's typical token spend.
-- The identity confirm step (the unconditional re-read) is part of the standing-pool variant of the review template (added to `templates/review.md` under a `{{#if standing}}…{{/if}}` block).
-
-**Concrete instruction for teammates:** Before claiming and beginning work on each task from the
-pool's task list, unconditionally re-read your own agent file at
-`plugins/synthex/agents/<your-agent-name>.md` using the Read tool. Do this on every task claim,
-not just the first one. Do not skip this step even if you believe your identity context is intact —
-post-compaction state is not reliably introspectable.
-
-**Cost rationale (FR-MMT5b verbatim):** This is a single Read call; cost is negligible vs. a code
-review's typical token spend.
 
 ---
 
@@ -238,18 +201,21 @@ Then exit cleanly. The Pool Lead's exit removes the in-process pool instance; su
 operations will find `pool_state: stopping` (or a missing index entry if cleanup has run) and
 treat the pool as not routing-eligible.
 
-#### Per-Task Reviewer Re-Issuance (D26)
+#### Per-Task Reviewer Re-Issuance — retired (ADR-plus-002)
 
-Per D26 (Task 26 spike outcome): spawn-prompt overlays live in the teammate's conversation history,
-not the system prompt, and are subject to lossy summarization during Claude Code auto-compaction.
-For pool reviewers processing many sequential tasks over hours, compaction is an expected event —
-not an edge case. The Pool Lead MUST re-issue the FR-MMT5b identity-confirm instruction AND the
-FR-MMT20 JSON-envelope clause in each per-task `SendMessage` to pool reviewers, embedding the
-critical overlay content in post-compaction context for every task.
+D26 (`docs/specs/multi-model-teams/teammate-api-spike.md` §6.3) mandated that the Pool Lead
+re-issue the FR-MMT5b identity-confirm instruction and the FR-MMT20 JSON-envelope clause in every
+per-task `SendMessage`, because spawn-prompt overlays lived in the teammate's conversation history
+and were not reliably durable across compaction. ADR-plus-002 reverses this: reviewer identity now
+comes from the `agentType: synthex:<agent-name>` spawn-time attachment (see the Spawn Pattern
+section above), which Task 51's live-compaction spike confirmed survives compaction, so the
+identity-confirm half of D26 is no longer needed. See `docs/specs/decisions/ADR-plus-002-teammate-identity-via-subagent-type.md`
+for the full evidence and the fallback if a host's teammate-spawn primitive does not honor
+`agentType`.
 
-**How to re-issue:** The Pool Lead reads the reviewer's spawn prompt from
-`~/.claude/teams/standing/<name>/config.json` (the `prompt` field) to retrieve the overlay
-instructions. Each `SendMessage` assigning a task to a reviewer must include the FR-MMT5b and
-FR-MMT20 overlay instructions verbatim as part of the task assignment message body. This renders
-spawn-prompt durability irrelevant for FR-MMT5b and FR-MMT20 compliance — the instructions are
-always fresh in post-compaction context.
+The FR-MMT20 JSON-envelope instruction is still delivered once, at spawn time, via the
+Multi-Model Conditional Overlay above (it is a team-specific behavioral overlay, not base agent
+identity, so it is not covered by the `agentType` durability argument). Per-task re-issuance of
+the JSON-envelope clause is not restored; long-idle multi-model pools carry a residual risk that a
+compaction event evicts the envelope instruction between tasks, noted as a Consequence in
+ADR-plus-002.

@@ -14,8 +14,13 @@
   - Bullets over paragraphs -- max 3 sentences per guidance block
   - Use {placeholder} syntax for values each concrete template fills in
 
-  See ADR-plus-001 (docs/specs/decisions/ADR-plus-001-read-on-spawn.md)
-  for the rationale behind the read-on-spawn agent identity approach.
+  See ADR-plus-001 (docs/specs/decisions/ADR-plus-001-read-on-spawn.md) for the read-on-spawn
+  agent identity approach this skeleton originally documented, and ADR-plus-002
+  (docs/specs/decisions/ADR-plus-002-teammate-identity-via-subagent-type.md) for why concrete
+  templates (review.md) now spawn reviewer teammates with `agentType: synthex:<agent-name>`
+  instead. Templates for roles without a stable one-teammate-per-agent-file mapping (e.g. a
+  role that is deliberately generic, or the Lead role, which has no Synthex agent file) may
+  still use the read-on-spawn pattern below.
 -->
 
 ## Purpose
@@ -41,29 +46,42 @@
      for the team to function. Mark Required=No for optional roles that enhance the team
      but can be omitted (e.g., Performance Engineer in review teams). -->
 
-### Spawn Pattern (read-on-spawn)
+### Spawn Pattern (`agentType: synthex:<agent-name>`)
 
-<!-- This section documents the exact spawn prompt structure per ADR-plus-001.
-     Every teammate is spawned using this pattern -- no exceptions. -->
+<!-- This section documents the default spawn shape per ADR-plus-002 (which reverses
+     ADR-plus-001's read-on-spawn approach for roles that map to a Synthex agent file).
+     Every teammate with a Synthex agent file row in the Agent References table above is
+     spawned using this pattern. -->
 
-Each teammate's spawn prompt follows this structure:
+Every role with a `plugins/synthex/agents/{agent}.md` row in the Agent References table is
+spawned with its `agentType` set to `synthex:{agent-name}` on the team-spawn call, not with a
+"read your agent file" instruction. This resolves the teammate's model, effort, and full system
+prompt from the agent file at spawn time, re-attached on every request outside the
+conversation-history message stream -- durable across compaction (ADR-plus-002; Task 51
+live-compaction spike). Roles with no Synthex agent file (e.g. a Lead role that is the command
+orchestrator, not an agent) keep a prompt-based identity per the read-on-spawn pattern below.
 
-1. **Identity:** "Read your full agent definition at `{agent file path}` and adopt it as your identity"
-   - The teammate reads the complete Synthex agent markdown file as its first action
-   - This gives the teammate full behavioral fidelity: expertise, output format, severity frameworks, behavioral rules
-   - No condensed summaries or inline identities -- the canonical agent file IS the identity
+Each teammate's spawn still carries two more things beyond agent-type identity:
 
-2. **Overlay:** Team-specific behavioral instructions from the overlay column above
+1. **Overlay:** Team-specific behavioral instructions from the overlay column above
    - Mailbox usage conventions (when to send messages, to whom, expected format)
    - Task list conventions (how to claim tasks, report completion, flag blockers)
    - Communication patterns (who this role coordinates with directly, reporting cadence)
    - These overlay instructions layer ON TOP of the base agent identity -- they do not replace it
 
-3. **Context:** Milestone/project context
+2. **Context:** Milestone/project context
    - CLAUDE.md and project-level conventions
    - Relevant specifications and design documents
    - Implementation plan (milestone scope, task dependencies, acceptance criteria)
    - Any task-specific context the lead provides at assignment time
+
+**Fallback (read-on-spawn, for roles without a Synthex agent file, or if a host's team-spawn
+primitive does not accept `agentType`):** the teammate's spawn prompt instructs it directly:
+"Read your full agent definition at `{agent file path}` and adopt it as your identity" as its
+first action -- the canonical agent file IS the identity, no condensed summary. See
+ADR-plus-002's Consequences for the detection/fallback contract (verify with `ListAgents`, not by
+reading `config.json`; if a spawned teammate's `agentType` is empty or mismatched, re-issue the
+read-on-spawn instruction for that teammate).
 
 ## Communication Patterns
 
@@ -129,7 +147,9 @@ resolve true. The section naming convention is:
 ### <Name> Overlay (apply when <flag>=true)
 ```
 
-For example, `review.md` currently defines two overlays:
+For example, `review.md` currently defines two overlays (a third, the Standing Pool Identity
+Confirm Overlay for FR-MMT5b, was retired by ADR-plus-002 — see that ADR and the Spawn Pattern
+section above for what replaced it):
 
 1. **`### Multi-Model Conditional Overlay (apply when multi_model=true)`** — included verbatim
    into the team Lead's and native reviewers' spawn prompts when `multi_model: true` resolves for
@@ -138,10 +158,10 @@ For example, `review.md` currently defines two overlays:
    JSON-envelope instruction requiring native reviewers to produce structured `findings_json`
    alongside their markdown report.
 
-2. **`### Standing Pool Identity Confirm Overlay (apply when standing=true)`** — included verbatim
-   into pool teammate spawn prompts, at the per-task workflow point, when `standing: true` resolves
-   for the pool (FR-MMT5b). Instructs each teammate to unconditionally re-read its own agent file
-   before beginning work on each newly-claimed task to mitigate idle-hour context compaction.
+2. **`### Standing Pool Lifecycle Overlay (apply when standing=true)`** — included verbatim into
+   the Pool Lead's spawn prompt ONLY when `standing: true` resolves for the pool (FR-MMT12,
+   FR-MMT9b, FR-MMT14). Defines `last_active_at` maintenance, idle persistence, shutdown signal
+   handling, draining, and clean exit.
 
 ### There is no rendering engine
 
@@ -184,4 +204,8 @@ syntax.
 | Template | Overlay Heading | Flag | Fires At | PRD Source |
 |----------|-----------------|------|----------|-----------|
 | `review.md` | `### Multi-Model Conditional Overlay (apply when multi_model=true)` | `multi_model=true` | Spawn time (Lead + reviewers) | FR-MMT4, FR-MMT20 |
-| `review.md` | `### Standing Pool Identity Confirm Overlay (apply when standing=true)` | `standing=true` | Per task claim (not spawn) | FR-MMT5b |
+| `review.md` | `### Standing Pool Lifecycle Overlay (apply when standing=true)` | `standing=true` | Spawn time (Lead only) | FR-MMT12, FR-MMT9b, FR-MMT14 |
+
+Retired: `### Standing Pool Identity Confirm Overlay (apply when standing=true)` (FR-MMT5b,
+`standing=true`, fired per task claim) — deleted by ADR-plus-002; reviewer identity now comes
+from the `agentType: synthex:<agent-name>` spawn-time attachment instead of a per-task re-read.
