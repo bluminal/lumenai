@@ -1,0 +1,18 @@
+{
+  "id": "level3-fanout-gate",
+  "items": [
+    {
+      "type": "reasoning",
+      "text": "spawn_agent is in my tool list; the ladder says to fan this out."
+    },
+    {
+      "type": "function_call",
+      "name": "spawn_agent",
+      "arguments": "{\"task\":\"no-op compatibility probe\"}"
+    },
+    {
+      "type": "agent_message",
+      "text": "Fanned out one no-op subagent task via spawn_agent and waited for it to complete. SYNTHEX_COMPAT_CANARY_TOOL_LEVEL3_FANOUT"
+    }
+  ]
+}

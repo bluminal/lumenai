@@ -13,13 +13,18 @@ import { assertCompleteInventory, readExpectedEntrypoints } from '../lib/contrac
 import { createProbeOverlay } from '../lib/probe-overlay.mjs';
 import { emit, runCommand, runCommandAsync } from '../lib/scenario-helpers.mjs';
 import {
+  LEVEL3_FANOUT_PROBE_ID,
+  LEVEL3_FANOUT_PROBE_TOKEN,
   NO_INJECTED_CONTEXT_PROBE_ID,
   NO_INJECTED_CONTEXT_PROBE_TOKEN,
   WORKFLOW_STEP_PROBE_ID,
   WORKFLOW_STEP_PROBE_TOKEN,
   assertInjectedContextFileRead,
+  assertToolAttemptedAtLeastOnce,
   assertToolAttemptedAtMostOnce,
+  countOpenCodeFanoutAttempts,
   countOpenCodeToolAttempts,
+  level3FanoutProbePrompt,
   noInjectedContextProbePrompt,
   opencodeReadInjectedContextFile,
   workflowStepProbePrompt,
@@ -140,7 +145,11 @@ try {
           options: { apiKey: '{env:SYNTHEX_COMPAT_CANARY_CREDENTIAL}' },
         },
       },
-      permission: { '*': 'deny', read: 'allow' },
+      // `task` allowed alongside `read`: Task 49's level-3 fan-out probe
+      // (FR-HM21) needs OpenCode's native `task` subagent tool available so
+      // a real run can actually call it, per docs/reqs/harness-
+      // modernization.md 5.3 ("OpenCode. Native `task` subagents...").
+      permission: { '*': 'deny', read: 'allow', task: 'allow' },
     }, null, 2)}\n`,
   );
 
@@ -202,11 +211,37 @@ try {
     file: contextFileRead,
   });
 
+  // Task 49 (FR-HM21, D22): level-3 capability-ladder fan-out probe.
+  // OpenCode's native fan-out tool is `task` (docs/reqs/harness-
+  // modernization.md 5.3), allowed above alongside `read`, so a real
+  // OpenCode session that honors the ladder gate should attempt one of the
+  // FR-HM21 level-3 candidate tools at least once here.
+  const level3FanoutResult = await runCommandAsync(
+    'opencode',
+    toolProbeRunArgs(level3FanoutProbePrompt(LEVEL3_FANOUT_PROBE_TOKEN)),
+    toolProbeRunOptions,
+  );
+  const level3FanoutOutput = `${level3FanoutResult.stdout}\n${level3FanoutResult.stderr}`;
+  assertCanaryToken({
+    harness,
+    id: LEVEL3_FANOUT_PROBE_ID,
+    token: LEVEL3_FANOUT_PROBE_TOKEN,
+    output: level3FanoutOutput,
+  });
+  const fanoutAttempts = countOpenCodeFanoutAttempts(level3FanoutOutput);
+  assertToolAttemptedAtLeastOnce({ harness, id: LEVEL3_FANOUT_PROBE_ID, attempts: fanoutAttempts });
+  emit(harness, 'tool-behavior', {
+    ok: true,
+    profile,
+    id: LEVEL3_FANOUT_PROBE_ID,
+    attempts: fanoutAttempts,
+  });
+
   emit(harness, 'complete', {
     ok: true,
     profile,
     activated: representatives.length,
-    toolBehaviorProbes: 2,
+    toolBehaviorProbes: 3,
     maxOutputTokens: 128,
     elapsedMs: Date.now() - startedAt,
   });

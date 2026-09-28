@@ -63,12 +63,18 @@ const SKIP_THE_STEP = 'skip the step';
  * both in the caller's tool list. One sentence, no line breaks, so it reads
  * correctly both printed standalone in a terminal and dropped into a table
  * cell (a future per-host gap-inventory table, FR-HM25 Task 52). Every
- * host entry below points at this same object -- there is only one gap
- * message today (`.pool`); Task 52 is where per-host phrasing (if any) or
- * additional gap keys would be layered on.
+ * host entry below points at this same object; Task 52 is where per-host
+ * phrasing (if any) would be layered on. `.ladderFallback` was added by
+ * Task 49 (FR-HM21) alongside `.pool` -- it is not a hard gate like
+ * `.pool` (nothing aborts), it is the neutral, single-sourced sentence
+ * `review-code`/`performance-audit` may surface when the FR-HM21
+ * capability ladder falls all the way to level 4 (sequential reviewers)
+ * for lack of a fan-out tool, so the fallback is documented rather than
+ * silent.
  */
 export const GAP_MESSAGES = Object.freeze({
   pool: 'Standing review pools require Agent Teams (the SendMessage and ListAgents tools); this host does not expose them, so pool commands are unavailable here -- use /synthex:review-code or /synthex:performance-audit for sequential review instead.',
+  ladderFallback: 'No parallel-subagent tool (Agent, Task, task, spawn_agent, or delegate_task) is in your tool list, so reviewers run sequentially instead of fanned out in one turn -- see the capability ladder in docs/standing-pool-routing.md.',
 });
 
 /**

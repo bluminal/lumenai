@@ -66,7 +66,7 @@ For each mailbox message:
 
 Apply the one-retry-then-`parse_failed` pattern:
 
-- If a reviewer's mailbox message is missing `findings_json` entirely, or if `findings_json` is not parseable JSON, send a clarification `SendMessage` to the reviewer (if the team is still active) asking for a re-send with the structured envelope.
+- If a reviewer's mailbox message is missing `findings_json` entirely, or if `findings_json` is not parseable JSON, send a clarification SendMessage (this agent's frontmatter already lists it as a required tool, and it is only ever invoked downstream of a pool-management command's own tool-presence gate) to the reviewer (if the team is still active) asking for a re-send with the structured envelope.
 - If the second attempt also fails, or if the team is no longer active, mark that reviewer's contribution as `error_code: "parse_failed"` in `per_reviewer_results`.
 - Proceed with the consolidation pipeline using only the well-formed findings. The audit artifact records the failure.
 

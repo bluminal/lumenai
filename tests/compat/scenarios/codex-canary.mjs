@@ -18,14 +18,19 @@ import {
 import { assertCompleteInventory, readExpectedEntrypoints } from '../lib/contract.mjs';
 import { createProbeOverlay } from '../lib/probe-overlay.mjs';
 import {
+  LEVEL3_FANOUT_PROBE_ID,
+  LEVEL3_FANOUT_PROBE_TOKEN,
   NO_INJECTED_CONTEXT_PROBE_ID,
   NO_INJECTED_CONTEXT_PROBE_TOKEN,
   WORKFLOW_STEP_PROBE_ID,
   WORKFLOW_STEP_PROBE_TOKEN,
   assertInjectedContextFileRead,
+  assertToolAttemptedAtLeastOnce,
   assertToolAttemptedAtMostOnce,
   codexReadInjectedContextFile,
+  countCodexFanoutAttempts,
   countCodexToolAttempts,
+  level3FanoutProbePrompt,
   noInjectedContextProbePrompt,
   workflowStepProbePrompt,
 } from '../lib/tool-probes.mjs';
@@ -193,6 +198,7 @@ try {
         id: NO_INJECTED_CONTEXT_PROBE_ID,
         text: noInjectedContextProbePrompt(NO_INJECTED_CONTEXT_PROBE_TOKEN),
       },
+      { id: LEVEL3_FANOUT_PROBE_ID, text: level3FanoutProbePrompt(LEVEL3_FANOUT_PROBE_TOKEN) },
     ],
     model: canaryModel(undefined),
   });
@@ -231,11 +237,33 @@ try {
     file: contextFileRead,
   });
 
+  // Task 49 (FR-HM21, D22): level-3 capability-ladder fan-out probe. Codex's
+  // native multi-agent tool is `spawn_agent` (docs/reqs/harness-
+  // modernization.md 5.3), so a real Codex session that honors the ladder
+  // gate should attempt one of the FR-HM21 level-3 candidate tools at least
+  // once here, unlike the workflow-step probe above which expects the
+  // opposite (an unavailable tool skipped, not called).
+  const level3FanoutResult = toolProbeResults.find(({ id }) => id === LEVEL3_FANOUT_PROBE_ID);
+  assertCanaryToken({
+    harness,
+    id: LEVEL3_FANOUT_PROBE_ID,
+    token: LEVEL3_FANOUT_PROBE_TOKEN,
+    output: JSON.stringify(level3FanoutResult),
+  });
+  const fanoutAttempts = countCodexFanoutAttempts(level3FanoutResult?.items);
+  assertToolAttemptedAtLeastOnce({ harness, id: LEVEL3_FANOUT_PROBE_ID, attempts: fanoutAttempts });
+  emit(harness, 'tool-behavior', {
+    ok: true,
+    profile,
+    id: LEVEL3_FANOUT_PROBE_ID,
+    attempts: fanoutAttempts,
+  });
+
   emit(harness, 'complete', {
     ok: true,
     profile,
     activated: activations.length,
-    toolBehaviorProbes: 2,
+    toolBehaviorProbes: 3,
     elapsedMs: Date.now() - startedAt,
   });
 } catch (error) {

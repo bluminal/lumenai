@@ -74,7 +74,7 @@ Before invoking the Performance Engineer, gather context:
 
 ### 4. Launch Performance Engineer
 
-Invoke the **Performance Engineer sub-agent** with:
+FR-HM21 levels 3-4 (Capability Ladder, `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing-performance-audit.md`): if a tool named `Agent`, `Task`, `task`, `spawn_agent`, or `delegate_task` is in your tool list, invoke the **Performance Engineer sub-agent**; otherwise, perform the performance-engineer role inline in this session (GAP_MESSAGES.ladderFallback explains why; also the depth-1 inline rule's outcome on a refused spawn). Either way, it runs with:
 
 - The audit scope
 - The URL for frontend analysis (if provided)

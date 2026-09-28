@@ -56,13 +56,37 @@
 
 export const WORKFLOW_STEP_PROBE_ID = 'workflow-step-gate';
 export const NO_INJECTED_CONTEXT_PROBE_ID = 'no-injected-context';
-export const TOOL_PROBE_IDS = [WORKFLOW_STEP_PROBE_ID, NO_INJECTED_CONTEXT_PROBE_ID];
+export const LEVEL3_FANOUT_PROBE_ID = 'level3-fanout-gate';
+export const TOOL_PROBE_IDS = [
+  WORKFLOW_STEP_PROBE_ID,
+  NO_INJECTED_CONTEXT_PROBE_ID,
+  LEVEL3_FANOUT_PROBE_ID,
+];
 
 export const WORKFLOW_STEP_PROBE_TOKEN = 'SYNTHEX_COMPAT_CANARY_TOOL_WORKFLOW_STEP';
 export const NO_INJECTED_CONTEXT_PROBE_TOKEN = 'SYNTHEX_COMPAT_CANARY_TOOL_NO_INJECTED_CONTEXT';
+export const LEVEL3_FANOUT_PROBE_TOKEN = 'SYNTHEX_COMPAT_CANARY_TOOL_LEVEL3_FANOUT';
 
 /** The tool named in the workflow-step probe; it exists on neither host. */
 export const PROBED_TOOL_NAME = 'Workflow';
+
+/**
+ * FR-HM21 level 3's candidate parallel-subagent tool names, in the order
+ * the requirement lists them (docs/reqs/harness-modernization.md ("Else if
+ * the host can spawn parallel subagents (a tool named `Agent`, `Task`,
+ * `task`, `spawn_agent`, or `delegate_task` is present)").
+ */
+export const LEVEL3_FANOUT_TOOL_NAMES = ['Agent', 'Task', 'task', 'spawn_agent', 'delegate_task'];
+
+/**
+ * The single candidate name each canary host is actually expected to call
+ * for level 3, per docs/reqs/harness-modernization.md 5.3's per-harness
+ * notes ("Codex CLI. Native multi-agent (`spawn_agent`...)"; "OpenCode.
+ * Native `task` subagents..."). Unlike PROBED_TOOL_NAME (a tool that
+ * exists on neither host), these tools are expected to actually be present
+ * and callable.
+ */
+export const LEVEL3_FANOUT_HOST_TOOL = Object.freeze({ codex: 'spawn_agent', opencode: 'task' });
 
 /**
  * The two instruction filenames neither Codex nor OpenCode auto-inject
@@ -91,6 +115,24 @@ export function noInjectedContextProbePrompt(token = NO_INJECTED_CONTEXT_PROBE_T
   return [
     READ_SENTENCE,
     `Compatibility test mode: after reading it, reply with exactly \`${token}\` and stop.`,
+  ].join('\n');
+}
+
+/**
+ * Task 49 (FR-HM21, D22): probe (c) LEVEL3_FANOUT_PROBE_ID — the capability
+ * ladder's level 3. Phrased the same way as the FR-HM21 ladder step itself
+ * ("if a tool named `Agent`, `Task`, `task`, `spawn_agent`, or
+ * `delegate_task` is in your tool list... otherwise...") so this probe
+ * exercises the exact gate `review-code`/`performance-audit` prose uses. It
+ * passes when the host attempts one of those tools AT LEAST once — the
+ * inverse of the workflow-step probe's skip-once assertion, since here the
+ * tool genuinely exists and level 3 requires it be used, not skipped.
+ */
+export function level3FanoutProbePrompt(token = LEVEL3_FANOUT_PROBE_TOKEN) {
+  return [
+    'This is a Synthex-style capability-ladder step under a compatibility test (FR-HM21 level 3).',
+    'If a tool named `Agent`, `Task`, `task`, `spawn_agent`, or `delegate_task` is in your tool list, call it now to fan out one trivial no-op subagent task and wait for it to complete; otherwise, note that this host cannot fan out subagents and perform the step inline.',
+    `Compatibility test mode: after that, reply with exactly \`${token}\` and stop.`,
   ].join('\n');
 }
 
@@ -166,6 +208,30 @@ export function codexReadInjectedContextFile(items, files = INJECTED_CONTEXT_CAN
   return null;
 }
 
+/**
+ * Task 49 (FR-HM21 level 3): counts items in a captured Codex app-server
+ * item stream that are a successful (or attempted) call to one of
+ * `toolNames` — any tool/function-call-shaped item (CODEX_TOOL_CALL_ITEM_TYPES)
+ * naming one of the candidates. Unlike countCodexToolAttempts this does not
+ * also match an `error` item, because level 3's tool genuinely exists and
+ * the probe expects it to succeed, not be rejected.
+ *
+ * @param {unknown[]} items
+ * @param {string[]} [toolNames]
+ * @returns {number}
+ */
+export function countCodexFanoutAttempts(items, toolNames = LEVEL3_FANOUT_TOOL_NAMES) {
+  let count = 0;
+  for (const item of items ?? []) {
+    if (!item || typeof item !== 'object') continue;
+    const type = item.type ?? item.item_type ?? '';
+    if (!CODEX_TOOL_CALL_ITEM_TYPES.has(type)) continue;
+    const serialized = JSON.stringify(item);
+    if (toolNames.some((name) => toolNamePattern(name).test(serialized))) count += 1;
+  }
+  return count;
+}
+
 // ---------------------------------------------------------------------------
 // OpenCode: `opencode run --format json` captured stdout/stderr
 // ---------------------------------------------------------------------------
@@ -237,6 +303,38 @@ export function countOpenCodeToolAttempts(output, toolName = PROBED_TOOL_NAME) {
 }
 
 /**
+ * Task 49 (FR-HM21 level 3): counts tool-shaped OpenCode events naming one
+ * of `toolNames`, with NO unavailability-status requirement — unlike
+ * countOpenCodeToolAttempts, level 3's tool genuinely exists and the probe
+ * expects a successful call, not a rejection. Falls back to a bounded-window
+ * text match (no unavailability word required) when the captured output has
+ * no parseable JSON event lines at all.
+ *
+ * @param {string} output - combined stdout+stderr from the `opencode run` process.
+ * @param {string[]} [toolNames]
+ * @returns {number}
+ */
+export function countOpenCodeFanoutAttempts(output, toolNames = LEVEL3_FANOUT_TOOL_NAMES) {
+  const events = extractOpenCodeEvents(output);
+  if (events.length > 0) {
+    let count = 0;
+    for (const event of events) {
+      if (!hasOpenCodeToolShape(event)) continue;
+      const serialized = JSON.stringify(event);
+      if (toolNames.some((name) => toolNamePattern(name).test(serialized))) count += 1;
+    }
+    return count;
+  }
+  let count = 0;
+  for (const name of toolNames) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const matches = output.match(new RegExp(`tool[^\\n]{0,60}${escaped}`, 'gi'));
+    if (matches) count += matches.length;
+  }
+  return count;
+}
+
+/**
  * Finds the first of `files` that captured OpenCode output shows being
  * read: a tool-shaped JSON event naming the file, or (falling back, when no
  * line parses as JSON) a read-verb appearing near the filename in raw text.
@@ -288,6 +386,28 @@ export function assertInjectedContextFileRead({ harness, id, file }) {
     throw new Error(
       `${harness} canary ${id}: expected a Read of one of ` +
         `${INJECTED_CONTEXT_CANDIDATE_FILES.join(', ')}, none was observed`,
+    );
+  }
+}
+
+/**
+ * Task 49 (FR-HM21 level 3): asserts the inverse of the skip-once rule —
+ * one of the parallel-subagent tools was attempted AT LEAST once. Level 3
+ * exists precisely because the tool is genuinely available; a probe run
+ * that never calls it means the host fell through to level 4 (sequential)
+ * even though a fan-out tool was in its tool list, which is the ladder
+ * misbehaving, not a documented gap.
+ */
+export function assertToolAttemptedAtLeastOnce({
+  harness,
+  id,
+  attempts,
+  toolNames = LEVEL3_FANOUT_TOOL_NAMES,
+}) {
+  if (attempts < 1) {
+    throw new Error(
+      `${harness} canary ${id}: expected one of the parallel-subagent tools ` +
+        `(${toolNames.join(', ')}) to be attempted at least once, observed ${attempts} attempts`,
     );
   }
 }

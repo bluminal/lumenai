@@ -16,15 +16,22 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   INJECTED_CONTEXT_CANDIDATE_FILES,
+  LEVEL3_FANOUT_HOST_TOOL,
+  LEVEL3_FANOUT_PROBE_ID,
+  LEVEL3_FANOUT_TOOL_NAMES,
   NO_INJECTED_CONTEXT_PROBE_ID,
   PROBED_TOOL_NAME,
   TOOL_PROBE_IDS,
   WORKFLOW_STEP_PROBE_ID,
   assertInjectedContextFileRead,
+  assertToolAttemptedAtLeastOnce,
   assertToolAttemptedAtMostOnce,
   codexReadInjectedContextFile,
+  countCodexFanoutAttempts,
   countCodexToolAttempts,
+  countOpenCodeFanoutAttempts,
   countOpenCodeToolAttempts,
+  level3FanoutProbePrompt,
   noInjectedContextProbePrompt,
   opencodeReadInjectedContextFile,
   workflowStepProbePrompt,
@@ -37,8 +44,12 @@ function loadFixture(name: string) {
 }
 
 describe('compat canary tool-behavior probes (Task 23)', () => {
-  it('declares exactly the two probe ids', () => {
-    expect(TOOL_PROBE_IDS).toEqual([WORKFLOW_STEP_PROBE_ID, NO_INJECTED_CONTEXT_PROBE_ID]);
+  it('declares exactly the three probe ids', () => {
+    expect(TOOL_PROBE_IDS).toEqual([
+      WORKFLOW_STEP_PROBE_ID,
+      NO_INJECTED_CONTEXT_PROBE_ID,
+      LEVEL3_FANOUT_PROBE_ID,
+    ]);
   });
 
   it('probes the same nonexistent tool on both hosts', () => {
@@ -174,6 +185,82 @@ describe('compat canary tool-behavior probes (Task 23)', () => {
     it('does not match a bare mention with no read verb in the text fallback', () => {
       const output = 'assistant: GEMINI.md was already injected, no action needed.\n';
       expect(opencodeReadInjectedContextFile(output)).toBeNull();
+    });
+  });
+
+  // ── Task 49 (FR-HM21, D22): level-3 capability-ladder fan-out probe ──────
+  describe('level-3 fan-out probe (Task 49, FR-HM21)', () => {
+    it('lists the FR-HM21 level-3 candidate tool names in requirement order', () => {
+      expect(LEVEL3_FANOUT_TOOL_NAMES).toEqual(['Agent', 'Task', 'task', 'spawn_agent', 'delegate_task']);
+    });
+
+    it('maps each canary host to its real fan-out tool', () => {
+      expect(LEVEL3_FANOUT_HOST_TOOL).toEqual({ codex: 'spawn_agent', opencode: 'task' });
+    });
+
+    it('phrases the level-3 probe as the FR-HM21 tool-presence gate', () => {
+      const prompt = level3FanoutProbePrompt('TEST_TOKEN');
+      expect(prompt).toMatch(
+        /If a tool named `Agent`, `Task`, `task`, `spawn_agent`, or `delegate_task` is in your tool list/,
+      );
+      expect(prompt).toMatch(/otherwise/i);
+      expect(prompt).toContain('TEST_TOKEN');
+    });
+
+    describe('Codex: countCodexFanoutAttempts', () => {
+      it('counts one successful call on the passing transcript', () => {
+        const fixture = loadFixture('codex-level3-fanout-pass');
+        const attempts = countCodexFanoutAttempts(fixture.items);
+        expect(attempts).toBe(1);
+        expect(() =>
+          assertToolAttemptedAtLeastOnce({ harness: 'codex', id: fixture.id, attempts }),
+        ).not.toThrow();
+      });
+
+      it('counts zero on the violating transcript (performed inline, never called)', () => {
+        const fixture = loadFixture('codex-level3-fanout-violation');
+        const attempts = countCodexFanoutAttempts(fixture.items);
+        expect(attempts).toBe(0);
+        expect(() =>
+          assertToolAttemptedAtLeastOnce({ harness: 'codex', id: fixture.id, attempts }),
+        ).toThrow(/attempted at least once/);
+      });
+
+      it('does not count reasoning/agent_message items that merely mention a candidate tool', () => {
+        const items = [
+          { type: 'reasoning', text: 'spawn_agent is in my tool list.' },
+          { type: 'agent_message', text: 'I will call spawn_agent now.' },
+        ];
+        expect(countCodexFanoutAttempts(items)).toBe(0);
+      });
+    });
+
+    describe('OpenCode: countOpenCodeFanoutAttempts', () => {
+      it('counts one successful call on the passing transcript', () => {
+        const fixture = loadFixture('opencode-level3-fanout-pass');
+        const attempts = countOpenCodeFanoutAttempts(fixture.output);
+        expect(attempts).toBe(1);
+        expect(() =>
+          assertToolAttemptedAtLeastOnce({ harness: 'opencode', id: fixture.id, attempts }),
+        ).not.toThrow();
+      });
+
+      it('counts zero on the violating transcript (performed inline, never called)', () => {
+        const fixture = loadFixture('opencode-level3-fanout-violation');
+        const attempts = countOpenCodeFanoutAttempts(fixture.output);
+        expect(attempts).toBe(0);
+        expect(() =>
+          assertToolAttemptedAtLeastOnce({ harness: 'opencode', id: fixture.id, attempts }),
+        ).toThrow(/attempted at least once/);
+      });
+
+      it('does not require an unavailability status word (unlike countOpenCodeToolAttempts)', () => {
+        const output = '{"type":"tool","tool":"task","status":"completed"}\n';
+        expect(countOpenCodeFanoutAttempts(output)).toBe(1);
+        // Confirms the two counters diverge: the same event is NOT an
+        // "unavailable tool" attempt for countOpenCodeToolAttempts.
+        expect(countOpenCodeToolAttempts(output, 'task')).toBe(0);
+      });
     });
   });
 });
