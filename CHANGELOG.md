@@ -5,6 +5,42 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 1.6.0 / synthex-plus 1.6.0] - 2026-09-28
+
+### Added
+
+- (synthex) retire commit-message-author for a scripted commit-lint hook (Task 46, FR-HM27)
+- (synthex) codex adapter passes canonical-finding schema via --output-schema (Task 43, FR-HM28)
+- (synthex) shrink review-prompter adapters via validate-findings delegation (Task 43, FR-HM28)
+- (synthex) add validate-findings script and canonical-finding.schema.json (Task 43, FR-HM28)
+- (synthex) add write-audit.mjs; retire audit-artifact-writer (Task 42, FR-HM26/FR-HM44)
+- (synthex) add assemble-bundle.sh; retire context-bundle-assembler (Task 41, FR-HM26/FR-HM44)
+- (synthex) init writes .synthex/facts.md; consumers fall back to detection (Task 40, FR-HM29)
+- (synthex) add state-flag.sh generic boolean-flag writer (Task 38, FR-HM26)
+- (synthex) add init-scaffold.sh for zero-token init scaffolding (Task 39, FR-HM26)
+
+### Fixed
+
+- (synthex) add no-shell Write-tool fallback to dismiss-upgrade-nudge and star (Task 38)
+- (synthex) keep init-scaffold.sh out of the plugin root; restore init prose fallback (Task 39)
+
+### Changed
+
+- (synthex) give init-scaffold's second commit loop a git identity so it passes on CI runners
+- (plans) record Task 45 done; Milestone 5.3 and Phase 5 complete
+- (synthex) retire plan-linter, port rubric to scripts/lint-plan.mjs (Task 45, FR-HM26)
+- (plans) record Task 46 done
+- (synthex) make Task 44 inventory assertion an upper bound so later retirements don't break it
+- (synthex) commit-lint.sh exits before config-get/node for non-commit shell calls (Task 46)
+- (plans) record Task 44 done; Task 45 in progress
+- (synthex) retire plan-scribe, PM edits plan in place (Task 44, FR-HM26)
+- (plans) record Task 43 done; Milestone 5.2 complete; Tasks 44 and 46 in progress
+- (synthex) shrink review-prompter adapters to <=6KB via shared doc (Task 43, FR-HM28)
+- (plans) record Tasks 41-42 done; Task 43 first pass merged
+- (plans) record Task 40 done; Milestone 5.1 complete; Tasks 41-43 in progress
+- (plans) record Tasks 38-39 done; Task 40 in progress
+- (plans) mark Tasks 38-39 in progress
+
 ## [synthex 1.5.0 / synthex-plus 1.5.0] - 2026-09-27
 
 ### Added
