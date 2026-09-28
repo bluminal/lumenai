@@ -24,7 +24,7 @@ Use instead: /synthex:init to set up a project, then /synthex:configure-teams
 if you want standing review pools (synthex-plus's team-* commands are
 retired outright — see the mapping table in the guide below).
 
-Full migration guide: docs/migrations/synthex-plus.md
+Full migration guide: https://github.com/bluminal/lumenai/blob/main/docs/migrations/synthex-plus.md
 ```
 
 ## See also

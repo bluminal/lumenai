@@ -25,5 +25,5 @@ one-line nudge synthex prints about lingering .synthex-plus/ state — use
 that instead. synthex-plus's own .synthex-plus/state.json is safe to
 delete; nothing reads it anymore.
 
-Full migration guide: docs/migrations/synthex-plus.md
+Full migration guide: https://github.com/bluminal/lumenai/blob/main/docs/migrations/synthex-plus.md
 ```

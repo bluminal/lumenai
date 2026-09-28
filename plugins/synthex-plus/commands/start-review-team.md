@@ -23,7 +23,7 @@ Use instead: /synthex:start-review-team — same parameters and behavior;
 just swap the plugin prefix. It still requires a host with an Agent Teams
 tool (SendMessage/ListAgents).
 
-Full migration guide: docs/migrations/synthex-plus.md
+Full migration guide: https://github.com/bluminal/lumenai/blob/main/docs/migrations/synthex-plus.md
 ```
 
 ## See also

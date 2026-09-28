@@ -24,7 +24,7 @@ Use instead: /synthex:refine-requirements — it fans reviewers out via the
 capability ladder (standing pool -> parallel subagents -> sequential),
 selected by what your host actually supports, the same way team-refine did.
 
-Full migration guide: docs/migrations/synthex-plus.md
+Full migration guide: https://github.com/bluminal/lumenai/blob/main/docs/migrations/synthex-plus.md
 ```
 
 ## See also

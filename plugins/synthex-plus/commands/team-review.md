@@ -26,7 +26,7 @@ selected by what your host actually supports, the same way team-review did.
 A running standing pool (start it with /synthex:start-review-team) gives you
 the cross-domain-alert behavior team-review had.
 
-Full migration guide: docs/migrations/synthex-plus.md
+Full migration guide: https://github.com/bluminal/lumenai/blob/main/docs/migrations/synthex-plus.md
 ```
 
 ## See also

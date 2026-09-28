@@ -23,7 +23,7 @@ Use instead: /synthex:configure-teams — same enable / routing-mode /
 matching-mode questions, but it writes .synthex/config.yaml instead of
 .synthex-plus/config.yaml.
 
-Full migration guide: docs/migrations/synthex-plus.md
+Full migration guide: https://github.com/bluminal/lumenai/blob/main/docs/migrations/synthex-plus.md
 ```
 
 ## See also

@@ -22,7 +22,7 @@ synthex-plus is deprecated and no longer does any work.
 Use instead: /synthex:list-teams — same parameters and behavior; just swap
 the plugin prefix.
 
-Full migration guide: docs/migrations/synthex-plus.md
+Full migration guide: https://github.com/bluminal/lumenai/blob/main/docs/migrations/synthex-plus.md
 ```
 
 ## See also
