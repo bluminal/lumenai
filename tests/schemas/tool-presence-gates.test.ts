@@ -200,12 +200,34 @@ export const KNOWN_UNGATED: KnownUngatedEntry[] = [
   // plugins/synthex/agents/codex-review-prompter.md:132 —
   //   "2. **Waits for the parent's decision** via a follow-up `SendMessage`
   //   from the orchestrator carrying the decision payload."
-  // Backticked `SendMessage`, not wrapped in a tool-presence gate. This is
-  // the only real D3 reference to SendMessage found in commands/ or
-  // agents/ today (a second, non-backticked, non-"tool"-suffixed mention
-  // of SendMessage exists at line 152 but does not meet the D3 token rule,
-  // so it is not a "reference" and needs no allowlist entry).
+  // Backticked `SendMessage`, not wrapped in a tool-presence gate. (A
+  // second, non-backticked, non-"tool"-suffixed mention of SendMessage
+  // exists at line 152 but does not meet the D3 token rule, so it is not
+  // a "reference" and needs no allowlist entry.)
   { file: 'plugins/synthex/agents/codex-review-prompter.md', tool: 'SendMessage' },
+
+  // Task 47 (FR-HM24, D11) folded the pool commands/agents into synthex/.
+  // Each of these two mentions is downstream of that same file's own
+  // top-level "Host Capability Gate" (Step 0 / `### 0.`), which already
+  // gates on `SendMessage`/`ListAgents` being in the tool list before any
+  // later step -- including these -- can run. The gate paragraph itself
+  // (containing "in your tool list" + "otherwise") is a separate,
+  // properly-gated reference and needs no allowlist entry; only these
+  // operational mentions further down the same file are ungated prose.
+  //
+  // plugins/synthex/commands/stop-review-team.md:58 —
+  //   "For each pool confirmed for stopping, send a `SendMessage` to the
+  //   Pool Lead with:"
+  { file: 'plugins/synthex/commands/stop-review-team.md', tool: 'SendMessage' },
+
+  // plugins/synthex/agents/team-orchestrator-bridge.md:69 — invoked only
+  // from the multi-model-review-orchestrator's team-mode path, which is
+  // itself only reachable once a pool-management command's Step 0 gate
+  // (or an equivalent tool-presence check upstream) has already confirmed
+  // SendMessage is available:
+  //   "...send a clarification `SendMessage` to the reviewer (if the team
+  //   is still active) asking for a re-send with the structured envelope."
+  { file: 'plugins/synthex/agents/team-orchestrator-bridge.md', tool: 'SendMessage' },
 ];
 
 // ── Acceptance criteria ─────────────────────────────────────────────────

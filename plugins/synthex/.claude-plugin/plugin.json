@@ -25,6 +25,9 @@
     "./agents/retrospective-facilitator.md",
     "./agents/security-reviewer.md",
     "./agents/sre-agent.md",
+    "./agents/standing-pool-cleanup.md",
+    "./agents/standing-pool-submitter.md",
+    "./agents/team-orchestrator-bridge.md",
     "./agents/tech-lead.md",
     "./agents/technical-writer.md",
     "./agents/terraform-plan-reviewer.md",
@@ -48,6 +51,10 @@
     "./commands/retrospective.md",
     "./commands/reliability-review.md",
     "./commands/performance-audit.md",
-    "./commands/star.md"
+    "./commands/star.md",
+    "./commands/configure-teams.md",
+    "./commands/start-review-team.md",
+    "./commands/stop-review-team.md",
+    "./commands/list-teams.md"
   ]
 }

@@ -5,7 +5,7 @@
  * `plugins/synthex/scripts/lib/host-matrix.mjs` is a build-time-only data
  * module (D9): a single constant table of the six harnesses Synthex
  * targets, keyed by host id, carrying the FR-HM12 Claude-tool-name map per
- * host plus placeholders for GAP_MESSAGES (Task 47, D11) and hook
+ * host plus the GAP_MESSAGES object (Task 47, D11) and hook
  * allowlists (Task 46, D25). Task 19 wires it into the generator; nothing
  * in this repo imports it yet, so this test only checks the module loads
  * and is internally consistent.
@@ -16,6 +16,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   CLAUDE_TOOL_NAMES,
+  GAP_MESSAGES,
   HOSTS,
   HOST_IDS,
   SKIP_LIST_TOOL_NAMES,
@@ -112,10 +113,12 @@ describe('host-matrix.mjs scaffold', () => {
     expect(HOSTS.grok.toolMap.Workflow).toContain("never use Grok's /workflow");
   });
 
-  it('has GAP_MESSAGES placeholders for every host, not wired up yet', () => {
+  it('Task 47 (FR-HM24, D11): every host points gapMessages at the shared GAP_MESSAGES object', () => {
     for (const host of Object.values(HOSTS)) {
-      expect(host.gapMessages).toBeNull();
+      expect(host.gapMessages).toBe(GAP_MESSAGES);
     }
+    expect(GAP_MESSAGES.pool).toBeTruthy();
+    expect(GAP_MESSAGES.pool).not.toContain('\n');
   });
 
   // Task 46 (D25/FR-HM27): Codex is the only host with a wired-up hook

@@ -26,6 +26,11 @@ const COMMANDS = [
     name: '/synthex:performance-audit',
     file: join(PLUGINS, 'synthex', 'commands', 'performance-audit.md'),
   },
+  // Task 47 (FR-HM24, D11): start-review-team folded into synthex verbatim.
+  {
+    name: '/synthex:start-review-team',
+    file: join(PLUGINS, 'synthex', 'commands', 'start-review-team.md'),
+  },
 ];
 
 // The verbatim sentence locked across all three commands. Per D25/NFR-MMT7

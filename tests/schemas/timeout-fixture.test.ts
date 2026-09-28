@@ -39,6 +39,14 @@ const SUBMITTER_PATH = join(
 
 const submitterContent = readFileSync(SUBMITTER_PATH, 'utf-8');
 
+// Task 47 (FR-HM24, D11) port: the same agent, folded into synthex.
+const SUBMITTER_SYNTHEX_PATH = join(
+  import.meta.dirname,
+  '..', '..', 'plugins', 'synthex', 'agents', 'standing-pool-submitter.md'
+);
+
+const submitterSynthexContent = readFileSync(SUBMITTER_SYNTHEX_PATH, 'utf-8');
+
 // ── Tests ─────────────────────────────────────────────────────────
 
 describe('timeout-fallback fixture — Layer 2 validation', () => {
@@ -163,6 +171,28 @@ describe('timeout-fallback fixture — Layer 2 validation', () => {
 
     it('submitter.md cites FR-MMT16a §3.4 for the timeout note requirement', () => {
       expect(submitterContent).toContain('FR-MMT16a');
+    });
+  });
+
+  // ── Task 47 (FR-HM24, D11) port: same checks against the synthex copy ──
+
+  describe('plugins/synthex/agents/standing-pool-submitter.md contains the verbatim timeout note', () => {
+    it('submitter.md contains "did not return a report within" (verbatim fragment)', () => {
+      expect(submitterSynthexContent).toContain('did not return a report within');
+    });
+
+    it('submitter.md contains "falling back to fresh-spawn review" (verbatim fragment)', () => {
+      expect(submitterSynthexContent).toContain('falling back to fresh-spawn review');
+    });
+
+    it('submitter.md contains the full verbatim timeout note template', () => {
+      expect(submitterSynthexContent).toContain(
+        "did not return a report within {timeout}s; falling back to fresh-spawn review."
+      );
+    });
+
+    it('submitter.md cites FR-MMT16a §3.4 for the timeout note requirement', () => {
+      expect(submitterSynthexContent).toContain('FR-MMT16a');
     });
   });
 

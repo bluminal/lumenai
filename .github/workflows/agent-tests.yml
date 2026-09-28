@@ -16,9 +16,9 @@ permissions:
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'harness/**']
   push:
-    branches: [main]
+    branches: [main, 'harness/**']
   workflow_dispatch:
     inputs:
       run_behavioral:

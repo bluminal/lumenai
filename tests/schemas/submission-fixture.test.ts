@@ -56,6 +56,12 @@ const SUBMITTER_MD_PATH = join(
   '..', '..', 'plugins', 'synthex-plus', 'agents', 'standing-pool-submitter.md'
 );
 
+// Task 47 (FR-HM24, D11) port: the same agent, folded into synthex.
+const SUBMITTER_MD_SYNTHEX_PATH = join(
+  import.meta.dirname,
+  '..', '..', 'plugins', 'synthex', 'agents', 'standing-pool-submitter.md'
+);
+
 const fixtureRaw = JSON.parse(readFileSync(FIXTURE_PATH, 'utf-8'));
 const fixture = fixtureRaw as {
   scenario: string;
@@ -435,6 +441,46 @@ describe('[11] plugins/synthex-plus/agents/standing-pool-submitter.md documents 
     const rulesSection = submitterContent.includes('Behavioral Rules');
     expect(rulesSection).toBe(true);
     // The rule must appear in the document alongside .tmp
+    const ruleWithTmp = submitterContent.includes('.tmp') && submitterContent.includes('rename');
+    expect(ruleWithTmp).toBe(true);
+  });
+});
+
+// ── Task 47 (FR-HM24, D11) port: [11] against the synthex copy ──────────
+
+describe('[11-synthex] plugins/synthex/agents/standing-pool-submitter.md documents .tmp + rename', () => {
+  const submitterContent = readFileSync(SUBMITTER_MD_SYNTHEX_PATH, 'utf-8');
+
+  it('standing-pool-submitter.md is readable and non-empty', () => {
+    expect(submitterContent.length).toBeGreaterThan(0);
+  });
+
+  it('documents the .tmp file extension (atomic write step 1)', () => {
+    expect(submitterContent).toContain('.tmp');
+  });
+
+  it('documents the mv (rename) step for atomic writes', () => {
+    expect(submitterContent).toContain('mv -f');
+  });
+
+  it('documents the .tmp + rename as atomic write pattern (FR-MMT16 §2)', () => {
+    const hasTmpPattern = submitterContent.includes('.json.tmp');
+    const hasRenamePattern = submitterContent.includes('mv -f');
+    expect(hasTmpPattern).toBe(true);
+    expect(hasRenamePattern).toBe(true);
+  });
+
+  it('documents that a partial write is never visible (atomicity guarantee)', () => {
+    const hasAtomicLanguage =
+      submitterContent.includes('partial write') ||
+      submitterContent.includes('atomic') ||
+      submitterContent.includes('atomically');
+    expect(hasAtomicLanguage).toBe(true);
+  });
+
+  it('documents the .tmp + rename rule in the Behavioral Rules section', () => {
+    const rulesSection = submitterContent.includes('Behavioral Rules');
+    expect(rulesSection).toBe(true);
     const ruleWithTmp = submitterContent.includes('.tmp') && submitterContent.includes('rename');
     expect(ruleWithTmp).toBe(true);
   });
