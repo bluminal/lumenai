@@ -1,5 +1,7 @@
 # Synthex+
 
+> **DEPRECATED** — Synthex+'s standing-review-pool capability has been folded into [Synthex](../synthex/) itself; there is nothing left that only Synthex+ can do. See [`docs/migrations/synthex-plus.md`](../../docs/migrations/synthex-plus.md) for how to move your config, the command-by-command mapping, and the removal timeline.
+
 > **BETA** — Synthex+ depends on Claude Code's **beta Agent Teams API**, which requires the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` feature flag. Both the Agent Teams API and this plugin are under active development. Expect breaking changes, evolving behavior, and rough edges. Use in production workflows at your own risk.
 
 Teams-optimized orchestration for [Synthex](../synthex/). Sustained multi-agent collaboration via Claude Code Agent Teams.

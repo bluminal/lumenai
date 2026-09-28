@@ -1,5 +1,12 @@
 # Product Requirements Document: Synthex+ (Teams-Optimized Orchestration)
 
+> **Superseded.** Synthex+ is deprecated; the standing-review-pool capability
+> this PRD describes was folded into `synthex` (see
+> `docs/plans/harness-modernization.md` Milestone 6.1–6.2 and decisions
+> D6–D8). This document is kept for historical context only — do not use it
+> to plan new work. See [`docs/migrations/synthex-plus.md`](../migrations/synthex-plus.md)
+> to migrate an existing Synthex+ project.
+
 ## 1. Vision & Purpose
 
 **Why this exists:** Synthex's subagent model works well for focused, single-invocation tasks -- a code review, a plan draft, a coverage analysis. But real software delivery involves sustained, multi-step collaborative work where agents need to coordinate over time, maintain independent context, and communicate directly with each other. Claude Code's experimental Agent Teams feature enables this: multiple independent Claude Code instances sharing a task list, exchanging messages, and persisting until the work is done.
