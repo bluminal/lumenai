@@ -23,17 +23,16 @@ interface CommandSpec {
   isTeam: boolean;
 }
 
+// Task 54: the Phase 5 synthex-plus team-* entries (team-implement,
+// team-review, team-plan, team-refine) were dropped — synthex-plus's team
+// commands are now migration stubs with no --loop wiring, and team-* is
+// retired outright (not folded into synthex; see docs/migrations/synthex-plus.md).
 const FR_NL1_COMMANDS: CommandSpec[] = [
   // Phase 4 — synthex
   { label: 'next-priority', plugin: 'synthex', filename: 'next-priority.md', isTeam: false },
   { label: 'write-implementation-plan', plugin: 'synthex', filename: 'write-implementation-plan.md', isTeam: false },
   { label: 'refine-requirements', plugin: 'synthex', filename: 'refine-requirements.md', isTeam: false },
   { label: 'review-code', plugin: 'synthex', filename: 'review-code.md', isTeam: false },
-  // Phase 5 — synthex-plus team commands
-  { label: 'team-implement', plugin: 'synthex-plus', filename: 'team-implement.md', isTeam: true },
-  { label: 'team-review', plugin: 'synthex-plus', filename: 'team-review.md', isTeam: true },
-  { label: 'team-plan', plugin: 'synthex-plus', filename: 'team-plan.md', isTeam: true },
-  { label: 'team-refine', plugin: 'synthex-plus', filename: 'team-refine.md', isTeam: true },
 ];
 
 const NEW_PARAM_ANCHORS = [

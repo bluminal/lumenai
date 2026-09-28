@@ -610,11 +610,15 @@ describe('Hooks Schema — Real Plugin Validation', () => {
       }
     });
 
-    it('contains TaskCompleted, TeammateIdle, and SessionStart hooks', () => {
+    // Task 54 (FR-HM2 tombstone, D7/D8): the plugin's hooks.json was emptied
+    // to {"hooks": {}} so stale installs stop running TaskCompleted,
+    // TeammateIdle, and SessionStart hooks after upgrading. See
+    // docs/migrations/synthex-plus.md and synthex-plus-tombstone.test.ts.
+    it('declares no hook events (Task 54 tombstone)', () => {
       const text = readFileSync(HOOKS_JSON_PATH, 'utf-8');
       const parsed = JSON.parse(text);
       const events = Object.keys(parsed.hooks).sort();
-      expect(events).toEqual(['SessionStart', 'TaskCompleted', 'TeammateIdle']);
+      expect(events).toEqual([]);
     });
 
     it('references scripts that exist on disk', () => {
