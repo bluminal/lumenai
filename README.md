@@ -89,7 +89,9 @@ The organization spans the full software lifecycle: **discover, build, ship, ope
 | **reliability-review** | Operational readiness assessment | SRE Agent + Terraform Plan Reviewer (opt.) |
 | **performance-audit** | Full-stack performance analysis | Performance Engineer |
 
-### Synthex+ (Beta)
+### Synthex+ (Beta, deprecated)
+
+> **Deprecated.** Synthex+'s standing-review-pool capability now lives in Synthex itself. See [`docs/migrations/synthex-plus.md`](./docs/migrations/synthex-plus.md) for the migration steps, the command mapping, and the removal timeline.
 
 A **companion plugin** to Synthex that adds persistent team orchestration via Claude Code's beta Agent Teams API. Synthex+ reuses Synthex agent definitions — it does not duplicate or modify them.
 

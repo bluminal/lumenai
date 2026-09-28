@@ -35,6 +35,8 @@ lumenai/
 │   │   └── main.md             # Primary implementation plan
 │   ├── specs/
 │   │   └── multi-model-teams/  # Multi-model team pool specifications (architecture, lifecycle, routing, recovery)
+│   ├── migrations/
+│   │   └── synthex-plus.md     # synthex-plus → synthex migration guide (D6/D7/D8)
 │   ├── agent-interactions.md   # Agent interaction map and orchestration flows
 │   └── research-sources.md     # Research sources behind agent designs
 ├── CLAUDE.md                   # This file
@@ -174,31 +176,18 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 | `retrospective` | Structured cycle retrospective | Metrics Analyst + Retrospective Facilitator |
 | `reliability-review` | Operational readiness assessment | SRE Agent + Terraform Plan Reviewer (opt.) |
 | `performance-audit` | Full-stack performance analysis | Performance Engineer |
+| `start-review-team` | Start a standing review pool | Launches a persistent pool of reviewer agents; pool ID returned for routing |
+| `stop-review-team` | Stop a standing review pool | Gracefully drains in-flight reviews and tears down the pool |
+| `list-teams` | List running pools | Shows active pool IDs, reviewer composition, and current load |
+| `configure-teams` | Re-runnable wizard for the `standing_pools` config block. Surfaces enable/skip + routing_mode + matching_mode questions. Does NOT spawn a pool (FR-MMT27 #3). Idempotent. | — |
 
 See `docs/agent-interactions.md` for the complete interaction map and `docs/research-sources.md` for the research behind each agent's design.
 
 ### Pool Routing (standing review pools)
 
-When a standing review pool is running (started via synthex-plus), `/review-code` and `/performance-audit` automatically route to it instead of invoking the default single-model reviewer sequence. Pool routing requires `standing_pools.enabled: true` in `.synthex-plus/config.yaml`. See `docs/specs/multi-model-teams/` for full pool specifications (architecture, lifecycle, routing rules, and recovery).
+When a standing review pool is running (started via `/synthex:start-review-team`), `/review-code` and `/performance-audit` automatically route to it instead of invoking the default single-model reviewer sequence. Pool routing requires `standing_pools.enabled: true` in `.synthex/config.yaml` (a project still on `.synthex-plus/config.yaml` keeps working for one major version — see `docs/migrations/synthex-plus.md`). See `docs/specs/multi-model-teams/` for full pool specifications (architecture, lifecycle, routing rules, and recovery).
 
-## Commands (Synthex Plus)
-
-Synthex Plus extends Synthex with multi-model team orchestration, standing reviewer pools, and parallel execution workflows.
-
-| Command | Purpose | Notes |
-|---------|---------|-------|
-| `start-review-team` | Start a standing review pool | Launches persistent pool of reviewer agents; pool ID returned for routing |
-| `stop-review-team` | Stop a standing review pool | Gracefully drains in-flight reviews and tears down the pool |
-| `list-teams` | List running pools | Shows active pool IDs, reviewer composition, and current load |
-| `team-review` | Multi-model team code review | Fan-out review to all pool members; consolidates findings |
-| `team-implement` | Parallel task implementation | Distributes implementation tasks across a team |
-| `team-plan` | Collaborative implementation planning | Multi-model plan review and refinement |
-| `team-refine` | Team-based requirements refinement | Fan-out PRD review across agents |
-| `team-init` | Initialize a multi-model team project | Sets up `.synthex-plus/config.yaml` and pool configuration |
-| `configure-teams` | Re-runnable wizard for the `standing_pools` config block. Surfaces enable/skip + routing_mode + matching_mode questions. Does NOT spawn a pool (FR-MMT27 #3). Idempotent. | — |
-| `dismiss-upgrade-nudge` | Silence the synthex-plus SessionStart upgrade nudge for this project by writing `dismissed: true` to `.synthex-plus/state.json`. Idempotent; no arguments. | — |
-
-See `docs/specs/multi-model-teams/` for pool specifications.
+> **synthex-plus is deprecated.** Its pool commands, pool agents, templates, docs, capability ladder, and lifecycle hooks were folded into `synthex` (Milestone 6.1). See `docs/migrations/synthex-plus.md`.
 
 ## Project Configuration Framework
 

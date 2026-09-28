@@ -234,7 +234,7 @@ This is scoped narrowly: `[H]` (human-validated) acceptance criteria are **never
 
 When a standing review pool is running (`/synthex:start-review-team`), `/review-code` and `/performance-audit` automatically route to the pool — no flags required. Routing is **off by default unless `standing_pools.enabled: true`** in `.synthex/config.yaml` (or, for one major version, the legacy `.synthex-plus/config.yaml`; see D6).
 
-For setup and configuration, see the [Standing Pools guide](./docs/standing-pools.md).
+For setup and configuration, see the [Standing Pools guide](./docs/standing-pools.md). Coming from Synthex+? See [`docs/migrations/synthex-plus.md`](../../docs/migrations/synthex-plus.md).
 
 ## Cost
 
