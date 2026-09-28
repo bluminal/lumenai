@@ -361,11 +361,19 @@ describe('cross-harness compatibility contract', () => {
       expect(gapMessage).toBe(GAP_MESSAGES.pool);
     }
 
-    // The README's gap section quotes GAP_MESSAGES.pool verbatim and notes
-    // Hermes' Kanban board as future work, not implemented.
-    const readme = readFileSync(resolve(compatRoot, 'README.md'), 'utf8');
-    expect(readme).toContain(GAP_MESSAGES.pool);
-    expect(readme).toMatch(/Hermes.{0,40}Kanban/is);
-    expect(readme).toMatch(/future/i);
+    // The compat README's gap section quotes GAP_MESSAGES.pool verbatim and
+    // notes Hermes' Kanban board as future work, not implemented.
+    const compatReadme = readFileSync(resolve(compatRoot, 'README.md'), 'utf8');
+    expect(compatReadme).toContain(GAP_MESSAGES.pool);
+    expect(compatReadme).toMatch(/Hermes.{0,40}Kanban/is);
+    expect(compatReadme).toMatch(/future/i);
+
+    // The user-facing plugin README (`## Installation`) quotes the same
+    // sentence verbatim so users -- not just compat-suite maintainers --
+    // learn about the gap.
+    const pluginReadme = readFileSync(resolve(pluginRoot, 'README.md'), 'utf8');
+    expect(pluginReadme).toContain(GAP_MESSAGES.pool);
+    expect(pluginReadme).toMatch(/Hermes.{0,40}Kanban/is);
+    expect(pluginReadme).toMatch(/future/i);
   });
 });
