@@ -54,7 +54,7 @@ Before reviewing, load these context sources:
 
 ### Step 2: Specification Relevance Analysis
 
-Before beginning the review, determine which project specifications are relevant to the code under review, using an inline, size-gated scan (subagents cannot spawn subagents on Claude Code, and depth-1 hosts refuse it, so this step never delegates):
+Before beginning the review, determine which project specifications are relevant to the code under review, using an inline, size-gated scan (subagents cannot spawn subagents on Claude Code, and depth-1 hosts refuse it, so this step never delegates). Read `.synthex/facts.md` first; if the fact is missing or stale per its freshness rule, detect as before.
 
 1. Read the list of available specifications from the configured path (default: all files in `@docs/specs`).
 2. Sum the total bytes under `code_review.spec_paths`. If the total is at most `code_review.spec_inline_bytes` (default 65536), **read the specs directly** in full. Otherwise, **scan only the first 50 lines of each spec** for relevance and read the relevant ones in full.

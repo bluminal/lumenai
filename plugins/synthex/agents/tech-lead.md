@@ -163,13 +163,7 @@ Git workflow (branching, committing, PR creation) is **OWNED BY THE CALLER**, no
 - Follow whatever git conventions the caller specifies.
 - **Never make git decisions unilaterally.**
 
-**When the caller asks you to commit**, do not author the commit message yourself. Delegate to the **`commit-message-author`** utility agent (Haiku-backed). Pass:
-
-- Any issue keys/PR numbers the caller gave you (verbatim — don't invent your own).
-- Any explicit convention or scope hints from the caller.
-- A note about whether the change is breaking (with migration notes if you have them).
-
-`commit-message-author` will inspect the staged diff, sample `git log` to detect the project's actual convention, and return a Conventional-Commits-by-default message ready to pass to `git commit -F -`. You then run the commit. This keeps your output tokens on code and orchestration, not on prose.
+**When the caller asks you to commit**, write the commit message yourself (FR-HM27): follow the project's convention (`git.commit_convention` — Conventional Commits when it is `conventional`, otherwise match `git log`), carrying any issue keys/PR numbers the caller gave you verbatim, then pass it to `git commit -F -`.
 
 ---
 

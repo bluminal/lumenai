@@ -1,0 +1,453 @@
+#!/usr/bin/env bash
+# validate-findings — normalize an external review CLI's raw stdout into the
+# canonical multi-model-review adapter envelope (FR-HM28, D13, FR-MR9,
+# FR-MR16). Every *-review-prompter adapter delegates Output Parsing,
+# Retry-Once, and Normalize-to-Canonical-Envelope (FR-MR8 responsibilities
+# 5-7) to this script instead of re-implementing them per-adapter, and the
+# orchestrator's depth-1 direct-CLI path (hosts that cannot nest subagents)
+# calls it the same way.
+#
+# Usage:
+#   validate-findings --reviewer-id <id> --family <family>
+#                      [--source-type native-team|external|native-recovery]
+#                      [--raw-output-path <path>] [--model <id>]
+#                      [--input <path>]
+#     Reads raw CLI stdout (fenced or bare JSON, or NDJSON) from --input, or
+#     from stdin when --input is omitted. Normalizes it: strips a wrapping
+#     markdown code fence (tolerating prelude/postlude prose around it),
+#     tries a direct JSON parse, falls back to joining newline-delimited
+#     JSON (merging findings[] arrays and usage token counts across lines),
+#     then falls back to stripping trailing commas and retrying both.
+#     Validates each finding against canonical-finding.schema.json (after
+#     injecting `source`, overwriting anything the CLI itself emitted there),
+#     drops any finding that still fails validation (never aborts the run;
+#     the drop count is folded into error_message), and prints the resulting
+#     envelope to stdout. A blob that cannot be normalized by any of the
+#     above prints a `parse_failed` envelope instead.
+#
+#   validate-findings --error <error_code> [--message <text>]
+#                      [--raw-output-path <path>]
+#     Skips parsing entirely and prints a `{"status":"failed", ...}`
+#     envelope for a failure the caller already detected — this is how every
+#     adapter constructs its cli_missing/cli_auth_failed/cli_failed/timeout/
+#     sandbox_violation/unknown_error envelopes (one script, not six
+#     hand-rolled JSON blobs). `error_code` MUST be one of the seven values
+#     in the closed FR-MR16 enum; adapters MUST NOT invent new codes. This
+#     path is pure bash — it never needs node or jq.
+#
+# Prefers node (guarded by `command -v node`); falls back to jq when node is
+# absent; falls back to a dependency-free `unknown_error` envelope when
+# neither is present. No `python`, anywhere (D19).
+#
+# Exit codes:
+#   0 - an envelope was printed to stdout. Check the JSON body's "status"
+#       field, not this exit code — a well-formed `{"status":"failed",...}`
+#       envelope is a normal, successful invocation of this script.
+#   1 - usage error (a required argument is missing, or --error was given a
+#       code outside the closed FR-MR16 enum). Nothing is printed to stdout.
+
+set -u
+
+# --- Resolve this script's own directory (no `dirname` dependency, mirrors
+#     scripts/lib/config-get.sh) so canonical-finding.schema.json resolves
+#     regardless of the caller's cwd. ---
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
+case "$SCRIPT_SOURCE" in
+  */*) SCRIPT_DIR_RAW="${SCRIPT_SOURCE%/*}" ;;
+  *) SCRIPT_DIR_RAW="." ;;
+esac
+SCRIPT_DIR="$(cd -- "$SCRIPT_DIR_RAW" 2>/dev/null && pwd -P)"
+SCHEMA_PATH="${SCRIPT_DIR:-.}/../agents/_shared/canonical-finding.schema.json"
+
+# --- Arg parsing -------------------------------------------------------
+REVIEWER_ID=""
+FAMILY=""
+SOURCE_TYPE="external"
+RAW_OUTPUT_PATH=""
+MODEL=""
+INPUT_FILE=""
+ERROR_CODE=""
+MESSAGE=""
+
+usage_error() {
+  printf 'validate-findings: usage: %s\n' "$1" >&2
+  exit 1
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --reviewer-id) REVIEWER_ID="${2:-}"; shift 2 ;;
+    --family) FAMILY="${2:-}"; shift 2 ;;
+    --source-type) SOURCE_TYPE="${2:-}"; shift 2 ;;
+    --raw-output-path) RAW_OUTPUT_PATH="${2:-}"; shift 2 ;;
+    --model) MODEL="${2:-}"; shift 2 ;;
+    --input) INPUT_FILE="${2:-}"; shift 2 ;;
+    --error) ERROR_CODE="${2:-}"; shift 2 ;;
+    --message) MESSAGE="${2:-}"; shift 2 ;;
+    *) usage_error "unknown argument \"$1\"" ;;
+  esac
+done
+
+# JSON-string-escape a value using only bash parameter expansion — no
+# interpreter required, so the --error fast path below never needs node/jq.
+json_escape() {
+  local s=$1
+  s=${s//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\r'/\\r}
+  s=${s//$'\t'/\\t}
+  printf '%s' "$s"
+}
+
+# Renders --raw-output-path as a JSON string, or JSON null when unset.
+json_raw_output_path() {
+  if [ -n "$RAW_OUTPUT_PATH" ]; then
+    printf '"%s"' "$(json_escape "$RAW_OUTPUT_PATH")"
+  else
+    printf 'null'
+  fi
+}
+
+# --- --error fast path (FR-MR16 closed enum; pure bash) ------------------
+if [ -n "$ERROR_CODE" ]; then
+  case "$ERROR_CODE" in
+    cli_missing|cli_auth_failed|cli_failed|parse_failed|timeout|sandbox_violation|unknown_error) ;;
+    *)
+      usage_error "\"$ERROR_CODE\" is not in the closed FR-MR16 enum (one of: cli_missing, cli_auth_failed, cli_failed, parse_failed, timeout, sandbox_violation, unknown_error)"
+      ;;
+  esac
+  MSG="${MESSAGE:-adapter reported $ERROR_CODE}"
+  printf '{"status":"failed","error_code":"%s","error_message":"%s","findings":[],"usage":null,"raw_output_path":%s}\n' \
+    "$(json_escape "$ERROR_CODE")" "$(json_escape "$MSG")" "$(json_raw_output_path)"
+  exit 0
+fi
+
+# --- Required args for the normalization path ---------------------------
+[ -n "$REVIEWER_ID" ] || usage_error "--reviewer-id is required"
+[ -n "$FAMILY" ] || usage_error "--family is required"
+case "$SOURCE_TYPE" in
+  native-team|external|native-recovery) ;;
+  *) usage_error "--source-type must be one of: native-team, external, native-recovery" ;;
+esac
+
+# --- Resolve the raw input to a real file path (never read real stdin
+#     inside the node heredoc below — that would collide with node reading
+#     its own program text from stdin; see codex-review-prompter.md's
+#     "stdin contention" gotcha for the same class of bug). ---
+CLEANUP_TMP=""
+if [ -n "$INPUT_FILE" ]; then
+  RESOLVED_INPUT="$INPUT_FILE"
+else
+  RESOLVED_INPUT="$(mktemp 2>/dev/null || printf '/tmp/validate-findings-stdin-%s' "$$")"
+  cat > "$RESOLVED_INPUT"
+  CLEANUP_TMP="$RESOLVED_INPUT"
+fi
+cleanup() { [ -n "$CLEANUP_TMP" ] && rm -f "$CLEANUP_TMP" 2>/dev/null; }
+trap cleanup EXIT
+
+# --- Preferred path: node ------------------------------------------------
+if command -v node >/dev/null 2>&1; then
+  node - "$SOURCE_TYPE" "$REVIEWER_ID" "$FAMILY" "$RAW_OUTPUT_PATH" "$MODEL" "$RESOLVED_INPUT" "$SCHEMA_PATH" <<'NODE_SCRIPT'
+const fs = require('fs');
+const [, , sourceType, reviewerId, family, rawOutputPathArg, model, inputFile, schemaPath] = process.argv;
+const rawOutputPath = rawOutputPathArg.length > 0 ? rawOutputPathArg : null;
+
+const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
+const SEVERITY_VALUES = schema.properties.severity.enum;
+const SOURCE_TYPE_VALUES = schema.properties.source.properties.source_type.enum;
+const TITLE_MAX = schema.properties.title.maxLength;
+const LINE_NUMBER_RE = new RegExp(schema.properties.finding_id.not.pattern, 'i');
+const REQUIRED_FIELDS = schema.required;
+
+function isNonEmptyString(v) { return typeof v === 'string' && v.length > 0; }
+
+function validateFinding(f) {
+  const errors = [];
+  if (typeof f !== 'object' || f === null || Array.isArray(f)) return ['finding must be an object'];
+  for (const field of REQUIRED_FIELDS) {
+    if (field === 'source') continue;
+    if (!isNonEmptyString(f[field])) errors.push(`missing "${field}"`);
+  }
+  if (isNonEmptyString(f.finding_id) && LINE_NUMBER_RE.test(f.finding_id)) errors.push('finding_id contains a line number');
+  if (f.severity !== undefined && !SEVERITY_VALUES.includes(f.severity)) errors.push('invalid severity');
+  if (isNonEmptyString(f.title) && f.title.length > TITLE_MAX) errors.push('title too long');
+  if (!f.source || typeof f.source !== 'object') errors.push('missing source');
+  else {
+    if (!isNonEmptyString(f.source.reviewer_id)) errors.push('missing source.reviewer_id');
+    if (!isNonEmptyString(f.source.family)) errors.push('missing source.family');
+    if (!SOURCE_TYPE_VALUES.includes(f.source.source_type)) errors.push('invalid source.source_type');
+  }
+  return errors;
+}
+
+// Extracts the interior of the FIRST fenced code block found anywhere in
+// the text, tolerating prelude/postlude prose the CLI printed around it
+// (a banner line, "Here is my review:", trailing "Thanks!", etc.). When no
+// fence is present, the trimmed text is used unchanged.
+const FENCE_RE = /```(?:json)?\r?\n?([\s\S]*?)```/;
+function stripFence(text) {
+  const m = FENCE_RE.exec(text);
+  return m ? m[1].trim() : text.trim();
+}
+
+function stripTrailingCommas(text) {
+  return text.replace(/,(\s*[}\]])/g, '$1');
+}
+
+function tryParse(text) {
+  try { return { ok: true, value: JSON.parse(text) }; } catch { return { ok: false }; }
+}
+
+function mergeUsage(a, b) {
+  if (!b || typeof b !== 'object') return a;
+  if (!a) return { ...b };
+  const sum = (x, y) => (typeof x === 'number' ? x : 0) + (typeof y === 'number' ? y : 0);
+  return {
+    input_tokens: sum(a.input_tokens, b.input_tokens),
+    output_tokens: sum(a.output_tokens, b.output_tokens),
+    model: b.model ?? a.model ?? null,
+  };
+}
+
+// NDJSON join: each non-empty line parses independently as JSON. Lines
+// carrying a `findings` array are merged (concatenated) and their `usage`
+// objects combined (summed token counts, last non-null model wins). A line
+// that is itself a bare finding/object is pushed directly. Mirrors
+// gemini-review-prompter.md's "streaming envelope shape" Known Gotcha.
+function tryNdjsonJoin(text) {
+  const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+  if (lines.length < 2) return { ok: false };
+  const parsedLines = [];
+  for (const line of lines) {
+    const p = tryParse(line);
+    if (!p.ok) return { ok: false };
+    parsedLines.push(p.value);
+  }
+  const findings = [];
+  let usage = null;
+  for (const v of parsedLines) {
+    if (v && typeof v === 'object' && !Array.isArray(v) && Array.isArray(v.findings)) {
+      findings.push(...v.findings);
+    } else if (Array.isArray(v)) {
+      findings.push(...v);
+    } else if (v && typeof v === 'object') {
+      findings.push(v);
+    }
+    if (v && typeof v === 'object' && v.usage) usage = mergeUsage(usage, v.usage);
+  }
+  return { ok: true, value: { findings, usage } };
+}
+
+function extractFindingsAndUsage(parsedValue) {
+  if (Array.isArray(parsedValue)) return { findings: parsedValue, usage: null };
+  if (parsedValue && typeof parsedValue === 'object') {
+    const findings = parsedValue.findings === null || parsedValue.findings === undefined ? [] : parsedValue.findings;
+    return { findings: Array.isArray(findings) ? findings : [], usage: parsedValue.usage ?? null };
+  }
+  return { findings: [], usage: null };
+}
+
+function normalize(rawText) {
+  const text = stripFence(rawText);
+
+  let parsed = tryParse(text);
+  if (parsed.ok) return { ok: true, ...extractFindingsAndUsage(parsed.value) };
+
+  const ndjson = tryNdjsonJoin(text);
+  if (ndjson.ok) return { ok: true, findings: ndjson.value.findings, usage: ndjson.value.usage };
+
+  const destrailed = stripTrailingCommas(text);
+  parsed = tryParse(destrailed);
+  if (parsed.ok) return { ok: true, ...extractFindingsAndUsage(parsed.value) };
+
+  const ndjson2 = tryNdjsonJoin(destrailed);
+  if (ndjson2.ok) return { ok: true, findings: ndjson2.value.findings, usage: ndjson2.value.usage };
+
+  return { ok: false };
+}
+
+function printEnvelope(env) { process.stdout.write(JSON.stringify(env) + '\n'); }
+function failEnvelope(code, message) {
+  return { status: 'failed', error_code: code, error_message: message, findings: [], usage: null, raw_output_path: rawOutputPath };
+}
+
+const rawText = fs.readFileSync(inputFile, 'utf8');
+
+if (rawText.trim().length === 0) {
+  printEnvelope(failEnvelope(
+    'parse_failed',
+    'validate-findings received empty input; nothing to parse.',
+  ));
+  process.exit(0);
+}
+
+const result = normalize(rawText);
+
+if (!result.ok) {
+  printEnvelope(failEnvelope(
+    'parse_failed',
+    'validate-findings could not parse the CLI output into the canonical envelope (fence-strip, NDJSON-join, and trailing-comma-strip all failed). Raw output preserved at raw_output_path.',
+  ));
+  process.exit(0);
+}
+
+const source = { reviewer_id: reviewerId, family, source_type: sourceType };
+const validFindings = [];
+let droppedCount = 0;
+for (const f of result.findings) {
+  const withSource = (f && typeof f === 'object' && !Array.isArray(f)) ? { ...f, source } : { source };
+  const errors = validateFinding(withSource);
+  if (errors.length === 0) {
+    validFindings.push(withSource);
+  } else {
+    droppedCount += 1;
+    process.stderr.write(`validate-findings: dropped a finding failing schema validation: ${JSON.stringify(errors)}\n`);
+  }
+}
+
+let usage = result.usage;
+if (usage && typeof usage === 'object' && !usage.model && model) usage = { ...usage, model };
+
+printEnvelope({
+  status: 'success',
+  error_code: null,
+  error_message: droppedCount > 0 ? `${droppedCount} finding(s) dropped: failed canonical-finding schema validation.` : null,
+  findings: validFindings,
+  usage: usage ?? null,
+  raw_output_path: rawOutputPath,
+});
+process.exit(0);
+NODE_SCRIPT
+  exit $?
+fi
+
+# --- Fallback path: jq (no node on PATH) ---------------------------------
+if command -v jq >/dev/null 2>&1; then
+  # 1. Fence-strip: extract the interior of the FIRST fenced code block
+  #    found anywhere in the blob (tolerating prelude/postlude prose); when
+  #    no fence is present, pass the blob through unchanged.
+  FENCE_STRIPPED="$(mktemp 2>/dev/null || printf '/tmp/validate-findings-fence-%s' "$$")"
+  awk '
+    BEGIN { infence = 0; found = 0 }
+    /^```/ {
+      if (infence) { infence = 0; found = 1; next }
+      else { infence = 1; next }
+    }
+    { if (infence) print; else if (!found) other[NR] = $0 }
+    END {
+      if (!found) { for (i = 1; i <= NR; i++) if (i in other) print other[i] }
+    }
+  ' "$RESOLVED_INPUT" > "$FENCE_STRIPPED"
+
+  JQ_PROGRAM='
+    def merge_usage(a; b):
+      if (b == null) then a
+      elif (a == null) then b
+      else {
+        input_tokens: ((a.input_tokens // 0) + (b.input_tokens // 0)),
+        output_tokens: ((a.output_tokens // 0) + (b.output_tokens // 0)),
+        model: (b.model // a.model // null)
+      } end;
+
+    def extract:
+      if (type == "array") then {findings: ., usage: null}
+      else {findings: (if (.findings == null) then [] else .findings end), usage: (.usage // null)}
+      end;
+
+    def ndjson_join($text):
+      ($text / "\n" | map(select(length > 0))) as $lines
+      | if ($lines | length) < 2 then null
+        else
+          ($lines | map(try fromjson catch null)) as $parsed
+          | if ($parsed | any(. == null)) then null
+            else
+              reduce $parsed[] as $v
+                ({findings: [], usage: null};
+                  (if ($v | type) == "array" then .findings += $v
+                   elif ($v.findings? != null) then .findings += $v.findings
+                   else .findings += [$v] end)
+                  | .usage = merge_usage(.usage; $v.usage?))
+            end
+        end;
+
+    ($raw | try fromjson catch null) as $direct
+    | if $direct != null then ($direct | extract)
+      else (ndjson_join($raw)) end
+  '
+
+  RAW_FOR_JQ="$(cat "$FENCE_STRIPPED")"
+
+  if [ -z "$(tr -d '[:space:]' < "$FENCE_STRIPPED")" ]; then
+    RESULT=""
+  else
+    RESULT="$(jq -c -n --arg raw "$RAW_FOR_JQ" "$JQ_PROGRAM" 2>/dev/null)"
+  fi
+
+  if [ -z "$RESULT" ] || [ "$RESULT" = "null" ]; then
+    # Retry once after a whole-blob trailing-comma strip (newlines
+    # collapsed first so the bracket-lookahead works across line breaks).
+    DESTRAILED="$(tr -d '\n' < "$FENCE_STRIPPED" | sed -E 's/,([[:space:]]*[]}])/\1/g')"
+    if [ -n "$DESTRAILED" ]; then
+      RESULT="$(jq -c -n --arg raw "$DESTRAILED" "$JQ_PROGRAM" 2>/dev/null)"
+    fi
+  fi
+  rm -f "$FENCE_STRIPPED" 2>/dev/null
+
+  if [ -z "$RESULT" ] || [ "$RESULT" = "null" ]; then
+    printf '{"status":"failed","error_code":"parse_failed","error_message":"validate-findings could not parse the CLI output into the canonical envelope (fence-strip, NDJSON-join, and trailing-comma-strip all failed). Raw output preserved at raw_output_path.","findings":[],"usage":null,"raw_output_path":%s}\n' \
+      "$(json_raw_output_path)"
+    exit 0
+  fi
+
+  jq -c -n \
+    --argjson result "$RESULT" \
+    --arg reviewer_id "$REVIEWER_ID" \
+    --arg family "$FAMILY" \
+    --arg source_type "$SOURCE_TYPE" \
+    --arg raw_output_path "$RAW_OUTPUT_PATH" \
+    --arg model "$MODEL" \
+    --slurpfile schema_arr "$SCHEMA_PATH" \
+    '
+      ($schema_arr[0]) as $schema
+      | ($schema.properties.severity.enum) as $severities
+      | ($schema.properties.source.properties.source_type.enum) as $source_types
+      | ($schema.properties.title.maxLength) as $title_max
+      | ($schema.properties.finding_id.not.pattern) as $line_number_pattern
+      | ($schema.required) as $required
+      | ({reviewer_id: $reviewer_id, family: $family, source_type: $source_type}) as $source
+      | ($result.findings // []) as $findings
+      | (reduce $findings[] as $f
+          ({valid: [], dropped: 0};
+            ((if ($f | type) == "object" then $f else {} end) + {source: $source}) as $wf
+            | ([$required[] | select(. != "source") | select(($wf[.] // "") == "" )] | length) as $missing
+            | (if ($wf.severity != null and ($severities | index($wf.severity)) == null) then 1 else 0 end) as $bad_sev
+            | (if ($source_types | index($source_type)) == null then 1 else 0 end) as $bad_src
+            | (if ($wf.finding_id != null and ($wf.finding_id | test($line_number_pattern; "i"))) then 1 else 0 end) as $bad_id
+            | (if ($wf.title != null and ($wf.title | length) > $title_max) then 1 else 0 end) as $bad_title
+            | (if ($missing + $bad_sev + $bad_src + $bad_id + $bad_title) == 0 then
+                 {valid: (.valid + [$wf]), dropped: .dropped}
+               else
+                 {valid: .valid, dropped: (.dropped + 1)}
+               end)
+          )
+        ) as $out
+      | (if ($result.usage != null and ($result.usage.model // "") == "" and $model != "") then
+           ($result.usage + {model: $model})
+         else $result.usage end) as $usage
+      | {
+          status: "success",
+          error_code: null,
+          error_message: (if $out.dropped > 0 then "\($out.dropped) finding(s) dropped: failed canonical-finding schema validation." else null end),
+          findings: $out.valid,
+          usage: $usage,
+          raw_output_path: (if ($raw_output_path | length) > 0 then $raw_output_path else null end)
+        }
+    '
+  exit 0
+fi
+
+# --- No interpreter available -------------------------------------------
+printf '{"status":"failed","error_code":"unknown_error","error_message":"Neither node nor jq is available on PATH; validate-findings cannot normalize adapter output.","findings":[],"usage":null,"raw_output_path":%s}\n' \
+  "$(json_raw_output_path)"
+exit 0

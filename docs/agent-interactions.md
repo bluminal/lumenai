@@ -41,18 +41,11 @@ Agents are organized into four layers: **Orchestration** (drive commands and del
    +---------------+ +---------------+ +------------------+
 
    UTILITY LAYER (Haiku-backed helpers)
-   +------------------+ +------------------+ +------------------+
-   | Findings         | | Plan Linter      | | Plan Scribe      |
-   | Consolidator     | | (structural      | | (applies PM's    |
-   | (dedup N reviews)| |  pre-review)     | |  edits to plan)  |
-   +------------------+ +------------------+ +------------------+
-   +-------------------------+
-   | Commit Message Author   |
-   | (detects project        |
-   |  convention; defaults   |
-   |  to Conventional        |
-   |  Commits 1.0.0)         |
-   +-------------------------+
+   +------------------+
+   | Findings         |
+   | Consolidator     |
+   | (dedup N reviews)|
+   +------------------+
 ```
 
 ---
@@ -73,14 +66,11 @@ Agents are organized into four layers: **Orchestration** (drive commands and del
 | **Tech Lead** | Performance Engineer | Performance analysis of implemented code |
 | **Tech Lead** | SRE Agent | Operational readiness for new services |
 | **Tech Lead** | Technical Writer | Documentation for implemented features |
-| **Tech Lead** | Commit Message Author | Authoring the commit message when the caller requests a commit (Haiku, detects project convention, defaults to Conventional Commits 1.0.0) |
 | **Lead Frontend Engineer** | Quality Engineer | Frontend test writing (component tests, interaction tests) |
 | **Lead Frontend Engineer** | Design System Agent | Design system consultation, compliance questions |
-| **Lead Frontend Engineer** | Commit Message Author | Authoring the commit message when the caller requests a commit |
 | **Product Manager** | UX Researcher | User research to inform product decisions |
 | **Product Manager** | Metrics Analyst | Product metrics to inform roadmap decisions |
-| **Product Manager** | Plan Scribe | Mechanical application of PM's decided edits to the plan document |
-| **`write-implementation-plan` command** | Plan Linter | Pre-review structural audit (once per draft cycle) |
+| **`write-implementation-plan` command** | `scripts/lint-plan.mjs` (script, FR-HM26) | Pre-review structural audit (once per draft cycle) |
 | **`write-implementation-plan` command** | Findings Consolidator | Dedup/group/sort reviewer findings before PM reads them |
 | **`review-code` command** | Findings Consolidator | Dedup/group/sort findings from Code Reviewer, Security Reviewer, Performance Engineer, Design System Agent |
 | **`refine-requirements` command** | Findings Consolidator | Dedup/group/sort PRD reviewer findings before PM triages them |
@@ -113,15 +103,15 @@ Agents are organized into four layers: **Orchestration** (drive commands and del
 ### `write-implementation-plan`
 
 ```
-User → PM drafts plan → Plan Linter (structural audit, Haiku)
+User → PM drafts plan → lint-plan.mjs (structural audit, script)
                        → PM addresses structural findings
                        → Reviewers (in parallel):
                           ├── Architect (feasibility, NFRs, architecture)
                           ├── Design System Agent (design tasks, UX impact)
                           └── Tech Lead (task clarity, parallelizability)
                        → Findings Consolidator (dedup/group/sort, Haiku)
-                       → PM addresses consolidated findings (delegates writes to Plan Scribe)
-                       → Re-review if needed → Plan Scribe writes final plan
+                       → PM addresses consolidated findings (edits the plan in place)
+                       → Re-review if needed → PM removes the DRAFT marker to finalize
 ```
 
 ### `next-priority`
@@ -133,7 +123,7 @@ User → Analyze plan → Select top tasks → For each task (in parallel):
                                                 ├── May delegate to Quality Eng.
                                                 ├── May request Security Review
                                                 ├── May request Design System review
-                                                └── Commit Message Author (Haiku) per commit
+                                                └── Writes its own commit message (FR-HM27) per commit
                                          → Validate → Merge → Update plan
 ```
 
@@ -320,7 +310,7 @@ All advisory agents follow the same quality gate pattern:
 | **Advisory** | Metrics Analyst, Design System Agent (compliance mode), SRE Agent | Provides analysis and recommendations |
 | **Planning + Strategy** | Product Manager | Gathers requirements, creates plans |
 | **Planning + Advisory** | Architect, UX Researcher, Retrospective Facilitator, Design System Agent (plan review mode) | Designs approaches, provides structured guidance |
-| **Utility (Haiku-backed)** | Findings Consolidator, Plan Linter, Plan Scribe, Commit Message Author | Narrow-scope helpers that let expensive agents delegate mechanical work (deduplication, structural audit, document rewriting, commit-message authoring) |
+| **Utility (Haiku-backed)** | Findings Consolidator | Narrow-scope helper that lets expensive agents delegate deduplication. Structural plan audit is the zero-token `scripts/lint-plan.mjs` (FR-HM26); the PM edits the plan in place and agents write commit messages directly (FR-HM27). |
 
 ---
 

@@ -34,13 +34,62 @@ Check if `@{config_path}` already exists.
 
 ### 2. Create Configuration File
 
-Read the default configuration template from the plugin's `config/defaults.yaml` file (located relative to this command at `../config/defaults.yaml`) using the **Read** tool. Then create the directory `.synthex/` in the project root if it doesn't exist, and write the template content to `@{config_path}` using the **Write** tool.
+Run `plugins/synthex/scripts/init-scaffold.sh` (resolved from the installed plugin root — Claude Code: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/init-scaffold.sh" "@{config_path}"`) as ONE Bash call. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
-**Implementation rules — strict:**
+The script (FR-HM26) does the mechanical work this step and Step 8 used to describe by hand, in one call:
 
-- Use the **Read** tool to load `defaults.yaml`. Use the **Write** tool to create the project config. **Do NOT use `cp`, `cat >`, `sed -i`, `tee`, or any shell command that takes the defaults path as an argument.** Shell commands trigger Claude Code's sensitive-file permission prompt (which flags both source and destination of `cp`) and risk argument-order bugs that could overwrite the plugin's defaults.
-- The plugin's `defaults.yaml` is **read-only**. Never write to it, never pass it as a destination argument to any tool, never edit it. It is a template, not project state.
-- The destination `@{config_path}` (default `.synthex/config.yaml`) is the only file this step creates.
+- Copies the plugin's `config/defaults.yaml` to `@{config_path}` (default `.synthex/config.yaml`) byte-for-byte — no transformation. **Idempotent:** an existing config file is left untouched by this call. If Step 1's "reset to defaults" choice was picked, re-run with a trailing `--force` to overwrite it.
+- Creates the standard document directories from Step 8 if they don't already exist.
+- FR-HM27 (D24): samples up to 50 commits (`git log`) and writes the majority-vote result to `git.commit_convention` in `@{config_path}` (one of `conventional`, `issue-key`, `gitmoji`, `plain`, or `auto` when no pattern reaches a 60% majority). Prints `Detected commit convention: <value> (from <N> commits)`. This runs on every invocation (not gated by idempotency), so re-running `init` re-samples history. The `scripts/commit-lint.sh` `PreToolUse` hook only lints when this key is explicitly `conventional`.
+
+It checks writability before writing and exits non-zero with a clear message if a target directory can't be written to (e.g. a read-only sandbox). Print its stdout/stderr to the user verbatim — it reports exactly what it created. The plugin's `config/defaults.yaml` stays read-only; the script never writes to it, and never takes it as anything but a read source.
+
+**Fallback (no shell tool, or the script is missing):** use the **Read** tool to load the plugin's `config/defaults.yaml` and the **Write** tool to create `@{config_path}` (skip it if the file exists, unless "reset to defaults" was chosen), then create the Step 8 directories. For the commit-convention detection, read up to 50 subjects from `git log` (whatever tool the host offers for running `git`), classify each against Conventional Commits (`^(feat|fix|perf|refactor|revert|build|ci|chore|docs|style|test)(\([^)]+\))?!?:`), an issue-key prefix (e.g. `PROJ-1234: ...` or `[PROJ-1234] ...`), or a gitmoji shortcode (`^:[a-z0-9_+-]+:`); if one category reaches 60% or more, write that value to `git.commit_convention`, otherwise write `auto`. Print the same `Detected commit convention: <value> (from <N> commits)` line. **Do NOT use `cp`, `cat >`, `sed -i`, `tee`, or any shell command that takes the defaults path as an argument**: Claude Code's permission engine flags both paths of `cp`, and an argument-order slip could overwrite the plugin's template.
+
+#### 2a. Detect and Write Project Facts
+
+FR-HM29 (D12): detect the four project facts below and write them to `.synthex/facts.md`, each under its own anchor with an inline freshness-rule comment. This is model work (detection reads the repo directly), not a script — there is nothing here a zero-token script does more simply.
+
+| Fact | Anchor | Freshness rule | How to detect |
+|------|--------|-----------------|----------------|
+| `commit_convention` | `#commit-convention` | Re-verify when HEAD has moved more than 50 commits past `recorded_sha` | Read the `git.commit_convention` value Step 2 just wrote to `@{config_path}` (FR-HM27) |
+| `test_runner` (+ coverage command) | `#test-runner` | Re-verify when `package.json` or `pytest.ini` mtime is newer than `recorded_at` | Inspect `package.json` scripts/devDependencies, `pytest.ini`, `vitest.config.*`, `jest.config.*` |
+| `frontend_framework` | `#frontend-framework` | Same rule as `test_runner` | Inspect `package.json` dependencies for React/Vue/Angular/Svelte, or `@docs/specs/frontend.md` |
+| `spec_index` (path glob to spec file map) | `#spec-index` | Re-verify when `docs/specs` mtime is newer than `recorded_at` | Glob `docs/specs/**/*.md` and record a path → title map |
+
+Write `.synthex/facts.md` with the **Write** tool in this format (omit a fact's section entirely if it can't be detected — never write a guess):
+
+```markdown
+# Project Facts
+
+Auto-generated by `/synthex:init`. Commands read this file first; if a fact
+is missing or stale per its freshness rule, they fall back to detecting it
+directly, the same way they did before this file existed.
+
+## commit_convention {#commit-convention}
+<!-- freshness: re-verify when HEAD is >50 commits past recorded_sha -->
+recorded_sha: <sha>
+value: conventional | issue-key | gitmoji | plain | auto
+
+## test_runner {#test-runner}
+<!-- freshness: re-verify when package.json or pytest.ini mtime > recorded_at -->
+recorded_at: <ISO-8601 timestamp>
+runner: vitest
+coverage_command: npx vitest run --coverage
+
+## frontend_framework {#frontend-framework}
+<!-- freshness: re-verify when package.json or pytest.ini mtime > recorded_at -->
+recorded_at: <ISO-8601 timestamp>
+value: react | vue | angular | svelte | none
+
+## spec_index {#spec-index}
+<!-- freshness: re-verify when docs/specs mtime > recorded_at -->
+recorded_at: <ISO-8601 timestamp>
+paths:
+  - docs/specs/foo.md: "Foo Spec"
+```
+
+Print `Wrote <N> facts to .synthex/facts.md`, where `<N>` is the count of fact sections actually written (0-4).
 
 ### 3. Configure Concurrent Tasks
 
@@ -110,11 +159,12 @@ Delegate to the `/synthex:configure-multi-model` wizard at `plugins/synthex/comm
 
 ### 5. Update .gitignore
 
-Check if `.gitignore` exists in the project root. Ensure it contains entries for **three** synthex-managed paths:
+Check if `.gitignore` exists in the project root. Ensure it contains entries for **four** synthex-managed paths:
 
 1. The worktrees base path (`.claude/worktrees` by default, or the value from `worktrees.base_path` in the config file).
 2. The synthex upgrade-nudge state file (`.synthex/state.json`) — per FR-UO24, this file is per-developer/per-clone and must not be committed.
 3. The synthex native-looping state directory (`.synthex/loops/`) — per D-NL14, loop state is per-developer/per-clone (each loop is per-session and includes a `session_id`).
+4. The synthex project facts file (`.synthex/facts.md`) — per FR-HM29 (D12), facts carry recorded SHAs and mtimes that differ per clone, so it is not committed.
 
 For each entry:
 
@@ -133,6 +183,9 @@ Concretely, the resulting block to append (omitting any lines already present) i
 
 # Synthex native-looping state (per-session, per-developer)
 .synthex/loops/
+
+# Synthex cached project facts (per-clone SHAs and mtimes; FR-HM29)
+.synthex/facts.md
 ```
 
 ### 6. Create `.worktreeinclude`
@@ -164,7 +217,7 @@ Delegate to the `/synthex:star` command at `plugins/synthex/commands/star.md`. R
 
 ### 8. Create Document Directories
 
-Create the following directories if they don't already exist:
+Already done — the Step 2 script call (`init-scaffold.sh`) created these directories if they didn't already exist:
 - `docs/reqs/` — Product requirements documents
 - `docs/plans/` — Implementation plans
 - `docs/specs/` — Technical specifications
@@ -173,7 +226,7 @@ Create the following directories if they don't already exist:
 - `docs/runbooks/` — Operational runbooks
 - `docs/retros/` — Retrospective documents
 
-Do NOT create any files inside these directories — just the directories.
+No action needed here; this step is a no-op kept for numbering continuity with Step 9's confirmation output. Do NOT create any files inside these directories — just the directories, and only via the Step 2 script (never ad hoc).
 
 ### 9. Confirm and Guide
 
@@ -184,6 +237,7 @@ Synthex initialized for this project.
 
 Created:
   .synthex/config.yaml           — Project configuration (concurrent_tasks: {chosen_value})
+  .synthex/facts.md              — Cached project facts (Wrote {N} facts to .synthex/facts.md)
   .gitignore                     — Added worktrees path (if not present)
   .worktreeinclude               — Env files copied into new Claude Code worktrees (if not present)
   docs/reqs/                     — Product requirements (PRDs)

@@ -23,6 +23,7 @@ import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   HERMES_READ_FILE_NOTE,
+  HOSTS,
   HOST_IDS,
   renderHostsEnv,
   renderHostsTable,
@@ -152,8 +153,6 @@ export const COMMAND_DESCRIPTIONS = {
 export const AGENT_DESCRIPTIONS = {
   architect:
     'Reviews system architecture, feasibility, and technical trade-offs; writes ADRs and RFC sections.',
-  'audit-artifact-writer':
-    'Writes per-invocation multi-model review audit markdown files from a unified findings envelope.',
   'bedrock-review-prompter':
     'Adapter that invokes AWS Bedrock as an external code-review proposer in multi-model review.',
   'claude-review-prompter':
@@ -162,10 +161,6 @@ export const AGENT_DESCRIPTIONS = {
     'Reviews code for craftsmanship, correctness, convention adherence, and reuse opportunities.',
   'codex-review-prompter':
     'Adapter that invokes the OpenAI Codex CLI as an external proposer in multi-model review.',
-  'commit-message-author':
-    'Writes a Conventional-Commits-style commit message from a staged or specified change set.',
-  'context-bundle-assembler':
-    'Assembles the shared context bundle (files, diffs, conventions) delivered to review proposers.',
   'design-system-agent':
     'Owns the design token registry and component library; audits frontend design-system compliance.',
   'findings-consolidator':
@@ -184,10 +179,6 @@ export const AGENT_DESCRIPTIONS = {
     'Adapter that POSTs to a local Ollama server as an external code-review proposer.',
   'performance-engineer':
     'Analyzes full-stack performance: Core Web Vitals, queries, and bundles, with quantified fixes.',
-  'plan-linter':
-    'Runs fast structural checks on a draft implementation plan before expensive reviewers see it.',
-  'plan-scribe':
-    "Applies the Product Manager's decided edits to an implementation plan document mechanically.",
   'product-manager':
     'Gathers requirements and turns them into a prioritized, value-driven implementation plan.',
   'quality-engineer':
@@ -421,6 +412,41 @@ Set \`SYNTHEX_HOST=<id>\` before running any \`scripts/*.sh\` so \`loop-step.sh 
 `;
 }
 
+// Task 46 (FR-HM27, D25): the generated Codex hook manifest. Codex's plugin
+// manifest points `hooks` at this file (Claude JSON shape, per
+// docs/reqs/harness-modernization.md's host notes) rather than the
+// hand-authored hooks/hooks.json Claude Code uses, because Codex must never
+// inherit Claude-only events (`Stop`, `SessionStart`, `TaskCompleted`,
+// `TeammateIdle` -- the last two don't exist yet, added by Task 50). Built
+// entirely from `HOSTS.codex.hookAllowlist` (single-sourced in
+// host-matrix.mjs) so the set of events Codex gets can only ever be a
+// subset of what that allowlist authorizes; today that is commit-lint's
+// PreToolUse entry only, using Codex's own Bash-equivalent tool name
+// (`toolMap.Bash`) as the matcher instead of Claude's `"Bash"`.
+const CODEX_HOOKS_RELATIVE_PATH = 'hooks/codex-hooks.json';
+const CODEX_HOOKS_PATH = join(pluginRoot, 'hooks', 'codex-hooks.json');
+
+function codexHooksJsonContents() {
+  const allowlist = HOSTS.codex.hookAllowlist;
+  const hooks = {};
+
+  if (allowlist?.events.includes('PreToolUse')) {
+    hooks.PreToolUse = [
+      {
+        matcher: allowlist.matcher,
+        hooks: [
+          {
+            type: 'command',
+            command: '${CLAUDE_PLUGIN_ROOT}/scripts/commit-lint.sh',
+          },
+        ],
+      },
+    ];
+  }
+
+  return `${JSON.stringify({ hooks }, null, 2)}\n`;
+}
+
 function skillContents(entry) {
   const skillDir = join(skillsRoot, entry.slug);
   const sourcePath = resolve(pluginRoot, entry.manifestPath);
@@ -491,11 +517,13 @@ function main() {
     writeFileSync(TOOL_MAP_DOCS_PATH, expectedToolMapDoc);
   }
 
-  // FR-HM41 (Task 35): docs/hosts.md and config/hosts.env, same --check
-  // contract as docs/tool-map.md above.
+  // FR-HM41 (Task 35): docs/hosts.md and config/hosts.env; Task 46
+  // (FR-HM27, D25): hooks/codex-hooks.json. Same --check contract as
+  // docs/tool-map.md above.
   for (const [path, expectedContents] of [
     [HOSTS_DOCS_PATH, hostsDocContents()],
     [HOSTS_ENV_PATH, renderHostsEnv()],
+    [CODEX_HOOKS_PATH, codexHooksJsonContents()],
   ]) {
     if (checkOnly) {
       if (!existsSync(path) || readFileSync(path, 'utf8') !== expectedContents) {

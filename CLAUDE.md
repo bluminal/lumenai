@@ -96,7 +96,7 @@ The agent always opens a **draft** PR — a human reviews and merges. If the age
 
 Implications for contributors:
 
-- Use Conventional Commit subjects on every commit that lands on `main` (the `commit-message-author` agent does this by default).
+- Use Conventional Commit subjects on every commit that lands on `main` (the Tech Lead / Lead Frontend Engineer / `next-priority` command write these directly, per FR-HM27; a fail-open `PreToolUse` hook — `scripts/commit-lint.sh` — lints them when `git.commit_convention` is explicitly `conventional`).
 - Mark breaking changes with `<type>!:` or a `BREAKING CHANGE:` footer — getting this wrong means a major change ships as a minor.
 - The bot pushes the release commit and tag using `GITHUB_TOKEN`, which by GitHub policy does not re-trigger workflows, so there's no release loop.
 
@@ -148,12 +148,7 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 
 | Agent | Role | Type |
 |-------|------|------|
-| `commit-message-author` | Authors a single commit message from a change set; detects project convention from `git log`, defaults to Conventional Commits 1.0.0 | Utility |
 | `findings-consolidator` | Dedup, group, and sort findings from multiple reviewers (preserves attribution) | Utility |
-| `plan-linter` | Structural audit of implementation plan drafts against the template rubric | Utility |
-| `plan-scribe` | Applies Product Manager's decided edits to the plan document mechanically | Utility |
-| `context-bundle-assembler` | Haiku-backed; assembles the canonical context bundle delivered to every multi-model review proposer (FR-MR28, D5) | Utility |
-| `audit-artifact-writer` | Haiku-backed; writes per-invocation audit-artifact markdown files for multi-model review runs (FR-MR24). Command-agnostic per D20. | Utility |
 | `codex-review-prompter` | Haiku-backed; OpenAI Codex CLI adapter for multi-model review (`agentic` tier; family `openai`) | Utility |
 | `gemini-review-prompter` | Haiku-backed; Google Gemini CLI adapter for multi-model review (`agentic` tier; family `google`) | Utility |
 | `ollama-review-prompter` | Haiku-backed; local Ollama HTTP API adapter for multi-model review (`text-only` tier; family `local-<model>`) | Utility |

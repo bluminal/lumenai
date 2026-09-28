@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://synthex.bluminal.dev/schemas/canonical-finding.json",
+  "title": "Canonical Finding",
+  "description": "Normative contract for every finding flowing through the multi-model review orchestrator (FR-MR13, D13). Single source of truth: this file. tests/schemas/canonical-finding.ts loads it at runtime and derives its enums, required-field list, and length limits from it, and plugins/synthex/scripts/validate-findings loads it to validate findings before printing the adapter envelope (FR-HM28), so neither can drift from this file. Prose mirror (field semantics, examples): plugins/synthex/agents/_shared/canonical-finding-schema.md.",
+  "type": "object",
+  "required": ["finding_id", "severity", "category", "title", "description", "file", "source"],
+  "properties": {
+    "finding_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier for fingerprint dedup (Stage 1). MUST NOT contain line numbers — line numbers shift across edits and would break dedup.",
+      "not": { "pattern": ":\\d+|[Ll]\\d+|line[-_]\\d+" }
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low"]
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "description": "e.g. security, correctness, performance, style, maintainability, reliability"
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "description": { "type": "string", "minLength": 1 },
+    "file": { "type": "string", "minLength": 1 },
+    "symbol": { "type": ["string", "null"] },
+    "line_range": {
+      "type": ["object", "null"],
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "integer", "minimum": 1 },
+        "end": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "source": {
+      "type": "object",
+      "required": ["reviewer_id", "family", "source_type"],
+      "properties": {
+        "reviewer_id": { "type": "string", "minLength": 1 },
+        "family": {
+          "type": "string",
+          "minLength": 1,
+          "description": "openai | google | anthropic | local-<model> | etc."
+        },
+        "source_type": {
+          "type": "string",
+          "enum": ["native-team", "external", "native-recovery"]
+        }
+      }
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "raised_by": {
+      "type": "array",
+      "description": "Populated post-consolidation: list of reviewer attributions for this consolidated finding.",
+      "items": {
+        "type": "object",
+        "required": ["reviewer_id", "family", "source_type"],
+        "properties": {
+          "reviewer_id": { "type": "string", "minLength": 1 },
+          "family": { "type": "string", "minLength": 1 },
+          "source_type": {
+            "type": "string",
+            "enum": ["native-team", "external", "native-recovery"]
+          }
+        }
+      }
+    },
+    "superseded_by_verification": { "type": "boolean" },
+    "verification_reasoning": { "type": "string" }
+  }
+}

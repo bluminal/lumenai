@@ -1,7 +1,9 @@
 /**
  * Audit-artifact markdown validator (FR-MR24, NFR-MR4).
  *
- * Source of truth: plugins/synthex/agents/audit-artifact-writer.md (Task 39)
+ * Source of truth: plugins/synthex/scripts/write-audit.mjs (Task 42;
+ * originally plugins/synthex/agents/audit-artifact-writer.md, Task 39 —
+ * the agent is retired and the script reproduces its format exactly)
  *
  * The audit writer produces a markdown file with 7 required sections (1-6 mandatory, 7 conditional)
  * plus 4 optional sections added for multi-model teams support (Tasks 59-60):

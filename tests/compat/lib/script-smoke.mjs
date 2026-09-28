@@ -39,6 +39,7 @@
 
 import { spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -377,6 +378,497 @@ function upgradeNudgeFeatureCase(ctx, includeNode) {
 }
 
 // ---------------------------------------------------------------------------
+// scripts/state-flag.sh — generic boolean-flag writer for .synthex/state
+// .json (FR-HM26, Task 38). The happy-path case proves the node-preferred
+// JSON.parse/stringify branch preserves an unrelated pre-existing field
+// (plugin_root) while setting a new flag; the fallback case proves the
+// sed/awk-only reader+writer does the same with neither jq nor node on
+// PATH.
+// ---------------------------------------------------------------------------
+
+function stateFlagHappyPathCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const synthexDir = join(ctx.workDir, '.synthex');
+  mkdirSync(synthexDir, { recursive: true });
+  writeFileSync(
+    join(synthexDir, 'state.json'),
+    JSON.stringify({
+      schema_version: 1,
+      last_seen_version: '0.5.0',
+      plugin_root: '/opt/synthex',
+      dismissed: false,
+    }),
+  );
+  const result = runScript(ctx.scriptAbsPath, ['dismissed'], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+  });
+  assert(result.code === 0, `state-flag exited ${result.code}: ${result.stderr}`);
+  const state = JSON.parse(readFileSync(join(synthexDir, 'state.json'), 'utf8'));
+  assert(state.dismissed === true, `dismissed was not set: ${JSON.stringify(state)}`);
+  assert(
+    state.plugin_root === '/opt/synthex',
+    `plugin_root was not preserved: ${JSON.stringify(state)}`,
+  );
+  assert(
+    state.last_seen_version === '0.5.0',
+    `last_seen_version was not preserved: ${JSON.stringify(state)}`,
+  );
+}
+
+function stateFlagFallbackCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const synthexDir = join(ctx.workDir, '.synthex');
+  mkdirSync(synthexDir, { recursive: true });
+  // No pre-existing state.json — proves the fallback path also handles the
+  // "seed a fresh file" case, not only field preservation.
+  const result = runScript(ctx.scriptAbsPath, ['starred'], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+  });
+  assert(result.code === 0, `state-flag exited ${result.code}: ${result.stderr}`);
+  const state = JSON.parse(readFileSync(join(synthexDir, 'state.json'), 'utf8'));
+  assert(state.starred === true, `starred was not set: ${JSON.stringify(state)}`);
+  assert(state.schema_version === 1, `schema_version missing: ${JSON.stringify(state)}`);
+}
+
+// ---------------------------------------------------------------------------
+// scripts/init-scaffold.sh — FR-HM26 config + doc-directory scaffold for
+// `/synthex:init` Steps 2/8. No jq/node dependency at all; the fallback
+// case additionally proves the idempotent no-op second run.
+// ---------------------------------------------------------------------------
+
+const INIT_SCAFFOLD_DOC_DIRS = [
+  'docs/reqs',
+  'docs/plans',
+  'docs/specs',
+  'docs/specs/decisions',
+  'docs/specs/rfcs',
+  'docs/runbooks',
+  'docs/retros',
+];
+
+function initScaffoldFreshCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const result = runScript(ctx.scriptAbsPath, [], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+  });
+  assert(result.code === 0, `init-scaffold exited ${result.code}: ${result.stderr}`);
+  assert(
+    result.stdout.includes('Created .synthex/config.yaml'),
+    `init-scaffold did not report the config file: ${JSON.stringify(result.stdout)}`,
+  );
+  const written = readFileSync(join(ctx.workDir, '.synthex', 'config.yaml'));
+  const defaults = readFileSync(join(ctx.pluginRoot, 'config', 'defaults.yaml'));
+  assert(
+    written.equals(defaults),
+    'init-scaffold: written config.yaml is not byte-identical to config/defaults.yaml',
+  );
+  for (const d of INIT_SCAFFOLD_DOC_DIRS) {
+    assert(existsSync(join(ctx.workDir, d)), `init-scaffold did not create ${d}`);
+  }
+}
+
+function initScaffoldIdempotentCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const opts = { pathDir, cwd: ctx.workDir, env: { CLAUDE_PROJECT_DIR: ctx.workDir } };
+  const first = runScript(ctx.scriptAbsPath, [], opts);
+  assert(first.code === 0, `init-scaffold first run exited ${first.code}: ${first.stderr}`);
+
+  const second = runScript(ctx.scriptAbsPath, [], opts);
+  assert(second.code === 0, `init-scaffold second run exited ${second.code}: ${second.stderr}`);
+  // FR-HM27 (Task 46): the config file and doc dirs are still fully
+  // idempotent (no "Created" line), but the commit-convention detection
+  // (D24) re-samples and prints on every run by design, so the second run
+  // is not entirely silent any more.
+  assert(
+    !second.stdout.includes('Created'),
+    `init-scaffold second run should not re-create anything, got: ${JSON.stringify(second.stdout)}`,
+  );
+  assert(
+    second.stdout.includes('Detected commit convention:'),
+    `init-scaffold second run should still print the commit-convention detection line, got: ${JSON.stringify(second.stdout)}`,
+  );
+  for (const d of INIT_SCAFFOLD_DOC_DIRS) {
+    assert(existsSync(join(ctx.workDir, d)), `init-scaffold lost ${d} on the second run`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// scripts/write-audit.mjs — Task 42 (FR-HM26, FR-HM44). Unlike every other
+// registered script, this one has a `#!/usr/bin/env node` shebang and no
+// bash entrypoint at all, so it cannot be exercised through runScript()'s
+// bash-only invocation. The happy-path case spawns node directly (as the
+// orchestrator's Step 9 call site does once its `command -v node` guard
+// passes). The "fallback" case does NOT try to run the node script under a
+// node-less PATH (impossible by construction); per the Task 37 registry's
+// documented allowance for a node-shebang script, it instead proves the
+// CALLING guard itself — the exact `command -v node` pattern
+// multi-model-review-orchestrator.md's Step 9 documents — degrades to a
+// clean non-zero exit with a message when node is absent, which is the
+// condition under which the orchestrator's prose fallback (rendering the
+// same markdown itself via its Write tool) takes over.
+// ---------------------------------------------------------------------------
+
+function writeAuditEnvelopeFixture() {
+  return {
+    command: 'review-code',
+    invocation_metadata: { target: 'staged changes', timestamp: '2026-04-28T10:00:00Z', short_hash: 'c7d8e9f' },
+    config_snapshot: { enabled: true, reviewers: ['codex-review-prompter'] },
+    preflight_result: { summary: '1 reviewer configured, 1 available, 1 family, aggregator: codex-review-prompter' },
+    unified_envelope: {
+      per_reviewer_results: [
+        { reviewer_id: 'code-reviewer', source_type: 'native-team', family: 'anthropic', status: 'success', findings_count: 0, error_code: null, usage: null },
+      ],
+      findings: [],
+      aggregator_resolution: { name: 'codex-review-prompter', source: 'configured' },
+      continuation_event: null,
+    },
+    audit_config: { enabled: true, output_path: 'docs/reviews/' },
+  };
+}
+
+function writeAuditHappyPathCase(ctx) {
+  const pathDir = ctx.buildRestrictedPath(true);
+  const nodeBin = join(pathDir, 'node');
+  const result = spawnSync(nodeBin, [ctx.scriptAbsPath], {
+    cwd: ctx.workDir,
+    env: { PATH: pathDir, CLAUDE_PROJECT_DIR: ctx.workDir },
+    input: JSON.stringify(writeAuditEnvelopeFixture()),
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  assert(result.status === 0, `write-audit.mjs exited ${result.status}: ${result.stderr}`);
+  const parsed = JSON.parse(result.stdout);
+  assert(parsed.status === 'written', `expected status "written", got: ${result.stdout}`);
+  assert(existsSync(parsed.path), `write-audit.mjs reported ${parsed.path} but it does not exist`);
+}
+
+function writeAuditNodeGuardFallbackCase(ctx) {
+  const pathDir = ctx.buildRestrictedPath(false);
+  const bash = join(pathDir, 'bash');
+  // Mirrors multi-model-review-orchestrator.md's Step 9 call site verbatim:
+  // guard with `command -v node`, and degrade cleanly (non-zero exit + a
+  // message) when it is absent — the orchestrator's prose-fallback trigger.
+  const guardScript = [
+    'if command -v node >/dev/null 2>&1; then',
+    `  node "${ctx.scriptAbsPath}"`,
+    'else',
+    '  echo "write-audit: node not found; falling back to prose render (FR-HM26 node-guard fallback)." >&2',
+    '  exit 3',
+    'fi',
+  ].join('\n');
+  const result = spawnSync(bash, ['-c', guardScript], {
+    cwd: ctx.workDir,
+    env: { PATH: pathDir, CLAUDE_PROJECT_DIR: ctx.workDir },
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  assert(result.status === 3, `expected the node-guard fallback to exit 3, got ${result.status}: ${result.stderr}`);
+  assert(/node not found/.test(result.stderr), `expected a node-not-found message, got: ${result.stderr}`);
+}
+
+// ---------------------------------------------------------------------------
+// scripts/lint-plan.mjs — Task 45 (FR-HM26). Same shape as write-audit.mjs
+// above: a `#!/usr/bin/env node` shebang and no bash entrypoint, so the
+// happy-path case spawns node directly (mirroring write-implementation
+// -plan.md Step 5.5's `command -v node` guard once it passes) and the
+// "fallback" case proves that CALLING guard itself degrades cleanly with a
+// message when node is absent — the condition under which Step 5.5's prose
+// fallback (self-checking against docs/plan-lint-rubric.md) takes over.
+// ---------------------------------------------------------------------------
+
+const LINT_PLAN_CLEAN_FIXTURE = [
+  '# Implementation Plan: Smoke Fixture',
+  '',
+  '## Overview',
+  'Fixture plan for the script-smoke suite.',
+  '',
+  '## Decisions',
+  '',
+  '| # | Decision | Context | Rationale |',
+  '|---|----------|---------|-----------|',
+  '| D1 | Keep it small. | Smoke test. | Speed. |',
+  '',
+  '## Open Questions',
+  '',
+  '| # | Question | Impact | Status |',
+  '|---|----------|--------|--------|',
+  '| Q1 | None. | None. | Resolved |',
+  '',
+  '## Phase 1: Only Phase',
+  '',
+  '### Milestone 1.1: Only Milestone',
+  '| # | Task | Complexity | Dependencies | Status |',
+  '|---|------|-----------|--------------|--------|',
+  '| 1 | Do the thing. | S | None | done |',
+  '',
+  '**Task 1 Acceptance Criteria:** `[T]` The thing is done.',
+  '',
+  '**Parallelizable:** None.',
+  '**Milestone Value:** Ships the thing.',
+  '',
+].join('\n');
+
+function lintPlanHappyPathCase(ctx) {
+  const pathDir = ctx.buildRestrictedPath(true);
+  const nodeBin = join(pathDir, 'node');
+  const planPath = join(ctx.workDir, 'plan.md');
+  writeFileSync(planPath, LINT_PLAN_CLEAN_FIXTURE);
+  const result = spawnSync(nodeBin, [ctx.scriptAbsPath, planPath], {
+    cwd: ctx.workDir,
+    env: { PATH: pathDir },
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  assert(result.status === 0, `lint-plan.mjs exited ${result.status} on a clean fixture: ${result.stderr}`);
+  const parsed = JSON.parse(result.stdout);
+  assert(parsed.total_findings === 0, `expected a clean fixture to have zero findings, got: ${result.stdout}`);
+  assert(parsed.passed === true, `expected passed: true on a clean fixture, got: ${result.stdout}`);
+}
+
+function lintPlanNodeGuardFallbackCase(ctx) {
+  const pathDir = ctx.buildRestrictedPath(false);
+  const bash = join(pathDir, 'bash');
+  // Mirrors write-implementation-plan.md's Step 5.5 call site verbatim:
+  // guard with `command -v node`, and degrade cleanly (non-zero exit + a
+  // message) when it is absent — the Step 5.5 prose-fallback trigger.
+  const guardScript = [
+    'if command -v node >/dev/null 2>&1; then',
+    `  node "${ctx.scriptAbsPath}" plan.md`,
+    'else',
+    '  echo "lint-plan: node not found; falling back to docs/plan-lint-rubric.md self-check (FR-HM26 node-guard fallback)." >&2',
+    '  exit 3',
+    'fi',
+  ].join('\n');
+  const result = spawnSync(bash, ['-c', guardScript], {
+    cwd: ctx.workDir,
+    env: { PATH: pathDir },
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  assert(result.status === 3, `expected the node-guard fallback to exit 3, got ${result.status}: ${result.stderr}`);
+  assert(/node not found/.test(result.stderr), `expected a node-not-found message, got: ${result.stderr}`);
+}
+
+// ---------------------------------------------------------------------------
+// scripts/assemble-bundle.sh — FR-HM26/FR-HM44 context bundle assembler
+// (replaces the retired `context-bundle-assembler` agent). The happy-path
+// case proves an in-cap file is inlined into `files[]` while an over-cap
+// file is routed to `needs_summary[]` instead, and that `.synthex/tmp/`
+// gets a self-ignoring `.gitignore`; the fallback case proves the same
+// routing works with neither jq nor node on PATH (the script never shells
+// out to either, so both paths are identical by construction — this still
+// proves the sed/awk-only implementation is the ONLY implementation, not a
+// node-preferred one silently masking a broken fallback).
+// ---------------------------------------------------------------------------
+
+function assembleBundleHappyPathCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const artifactPath = join(ctx.workDir, 'artifact.ts');
+  const smallPath = join(ctx.workDir, 'small.ts');
+  const bigPath = join(ctx.workDir, 'big.ts');
+  writeFileSync(artifactPath, 'artifact content\n');
+  writeFileSync(smallPath, 'small\n');
+  writeFileSync(bigPath, 'x'.repeat(90_000));
+
+  const result = runScript(
+    ctx.scriptAbsPath,
+    [
+      'assemble',
+      '--artifact', artifactPath,
+      '--touched', artifactPath,
+      '--touched', smallPath,
+      '--touched', bigPath,
+    ],
+    { pathDir, cwd: ctx.workDir, env: { CLAUDE_PROJECT_DIR: ctx.workDir } },
+  );
+  assert(result.code === 0, `assemble-bundle exited ${result.code}: ${result.stderr}`);
+  const bundlePath = result.stdout.trim();
+  assert(existsSync(bundlePath), `assemble-bundle did not print an existing bundle path: ${JSON.stringify(result.stdout)}`);
+
+  const bundle = JSON.parse(readFileSync(bundlePath, 'utf8'));
+  assert(bundle.status === 'success', `expected status success, got ${JSON.stringify(bundle.status)}`);
+  assert(bundle.manifest.artifact.inlined === true, 'artifact must be inlined');
+  const filePaths = bundle.files.map((f) => f.path);
+  assert(filePaths.includes(smallPath), `small.ts should be inlined: ${JSON.stringify(filePaths)}`);
+  assert(!filePaths.includes(bigPath), `big.ts should NOT be inlined: ${JSON.stringify(filePaths)}`);
+  const needsSummaryPaths = bundle.needs_summary.map((f) => f.path);
+  assert(needsSummaryPaths.includes(bigPath), `big.ts should be in needs_summary: ${JSON.stringify(needsSummaryPaths)}`);
+
+  const gitignorePath = join(ctx.workDir, '.synthex', 'tmp', '.gitignore');
+  assert(existsSync(gitignorePath), '.synthex/tmp/.gitignore was not created');
+  assert(
+    readFileSync(gitignorePath, 'utf8').trim() === '*',
+    `.gitignore should contain "*", got ${JSON.stringify(readFileSync(gitignorePath, 'utf8'))}`,
+  );
+}
+
+function assembleBundleFallbackCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const synthexDir = join(ctx.workDir, '.synthex');
+  mkdirSync(synthexDir, { recursive: true });
+  writeFileSync(
+    join(synthexDir, 'config.yaml'),
+    'multi_model_review:\n  context:\n    max_bundle_bytes: 100000\n    max_file_bytes: 10\n',
+  );
+  const artifactPath = join(ctx.workDir, 'artifact.ts');
+  writeFileSync(artifactPath, 'over ten bytes of artifact content\n');
+
+  const result = runScript(
+    ctx.scriptAbsPath,
+    ['assemble', '--artifact', artifactPath],
+    { pathDir, cwd: ctx.workDir, env: { CLAUDE_PROJECT_DIR: ctx.workDir } },
+  );
+  assert(result.code === 0, `assemble-bundle exited ${result.code}: ${result.stderr}`);
+  const bundlePath = result.stdout.trim();
+  const bundle = JSON.parse(readFileSync(bundlePath, 'utf8'));
+  assert(bundle.status === 'success', `expected status success, got ${JSON.stringify(bundle.status)}`);
+  // The artifact is exempt from max_file_bytes routing (Behavioral Rule 1):
+  // even at 36 bytes > max_file_bytes (10), it stays inlined, never
+  // demoted to needs_summary, because it can never be summarized.
+  assert(bundle.manifest.artifact.inlined === true, 'artifact must stay inlined despite exceeding max_file_bytes');
+  assert(bundle.needs_summary.length === 0, `artifact must not appear in needs_summary: ${JSON.stringify(bundle.needs_summary)}`);
+
+  // A second run with the project's max_bundle_bytes lowered below the
+  // artifact's own size proves the narrow_scope_required error path.
+  writeFileSync(
+    join(synthexDir, 'config.yaml'),
+    'multi_model_review:\n  context:\n    max_bundle_bytes: 10\n    max_file_bytes: 100000\n',
+  );
+  const errorResult = runScript(
+    ctx.scriptAbsPath,
+    ['assemble', '--artifact', artifactPath],
+    { pathDir, cwd: ctx.workDir, env: { CLAUDE_PROJECT_DIR: ctx.workDir } },
+  );
+  assert(errorResult.code === 2, `expected exit 2 (narrow_scope_required), got ${errorResult.code}: ${errorResult.stderr}`);
+  const errorBundle = JSON.parse(readFileSync(errorResult.stdout.trim(), 'utf8'));
+  assert(errorBundle.status === 'error', `expected status error, got ${JSON.stringify(errorBundle.status)}`);
+  assert(
+    errorBundle.error_code === 'narrow_scope_required',
+    `expected narrow_scope_required, got ${JSON.stringify(errorBundle.error_code)}`,
+  );
+  assert(errorBundle.manifest === null, 'error bundle manifest must be null');
+}
+
+// ---------------------------------------------------------------------------
+// scripts/commit-lint.sh — FR-HM27 (D24, Task 46) fail-open PreToolUse(Bash)
+// hook that lints `git commit` subjects against Conventional Commits, but
+// only when the project's git.commit_convention key is explicitly
+// "conventional". Node does the actual JSON/command parsing; the happy
+// path proves a bad subject is blocked, the fallback proves the
+// `command -v node` guard fails OPEN (allows) rather than erroring.
+// ---------------------------------------------------------------------------
+
+function commitLintBadSubjectStdin() {
+  return JSON.stringify({
+    tool_name: 'Bash',
+    tool_input: { command: 'git commit -m "not a conventional subject"' },
+    cwd: '.',
+  });
+}
+
+function commitLintHappyPathCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const synthexDir = join(ctx.workDir, '.synthex');
+  mkdirSync(synthexDir, { recursive: true });
+  writeFileSync(join(synthexDir, 'config.yaml'), 'git:\n  commit_convention: conventional\n');
+
+  const result = runScript(ctx.scriptAbsPath, [], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+    stdin: commitLintBadSubjectStdin(),
+  });
+  assert(result.code === 2, `expected exit 2 (blocked), got ${result.code}: ${result.stderr}`);
+  assert(
+    result.stderr.includes('does not match Conventional Commits'),
+    `expected a fix hint on stderr, got: ${result.stderr}`,
+  );
+}
+
+function commitLintFallbackCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const synthexDir = join(ctx.workDir, '.synthex');
+  mkdirSync(synthexDir, { recursive: true });
+  // Same "conventional" config and same bad subject as the happy path —
+  // the only difference is node's absence, proving the guard fails open
+  // (allows) rather than blocking or erroring without node to parse JSON.
+  writeFileSync(join(synthexDir, 'config.yaml'), 'git:\n  commit_convention: conventional\n');
+
+  const result = runScript(ctx.scriptAbsPath, [], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+    stdin: commitLintBadSubjectStdin(),
+  });
+  assert(result.code === 0, `expected exit 0 (fail open without node), got ${result.code}: ${result.stderr}`);
+}
+
+// ---------------------------------------------------------------------------
+// scripts/validate-findings — FR-HM28 adapter-output normalizer. Node is
+// preferred; when node is absent this script falls back to jq, but jq is
+// NEVER on PATH in these restricted-PATH scenarios either (see the module
+// header), so the "missing jq/node fallback" case below exercises the
+// script's third branch: the dependency-free `unknown_error` envelope it
+// prints when NEITHER interpreter is reachable, rather than silently
+// producing nothing.
+// ---------------------------------------------------------------------------
+
+const VALIDATE_FINDINGS_STDIN = '```json\n' + JSON.stringify({
+  findings: [
+    {
+      finding_id: 'security.handleLogin.missing-csrf-check',
+      severity: 'high',
+      category: 'security',
+      title: 'Missing CSRF check in handleLogin',
+      description: 'The handleLogin function does not validate CSRF tokens.',
+      file: 'src/auth/handleLogin.ts',
+    },
+  ],
+  usage: { input_tokens: 100, output_tokens: 20, model: 'gpt-5' },
+}) + '\n```';
+
+function validateFindingsHappyPathCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const result = runScript(
+    ctx.scriptAbsPath,
+    ['--reviewer-id', 'codex-review-prompter', '--family', 'openai'],
+    { pathDir, cwd: ctx.workDir, stdin: VALIDATE_FINDINGS_STDIN },
+  );
+  assert(result.code === 0, `validate-findings exited ${result.code}: ${result.stderr}`);
+  const envelope = JSON.parse(result.stdout);
+  assert(envelope.status === 'success', `expected status success, got: ${result.stdout}`);
+  assert(envelope.findings.length === 1, `expected 1 finding, got: ${result.stdout}`);
+  assert(
+    envelope.findings[0].source.reviewer_id === 'codex-review-prompter'
+      && envelope.findings[0].source.family === 'openai'
+      && envelope.findings[0].source.source_type === 'external',
+    `source was not injected correctly: ${result.stdout}`,
+  );
+}
+
+function validateFindingsFallbackCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const result = runScript(
+    ctx.scriptAbsPath,
+    ['--reviewer-id', 'codex-review-prompter', '--family', 'openai'],
+    { pathDir, cwd: ctx.workDir, stdin: VALIDATE_FINDINGS_STDIN },
+  );
+  assert(result.code === 0, `validate-findings exited ${result.code}: ${result.stderr}`);
+  const envelope = JSON.parse(result.stdout);
+  assert(
+    envelope.status === 'failed' && envelope.error_code === 'unknown_error',
+    `expected the dependency-free unknown_error envelope, got: ${result.stdout}`,
+  );
+  assert(Array.isArray(envelope.findings) && envelope.findings.length === 0, `findings should be empty: ${result.stdout}`);
+}
+
+// ---------------------------------------------------------------------------
 // Registry — SMOKE_CASES keys are relPath as produced by
 // discoverRuntimeScripts() (relative to pluginRoot, e.g. "scripts/loop-step
 // .sh"). tests/schemas/script-smoke-registry.test.ts fails if a discovered
@@ -442,6 +934,76 @@ export const SMOKE_CASES = {
     {
       name: 'missing jq/node fallback: upgrade across the threshold prints both nudges',
       run: (ctx) => upgradeNudgeFeatureCase(ctx, false),
+    },
+  ],
+  'scripts/state-flag.sh': [
+    {
+      name: 'happy path: sets a flag and preserves unrelated existing fields (node present)',
+      run: (ctx) => stateFlagHappyPathCase(ctx, true),
+    },
+    {
+      name: 'missing jq/node fallback: seeds a fresh file and sets the flag via the sed/awk path',
+      run: (ctx) => stateFlagFallbackCase(ctx, false),
+    },
+  ],
+  'scripts/commit-lint.sh': [
+    {
+      name: 'happy path: blocks a bad -m subject with a fix hint when git.commit_convention is "conventional" (node present)',
+      run: (ctx) => commitLintHappyPathCase(ctx, true),
+    },
+    {
+      name: 'missing node fallback: the command -v node guard fails open (allows) the same bad subject',
+      run: (ctx) => commitLintFallbackCase(ctx, false),
+    },
+  ],
+  'scripts/init-scaffold.sh': [
+    {
+      name: 'happy path: fresh project gets a byte-identical config.yaml and all doc dirs (node present)',
+      run: (ctx) => initScaffoldFreshCase(ctx, true),
+    },
+    {
+      name: 'missing jq/node fallback: same scaffold plus an idempotent no-op second run',
+      run: (ctx) => initScaffoldIdempotentCase(ctx, false),
+    },
+  ],
+  'scripts/write-audit.mjs': [
+    {
+      name: 'happy path: writes the audit markdown and reports status: "written" (node present)',
+      run: (ctx) => writeAuditHappyPathCase(ctx),
+    },
+    {
+      name: 'missing node fallback: the calling `command -v node` guard degrades to a clean non-zero exit with a message',
+      run: (ctx) => writeAuditNodeGuardFallbackCase(ctx),
+    },
+  ],
+  'scripts/lint-plan.mjs': [
+    {
+      name: 'happy path: a clean fixture plan yields zero findings and exit 0 (node present)',
+      run: (ctx) => lintPlanHappyPathCase(ctx),
+    },
+    {
+      name: 'missing node fallback: the calling `command -v node` guard degrades to a clean non-zero exit with a message',
+      run: (ctx) => lintPlanNodeGuardFallbackCase(ctx),
+    },
+  ],
+  'scripts/assemble-bundle.sh': [
+    {
+      name: 'happy path: in-cap file inlined, over-cap file routed to needs_summary, .gitignore self-ignores (node present)',
+      run: (ctx) => assembleBundleHappyPathCase(ctx, true),
+    },
+    {
+      name: 'missing jq/node fallback: artifact exemption plus narrow_scope_required error path',
+      run: (ctx) => assembleBundleFallbackCase(ctx, false),
+    },
+  ],
+  'scripts/validate-findings': [
+    {
+      name: 'happy path: fence-stripped JSON envelope normalized with source injected (node present)',
+      run: (ctx) => validateFindingsHappyPathCase(ctx, true),
+    },
+    {
+      name: 'missing jq/node fallback: dependency-free unknown_error envelope printed on stdout',
+      run: (ctx) => validateFindingsFallbackCase(ctx, false),
     },
   ],
 };

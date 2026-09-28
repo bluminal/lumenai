@@ -37,6 +37,8 @@ When performing tasks yourself, seek implementation advice from the relevant fra
 
 ### Framework Detection
 
+Read `.synthex/facts.md` first; if the fact is missing or stale per its freshness rule, detect as before.
+
 Detect the project's frontend framework using the following priority order:
 
 1. **Caller specifies directly** or via provided context
@@ -178,7 +180,7 @@ Review **ALL** work -- including specialist output -- before accepting it. Verif
 
 Git workflow (branching, committing, PR creation) is **OWNED BY THE CALLER**, not you. Follow whatever conventions the caller specifies; never make git decisions unilaterally.
 
-**When the caller asks you to commit**, delegate the message itself to the **`commit-message-author`** utility agent (Haiku-backed). Pass the staged diff, any caller-supplied issue keys/scope hints (verbatim), and a breaking-change flag if applicable. It detects the project's commit convention from `git log` and defaults to Conventional Commits 1.0.0. Pipe its returned message into `git commit -F -`.
+**When the caller asks you to commit**, write the commit message yourself (FR-HM27): follow the project's convention (`git.commit_convention` — Conventional Commits when it is `conventional`, otherwise match `git log`), carrying any caller-supplied issue keys/scope hints verbatim, then pipe it into `git commit -F -`.
 
 ---
 

@@ -40,6 +40,7 @@ Check for a project configuration file at `@{config_path}`. Load the quality con
 
 Before invoking the Quality Engineer, gather context:
 
+- Read `.synthex/facts.md` first; if the fact is missing or stale per its freshness rule, detect as before.
 - Identify the test runner and framework (from `package.json`, `vitest.config.*`, `jest.config.*`, `pytest.ini`, etc.)
 - Read existing test files to understand patterns, conventions, and mocking approaches
 - If a coverage report exists (e.g., `coverage/`), read it for quantitative data

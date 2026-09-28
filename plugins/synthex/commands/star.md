@@ -69,18 +69,13 @@ Options:
 
    If none of the openers succeed, that's fine — the URL is already printed. Do not surface opener errors.
 
-3. Update `.synthex/state.json` to mark `starred: true`. Use the **Write** tool, preserving any existing `last_seen_version` and `dismissed` fields. The full state document after update is:
+3. Set `starred: true` in `state_file` (FR-HM18 — one Bash call). Run `plugins/synthex/scripts/state-flag.sh starred` (resolved from the installed plugin root — Claude Code: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/state-flag.sh" starred`). On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
-   ```json
-   {
-     "schema_version": 1,
-     "last_seen_version": "<preserved from existing state, or current synthex plugin version if absent>",
-     "dismissed": <preserved, default false>,
-     "starred": true,
-     "star_dismissed": <preserved, default false>,
-     "updated_at": "<current UTC ISO 8601 timestamp>"
-   }
-   ```
+   **Fallback (no shell tool, or the script is missing):** use the **Write** tool to write `state_file` yourself: keep every existing field, set `"starred": true` and `updated_at` to the current UTC ISO 8601 time, and start from `{"schema_version": 1}` if the file is missing or malformed.
+
+   The script atomically sets `"starred": true`, reusing `upgrade-nudge.sh`'s field-preservation rules: every other existing field — `last_seen_version`, `dismissed`, `star_dismissed`, `plugin_root` — is preserved untouched.
+
+   Interpret the exit code: `0` — success, proceed. `2` — `.synthex/` does not exist (already caught by step 1). `5` — the state directory was not writable; print `Could not write .synthex/state.json — check directory permissions.` and stop (the URL is already printed, so this is non-fatal to the user's ability to star manually).
 
 #### Maybe later
 
@@ -100,18 +95,13 @@ Do NOT write state. The upgrade-nudge hook will surface this prompt again on the
    Got it — we won't ask again for this project. If you change your mind, the repo is at https://github.com/bluminal/lumenai.
    ```
 
-2. Update `.synthex/state.json` to mark `star_dismissed: true`. Use the **Write** tool, preserving any existing fields. Full document:
+2. Set `star_dismissed: true` in `state_file` (FR-HM18 — one Bash call). Run `plugins/synthex/scripts/state-flag.sh star_dismissed` (resolved from the installed plugin root — Claude Code: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/state-flag.sh" star_dismissed`). On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
-   ```json
-   {
-     "schema_version": 1,
-     "last_seen_version": "<preserved, or current synthex plugin version if absent>",
-     "dismissed": <preserved, default false>,
-     "starred": <preserved, default false>,
-     "star_dismissed": true,
-     "updated_at": "<current UTC ISO 8601 timestamp>"
-   }
-   ```
+   **Fallback (no shell tool, or the script is missing):** use the **Write** tool to write `state_file` yourself: keep every existing field, set `"star_dismissed": true` and `updated_at` to the current UTC ISO 8601 time, and start from `{"schema_version": 1}` if the file is missing or malformed.
+
+   The script atomically sets `"star_dismissed": true`, preserving every other existing field (`last_seen_version`, `dismissed`, `starred`, `plugin_root`) untouched.
+
+   Interpret the exit code the same way as the "Yes, take me there" branch above: `0` success, `2` `.synthex/` missing (already caught by step 1), `5` writability failure (print the same message and stop).
 
 ## State schema
 

@@ -291,19 +291,29 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
       'write-implementation-plan.md (1); Task 31 (FR-HM15) adds 3 more gates pointing ' +
       'at docs/model-resolution.md — one each in review-code.md, performance-audit.md, ' +
       'and write-implementation-plan.md, all three at their Task 13/14 D17 size ' +
-      'budgets with no room to inline the Model Resolution paragraph directly',
+      'budgets with no room to inline the Model Resolution paragraph directly; Task 43 ' +
+      '(FR-HM28) adds 6 more gates — one per *-review-prompter.md adapter — all pointing ' +
+      'at docs/adapter-common.md; Task 45 (FR-HM26) adds 1 more gate in ' +
+      'write-implementation-plan.md\'s Step 5.5 no-node prose fallback, pointing at ' +
+      'docs/plan-lint-rubric.md',
     () => {
       const nativeLoopingMentions = files.reduce((count, relFile) => {
         const text = readFileSync(join(ROOT, relFile), 'utf8');
         return count + (text.match(/docs\/native-looping\.md/g) ?? []).length;
       }, 0);
       expect(nativeLoopingMentions).toBeGreaterThanOrEqual(32);
-      expect(allIncludes).toHaveLength(9);
+      expect(allIncludes).toHaveLength(16);
       expect(new Set(allIncludes.map((i) => i.file))).toEqual(
         new Set([
           'plugins/synthex/commands/review-code.md',
           'plugins/synthex/commands/performance-audit.md',
           'plugins/synthex/commands/write-implementation-plan.md',
+          'plugins/synthex/agents/bedrock-review-prompter.md',
+          'plugins/synthex/agents/claude-review-prompter.md',
+          'plugins/synthex/agents/codex-review-prompter.md',
+          'plugins/synthex/agents/gemini-review-prompter.md',
+          'plugins/synthex/agents/llm-review-prompter.md',
+          'plugins/synthex/agents/ollama-review-prompter.md',
         ]),
       );
       expect(new Set(allIncludes.map((i) => i.rawTarget))).toEqual(
@@ -314,6 +324,8 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
           '${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing-performance-audit.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/plan-multi-model.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/model-resolution.md',
+          '${CLAUDE_PLUGIN_ROOT}/docs/adapter-common.md',
+          '${CLAUDE_PLUGIN_ROOT}/docs/plan-lint-rubric.md',
         ]),
       );
     },

@@ -104,23 +104,26 @@ The summary is emitted regardless of warnings; blocked errors prevent the summar
 
 ### Step 1 — Bundle Assembly (D5, FR-MR28)
 
-Invoke the `context-bundle-assembler` agent ONCE with:
-- `artifact_path` (from input)
-- `touched_files` (from input)
-- `conventions` (from `config.multi_model_review.context.convention_paths` if set, else default `[CLAUDE.md, .eslintrc, .prettierrc]`)
-- `spec_paths` (from `config.multi_model_review.context.spec_paths` if set)
-- `config.max_bundle_bytes` and `config.max_file_bytes` (from `config.multi_model_review.context`)
+Run `scripts/assemble-bundle.sh assemble` ONCE (Bash) — this replaces the retired `context-bundle-assembler` agent (FR-HM26): a mechanical script performs the byte-cap routing so it never re-emits the whole bundle through an LLM. Pass:
+- `--artifact <artifact_path>` (from input)
+- `--touched <path>` for each entry in `touched_files` (from input)
+- `--convention <path>` for each entry in `config.multi_model_review.context.convention_paths` if set, else the default `[CLAUDE.md, .eslintrc, .prettierrc]`
+- `--spec <path>` for each file under `config.multi_model_review.context.spec_paths` whose filename contains a substring of the artifact's filename or parent directory (OQ-8 filename-substring heuristic). The script performs no matching itself — resolving WHICH spec files qualify stays this step's job; the script only receives already-resolved concrete paths.
 
-If the assembler returns `status: "error"` with `error_code: "narrow_scope_required"`, surface that error to the caller and stop. The caller decides whether to retry with a narrower scope.
+The script reads `multi_model_review.context.max_file_bytes` / `.max_bundle_bytes` itself (via `scripts/lib/config-get.sh`), writes `.synthex/tmp/bundle-<hash>.json`, and prints that path on stdout.
 
-If success: hold the assembled bundle for delivery to all proposers. The bundle is **identical for every proposer** per D5.
+If the script exits `2` (`error_code: "narrow_scope_required"` — the artifact alone exceeds `max_bundle_bytes`), surface that error to the caller and stop. The caller decides whether to retry with a narrower scope.
+
+On success (exit `0`): read the written bundle JSON. The artifact and every conventions/touched/spec file at or under `max_file_bytes` are already inlined verbatim in `files[]` — no LLM call needed for those. For each entry in `needs_summary[]` (a file over `max_file_bytes` the script deliberately did NOT read or summarize), issue one Haiku `effort: low` summarization call per entry (focus: shape and structure relevant to the artifact under review), then merge the resulting summary text into `files[]` for that path and flip its manifest entry's `inlined` flag to `true`. This is the only LLM cost bundle assembly incurs — the "no 200 KB Haiku re-emission" saving FR-HM26 exists for. The artifact itself is NEVER in `needs_summary` (Behavioral Rule 1, carried over from the retired agent) and is always inlined verbatim by the script.
+
+Hold the assembled bundle for delivery to all proposers. The bundle is **identical for every proposer** per D5. After consolidation finishes, remove the bundle file by running `scripts/assemble-bundle.sh cleanup <bundle-path>` ("at run end" per the FR-HM26 acceptance criteria); the script also self-sweeps every bundle older than 24h on its next `assemble` run as a backstop for crashed/incomplete invocations.
 
 ### Step 2 — Aggregator Resolution (D17, FR-MR15)
 
 Resolve `config.multi_model_review.aggregator.command`:
 
 - If a concrete adapter name (e.g., `codex-review-prompter`): use it.
-- If `auto`: walk the **D17 strict total-order tier table** against the configured proposer set:
+- If `auto`: walk the **D17 strict total-order tier table** against the configured proposer set. The table is single-sourced in `config/defaults.yaml` (`multi_model_review.aggregator.tier_table`, family-keyed rows, FR-HM28) — the strict order it encodes is:
   ```
   Claude Opus > GPT-5 > Claude Sonnet > Gemini 2.5 Pro > DeepSeek V3 > Qwen 32B
   ```
@@ -132,7 +135,9 @@ The resolved aggregator name and source ("configured" | "tier-table" | "host-fal
 
 **FR-MR12 verbatim:** "Native and external proposers run in a single parallel Task batch."
 
-If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Build, and Hermes), perform the role inline in this session, then continue.
+If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Build, and Hermes), perform the role inline in this session, then continue. Concretely: instead of spawning the `*-review-prompter` adapter agents, invoke each configured external CLI directly via Bash and pipe its raw stdout through `${CLAUDE_PLUGIN_ROOT}/scripts/validate-findings --reviewer-id <adapter> --family <family> --raw-output-path <path>` (FR-HM28) to get the same FR-MR9 envelope the adapter agent would have returned — the depth-1 rule is a call-shape substitution, not a feature loss.
+
+On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
 Issue ONE parallel Task batch containing:
 
@@ -413,6 +418,31 @@ The self-preference warning (Step 0c) fires when the aggregator family equals th
 
 Return the consolidated envelope. The `findings[]` array now contains CONSOLIDATED findings (post-Stages 1, 2, 4, 5, 5b, 6) with `raised_by[]` populated for every finding. The `per_reviewer_results` table still contains per-reviewer raw counts (for audit traceability — these counts reflect pre-consolidation findings from each proposer).
 
+#### Audit artifact write (FR-MR24, FR-HM26, FR-HM44)
+
+Before returning the envelope, write the per-invocation audit artifact. `audit-artifact-writer` (the Haiku sub-agent this used to describe) is retired — it had no invocation site (FR-HM44); `plugins/synthex/scripts/write-audit.mjs` now owns the write and reproduces its file path, filename pattern, and all 7 required + up to 4 optional markdown sections exactly (Task 42). Run it as ONE Bash call, guarded with `command -v node`:
+
+```bash
+if command -v node >/dev/null 2>&1; then
+  node "${CLAUDE_PLUGIN_ROOT}/scripts/write-audit.mjs" <<'EOF'
+{ "command": "...", "invocation_metadata": {...}, "config_snapshot": {...},
+  "preflight_result": {...}, "unified_envelope": {...}, "audit_config": {...},
+  "team_metadata": {...}, "pool_routing": {...}, "recovery": {...} }
+EOF
+else
+  : # node unavailable — FR-HM26 node-guard fallback: render the SAME
+    # markdown yourself with your own Write tool (all 7 required sections;
+    # the 4 optional sections whenever their input block is present), at
+    # "<audit.output_path>/<YYYY-MM-DD>-<command>-<short-hash>.md" — the
+    # exact filename and section structure write-audit.mjs's own header
+    # comment documents. This is the documented prose fallback.
+fi
+```
+
+On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
+
+No file is written, on either path, when `multi_model_review.audit.enabled` is false — both write-audit.mjs and the prose fallback implement the same FR-MR24 skip-write rule. Both paths produce byte-for-byte the same section structure; only the writer differs.
+
 ---
 
 ## Behavioral Rules
@@ -430,7 +460,7 @@ Return the consolidated envelope. The `findings[]` array now contains CONSOLIDAT
 
 ## Source Authority
 
-FR-MR9 (adapter envelope, Task 4), FR-MR11 (Sonnet orchestrator), FR-MR12 (single-batch fan-out, Step 3), FR-MR14 (Stages 1/2/4, Steps 8a/8b/8c; Stage 5b, Step 8e), FR-MR14a (Stage 5, Step 8d), FR-MR14b (Stage 6, Step 8f), FR-MR15 (aggregator tier-table + bias mitigation, Step 8g), FR-MR17 (native-only continuation, cloud-surface remediation), FR-MR20 (preflight, Step 0), FR-MR28 (context bundle role), D5 (single source of truth for bundle), D6 (single parallel Task batch), D17 (aggregator tier table, Step 2/0e/8g), D18 (Stage 4 bound, Step 8c), D21 (path-and-reason header regex, Step 7), D23 (Stage 3 embedding fallback, Step 8b-2), NFR-MR2 (cloud-surface remediation, Step 6), `multi_model_review.consolidation.{stage2_jaccard_threshold, stage3_embedding_threshold, stage3_stage4_floor, stage4.max_calls_per_consolidation}` (consolidation config keys), Task 5 (`context-bundle-assembler`, Step 1), Task 4 (adapter contract, Step 3), Task 1 (canonical finding schema).
+FR-MR9 (adapter envelope, Task 4), FR-MR11 (Sonnet orchestrator), FR-MR12 (single-batch fan-out, Step 3), FR-MR14 (Stages 1/2/4, Steps 8a/8b/8c; Stage 5b, Step 8e), FR-MR14a (Stage 5, Step 8d), FR-MR14b (Stage 6, Step 8f), FR-MR15 (aggregator tier-table + bias mitigation, Step 8g), FR-MR17 (native-only continuation, cloud-surface remediation), FR-MR20 (preflight, Step 0), FR-MR28 (context bundle role), D5 (single source of truth for bundle), D6 (single parallel Task batch), D17 (aggregator tier table, Step 2/0e/8g), D18 (Stage 4 bound, Step 8c), D21 (path-and-reason header regex, Step 7), D23 (Stage 3 embedding fallback, Step 8b-2), NFR-MR2 (cloud-surface remediation, Step 6), `multi_model_review.consolidation.{stage2_jaccard_threshold, stage3_embedding_threshold, stage3_stage4_floor, stage4.max_calls_per_consolidation}` (consolidation config keys), Task 5 (`context-bundle-assembler`, Step 1), Task 4 (adapter contract, Step 3), Task 1 (canonical finding schema), FR-MR24 (audit artifact requirements, Step 9), FR-HM26 (script replaces `audit-artifact-writer`, Step 9), FR-HM44 (latent defect: the agent had no invocation site), Task 42 (`write-audit.mjs`, Step 9).
 
 ---
 
@@ -438,4 +468,4 @@ FR-MR9 (adapter envelope, Task 4), FR-MR11 (Sonnet orchestrator), FR-MR12 (singl
 
 All consolidation stages are implemented above: ~~Stage 5 — Severity reconciliation (Task 28).~~ DONE (Step 8d, FR-MR14a). ~~Stage 5b — Contradiction scan / CoVe (Tasks 29a/29b).~~ DONE (Step 8e). ~~Stage 6 — Minority-of-one detection (Task 30).~~ DONE (Step 8f, FR-MR14b). ~~Aggregator bias-mitigation (Task 31).~~ DONE (Step 8g, FR-MR15) — Q3 inline-vs-separate aggregator-prompt partially resolved: D17 takes precedence (external adapter path documented); inline host-fallback documented for v1. ~~Stages 1+2 land in Task 24+25 (Milestone 3.2).~~ DONE (Steps 8a/8b). ~~Stage 4 in Task 26.~~ DONE (Step 8c). ~~Preflight is added inline in Task 21.~~ DONE (Step 0). ~~Stage 3 deferred to Phase 7.~~ DONE (Step 8b-2, D23).
 
-Still pending: audit-artifact-writer (Milestone 4.0, Task 39).
+~~audit-artifact-writer (Milestone 4.0, Task 39).~~ DONE (Step 9, Task 42, FR-HM26/FR-HM44) — the agent is retired; `scripts/write-audit.mjs` writes the audit artifact directly, guarded with `command -v node` and a documented prose fallback.
