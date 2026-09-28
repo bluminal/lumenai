@@ -62,6 +62,14 @@ cd <project> && hermes skills trust
 
 Never nest `commands/` or `agents/` inside a skill folder — Hermes's Skills Guard scans project skills at load and quarantines (fail-closed) any it scores `dangerous`, and the canonical `commands/`/`agents/` files trip several of its heuristics (path traversal, agent-config modification) when placed inside a skill directory. The symlink layout above keeps them outside every skill folder, so nothing is quarantined. `hermes skills trust` is per git checkout; run it again after re-cloning. See `docs/specs/harness-modernization/spikes.md`, Task 8, for the full spike this recipe is based on.
 
+### Standing review pools
+
+Standing review pools (`/synthex:start-review-team`) need Claude Code's Agent Teams tools and are a documented gap elsewhere:
+
+> Standing review pools require Agent Teams (the SendMessage and ListAgents tools); this host does not expose them, so pool commands are unavailable here -- use /synthex:review-code or /synthex:performance-audit for sequential review instead.
+
+Codex, Gemini CLI, OpenCode, and Grok hit this gap. `/synthex:review-code` and `/synthex:performance-audit` still work everywhere through the capability ladder: parallel sub-agents where the host has one, sequential reviewers otherwise. Hermes' Kanban board is noted as possible future pool-backend work, not implemented.
+
 For copyable installation and update instructions, see [Agent compatibility](https://slashsynthex.com/docs/agent-compatibility).
 
 ### Upgrading a manual install

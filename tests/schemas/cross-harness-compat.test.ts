@@ -25,6 +25,7 @@ import {
   capabilityPolicy,
   harnessIds,
   harnesses as harnessMetadata,
+  poolCapabilityGaps,
   profiles,
   supportsProfile,
 } from '../compat/lib/harnesses.mjs';
@@ -34,6 +35,7 @@ import {
   diffInventoryAgainstManifest,
   WRAPPER_COUNT,
 } from '../compat/lib/inventory.mjs';
+import { GAP_MESSAGES } from '../../plugins/synthex/scripts/lib/host-matrix.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const pluginRoot = resolve(repoRoot, 'plugins/synthex');
@@ -338,5 +340,40 @@ describe('cross-harness compatibility contract', () => {
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true });
     }
+  });
+
+  it('records the FR-HM25 standing-pool gap for Codex, Gemini, OpenCode, and Grok', () => {
+    // Task 52 (FR-HM25): standing review pools are a documented gap on
+    // every host except Claude Code. Grok has no Docker-based lifecycle in
+    // `harnesses`/`harnessIds` above, so it is asserted separately here
+    // rather than folded into the `%s` cases above.
+    expect(Object.keys(poolCapabilityGaps).sort()).toEqual([
+      'codex',
+      'gemini',
+      'grok',
+      'opencode',
+    ]);
+    expect(poolCapabilityGaps).not.toHaveProperty('claude');
+    expect(poolCapabilityGaps).not.toHaveProperty('hermes');
+
+    // Single-sourced: every entry is GAP_MESSAGES.pool imported, not copied.
+    for (const gapMessage of Object.values(poolCapabilityGaps)) {
+      expect(gapMessage).toBe(GAP_MESSAGES.pool);
+    }
+
+    // The compat README's gap section quotes GAP_MESSAGES.pool verbatim and
+    // notes Hermes' Kanban board as future work, not implemented.
+    const compatReadme = readFileSync(resolve(compatRoot, 'README.md'), 'utf8');
+    expect(compatReadme).toContain(GAP_MESSAGES.pool);
+    expect(compatReadme).toMatch(/Hermes.{0,40}Kanban/is);
+    expect(compatReadme).toMatch(/future/i);
+
+    // The user-facing plugin README (`## Installation`) quotes the same
+    // sentence verbatim so users -- not just compat-suite maintainers --
+    // learn about the gap.
+    const pluginReadme = readFileSync(resolve(pluginRoot, 'README.md'), 'utf8');
+    expect(pluginReadme).toContain(GAP_MESSAGES.pool);
+    expect(pluginReadme).toMatch(/Hermes.{0,40}Kanban/is);
+    expect(pluginReadme).toMatch(/future/i);
   });
 });
