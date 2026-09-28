@@ -1,4 +1,4 @@
 {
   "bump": "major",
-  "reason": "Synthex now supports Claude Code, Codex CLI, Gemini CLI, and OpenCode from one shared Agent Skills distribution."
+  "reason": "synthex-plus is tombstoned: its pool capability now lives in synthex; see docs/migrations/synthex-plus.md."
 }
