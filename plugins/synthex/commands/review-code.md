@@ -47,7 +47,7 @@ Check for a project configuration file at `@{config_path}`. If it exists, load t
 
 ### 1b. Standing Pool Discovery and Routing (FR-MMT15)
 
-If `standing_pools.enabled` is true, Read `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md` and follow it; otherwise skip to Step 2. On other hosts, resolve the plugin root from `.synthex/state.json`'s `plugin_root` field and read the same file relative to it.
+If `standing_pools.enabled` is true (`.synthex/config.yaml`; falls back per D6 to the legacy `.synthex-plus/config.yaml` for one major version, printing a deprecation warning), Read `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md` and follow it; otherwise skip to Step 2. On other hosts, resolve the plugin root from `.synthex/state.json`'s `plugin_root` field and read the same file relative to it.
 
 ---
 

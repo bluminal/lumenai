@@ -1,6 +1,6 @@
 # Standing Pool Discovery and Routing (FR-MMT15)
 
-Cold-path detail for `/synthex:review-code` Step 1b (FR-HM5, D17). Read only when `standing_pools.enabled: true` in `.synthex-plus/config.yaml`; the gate that includes this file lives at `plugins/synthex/commands/review-code.md`. This is not a standalone command — it has no frontmatter and is never registered in `plugin.json`.
+Cold-path detail for `/synthex:review-code` Step 1b (FR-HM5, D17). Read only when `standing_pools.enabled: true` resolves per the D6 fallback (Step 1b's own gate line in `plugins/synthex/commands/review-code.md`, which is what actually includes this file, spells out the fallback). This is not a standalone command — it has no frontmatter and is never registered in `plugin.json`.
 
 This step executes at command-invocation time, before any diff resolution or reviewer spawning.
 
@@ -23,7 +23,7 @@ Filter pools in the index:
 **Stale-pool detection (FR-MMT22):** During filtering, if a pool meets EITHER stale condition:
   - Condition 1: The pool's `metadata_dir` no longer exists on disk
   - Condition 2: `last_active_at` is older than `max(ttl_minutes minutes, 24 hours)`
-  → Invoke the `standing-pool-cleanup` agent at `plugins/synthex-plus/agents/standing-pool-cleanup.md` with the pool name and detection reason.
+  → Invoke the `standing-pool-cleanup` agent at `plugins/synthex/agents/standing-pool-cleanup.md` with the pool name and detection reason.
   → Emit this verbatim one-time-per-session warning (substituting pool name and fallback action): `"Standing pool '{name}' was stale and has been cleaned up. {fallback_action}."`
   → Treat the cleaned-up pool as absent.
 
@@ -53,7 +53,7 @@ Pick the **first matching pool** by name sort order. Produce the inline-discover
    - `subject`: e.g., `"Code review: {target description}"`
    - `description`: the diff scope, files to review, relevant specs, and the reviewer's specific focus area (same context that would be passed to a fresh-spawn reviewer in Step 4)
 
-3. Invoke the `standing-pool-submitter` agent at `plugins/synthex-plus/agents/standing-pool-submitter.md` with:
+3. Invoke the `standing-pool-submitter` agent at `plugins/synthex/agents/standing-pool-submitter.md` with:
    ```json
    {
      "pool_name": "<matched pool name>",
@@ -98,7 +98,7 @@ Pick the **first matching pool** by name sort order. Produce the inline-discover
 
 #### 1b-iv. Routing Mode Semantics
 
-Apply `standing_pools.routing_mode` from `.synthex-plus/config.yaml` (default: `prefer-with-fallback`):
+Apply `standing_pools.routing_mode` (default: `prefer-with-fallback`). Resolve `standing_pools.*` from `.synthex/config.yaml`; if it is not defined there, fall back for one major version to the legacy `.synthex-plus/config.yaml` and print a deprecation warning (D6) -- migrate to `.synthex/config.yaml` before the next major release.
 
 **`prefer-with-fallback` (default):**
 - If `routing_decision` is any `fell-back-*`: proceed silently to Step 2 (fresh-spawn review). No error.
@@ -110,6 +110,6 @@ Apply `standing_pools.routing_mode` from `.synthex-plus/config.yaml` (default: `
   Routing mode is 'explicit-pool-required', so this command will not fall back to
   fresh-spawn reviewers. To proceed, either:
     1. Start a matching pool:
-         /synthex-plus:start-review-team --reviewers code-reviewer,security-reviewer
-    2. Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml
+         /synthex:start-review-team --reviewers code-reviewer,security-reviewer
+    2. Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml
   ```

@@ -29,7 +29,9 @@
  *       fixtures under tests/fixtures/cold-path/, captured from the
  *       pre-Task-14 command files, must each appear as an exact,
  *       unmodified substring of the doc file it moved to.
- *   [T] performance-audit.md is ≤ 8,704 bytes (8.5 KB).
+ *   [T] performance-audit.md is ≤ 8.75 KB (8,960 bytes). (Task 48/FR-HM24
+ *       raised this from 8,704 bytes to fit the D6 legacy-config-fallback
+ *       clause added to the Step 1b gate line.)
  *   [T] write-implementation-plan.md is ≤ 26,112 bytes (25.5 KB).
  *   [T] both command files contain the D17 gates that replaced the moved
  *       blocks (same rules cold-path-includes.test.ts enforces).
@@ -161,9 +163,9 @@ describe('Task 14: performance-audit.md + write-implementation-plan.md cold-path
   // ── [T] size budgets ──────────────────────────────────────────────────
 
   describe('[T] size budgets', () => {
-    it('performance-audit.md is at or under 8,704 bytes (8.5 KB)', () => {
+    it('performance-audit.md is at or under 8,960 bytes (8.75 KB)', () => {
       const bytes = Buffer.byteLength(perfAuditContent, 'utf-8');
-      expect(bytes).toBeLessThanOrEqual(8_704);
+      expect(bytes).toBeLessThanOrEqual(8_960);
     });
 
     it('write-implementation-plan.md is at or under 26,112 bytes (25.5 KB)', () => {

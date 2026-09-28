@@ -230,11 +230,11 @@ This is scoped narrowly: `[H]` (human-validated) acceptance criteria are **never
 /synthex:next-priority --loop --completion-promise "ALLDONE" --auto-decide
 ```
 
-## Standing Review Pools (via Synthex+)
+## Standing Review Pools
 
-When [Synthex+](../synthex-plus/README.md) is installed and a standing review pool is running, `/review-code` and `/performance-audit` automatically route to the pool — no flags required. Routing is **off by default unless synthex-plus is initialized with `standing_pools.enabled: true`**.
+When a standing review pool is running (`/synthex:start-review-team`), `/review-code` and `/performance-audit` automatically route to the pool — no flags required. Routing is **off by default unless `standing_pools.enabled: true`** in `.synthex/config.yaml` (or, for one major version, the legacy `.synthex-plus/config.yaml`; see D6).
 
-For setup and configuration, see the [Standing Pools guide](../synthex-plus/docs/standing-pools.md).
+For setup and configuration, see the [Standing Pools guide](./docs/standing-pools.md).
 
 ## Cost
 

@@ -12,9 +12,9 @@ Unlike `team-review`, which spawns a fresh team per review invocation, `start-re
 | `reviewers` | Comma-separated reviewer agent names | `standing_pools.default_reviewers` (default `code-reviewer,security-reviewer`) | No |
 | `multi_model` | Enable multi-model on this pool | `standing_pools.default_multi_model` (default `false`) | No |
 | `ttl_minutes` | TTL override in minutes | `standing_pools.ttl_minutes` (default 60) | No |
-| `config_path` | Synthex+ config path | `.synthex-plus/config.yaml` | No |
+| `config_path` | Synthex project config path | `.synthex/config.yaml` | No |
 
-**Config resolution order:** command parameter > project config (`{config_path}`) > plugin defaults (`config/defaults.yaml`) > hardcoded fallback.
+**Config resolution order:** command parameter > project config (`{config_path}`) > plugin defaults (`config/defaults.yaml`) > hardcoded fallback. Resolve `standing_pools.*` from `.synthex/config.yaml`; if it is not defined there, fall back for one major version to the legacy `.synthex-plus/config.yaml` and print a deprecation warning (D6) -- migrate to `.synthex/config.yaml` before the next major release.
 
 ## Workflow
 
@@ -79,7 +79,7 @@ On `n`, abort cleanly. On `Y`, remove the stale directory and continue.
 
 ### Step 2. Parameter Resolution and Defaults
 
-Load `{config_path}` (default `.synthex-plus/config.yaml`). For any omitted parameter, fall back silently to the corresponding `standing_pools.*` config key:
+Load `{config_path}` (default `.synthex/config.yaml`). For any omitted parameter, fall back silently to the corresponding `standing_pools.*` config key:
 
 | Parameter | Config key | Hardcoded fallback |
 |-----------|------------|--------------------|
@@ -185,7 +185,7 @@ Hold the lock through steps 7–8. Release it with `rmdir ~/.claude/teams/standi
 
 Spawn the pool using the `Teammate` API `spawnTeam` with team name `standing/<name>`.
 
-Compose the spawn prompt for each pool teammate using the **overlay-composition logic defined in D22**. Read all overlay content from `plugins/synthex-plus/templates/review.md` verbatim — no summarization.
+Compose the spawn prompt for each pool teammate using the **overlay-composition logic defined in D22**. Read all overlay content from `${CLAUDE_PLUGIN_ROOT}/templates/review.md` verbatim — no summarization. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
 #### Overlay-Composition Logic (D22 — all four clauses MUST be applied)
 
@@ -214,7 +214,7 @@ All overlay content is copied from `templates/review.md` verbatim — do not par
 ```
 You are the Pool Lead for standing pool "<name>".
 
-Read your team context at plugins/synthex-plus/templates/review.md, roles table, Lead row.
+Read your team context at plugins/synthex/templates/review.md, roles table, Lead row.
 
 [### Standing Pool Identity Confirm Overlay (apply when standing=true) — verbatim from templates/review.md]
 
@@ -353,8 +353,8 @@ Submission:
   (review-code, performance-audit) will route to this pool automatically when
   it is idle and its roster covers the command's required reviewers.
 
-To stop this pool:   /synthex-plus:stop-review-team --name <name>
-To check status:     /synthex-plus:list-teams
+To stop this pool:   /synthex:stop-review-team --name <name>
+To check status:     /synthex:list-teams
 ```
 
 ---

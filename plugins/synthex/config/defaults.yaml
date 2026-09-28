@@ -636,18 +636,19 @@ git:
   commit_convention: auto
 
 # -------------------------------------------------------------------
-# Standing Review Pools (FR-HM24, Task 47)
+# Standing Review Pools (FR-HM24, Tasks 47-48)
 #
-# Folded in from synthex-plus's config/defaults.yaml verbatim. Every key
-# below is currently INERT from synthex's own perspective: the four pool
-# commands moved into this plugin (`configure-teams`, `start-review-team`,
-# `stop-review-team`, `list-teams`) and the three pool agents still read
-# `.synthex-plus/config.yaml` (D17 cross-file resolution, unchanged from
-# synthex-plus) rather than this file. Task 48 repoints every
-# `standing_pools.*` read (the routing doc, the pool commands, and the
-# three pool agents) at `.synthex/config.yaml` -- this block's presence
-# here now is what makes that repoint a pure read-site change with no
-# schema migration. `configure-teams` starts writing here in Task 48 too.
+# Folded in from synthex-plus's config/defaults.yaml verbatim. Task 47
+# moved the four pool commands (`configure-teams`, `start-review-team`,
+# `stop-review-team`, `list-teams`) and the three pool agents into this
+# plugin. Task 48 repointed every `standing_pools.*` read (the routing
+# doc, the pool commands, and review-code/performance-audit's routing
+# gate) at `.synthex/config.yaml` -- this block's presence here is what
+# makes that repoint a pure read-site change with no schema migration.
+# Every reader falls back to the legacy `.synthex-plus/config.yaml` for
+# one major version, printing a deprecation warning when a value only
+# resolves there (D6). `configure-teams` writes only `.synthex/config.yaml`
+# (D23); it never writes the legacy file.
 #
 # `start-review-team`, `stop-review-team`, and `list-teams` are gated by
 # tool presence (D11): on a host without `SendMessage`/`ListAgents` they

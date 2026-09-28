@@ -367,15 +367,15 @@ describe('(c) explicit-pool-required-abort — no pool, aborts with verbatim FR-
       expect(error).toBeNull();
     });
 
-    it("error_message contains '/synthex-plus:start-review-team --reviewers performance-engineer'", () => {
+    it("error_message contains '/synthex:start-review-team --reviewers performance-engineer'", () => {
       expect(fixtureC.expected.error_message).toContain(
-        '/synthex-plus:start-review-team --reviewers performance-engineer'
+        '/synthex:start-review-team --reviewers performance-engineer'
       );
     });
 
-    it("error_message contains \"Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml\"", () => {
+    it("error_message contains \"Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml\"", () => {
       expect(fixtureC.expected.error_message).toContain(
-        "Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml"
+        "Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml"
       );
     });
   });
@@ -414,13 +414,13 @@ describe('cross-file: plugins/synthex/docs/standing-pool-routing-performance-aud
 
   it('the doc contains the start-review-team remediation hint for performance-engineer', () => {
     expect(routingDocContent).toContain(
-      '/synthex-plus:start-review-team --reviewers performance-engineer'
+      '/synthex:start-review-team --reviewers performance-engineer'
     );
   });
 
   it('the doc contains the config change remediation hint', () => {
     expect(routingDocContent).toContain(
-      "Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml"
+      "Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml"
     );
   });
 });

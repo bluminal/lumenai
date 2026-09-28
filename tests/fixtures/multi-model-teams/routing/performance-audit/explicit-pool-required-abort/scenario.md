@@ -30,8 +30,8 @@ No standing pool matches the required reviewers (performance-engineer).
 Routing mode is 'explicit-pool-required', so this command will not fall back to
 fresh-spawn reviewers. To proceed, either:
   1. Start a matching pool:
-       /synthex-plus:start-review-team --reviewers performance-engineer
-  2. Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml
+       /synthex:start-review-team --reviewers performance-engineer
+  2. Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml
 ```
 
 ## Assertions

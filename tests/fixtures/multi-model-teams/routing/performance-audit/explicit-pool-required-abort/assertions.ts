@@ -95,7 +95,7 @@ export function assertReferencesPerformanceEngineer(): string | null {
 /** Asserts start-review-team remediation hint is present with performance-engineer. */
 export function assertStartReviewTeamHintPresent(): string | null {
   const message = fixture.expected.error_message;
-  const hint = '/synthex-plus:start-review-team --reviewers performance-engineer';
+  const hint = '/synthex:start-review-team --reviewers performance-engineer';
   if (!message.includes(hint)) {
     return `error_message missing start-review-team remediation hint: "${hint}"`;
   }
@@ -105,7 +105,7 @@ export function assertStartReviewTeamHintPresent(): string | null {
 /** Asserts config change remediation hint is present. */
 export function assertConfigChangeHintPresent(): string | null {
   const message = fixture.expected.error_message;
-  const hint = "Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml";
+  const hint = "Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml";
   if (!message.includes(hint)) {
     return `error_message missing config change remediation hint: "${hint}"`;
   }

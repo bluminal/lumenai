@@ -1,0 +1,14 @@
+# Fixture project config for the promptfoo "pool-gate-new-config-only" case
+# (tests/promptfoo.config.yaml, Task 48 / FR-HM24 / D6).
+#
+# This project has ONLY .synthex/config.yaml — no legacy
+# .synthex-plus/config.yaml exists anywhere in it. standing_pools.enabled:
+# true here alone must be enough for /synthex:review-code's Step 1b gate
+# to fire and route to the pool doc; no D6 fallback is needed or expected
+# in this scenario.
+standing_pools:
+  enabled: true
+  ttl_minutes: 60
+  default_name: review-pool
+  matching_mode: covers
+  routing_mode: prefer-with-fallback
