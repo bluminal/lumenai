@@ -869,6 +869,28 @@ function validateFindingsFallbackCase(ctx, includeNode) {
 }
 
 // ---------------------------------------------------------------------------
+// scripts/task-completed-gate.sh and scripts/teammate-idle-gate.sh — Task 48
+// asset-fold copies of the FR-HM23 TaskCompleted/TeammateIdle hook shims.
+// Both scripts are unconditional `exit 0` stubs today (the real
+// classification-table logic, gated on `standing_pools.enabled` via
+// config-get.sh, lands in Task 50) — no jq/node branching exists yet, so
+// the "happy path" and "missing jq/node fallback" cases exercise the exact
+// same behavior (allow, no stdout) under a PATH with and without node,
+// proving the shim runs cleanly either way rather than merely existing.
+// ---------------------------------------------------------------------------
+
+function gateShimAllowCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const result = runScript(ctx.scriptAbsPath, [], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+  });
+  assert(result.code === 0, `expected exit 0 (allow), got ${result.code}: ${result.stderr}`);
+  assert(result.stdout === '', `expected no stdout from the stub, got: ${result.stdout}`);
+}
+
+// ---------------------------------------------------------------------------
 // Registry — SMOKE_CASES keys are relPath as produced by
 // discoverRuntimeScripts() (relative to pluginRoot, e.g. "scripts/loop-step
 // .sh"). tests/schemas/script-smoke-registry.test.ts fails if a discovered
@@ -1004,6 +1026,26 @@ export const SMOKE_CASES = {
     {
       name: 'missing jq/node fallback: dependency-free unknown_error envelope printed on stdout',
       run: (ctx) => validateFindingsFallbackCase(ctx, false),
+    },
+  ],
+  'scripts/task-completed-gate.sh': [
+    {
+      name: 'happy path: allows completion (exit 0, no stdout) with node present',
+      run: (ctx) => gateShimAllowCase(ctx, true),
+    },
+    {
+      name: 'missing jq/node fallback: same allow behavior with neither interpreter on PATH',
+      run: (ctx) => gateShimAllowCase(ctx, false),
+    },
+  ],
+  'scripts/teammate-idle-gate.sh': [
+    {
+      name: 'happy path: allows idle (exit 0, no stdout) with node present',
+      run: (ctx) => gateShimAllowCase(ctx, true),
+    },
+    {
+      name: 'missing jq/node fallback: same allow behavior with neither interpreter on PATH',
+      run: (ctx) => gateShimAllowCase(ctx, false),
     },
   ],
 };

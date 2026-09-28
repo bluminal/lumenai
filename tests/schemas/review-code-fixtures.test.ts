@@ -527,15 +527,15 @@ describe('(e) explicit-pool-required-abort — no pool, aborts with verbatim FR-
       expect(error).toBeNull();
     });
 
-    it("error_message contains '/synthex-plus:start-review-team --reviewers code-reviewer,security-reviewer'", () => {
+    it("error_message contains '/synthex:start-review-team --reviewers code-reviewer,security-reviewer'", () => {
       expect(fixtureE.expected.error_message).toContain(
-        '/synthex-plus:start-review-team --reviewers code-reviewer,security-reviewer'
+        '/synthex:start-review-team --reviewers code-reviewer,security-reviewer'
       );
     });
 
-    it("error_message contains \"Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml\"", () => {
+    it("error_message contains \"Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml\"", () => {
       expect(fixtureE.expected.error_message).toContain(
-        "Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml"
+        "Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml"
       );
     });
   });
