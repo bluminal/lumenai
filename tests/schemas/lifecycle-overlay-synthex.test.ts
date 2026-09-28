@@ -123,11 +123,17 @@ describe('templates/review.md (synthex) — Task 27/48 Standing Pool Lifecycle O
     expect(lifecycleSection).toContain('FR-MMT14');
   });
 
-  it('[H][T] FR-MMT5b (identity-confirm re-issuance per D26) referenced in lifecycle section', () => {
+  // Task 51 (FR-HM22, ADR-plus-002) retired the D26 per-task identity-confirm re-issuance;
+  // FR-MMT5b now appears only as a historical pointer in the "retired" note below the
+  // lifecycle overlay, not as an active re-paste instruction — see start-review-team-synthex.test.ts
+  // T11 for the replacement (agentType spawn + ListAgents verification).
+  it('[H][T] FR-MMT5b is referenced only as a historical "retired (ADR-plus-002)" pointer', () => {
     expect(lifecycleSection).toContain('FR-MMT5b');
+    expect(lifecycleSection).toContain('Per-Task Reviewer Re-Issuance — retired (ADR-plus-002)');
+    expect(lifecycleSection).not.toContain('### Standing Pool Identity Confirm Overlay');
   });
 
-  it('[H][T] FR-MMT20 (JSON-envelope re-issuance per D26) referenced in lifecycle section', () => {
+  it('[H][T] FR-MMT20 (JSON-envelope, still delivered once at spawn time) referenced in lifecycle section', () => {
     expect(lifecycleSection).toContain('FR-MMT20');
   });
 

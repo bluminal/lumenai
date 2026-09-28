@@ -185,15 +185,13 @@ Hold the lock through steps 7–8. Release it with `rmdir ~/.claude/teams/standi
 
 Spawn the pool using the `Teammate` API `spawnTeam` with team name `standing/<name>`.
 
-Compose the spawn prompt for each pool teammate using the **overlay-composition logic defined in D22**. Read all overlay content from `${CLAUDE_PLUGIN_ROOT}/templates/review.md` verbatim — no summarization. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
+**Reviewer identity (ADR-plus-002, FR-HM22):** spawn each reviewer teammate with `agentType: "synthex:<agent-name>"` set on the `spawnTeam` call for that teammate — the same mechanism the Agent tool uses for `subagent_type`. This resolves the reviewer's model, effort, and full system prompt from `plugins/synthex/agents/<agent-name>.md` at spawn time and re-attaches them on every request outside the conversation-history message stream, so identity survives compaction (Task 51 live-compaction spike; `docs/specs/decisions/ADR-plus-002-teammate-identity-via-subagent-type.md`). Do NOT instruct a reviewer to read its own agent file as a spawn-time or per-task action — the `agentType` attachment supersedes the ADR-plus-001 read-on-spawn pattern for reviewers. The Pool Lead has no Synthex agent file (it is the command orchestrator, not an agent) and keeps its existing prompt-based spawn.
 
-#### Overlay-Composition Logic (D22 — all four clauses MUST be applied)
+Compose the remaining spawn prompt content for each pool teammate using the **overlay-composition logic defined in D22**. Read all overlay content from `${CLAUDE_PLUGIN_ROOT}/templates/review.md` verbatim — no summarization. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
-**(a) Standing Pool Identity Confirm Overlay — ALL pool teammates, unconditionally**
+#### Overlay-Composition Logic (D22 — both remaining clauses MUST be applied)
 
-ALWAYS include the section `### Standing Pool Identity Confirm Overlay (apply when standing=true)` verbatim in EVERY pool teammate's spawn prompt. This applies to Pool Lead and every reviewer. The `standing=true` condition is true for all pool teammates spawned by this command.
-
-**(b) Multi-Model Conditional Overlay — conditional on `multi_model: true`**
+**(a) Multi-Model Conditional Overlay — conditional on `multi_model: true`**
 
 When `multi_model: true`:
 - Include the section `### Multi-Model Conditional Overlay (apply when multi_model=true)` verbatim in the Pool Lead's spawn prompt (the Lead Suppression subsection applies to the Pool Lead).
@@ -201,11 +199,11 @@ When `multi_model: true`:
 
 When `multi_model: false`, omit this overlay entirely from all spawn prompts.
 
-**(c) Standing Pool Lifecycle Overlay — Pool Lead ONLY**
+**(b) Standing Pool Lifecycle Overlay — Pool Lead ONLY**
 
 Include the section `### Standing Pool Lifecycle Overlay (apply when standing=true)` from `templates/review.md` verbatim in the Pool Lead's spawn prompt ONLY — NOT in reviewer spawn prompts. Reviewers do NOT receive the Lifecycle Overlay.
 
-**(d) All overlay content is read verbatim**
+**(c) All overlay content is read verbatim**
 
 All overlay content is copied from `templates/review.md` verbatim — do not paraphrase, summarize, or reconstruct from memory. If the file cannot be read, abort with an error before any filesystem writes.
 
@@ -216,8 +214,6 @@ You are the Pool Lead for standing pool "<name>".
 
 Read your team context at plugins/synthex/templates/review.md, roles table, Lead row.
 
-[### Standing Pool Identity Confirm Overlay (apply when standing=true) — verbatim from templates/review.md]
-
 [### Standing Pool Lifecycle Overlay (apply when standing=true) — verbatim from templates/review.md]
 
 [### Multi-Model Conditional Overlay (apply when multi_model=true) — verbatim from templates/review.md, Lead Suppression section only — INCLUDED ONLY WHEN multi_model=true]
@@ -227,19 +223,23 @@ Pool task root: ~/.claude/tasks/standing/<name>/
 Your mailbox: ~/.claude/teams/standing/<name>/inboxes/lead/
 ```
 
-#### Reviewer Spawn Prompt Structure (one per reviewer in the roster)
+#### Reviewer Spawn Call (one per reviewer in the roster)
 
 ```
-Read your agent definition at plugins/synthex/agents/<agent-name>.md and adopt it as your identity.
+spawnTeam teammate:
+  agentType: "synthex:<agent-name>"
+  name: "<agent-name>"
+  prompt: |
+    [### Multi-Model Conditional Overlay (apply when multi_model=true) — verbatim from templates/review.md, Reviewer JSON-Envelope section only — INCLUDED ONLY WHEN multi_model=true]
 
-[### Standing Pool Identity Confirm Overlay (apply when standing=true) — verbatim from templates/review.md]
-
-[### Multi-Model Conditional Overlay (apply when multi_model=true) — verbatim from templates/review.md, Reviewer JSON-Envelope section only — INCLUDED ONLY WHEN multi_model=true]
-
-Pool name: <name>
-Pool task root: ~/.claude/tasks/standing/<name>/
-Your mailbox: ~/.claude/teams/standing/<name>/inboxes/<agent-name>/
+    Pool name: <name>
+    Pool task root: ~/.claude/tasks/standing/<name>/
+    Your mailbox: ~/.claude/teams/standing/<name>/inboxes/<agent-name>/
 ```
+
+#### Step 7c. Verify Spawn Identity (FR-HM22 acceptance)
+
+After spawning, call ListAgents and confirm, for each reviewer teammate, that its returned `agentType` equals `synthex:<agent-name>` for the agent it was spawned with. Do NOT verify identity by reading `~/.claude/teams/standing/<name>/config.json` — ListAgents is the source of truth for a live teammate's resolved agent type, per the FR-HM22 acceptance criterion. If any reviewer's `agentType` is empty or does not match, apply the read-on-spawn fallback from the Reviewer Identity paragraph above for that reviewer (re-issue "Read your full agent definition at `plugins/synthex/agents/<agent-name>.md` and adopt it as your identity" via SendMessage) before proceeding to Step 8, and note the fallback in the Step 10 confirmation.
 
 ---
 
@@ -307,7 +307,7 @@ Release the lock even if the writes failed. If the write fails, abort with a cle
 
 ### Step 9. Idle the Pool
 
-After spawn, pool teammates perform read-on-spawn identity initialization and sit idle, waiting for tasks to appear in the pool's task root (`~/.claude/tasks/standing/<name>/`).
+After spawn (identity already resolved via `agentType` and verified in Step 7c), pool teammates sit idle, waiting for tasks to appear in the pool's task root (`~/.claude/tasks/standing/<name>/`).
 
 The Pool Lead monitors for incoming work and for lifecycle signals. When the Pool Lead is ready to receive work, it emits a "pool ready" message to the host session mailbox.
 
