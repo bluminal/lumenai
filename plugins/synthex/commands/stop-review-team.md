@@ -55,7 +55,7 @@ If `--force` is set, skip this check entirely and proceed directly to Step 3.
 
 ### 3. Send Shutdown Signal
 
-For each pool confirmed for stopping, send a `SendMessage` to the Pool Lead with:
+For each pool confirmed for stopping, send a SendMessage (already confirmed available by Step 0's gate above) to the Pool Lead with:
 
 - `to`: the Pool Lead's teammate identifier for this pool
 - `type`: `shutdown`

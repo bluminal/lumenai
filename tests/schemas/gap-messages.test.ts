@@ -72,4 +72,39 @@ describe('Task 47 (FR-HM24, D11): gap-messages.test.ts', () => {
       expect(content).not.toMatch(/`ListAgents`/);
     });
   });
+
+  // ── Task 49 (FR-HM21): GAP_MESSAGES covers the capability ladder's ────────
+  // level-4 (sequential) fallback, alongside the pre-existing pool gap.
+  describe('GAP_MESSAGES.ladderFallback (Task 49, FR-HM21)', () => {
+    it('is a single-sourced, non-empty, single-line sentence naming every level-3 candidate tool', () => {
+      expect(GAP_MESSAGES.ladderFallback).toBeTruthy();
+      expect(typeof GAP_MESSAGES.ladderFallback).toBe('string');
+      expect(GAP_MESSAGES.ladderFallback).not.toContain('\n');
+      for (const tool of ['Agent', 'Task', 'task', 'spawn_agent', 'delegate_task']) {
+        expect(GAP_MESSAGES.ladderFallback).toContain(tool);
+      }
+    });
+
+    it('names no host and never says the bare word "Workflows"', () => {
+      for (const hostName of ['Codex', 'Gemini', 'OpenCode', 'Grok', 'Hermes', 'Claude Code']) {
+        expect(GAP_MESSAGES.ladderFallback).not.toContain(hostName);
+      }
+      expect(GAP_MESSAGES.ladderFallback).not.toMatch(/\bWorkflows\b/);
+    });
+
+    it('standing-pool-routing.md documents the ladder and prints GAP_MESSAGES.ladderFallback verbatim', () => {
+      const doc = readFileSync(
+        join(repoRoot, 'plugins', 'synthex', 'docs', 'standing-pool-routing.md'),
+        'utf8',
+      );
+      expect(doc).toContain(GAP_MESSAGES.ladderFallback);
+    });
+
+    it('review-code.md and performance-audit.md Step 4 reference GAP_MESSAGES.ladderFallback as the level-4 rationale', () => {
+      const reviewCode = readCommand('review-code');
+      const perfAudit = readCommand('performance-audit');
+      expect(reviewCode).toContain('GAP_MESSAGES.ladderFallback');
+      expect(perfAudit).toContain('GAP_MESSAGES.ladderFallback');
+    });
+  });
 });

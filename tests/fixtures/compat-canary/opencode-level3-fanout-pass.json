@@ -1,0 +1,4 @@
+{
+  "id": "level3-fanout-gate",
+  "output": "{\"type\":\"tool\",\"tool\":\"task\",\"status\":\"completed\",\"input\":{\"description\":\"no-op compatibility probe\"}}\n{\"type\":\"message\",\"text\":\"Fanned out one no-op subagent task via task and waited for it to complete. SYNTHEX_COMPAT_CANARY_TOOL_LEVEL3_FANOUT\"}\n"
+}

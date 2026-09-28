@@ -33,7 +33,13 @@ const STANDING_POOL_ROUTING_DOC_PATH = join(
   '..', '..', 'plugins', 'synthex', 'docs', 'standing-pool-routing.md'
 );
 
+const REVIEW_CODE_MD_PATH = join(
+  import.meta.dirname,
+  '..', '..', 'plugins', 'synthex', 'commands', 'review-code.md'
+);
+
 const content = readFileSync(STANDING_POOL_ROUTING_DOC_PATH, 'utf-8');
+const commandContent = readFileSync(REVIEW_CODE_MD_PATH, 'utf-8');
 
 describe('review-code.md — Tasks 54+55 [T] acceptance criteria (inline discovery + pool routing + recovery)', () => {
 
@@ -143,6 +149,22 @@ describe('review-code.md — Tasks 54+55 [T] acceptance criteria (inline discove
       content.includes('>= 60') ||
       content.includes('≥ 60');
     expect(has60sThreshold).toBe(true);
+  });
+
+  // ── [T] Task 49 (FR-HM21): Capability Ladder — level 1 is nested in it ────
+  describe('Task 49 (FR-HM21): capability ladder', () => {
+    it('the routing doc documents pool routing as ladder level 1', () => {
+      expect(content).toMatch(/## Capability Ladder \(FR-HM21\)/);
+      expect(content).toMatch(/\*\*Pool routing\.\*\*/);
+    });
+
+    it('review-code.md Step 4 selects fan-out vs. sequential by tool presence, per the ladder', () => {
+      expect(commandContent).toMatch(
+        /if a tool named `Agent`, `Task`, `task`, `spawn_agent`, or `delegate_task` is in your tool list/,
+      );
+      expect(commandContent).toMatch(/otherwise, run them sequentially/i);
+      expect(commandContent).toContain('FR-HM21 levels 3-4');
+    });
   });
 
 });

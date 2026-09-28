@@ -113,3 +113,14 @@ Apply `standing_pools.routing_mode` (default: `prefer-with-fallback`). Resolve `
          /synthex:start-review-team --reviewers code-reviewer,security-reviewer
     2. Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml
   ```
+
+## Capability Ladder (FR-HM21)
+
+`/synthex:review-code` and `/synthex:performance-audit` select their reviewer-orchestration strategy by walking this ladder, in order, at every invocation. Selection is always by tool presence, checked fresh each time — never by host name, and never by matching a feature name that only coincidentally resembles a Claude tool name on some other host.
+
+1. **Pool routing.** If `SendMessage` and `ListAgents` are in your tool list, and `standing_pools.enabled` resolves to `true` (per the D6 fallback above), and a matching pool is running: route to the pool. This is §1b above, in full.
+2. **Workflow engine (placeholder).** If a `Workflow` tool is in your tool list and `code_review.engine: workflow` is set in `.synthex/config.yaml`: FR-HM16's engine handles the review. This slot is a placeholder — FR-HM16 is not implemented yet, so no host reaches it today; it is documented here so the ladder's shape is complete and level 3 knows to check for it first.
+3. **Parallel subagent fan-out.** Otherwise, if a tool named `Agent`, `Task`, `task`, `spawn_agent`, or `delegate_task` is in your tool list: launch every required reviewer in one turn and consolidate their findings via the prose consolidation path (the findings-consolidator step each command already documents). On a depth-1 host, when the command is already running inside a subagent and a nested spawn at this level is refused, apply the depth-1 inline rule below instead of falling through to level 4.
+4. **Sequential reviewers.** Otherwise: run the required reviewers one at a time in the same turn, in the order they are configured. This is today's baseline — it always works, so it is the ladder's floor, not a degraded mode. When this is the level actually reached, the reason is: "No parallel-subagent tool (Agent, Task, task, spawn_agent, or delegate_task) is in your tool list, so reviewers run sequentially instead of fanned out in one turn -- see the capability ladder in docs/standing-pool-routing.md."
+
+**Depth-1 inline rule (FR-HM42):** on a depth-1 host, when the command is already running inside a subagent and a spawn at level 3 is refused, perform the reviewer roles inline in this session instead of falling to level 4 — the command still completes the review in one turn, it just performs the reviewer roles itself rather than spawning them out.

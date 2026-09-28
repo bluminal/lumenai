@@ -118,9 +118,9 @@ Before launching reviewers, gather context they'll need:
 - Read convention sources from config (e.g., `.eslintrc`, `.prettierrc`)
 - Identify the programming language(s) and frameworks in the diff
 
-### 4. Launch Reviewers in Parallel
+### 4. Launch Reviewers
 
-For each enabled reviewer, launch a sub-agent IN PARALLEL, providing the full diff and project context, and expecting structured output with a PASS/WARN/FAIL verdict and severity-ranked findings:
+FR-HM21 levels 3-4 (Capability Ladder, `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md`): if a tool named `Agent`, `Task`, `task`, `spawn_agent`, or `delegate_task` is in your tool list, launch each enabled reviewer as a sub-agent IN PARALLEL, in one turn; otherwise, run them sequentially, one at a time (GAP_MESSAGES.ladderFallback explains why). A refused spawn on a depth-1 host applies the inline rule, not level 4. Provide the full diff and project context; expect a PASS/WARN/FAIL verdict with severity-ranked findings:
 
 - **Code Reviewer:** craftsmanship review (correctness, maintainability, convention adherence, specification compliance, reuse opportunities).
 - **Security Reviewer:** security-focused review (vulnerabilities, secrets, injection, access control).

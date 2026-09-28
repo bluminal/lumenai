@@ -119,3 +119,7 @@ Apply `standing_pools.routing_mode` (default: `prefer-with-fallback`). Resolve `
 
 ---
 
+## Capability Ladder (FR-HM21)
+
+The pool routing above is level 1 of the same FR-HM21 capability ladder `docs/standing-pool-routing.md`'s Capability Ladder section documents in full (levels 1-4, the level-2 placeholder, and the depth-1 inline rule). `performance-audit`'s required-reviewer-set is always the single static `[performance-engineer]`, so its levels 3 and 4 differ only in whether that one reviewer is spawned as a sub-agent (a tool named `Agent`, `Task`, `task`, `spawn_agent`, or `delegate_task` is in your tool list) or performed inline in this session (otherwise, or when a spawn is refused — the depth-1 inline rule) — there is no multi-reviewer fan-out or consolidation step to gate here, unlike `review-code`.
+
