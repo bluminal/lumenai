@@ -18,13 +18,28 @@
  *   - teammate-idle-gate.sh: the standing-pool exemption (always allow) and
  *     the non-standing role-matching / dependency / cross-functional rules
  *
+ * Task 50 follow-up (review found a blocking bug — see task-completed-gate
+ * .sh's header): the first version blocked every non-documentation
+ * completion forever, including the re-mark after review actually
+ * happened, since nothing distinguished a reviewed completion from an
+ * unreviewed one. Fixed by two allow paths, both covered below:
+ *   - a `Review verdict: PASS|WARN` marker in the completion note/task
+ *     description allows; `FAIL` keeps blocking
+ *   - with no marker, a task id is allowed through on its second
+ *     completion attempt (recorded under .synthex/tmp/task-gate/<id>,
+ *     fail-open if unwritable)
+ * teammate-idle-gate.sh got the same defensive fix for the mirror-image
+ * risk (an idle teammate re-blocked forever on a task the caller can't
+ * actually assign): a task id already suggested once is allowed through
+ * on a later idle event (.synthex/tmp/idle-gate/<id>, same fail-open rule).
+ *
  * Spec: docs/reqs/harness-modernization.md § FR-HM23.
  * Plan: docs/plans/harness-modernization.md Task 50.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'child_process';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, chmodSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -178,7 +193,7 @@ describe('task-completed-gate.sh — work-type classification table (Task 50, FR
     const result = runHook(TASK_COMPLETED_SCRIPT, { files: ['tests/foo.test.ts', 'tests/bar.spec.ts'] });
     expect(result.status).toBe(2);
     expect(result.stderr).toContain('test change');
-    expect(result.stderr).toContain('route to code-reviewer before');
+    expect(result.stderr).toContain('route to code-reviewer,');
   });
 
   it('classifies an all-documentation change as documentation and allows (exit 0, no gate)', () => {
@@ -219,6 +234,99 @@ describe('task-completed-gate.sh — work-type classification table (Task 50, FR
     const result = runHook(TASK_COMPLETED_SCRIPT, { completion_note: { files: ['infra/main.tf'] } });
     expect(result.status).toBe(2);
     expect(result.stderr).toContain('infrastructure change');
+  });
+});
+
+describe('task-completed-gate.sh — verdict marker and once-per-task safety net (Task 50 follow-up, FR-HM23)', () => {
+  beforeEach(() => {
+    writeSynthexConfig(ENABLED_POOLS_CONFIG);
+  });
+
+  it('a PASS verdict marker in `notes` allows (exit 0), fixing the original always-blocks bug', () => {
+    const result = runHook(TASK_COMPLETED_SCRIPT, {
+      files: ['src/a.ts'],
+      notes: 'Reviewed by code-reviewer and security-reviewer. Review verdict: PASS',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+  });
+
+  it('a WARN verdict marker (case-insensitive, in completion_note) allows (exit 0)', () => {
+    const result = runHook(TASK_COMPLETED_SCRIPT, {
+      files: ['src/a.ts'],
+      completion_note: 'minor nit only. review verdict: warn',
+    });
+    expect(result.status).toBe(0);
+  });
+
+  it('a WARN verdict marker in completion_note.text allows (exit 0)', () => {
+    const result = runHook(TASK_COMPLETED_SCRIPT, {
+      files: ['src/a.ts'],
+      completion_note: { text: 'Review verdict: WARN', files: ['src/a.ts'] },
+    });
+    expect(result.status).toBe(0);
+  });
+
+  it('a verdict marker in task.description allows (exit 0)', () => {
+    const result = runHook(TASK_COMPLETED_SCRIPT, {
+      files: ['src/a.ts'],
+      task: { description: 'Implement the thing. Review verdict: PASS' },
+    });
+    expect(result.status).toBe(0);
+  });
+
+  it('a FAIL verdict marker keeps blocking (exit 2) with a fix-and-retry message', () => {
+    const result = runHook(TASK_COMPLETED_SCRIPT, {
+      files: ['src/a.ts'],
+      notes: 'Review verdict: FAIL - missing null check',
+    });
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('FAIL verdict recorded');
+    expect(result.stderr).toContain('code-reviewer, security-reviewer');
+    expect(result.stderr).toContain('Review verdict: PASS');
+  });
+
+  it('the reproduction case ({"files":["src/a.ts"]}) blocks once, then allows on a second attempt with the same task id', () => {
+    const payload = { files: ['src/a.ts'], task_id: 'task-42' };
+    const first = runHook(TASK_COMPLETED_SCRIPT, payload);
+    expect(first.status).toBe(2);
+    expect(first.stderr).toContain('code change');
+
+    const second = runHook(TASK_COMPLETED_SCRIPT, payload);
+    expect(second.status).toBe(0);
+  });
+
+  it('a different task id still blocks even after another id was let through once', () => {
+    const first = runHook(TASK_COMPLETED_SCRIPT, { files: ['src/a.ts'], task_id: 'task-1' });
+    expect(first.status).toBe(2);
+    const firstAgain = runHook(TASK_COMPLETED_SCRIPT, { files: ['src/a.ts'], task_id: 'task-1' });
+    expect(firstAgain.status).toBe(0);
+
+    const second = runHook(TASK_COMPLETED_SCRIPT, { files: ['src/a.ts'], task_id: 'task-2' });
+    expect(second.status).toBe(2);
+  });
+
+  it('with no task id at all, every attempt keeps blocking (no id to key the safety net on) and says so', () => {
+    const payload = { files: ['src/a.ts'] };
+    const first = runHook(TASK_COMPLETED_SCRIPT, payload);
+    expect(first.status).toBe(2);
+    expect(first.stderr).toContain('No task id in this payload');
+
+    const second = runHook(TASK_COMPLETED_SCRIPT, payload);
+    expect(second.status).toBe(2);
+  });
+
+  it('fails open (exit 0) on the very first block when .synthex/tmp is unwritable, instead of deadlocking', () => {
+    const synthexDir = join(projectDir, '.synthex');
+    // .synthex/config.yaml is already written by beforeEach; lock the whole
+    // .synthex/ dir so mkdir('.synthex/tmp/task-gate') cannot succeed.
+    chmodSync(synthexDir, 0o555);
+    try {
+      const result = runHook(TASK_COMPLETED_SCRIPT, { files: ['src/a.ts'], task_id: 'task-locked' });
+      expect(result.status).toBe(0);
+    } finally {
+      chmodSync(synthexDir, 0o755);
+    }
   });
 });
 
@@ -360,5 +468,77 @@ describe('teammate-idle-gate.sh — non-standing role matching (Task 50, FR-HM23
       pending_tasks: [{ id: 'task-1', role: 'frontend', blocked: true }],
     });
     expect(result.status).toBe(0);
+  });
+});
+
+describe('teammate-idle-gate.sh — loop safety net (Task 50 follow-up, FR-HM23)', () => {
+  beforeEach(() => {
+    writeSynthexConfig(ENABLED_POOLS_CONFIG);
+  });
+
+  it('blocks once, then allows idle on a second event with the same unresolved top-match task id', () => {
+    const payload = {
+      standing: false,
+      teammate: { role: 'reviewer' },
+      pending_tasks: [{ id: 'task-9', role: 'reviewer', blocked: false }],
+    };
+    const first = runHook(TEAMMATE_IDLE_SCRIPT, payload);
+    expect(first.status).toBe(2);
+    expect(first.stderr).toContain('assign task-9');
+
+    // Same task id still pending, unchanged — a caller that could not
+    // actually assign it must not be re-blocked forever.
+    const second = runHook(TEAMMATE_IDLE_SCRIPT, payload);
+    expect(second.status).toBe(0);
+  });
+
+  it('a different task id still blocks even after another id was let through once', () => {
+    const first = runHook(TEAMMATE_IDLE_SCRIPT, {
+      standing: false,
+      teammate: { role: 'reviewer' },
+      pending_tasks: [{ id: 'task-9', role: 'reviewer', blocked: false }],
+    });
+    expect(first.status).toBe(2);
+    const firstAgain = runHook(TEAMMATE_IDLE_SCRIPT, {
+      standing: false,
+      teammate: { role: 'reviewer' },
+      pending_tasks: [{ id: 'task-9', role: 'reviewer', blocked: false }],
+    });
+    expect(firstAgain.status).toBe(0);
+
+    const second = runHook(TEAMMATE_IDLE_SCRIPT, {
+      standing: false,
+      teammate: { role: 'reviewer' },
+      pending_tasks: [{ id: 'task-10', role: 'reviewer', blocked: false }],
+    });
+    expect(second.status).toBe(2);
+    expect(second.stderr).toContain('assign task-10');
+  });
+
+  it('a standing-pool teammate never writes an idle-gate marker (always exit 0, even with a repeatable match)', () => {
+    const payload = {
+      standing: true,
+      teammate: { role: 'reviewer' },
+      pending_tasks: [{ id: 'task-9', role: 'reviewer', blocked: false }],
+    };
+    const first = runHook(TEAMMATE_IDLE_SCRIPT, payload);
+    expect(first.status).toBe(0);
+    const second = runHook(TEAMMATE_IDLE_SCRIPT, payload);
+    expect(second.status).toBe(0);
+  });
+
+  it('fails open (exit 0) on the very first block when .synthex/tmp is unwritable, instead of deadlocking', () => {
+    const synthexDir = join(projectDir, '.synthex');
+    chmodSync(synthexDir, 0o555);
+    try {
+      const result = runHook(TEAMMATE_IDLE_SCRIPT, {
+        standing: false,
+        teammate: { role: 'reviewer' },
+        pending_tasks: [{ id: 'task-locked', role: 'reviewer', blocked: false }],
+      });
+      expect(result.status).toBe(0);
+    } finally {
+      chmodSync(synthexDir, 0o755);
+    }
   });
 });

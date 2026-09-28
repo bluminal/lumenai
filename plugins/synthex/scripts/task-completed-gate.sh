@@ -17,6 +17,32 @@
 # yet): JSON on stdin with a `files` array (paths touched by the completed
 # task), optionally nested under `completion_note.files` or `task.files`.
 # Missing/unparseable input degrades to the empty-file-list default (`code`).
+# A task id, tried as `task_id`, `id`, or `task.id`, lets the once-per-task
+# safety net below key its record; free text tried as `notes`,
+# `completion_note` (string or `.text`), `task.description`, or
+# `description` is scanned for the verdict marker below.
+#
+# Bug found in review (Task 50 follow-up): the first version of this script
+# always blocked a non-documentation completion, including the re-mark
+# after review — there was no way to ever let a task through. Two allow
+# paths fix that:
+#
+#   1. Verdict marker: a payload text field containing
+#      `Review verdict: PASS` or `Review verdict: WARN` (case-insensitive)
+#      allows (exit 0) — the calling agent writes this into the completion
+#      note after getting the named reviewers' input. `Review verdict: FAIL`
+#      keeps blocking, with the same reviewers named again.
+#   2. Once-per-task safety net: with no verdict marker, a task id is
+#      recorded under `.synthex/tmp/task-gate/<task_id>` the first time it
+#      blocks; a second completion attempt for the same id is allowed even
+#      without a marker, so a teammate that never learns the marker
+#      convention is nagged once, not deadlocked forever. If
+#      `.synthex/tmp/` cannot be written to (checked before every block),
+#      the gate fails open (allow) rather than risk exactly that deadlock
+#      from an unwritable marker directory. With no task id in the payload
+#      at all, this safety net cannot key a record deterministically, so it
+#      is skipped entirely — only the verdict marker can unblock that case,
+#      and the block message says so.
 #
 # Gating (FR-HM23): no-ops (exit 0) when `standing_pools.enabled` resolves to
 # anything other than the literal string "true" via scripts/lib/config-get.sh,
@@ -39,11 +65,13 @@
 #
 # Exit codes:
 #   0 - allow completion (gate disabled, documentation-only change, no
-#       config, standing_pools.enabled is not "true", or node is missing —
-#       all fail open)
+#       config, standing_pools.enabled is not "true", node is missing, a
+#       PASS/WARN verdict marker is present, this task id already blocked
+#       once before, or the task-gate marker directory is unwritable — all
+#       fail open)
 #   2 - block completion: the classified work type and its required
-#       reviewers are printed on stderr; route to them before re-marking
-#       the task complete
+#       reviewers are printed on stderr, along with the verdict-marker
+#       instructions; route to them before re-marking the task complete
 
 set -u
 
@@ -80,8 +108,12 @@ POOLS_ENABLED="$(bash "$CONFIG_GET" standing_pools.enabled false 2>/dev/null)"
 GATE_ENABLED="$(bash "$CONFIG_GET" hooks.task_completed.review_gate.enabled true 2>/dev/null)"
 [ "$GATE_ENABLED" = "true" ] || exit 0
 
-node - "$INPUT" <<'NODE_SCRIPT'
+node - "$INPUT" "$PROJECT_ROOT" <<'NODE_SCRIPT'
+const fs = require('fs');
+const path = require('path');
+
 const raw = process.argv[2] || '';
+const projectRoot = process.argv[3] || process.cwd();
 
 let payload;
 try {
@@ -95,6 +127,30 @@ function filesFrom(p) {
   if (Array.isArray(p?.completion_note?.files)) return p.completion_note.files;
   if (Array.isArray(p?.task?.files)) return p.task.files;
   return [];
+}
+
+function taskIdFrom(p) {
+  if (typeof p?.task_id === 'string' && p.task_id.trim()) return p.task_id.trim();
+  if (typeof p?.id === 'string' && p.id.trim()) return p.id.trim();
+  if (typeof p?.task?.id === 'string' && p.task.id.trim()) return p.task.id.trim();
+  return null;
+}
+
+/** Every free-text field a completion payload might carry a verdict in. */
+function noteTextsFrom(p) {
+  const texts = [];
+  if (typeof p?.notes === 'string') texts.push(p.notes);
+  if (typeof p?.completion_note === 'string') texts.push(p.completion_note);
+  else if (typeof p?.completion_note?.text === 'string') texts.push(p.completion_note.text);
+  if (typeof p?.task?.description === 'string') texts.push(p.task.description);
+  if (typeof p?.description === 'string') texts.push(p.description);
+  return texts.join('\n');
+}
+
+/** `Review verdict: PASS|WARN|FAIL` (case-insensitive) -> 'PASS'|'WARN'|'FAIL'|null. */
+function verdictFrom(p) {
+  const m = noteTextsFrom(p).match(/Review verdict:\s*(PASS|WARN|FAIL)\b/i);
+  return m ? m[1].toUpperCase() : null;
 }
 
 const files = filesFrom(payload).filter((f) => typeof f === 'string');
@@ -131,13 +187,13 @@ const isDoc = (f) => /\.(md|mdx|txt|rst|adoc)$/.test(f) || /(^|\/)docs\//.test(f
 //  - mixed frontend + backend -> frontend (handled: frontend is checked
 //    before the generic code rule).
 //  - no files listed -> code (the most common default).
-function classify(fs) {
-  if (fs.length === 0) return 'code';
-  if (fs.some(isInfra)) return 'infrastructure';
-  if (fs.some(isFrontend)) return 'frontend';
-  if (fs.every(isTest)) return 'test';
-  if (fs.some(isCode)) return 'code';
-  if (fs.every(isDoc)) return 'documentation';
+function classify(fileList) {
+  if (fileList.length === 0) return 'code';
+  if (fileList.some(isInfra)) return 'infrastructure';
+  if (fileList.some(isFrontend)) return 'frontend';
+  if (fileList.every(isTest)) return 'test';
+  if (fileList.some(isCode)) return 'code';
+  if (fileList.every(isDoc)) return 'documentation';
   return 'code';
 }
 
@@ -157,9 +213,63 @@ const REVIEWERS = {
 };
 
 const reviewers = REVIEWERS[workType] || REVIEWERS.code;
+const verdict = verdictFrom(payload);
+
+// Allow path 1: a recorded verdict. PASS/WARN means the named reviewers
+// already looked at this and the calling agent recorded the outcome.
+if (verdict === 'PASS' || verdict === 'WARN') {
+  process.exit(0);
+}
+
+if (verdict === 'FAIL') {
+  process.stderr.write(
+    `task-completed-gate: FAIL verdict recorded — route to ${reviewers.join(', ')}, fix the findings, then re-mark complete with ` +
+      `"Review verdict: PASS" or "Review verdict: WARN" in the completion note (FR-HM23).\n`,
+  );
+  process.exit(1);
+}
+
+// No verdict marker. Allow path 2: once-per-task safety net, so a
+// teammate that never learns the marker convention is nagged once, not
+// deadlocked forever — see this script's header for why an unwritable
+// marker directory also fails open here rather than risk that same
+// deadlock from the other direction.
+const taskId = taskIdFrom(payload);
+let markerNote = 'No task id in this payload, so the once-per-task safety net cannot key a ' +
+  'record — add the `Review verdict: PASS|WARN` marker, since this will otherwise keep blocking on every retry.';
+
+if (taskId) {
+  const safeId = taskId.replace(/[^A-Za-z0-9_.-]/g, '_');
+  const gateDir = path.join(projectRoot, '.synthex', 'tmp', 'task-gate');
+  const markerPath = path.join(gateDir, safeId);
+
+  let markerExists;
+  try {
+    markerExists = fs.existsSync(markerPath);
+  } catch {
+    process.exit(0); // can't even check — fail open
+  }
+
+  if (markerExists) {
+    process.exit(0); // already blocked once for this task id — let it through
+  }
+
+  try {
+    fs.mkdirSync(gateDir, { recursive: true });
+    const gitignorePath = path.join(projectRoot, '.synthex', 'tmp', '.gitignore');
+    if (!fs.existsSync(gitignorePath)) fs.writeFileSync(gitignorePath, '*\n');
+    fs.writeFileSync(markerPath, new Date().toISOString() + '\n');
+  } catch {
+    process.exit(0); // unwritable — fail open rather than deadlock forever
+  }
+
+  markerNote = 'A repeat completion of this task id will be allowed through even without a marker, ' +
+    'but adding `Review verdict: PASS|WARN` to the completion note is preferred.';
+}
 
 process.stderr.write(
-  `task-completed-gate: ${workType} change — route to ${reviewers.join(', ')} before marking this task complete (FR-HM23).\n`,
+  `task-completed-gate: ${workType} change — route to ${reviewers.join(', ')}, then re-mark complete with ` +
+    `"Review verdict: PASS" or "Review verdict: WARN" in the completion note (FR-HM23). ${markerNote}\n`,
 );
 process.exit(1);
 NODE_SCRIPT

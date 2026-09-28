@@ -32,6 +32,21 @@
 # itself. Missing/unparseable input degrades to "no matching work" (allow
 # idle).
 #
+# Loop safety net (Task 50 follow-up, same review that found the
+# task-completed-gate.sh deadlock): a block here is only ever safe if the
+# calling agent actually assigns the named task before the teammate goes
+# idle again — if it cannot (the assignment fails, or a caller ignores the
+# instruction and re-polls with the same unchanged pending_tasks), the same
+# task id would otherwise be re-suggested and re-blocked forever, the same
+# structural bug task-completed-gate.sh had. The fix is the same shape: the
+# first time this script would block on a given task id, it records that
+# under `.synthex/tmp/idle-gate/<task_id>` (checked for writability first,
+# same fail-open rule as below); if that same task id is still the top
+# match on a later idle event, the second block is skipped (allow idle
+# instead) rather than repeat forever. This does not stop the teammate from
+# being offered a *different* matching task later — only the specific
+# stuck id stops recurring.
+#
 # Gating (FR-HM23): same as task-completed-gate.sh — no-ops when
 # `standing_pools.enabled` is not "true" (resolved via
 # scripts/lib/config-get.sh, which falls back for one major version to the
@@ -42,8 +57,10 @@
 #
 # Exit codes:
 #   0 - allow idle (gate disabled, no config, standing_pools.enabled is not
-#       "true", node is missing, standing-pool teammate, or no matching
-#       unblocked work — all fail open)
+#       "true", node is missing, standing-pool teammate, no matching
+#       unblocked work, this exact task id was already suggested once
+#       before, or the idle-gate marker directory is unwritable — all fail
+#       open)
 #   2 - keep working: the task to assign is printed on stderr; assign it
 #       before allowing the teammate to go idle
 
@@ -83,9 +100,13 @@ GATE_ENABLED="$(bash "$CONFIG_GET" hooks.teammate_idle.work_assignment.enabled t
 
 CROSS_FUNCTIONAL="$(bash "$CONFIG_GET" hooks.teammate_idle.work_assignment.allow_cross_functional false 2>/dev/null)"
 
-node - "$INPUT" "$CROSS_FUNCTIONAL" <<'NODE_SCRIPT'
+node - "$INPUT" "$CROSS_FUNCTIONAL" "$PROJECT_ROOT" <<'NODE_SCRIPT'
+const fs = require('fs');
+const path = require('path');
+
 const raw = process.argv[2] || '';
 const allowCrossFunctional = process.argv[3] === 'true';
+const projectRoot = process.argv[4] || process.cwd();
 
 let payload;
 try {
@@ -127,6 +148,34 @@ if (!assign && allowCrossFunctional) {
 
 if (!assign) {
   process.exit(0); // no matching, unblocked work — allow idle
+}
+
+// Loop safety net: if this exact task id was already suggested once
+// before and is still the top match, allow idle instead of blocking
+// again — see this script's header for why (mirrors
+// task-completed-gate.sh's once-per-task fix for the same class of bug).
+const safeId = String(assign.id).replace(/[^A-Za-z0-9_.-]/g, '_');
+const gateDir = path.join(projectRoot, '.synthex', 'tmp', 'idle-gate');
+const markerPath = path.join(gateDir, safeId);
+
+let markerExists;
+try {
+  markerExists = fs.existsSync(markerPath);
+} catch {
+  process.exit(0); // can't even check — fail open
+}
+
+if (markerExists) {
+  process.exit(0); // already suggested once for this task id — stop re-blocking
+}
+
+try {
+  fs.mkdirSync(gateDir, { recursive: true });
+  const gitignorePath = path.join(projectRoot, '.synthex', 'tmp', '.gitignore');
+  if (!fs.existsSync(gitignorePath)) fs.writeFileSync(gitignorePath, '*\n');
+  fs.writeFileSync(markerPath, new Date().toISOString() + '\n');
+} catch {
+  process.exit(0); // unwritable — fail open rather than deadlock forever
 }
 
 const suffix = crossFunctional ? ' (cross-functional suggestion)' : '';
