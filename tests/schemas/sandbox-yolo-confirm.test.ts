@@ -37,6 +37,14 @@ const COMMANDS: Cmd[] = [
     file: join(PLUGINS, 'synthex', 'docs', 'sandbox-yolo.md'),
     followupContext: 'audit',
   },
+  // Task 47 (FR-HM24, D11): start-review-team folded into synthex verbatim
+  // (Step 5a and its Sandbox-Yolo Confirmation body are unchanged from the
+  // synthex-plus original above).
+  {
+    name: '/synthex:start-review-team',
+    file: join(PLUGINS, 'synthex', 'commands', 'start-review-team.md'),
+    followupContext: 'pool',
+  },
 ];
 
 // D25 / NFR-MMT7: this string is locked verbatim per-character.

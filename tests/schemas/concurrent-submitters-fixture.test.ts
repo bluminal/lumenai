@@ -45,6 +45,12 @@ const SUBMITTER_MD_PATH = join(
   '..', '..', 'plugins', 'synthex-plus', 'agents', 'standing-pool-submitter.md'
 );
 
+// Task 47 (FR-HM24, D11) port: the same agent, folded into synthex.
+const SUBMITTER_MD_SYNTHEX_PATH = join(
+  import.meta.dirname,
+  '..', '..', 'plugins', 'synthex', 'agents', 'standing-pool-submitter.md'
+);
+
 const ROUTING_MD_PATH = join(
   import.meta.dirname,
   '..', '..', 'docs', 'specs', 'multi-model-teams', 'routing.md'
@@ -316,6 +322,53 @@ describe('[9] standing-pool-submitter.md contains report_to field documentation'
     // "report_to field is shared across all tasks in this batch"
     expect(submitterContent).toContain('report_to');
     // The submitter doc explains this path goes in each task file
+    expect(submitterContent).toContain('report-to path');
+  });
+});
+
+// ── Task 47 (FR-HM24, D11) port: [8]/[9] against the synthex copy ────────
+
+describe('[8-synthex] plugins/synthex/agents/standing-pool-submitter.md contains UUID or uuid', () => {
+  const submitterContent = readFileSync(SUBMITTER_MD_SYNTHEX_PATH, 'utf-8');
+
+  it('standing-pool-submitter.md is readable and non-empty', () => {
+    expect(submitterContent.length).toBeGreaterThan(0);
+  });
+
+  it('standing-pool-submitter.md contains "UUID" or "uuid"', () => {
+    const hasUUID = submitterContent.includes('UUID') || submitterContent.includes('uuid');
+    expect(hasUUID).toBe(true);
+  });
+
+  it('documents UUID-based filenames for uniqueness across concurrent submitters', () => {
+    const hasUniqueUUID =
+      submitterContent.includes('UUID') &&
+      (submitterContent.includes('unique') || submitterContent.includes('concurrent'));
+    expect(hasUniqueUUID).toBe(true);
+  });
+
+  it('documents both batch_uuid and report_uuid generation in Step 2', () => {
+    expect(submitterContent).toContain('batch_uuid');
+    expect(submitterContent).toContain('report_uuid');
+  });
+});
+
+describe('[9-synthex] plugins/synthex/agents/standing-pool-submitter.md contains report_to field documentation', () => {
+  const submitterContent = readFileSync(SUBMITTER_MD_SYNTHEX_PATH, 'utf-8');
+
+  it('standing-pool-submitter.md contains "report_to"', () => {
+    expect(submitterContent).toContain('report_to');
+  });
+
+  it('documents report_to path as uuid-based (unique per submission)', () => {
+    const hasReportToWithUuid =
+      submitterContent.includes('report_to') &&
+      (submitterContent.includes('report_uuid') || submitterContent.includes('<report_uuid>'));
+    expect(hasReportToWithUuid).toBe(true);
+  });
+
+  it('documents report_to as shared across tasks in the same batch', () => {
+    expect(submitterContent).toContain('report_to');
     expect(submitterContent).toContain('report-to path');
   });
 });

@@ -13,15 +13,21 @@ import { readExpectedEntrypoints } from './contract.mjs';
  * silently diverge from `plugins/synthex/.claude-plugin/plugin.json` --
  * use `diffInventoryAgainstManifest()` in a test to catch that drift.
  */
-export const COMMAND_COUNT = 18;
+// Task 47 (FR-HM24, D11) folded 4 pool-management commands
+// (configure-teams, start-review-team, stop-review-team, list-teams) in
+// from synthex-plus, taking the count from 18 to 22 (Phase 6 target
+// 22/26/48 per D2/D5).
+export const COMMAND_COUNT = 22;
 // Phase 5 retired four utility agents: context-bundle-assembler (Task 41,
 // replaced by scripts/assemble-bundle.sh), audit-artifact-writer (Task 42,
 // replaced by scripts/write-audit.mjs), plan-scribe (Task 44, FR-HM26 --
 // the PM now writes and edits the plan in place), commit-message-author
 // (Task 46, FR-HM27, replaced by a one-sentence rule plus
 // scripts/commit-lint.sh), and plan-linter (Task 45, FR-HM26, replaced by
-// scripts/lint-plan.mjs), dropping 28 to 23.
-export const AGENT_COUNT = 23;
+// scripts/lint-plan.mjs), dropping 28 to 23. Task 47 (FR-HM24, D11) then
+// folded in 3 pool agents (standing-pool-cleanup, standing-pool-submitter,
+// team-orchestrator-bridge) from synthex-plus, taking 23 to 26.
+export const AGENT_COUNT = 26;
 
 /** Wrappers = every generated portable skill, one per command + agent. */
 export const WRAPPER_COUNT = COMMAND_COUNT + AGENT_COUNT;
