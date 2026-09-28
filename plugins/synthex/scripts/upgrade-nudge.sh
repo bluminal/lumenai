@@ -66,7 +66,7 @@ CONFIG_FILE="$SYNTHEX_DIR/config.yaml"
 # leftover directory is deleted.
 LEGACY_PLUS_DIR="$PROJECT_ROOT/.synthex-plus"
 if [ -d "$LEGACY_PLUS_DIR" ]; then
-    printf 'Synthex Plus is deprecated: its pool commands and agents now live in Synthex, and this project still has a .synthex-plus/ directory. See docs/migrations/synthex-plus.md to move standing_pools to .synthex/config.yaml (or run /synthex:configure-teams) and uninstall synthex-plus.\n'
+    printf 'Synthex Plus is deprecated: its pool commands and agents now live in Synthex, and this project still has a .synthex-plus/ directory. See https://github.com/bluminal/lumenai/blob/main/docs/migrations/synthex-plus.md to move standing_pools to .synthex/config.yaml (or run /synthex:configure-teams) and uninstall synthex-plus.\n'
 fi
 
 LAST_SEEN=""

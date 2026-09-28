@@ -1,6 +1,5 @@
 /**
- * Layer 1: Structural tests for /synthex:dismiss-upgrade-nudge and
- * /synthex-plus:dismiss-upgrade-nudge commands.
+ * Layer 1: Structural tests for /synthex:dismiss-upgrade-nudge.
  *
  * Task 20 acceptance criteria:
  *   - frontmatter (model: haiku)
@@ -8,13 +7,14 @@
  *   - sets dismissed: true
  *   - idempotent re-creation logic documented (creates state if missing)
  *
- * Both commands are tested in parallel since they mirror each other. The
- * synthex variant was repointed at scripts/state-flag.sh (Task 38,
+ * The synthex variant was repointed at scripts/state-flag.sh (Task 38,
  * FR-HM26): it no longer writes state.json inline via the Write tool, so
  * its "State file write" / "Idempotent re-creation" assertions check the
  * new script-delegation prose instead — see the `usesScript` branch below.
- * synthex-plus is untouched (still writes state.json inline) and keeps the
- * original assertions.
+ *
+ * Task 54: the synthex-plus variant was dropped from this table — its
+ * dismiss-upgrade-nudge.md is now a migration stub (see
+ * docs/migrations/synthex-plus.md) with no state.json write to validate.
  *
  * Plan: docs/plans/upgrade-onboarding.md Task 20; docs/plans/harness
  * -modernization.md Task 38.
@@ -37,16 +37,6 @@ const SYNTHEX_DISMISS = join(
   'dismiss-upgrade-nudge.md'
 );
 
-const SYNTHEX_PLUS_DISMISS = join(
-  __dirname,
-  '..',
-  '..',
-  'plugins',
-  'synthex-plus',
-  'commands',
-  'dismiss-upgrade-nudge.md'
-);
-
 const variants: {
   label: string;
   path: string;
@@ -60,13 +50,6 @@ const variants: {
     statePath: '.synthex/state.json',
     siblingCommand: '/synthex:configure-multi-model',
     usesScript: true,
-  },
-  {
-    label: 'synthex-plus',
-    path: SYNTHEX_PLUS_DISMISS,
-    statePath: '.synthex-plus/state.json',
-    siblingCommand: '/synthex-plus:configure-teams',
-    usesScript: false,
   },
 ];
 

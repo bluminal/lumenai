@@ -291,7 +291,38 @@ describe('cross-harness compatibility contract', () => {
     expect(workflow).toContain('plugins/synthex-plus/.claude-plugin/plugin.json');
   });
 
-  it('marks the cross-harness distribution release as a one-time major bump', () => {
+  it('still bumps synthex-plus in lockstep with synthex (Task 54: tombstone, not removal)', () => {
+    const workflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/release.yml'),
+      'utf8',
+    );
+
+    // Reads the current synthex-plus manifest version alongside synthex's.
+    expect(workflow).toContain(
+      'PLUS_OLD=$(jq -r .version plugins/synthex-plus/.claude-plugin/plugin.json)',
+    );
+    // Computes a bumped version for it using the same BUMP level.
+    expect(workflow).toContain('PLUS_NEW=$(bump_semver "$PLUS_OLD" "$BUMP")');
+    // Writes the bumped version back into its own manifest...
+    expect(workflow).toContain(
+      "jq --indent 2 --arg v \"$PLUS_NEW\" '.version = $v' \\\n            plugins/synthex-plus/.claude-plugin/plugin.json",
+    );
+    // ...and into the marketplace's plugins[] entry for it, one manifest set
+    // alongside synthex (FR-HM2: "release.yml bumps one plugin manifest set").
+    expect(workflow).toContain(
+      '| (.plugins[] | select(.name == "synthex-plus").version) = $p',
+    );
+    // The release commit message and GitHub release title both name the
+    // bumped synthex-plus version, not just synthex's.
+    expect(workflow).toContain(
+      'git commit -m "release: synthex ${SYNTHEX_NEW} + synthex-plus ${PLUS_NEW}"',
+    );
+    expect(workflow).toContain(
+      '--title "v${MARKET_NEW} — synthex ${SYNTHEX_NEW} + synthex-plus ${PLUS_NEW}"',
+    );
+  });
+
+  it('marks the synthex-plus tombstone release as a one-time major bump (Task 54, D7/D8)', () => {
     const intent = JSON.parse(
       readFileSync(resolve(repoRoot, '.release-intent.json'), 'utf8'),
     );
@@ -301,7 +332,7 @@ describe('cross-harness compatibility contract', () => {
     );
 
     expect(intent.bump).toBe('major');
-    expect(intent.reason).toContain('Codex CLI');
+    expect(intent.reason).toContain('docs/migrations/synthex-plus.md');
     expect(workflow).toContain('RELEASE_INTENT_FILE=".release-intent.json"');
     expect(workflow).toContain('Release intent raised bump');
   });

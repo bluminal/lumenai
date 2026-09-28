@@ -32,14 +32,7 @@ import {
 
 // ── File paths ────────────────────────────────────────────────────
 
-const SUBMITTER_PATH = join(
-  import.meta.dirname,
-  '..', '..', 'plugins', 'synthex-plus', 'agents', 'standing-pool-submitter.md'
-);
-
-const submitterContent = readFileSync(SUBMITTER_PATH, 'utf-8');
-
-// Task 47 (FR-HM24, D11) port: the same agent, folded into synthex.
+// Task 47 (FR-HM24, D11) port; Task 54 tombstoned the synthex-plus original.
 const SUBMITTER_SYNTHEX_PATH = join(
   import.meta.dirname,
   '..', '..', 'plugins', 'synthex', 'agents', 'standing-pool-submitter.md'
@@ -151,30 +144,9 @@ describe('timeout-fallback fixture — Layer 2 validation', () => {
     });
   });
 
-  // ── standing-pool-submitter.md verbatim note check ────────────────
-
-  describe('standing-pool-submitter.md contains the verbatim timeout note', () => {
-    it('submitter.md contains "did not return a report within" (verbatim fragment)', () => {
-      expect(submitterContent).toContain('did not return a report within');
-    });
-
-    it('submitter.md contains "falling back to fresh-spawn review" (verbatim fragment)', () => {
-      expect(submitterContent).toContain('falling back to fresh-spawn review');
-    });
-
-    it('submitter.md contains the full verbatim timeout note template', () => {
-      // The template uses {name} and {timeout} placeholders in the document
-      expect(submitterContent).toContain(
-        "did not return a report within {timeout}s; falling back to fresh-spawn review."
-      );
-    });
-
-    it('submitter.md cites FR-MMT16a §3.4 for the timeout note requirement', () => {
-      expect(submitterContent).toContain('FR-MMT16a');
-    });
-  });
-
-  // ── Task 47 (FR-HM24, D11) port: same checks against the synthex copy ──
+  // ── standing-pool-submitter.md verbatim note check (Task 54: synthex-plus
+  // tombstoned; the synthex copy below, ported in Task 47, is the sole
+  // surviving copy) ─────────────────────────────────────────────────
 
   describe('plugins/synthex/agents/standing-pool-submitter.md contains the verbatim timeout note', () => {
     it('submitter.md contains "did not return a report within" (verbatim fragment)', () => {
