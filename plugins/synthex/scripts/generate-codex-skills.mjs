@@ -447,7 +447,8 @@ Set \`SYNTHEX_HOST=<id>\` before running any \`scripts/*.sh\` so \`loop-step.sh 
 // docs/reqs/harness-modernization.md's host notes) rather than the
 // hand-authored hooks/hooks.json Claude Code uses, because Codex must never
 // inherit Claude-only events (`Stop`, `SessionStart`, `TaskCompleted`,
-// `TeammateIdle` -- the last two don't exist yet, added by Task 50). Built
+// `TeammateIdle` -- the last two are real command hooks in hooks/hooks.json
+// as of Task 50, FR-HM23, but Codex never gets them either way). Built
 // entirely from `HOSTS.codex.hookAllowlist` (single-sourced in
 // host-matrix.mjs) so the set of events Codex gets can only ever be a
 // subset of what that allowlist authorizes; today that is commit-lint's

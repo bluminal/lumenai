@@ -748,3 +748,48 @@ lifecycle:
   # Applies to /review-code, /performance-audit, and any future command
   # that supports pool routing (FR-MMT16a).  Default: 300 seconds (5 min).
   submission_timeout_seconds: 300
+
+# -------------------------------------------------------------------
+# Lifecycle Hooks: TaskCompleted / TeammateIdle (FR-HM23, Task 50)
+#
+# scripts/task-completed-gate.sh and scripts/teammate-idle-gate.sh are real
+# command hooks (hooks/hooks.json) that exit 2 to block/redirect and exit 0
+# to allow. Both are gated on standing_pools.enabled above via
+# scripts/lib/config-get.sh: when pools are disabled, unconfigured, or node
+# is unavailable, both hooks no-op (exit 0) so they stay silent for Agent
+# Teams sessions that have nothing to do with Synthex.
+#
+# Only the two `enabled` switches and `allow_cross_functional` are read from
+# config -- scripts/lib/config-get.sh's documented YAML subset (D26) does
+# not parse flow lists (`[a, b]`), so the reviewers-by-work-type routing
+# table below is illustrative only; the scripts hardcode the same table as
+# their single source of truth (see each script's header comment). Ported
+# from synthex-plus's config/defaults.yaml (Tasks 27/28 era); the
+# `auto_reopen_on_fail` key from that version is dropped here because a
+# command hook has no model turn in which to reopen a task or evaluate a
+# reviewer verdict -- see task-completed-gate.sh's header for what changed.
+# -------------------------------------------------------------------
+hooks:
+  # Fires when a teammate marks a task as completed. The review gate
+  # classifies the work type and names the reviewers that must see it
+  # before the task is re-marked complete.
+  task_completed:
+    review_gate:
+      enabled: true
+
+      # Illustrative only -- see the note above. The authoritative table
+      # lives in scripts/task-completed-gate.sh.
+      reviewers:
+        code: [code-reviewer, security-reviewer]
+        frontend: [code-reviewer, security-reviewer, design-system-agent]
+        infrastructure: [code-reviewer, terraform-plan-reviewer]
+
+  # Fires when a teammate has no assigned tasks and is idle.
+  teammate_idle:
+    work_assignment:
+      enabled: true
+
+      # Whether idle teammates can pick up tasks outside their role when no
+      # role-matching unblocked task exists. When false, a frontend
+      # teammate is only ever pointed at frontend tasks.
+      allow_cross_functional: false

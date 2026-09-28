@@ -869,25 +869,89 @@ function validateFindingsFallbackCase(ctx, includeNode) {
 }
 
 // ---------------------------------------------------------------------------
-// scripts/task-completed-gate.sh and scripts/teammate-idle-gate.sh — Task 48
-// asset-fold copies of the FR-HM23 TaskCompleted/TeammateIdle hook shims.
-// Both scripts are unconditional `exit 0` stubs today (the real
-// classification-table logic, gated on `standing_pools.enabled` via
-// config-get.sh, lands in Task 50) — no jq/node branching exists yet, so
-// the "happy path" and "missing jq/node fallback" cases exercise the exact
-// same behavior (allow, no stdout) under a PATH with and without node,
-// proving the shim runs cleanly either way rather than merely existing.
+// scripts/task-completed-gate.sh and scripts/teammate-idle-gate.sh — Task 50
+// (FR-HM23) real TaskCompleted/TeammateIdle command hooks: a deterministic
+// classification table gated on `standing_pools.enabled` via config-get.sh.
+// The happy-path case enables pools and proves the real classification
+// blocks (exit 2) with the expected reviewer/task routing on stderr; the
+// "missing node fallback" case proves the `command -v node` guard fails
+// open (allows) under the exact same enabled config, since these scripts
+// need node to parse the JSON payload safely.
 // ---------------------------------------------------------------------------
 
-function gateShimAllowCase(ctx, includeNode) {
+function writeStandingPoolsEnabledConfig(workDir, extraYaml = '') {
+  const synthexDir = join(workDir, '.synthex');
+  mkdirSync(synthexDir, { recursive: true });
+  writeFileSync(
+    join(synthexDir, 'config.yaml'),
+    `standing_pools:\n  enabled: true\n${extraYaml}`,
+  );
+}
+
+function taskCompletedGateBlockCase(ctx, includeNode) {
   const pathDir = ctx.buildRestrictedPath(includeNode);
+  writeStandingPoolsEnabledConfig(ctx.workDir);
   const result = runScript(ctx.scriptAbsPath, [], {
     pathDir,
     cwd: ctx.workDir,
     env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+    stdin: JSON.stringify({ files: ['src/foo.ts'] }),
   });
-  assert(result.code === 0, `expected exit 0 (allow), got ${result.code}: ${result.stderr}`);
-  assert(result.stdout === '', `expected no stdout from the stub, got: ${result.stdout}`);
+  assert(result.code === 2, `expected exit 2 (block), got ${result.code}: ${result.stderr}`);
+  assert(
+    result.stderr.includes('code change') && result.stderr.includes('code-reviewer, security-reviewer'),
+    `expected the code-work-type routing message on stderr, got: ${result.stderr}`,
+  );
+}
+
+function taskCompletedGateNodeGuardFallbackCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  writeStandingPoolsEnabledConfig(ctx.workDir);
+  const result = runScript(ctx.scriptAbsPath, [], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+    stdin: JSON.stringify({ files: ['src/foo.ts'] }),
+  });
+  assert(result.code === 0, `expected exit 0 (fail open without node), got ${result.code}: ${result.stderr}`);
+  assert(result.stdout === '', `expected no stdout, got: ${result.stdout}`);
+}
+
+function teammateIdleGateBlockCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  writeStandingPoolsEnabledConfig(ctx.workDir);
+  const result = runScript(ctx.scriptAbsPath, [], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+    stdin: JSON.stringify({
+      standing: false,
+      teammate: { role: 'reviewer' },
+      pending_tasks: [{ id: 'task-9', role: 'reviewer', blocked: false }],
+    }),
+  });
+  assert(result.code === 2, `expected exit 2 (keep working), got ${result.code}: ${result.stderr}`);
+  assert(
+    result.stderr.includes('assign task-9'),
+    `expected the matching-task routing message on stderr, got: ${result.stderr}`,
+  );
+}
+
+function teammateIdleGateNodeGuardFallbackCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  writeStandingPoolsEnabledConfig(ctx.workDir);
+  const result = runScript(ctx.scriptAbsPath, [], {
+    pathDir,
+    cwd: ctx.workDir,
+    env: { CLAUDE_PROJECT_DIR: ctx.workDir },
+    stdin: JSON.stringify({
+      standing: false,
+      teammate: { role: 'reviewer' },
+      pending_tasks: [{ id: 'task-9', role: 'reviewer', blocked: false }],
+    }),
+  });
+  assert(result.code === 0, `expected exit 0 (fail open without node), got ${result.code}: ${result.stderr}`);
+  assert(result.stdout === '', `expected no stdout, got: ${result.stdout}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1030,22 +1094,22 @@ export const SMOKE_CASES = {
   ],
   'scripts/task-completed-gate.sh': [
     {
-      name: 'happy path: allows completion (exit 0, no stdout) with node present',
-      run: (ctx) => gateShimAllowCase(ctx, true),
+      name: 'happy path: standing_pools.enabled + a code file blocks with the code-reviewer/security-reviewer routing message (node present)',
+      run: (ctx) => taskCompletedGateBlockCase(ctx, true),
     },
     {
-      name: 'missing jq/node fallback: same allow behavior with neither interpreter on PATH',
-      run: (ctx) => gateShimAllowCase(ctx, false),
+      name: 'missing node fallback: the command -v node guard fails open (allows) the same enabled config',
+      run: (ctx) => taskCompletedGateNodeGuardFallbackCase(ctx, false),
     },
   ],
   'scripts/teammate-idle-gate.sh': [
     {
-      name: 'happy path: allows idle (exit 0, no stdout) with node present',
-      run: (ctx) => gateShimAllowCase(ctx, true),
+      name: 'happy path: standing_pools.enabled + a matching unblocked task blocks with the task-id routing message (node present)',
+      run: (ctx) => teammateIdleGateBlockCase(ctx, true),
     },
     {
-      name: 'missing jq/node fallback: same allow behavior with neither interpreter on PATH',
-      run: (ctx) => gateShimAllowCase(ctx, false),
+      name: 'missing node fallback: the command -v node guard fails open (allows) the same enabled config',
+      run: (ctx) => teammateIdleGateNodeGuardFallbackCase(ctx, false),
     },
   ],
 };
