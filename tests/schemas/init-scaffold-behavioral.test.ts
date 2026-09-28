@@ -310,14 +310,17 @@ function buildGitRestrictedPath(): string {
   return bin;
 }
 
+// CI runners have no global git identity; every test commit must carry one.
+const GIT_ENV = {
+  ...process.env,
+  GIT_AUTHOR_NAME: 'Test',
+  GIT_AUTHOR_EMAIL: 'test@example.com',
+  GIT_COMMITTER_NAME: 'Test',
+  GIT_COMMITTER_EMAIL: 'test@example.com',
+};
+
 function commitAll(dir: string, subjects: string[]) {
-  const env = {
-    ...process.env,
-    GIT_AUTHOR_NAME: 'Test',
-    GIT_AUTHOR_EMAIL: 'test@example.com',
-    GIT_COMMITTER_NAME: 'Test',
-    GIT_COMMITTER_EMAIL: 'test@example.com',
-  };
+  const env = GIT_ENV;
   execFileSync('git', ['init', '-q'], { cwd: dir, env });
   for (const subject of subjects) {
     execFileSync('git', ['commit', '-q', '--allow-empty', '-m', subject], { cwd: dir, env });
@@ -395,7 +398,7 @@ describe('init-scaffold.sh commit-convention detection (FR-HM27, D24, Task 46)',
     // 3 pre-existing plain commits + 5 new conventional ones = 5/8 = 62.5%,
     // clearing the 60% majority threshold.
     for (const subject of ['feat: a', 'fix: b', 'chore: c', 'docs: d', 'refactor: e']) {
-      execFileSync('git', ['commit', '-q', '--allow-empty', '-m', subject], { cwd: projectDir });
+      execFileSync('git', ['commit', '-q', '--allow-empty', '-m', subject], { cwd: projectDir, env: GIT_ENV });
     }
 
     const second = runWithGit();
