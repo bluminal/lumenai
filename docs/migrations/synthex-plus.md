@@ -31,8 +31,12 @@ whatever pools this project has running:
 ```
 
 Run `/synthex-plus:list-teams` first if you're not sure what's active.
-Stopping the pool now avoids an orphaned pool process that nothing is
-routing to once you switch commands in Step 3.
+Stopping the pool now avoids an orphaned pool that nothing is routing to
+once you switch commands in Step 3.
+
+Already upgraded? The `synthex-plus` commands are migration stubs from
+that release on, so use `/synthex:list-teams` and
+`/synthex:stop-review-team` instead — they manage the same pools.
 
 ## Step 2 — Move your config
 
@@ -124,9 +128,8 @@ to the legacy `.synthex-plus/config.yaml` location for **one major
 version** if `.synthex/config.yaml` has no `standing_pools` block,
 printing a deprecation notice each time it does. This exists so a project
 that hasn't gotten around to Step 2 doesn't silently lose pool routing on
-upgrade. It is not a long-term option — the fallback is removed in the
-release after next, and `synthex-plus` will be gone by then anyway (see
-Timeline).
+upgrade. It is not a long-term option: the fallback is removed in the
+next major `synthex` release after this one (see Timeline).
 
 You'll also see a one-line reminder at the start of any session in a
 project where `.synthex-plus/` still exists, independent of whether pool
@@ -134,19 +137,19 @@ routing is currently working — that's the signal to finish Steps 2–4.
 
 ## Timeline
 
-1. **This release** — `synthex-plus`'s pool capability is folded into
-   `synthex`. `synthex-plus` still works exactly as before; nothing is
-   removed yet. This is a good time to migrate.
-2. **Tombstone release** — `synthex-plus` ships with empty hooks, no
-   agents, and command stubs that print these same migration steps
-   instead of running. Anything still pointed at `synthex-plus` stops
-   working at this point; the `.synthex-plus/config.yaml` fallback in
-   `synthex` is unaffected by this release. This is a major (breaking)
-   version bump.
-3. **Removal release** — the `synthex-plus` plugin, its marketplace
-   entry, and the `.synthex-plus/config.yaml` fallback are deleted
-   entirely. If you haven't migrated by then, pool routing in `synthex`
-   stops working until you complete Step 2.
+1. **This release (major version bump)** — the pool capability is folded
+   into `synthex`, and `synthex-plus` ships as a tombstone at the same
+   time: empty hooks, no agents, and command stubs that print these
+   migration steps instead of running. Anything still pointed at
+   `synthex-plus` stops working as soon as you upgrade, which is why
+   Step 1 comes first. `synthex` keeps reading a legacy
+   `.synthex-plus/config.yaml`, with a deprecation notice.
+2. **Removal release** — the `synthex-plus` plugin and its marketplace
+   entry are deleted. Removing a plugin from the marketplace does not
+   uninstall a copy you already have, so uninstall it yourself (Step 4).
+   The config fallback is unaffected.
+3. **Next major `synthex` release** — the `.synthex-plus/config.yaml`
+   fallback is removed. If you haven't finished Step 2 by then, pool
+   routing stops until you do.
 
-Migrating in Step 1–4 above at any point before the removal release is
-all that's required; there's no reason to wait for the tombstone.
+Nothing here requires waiting: complete Steps 1–4 whenever you upgrade.
