@@ -126,9 +126,9 @@ describe('Task 31 (FR-HM15, D29): Model Resolution paragraph', () => {
     expect(registered.has(`./docs/${GATED_DOC}`)).toBe(false);
   });
 
-  it('review-code.md stays at or under its 15,872-byte D17 budget (Task 13; raised by Task 48/D6, then Task 49/FR-HM21 by 256 B for the Step 4 capability-ladder gate)', () => {
+  it('review-code.md stays at or under its 16,000-byte D17 budget (Task 13; raised by Task 48/D6, then Task 49/FR-HM21 by 256 B for the Step 4 capability-ladder gate, then Task 57 by 128 B for the deterministic, FR-HM3-gated "never call Workflow unless" level-2 pointer — the live-run gate-leak fix)', () => {
     const content = readFileSync(join(COMMANDS_DIR, 'review-code.md'), 'utf-8');
-    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(15_872);
+    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(16_000);
   });
 
   it('performance-audit.md stays at or under its 9,472-byte D17 budget (Task 14; raised by Task 48/D6, then Task 49/FR-HM21 by 512 B for the Step 4 capability-ladder gate)', () => {

@@ -113,6 +113,21 @@ function normalizeFileKey(file) {
   return String(file || '').trim().toLowerCase();
 }
 
+function linesOverlapOrNear(rangeA, rangeB, maxGap = 5) {
+  if (!rangeA || !rangeB) return false;
+  if (typeof rangeA.start !== 'number' || typeof rangeB.start !== 'number') return false;
+  const endA = typeof rangeA.end === 'number' ? rangeA.end : rangeA.start;
+  const endB = typeof rangeB.end === 'number' ? rangeB.end : rangeB.start;
+  if (rangeA.start <= endB && rangeB.start <= endA) return true; // overlap
+  const gap = rangeA.start > endB ? rangeA.start - endB : rangeB.start - endA;
+  return gap <= maxGap;
+}
+
+function sameLocation(a, b) {
+  if (a.symbol && b.symbol && a.symbol === b.symbol) return true;
+  return linesOverlapOrNear(a.line_range, b.line_range);
+}
+
 function asRaisedByEntry(finding) {
   const source = finding.source || {};
   return {
@@ -145,16 +160,25 @@ function mergeTwoFindings(base, incoming) {
   const primary = incomingWins ? incoming : base;
   const severitiesSeen = new Set(mergedRaisedBy.map((r) => r.severity).filter(Boolean));
 
+  const categories = [base.category, incoming.category].filter(Boolean);
+  const mergedCategory = [...new Set(categories)].join(' / ');
+
   return {
     ...primary,
     raised_by: mergedRaisedBy,
     severity: incomingWins ? incoming.severity : base.severity,
     severity_disagreement: severitiesSeen.size > 1,
+    ...(mergedCategory ? { category: mergedCategory } : {}),
   };
+}
+
+function stampReviewerSource(findings, source) {
+  return (findings || []).filter(Boolean).map((finding) => ({ ...finding, source }));
 }
 
 function dedupeFindings(findings, opts = {}) {
   const jaccardThreshold = opts.jaccardThreshold ?? 0.8;
+  const locationJaccardThreshold = opts.locationJaccardThreshold ?? 0.3;
   const input = Array.isArray(findings) ? findings.filter(Boolean) : [];
 
   // Stage 1 — exact finding_id collapse.
@@ -198,7 +222,10 @@ function dedupeFindings(findings, opts = {}) {
       for (let j = i + 1; j < bucket.length; j += 1) {
         if (claimed[j]) continue;
         const score = jaccardSimilarity(tokenSets[i], tokenSets[j]);
-        if (score >= jaccardThreshold) {
+        const strongTitleMatch = score >= jaccardThreshold;
+        const sameLocationModerateMatch = score >= locationJaccardThreshold
+          && sameLocation(bucket[i], bucket[j]);
+        if (strongTitleMatch || sameLocationModerateMatch) {
           current = mergeTwoFindings(current, bucket[j]);
           claimed[j] = true;
           stage2Merged += 1;
@@ -458,193 +485,169 @@ function safeJsonParse(text) {
 // docs/standing-pool-routing.md) per FR-HM16 — scripts have no filesystem,
 // shell, Date.now(), or AskUserQuestion. Everything this script needs
 // arrives pre-resolved via `args`.
+//
+// A single Workflow call runs exactly ONE review cycle and returns — it
+// cannot wait for a human to apply fixes between cycles. The command's
+// own Review Loop (review-code.md Step 6) owns the fix-and-re-review loop
+// across turns: on a FAIL verdict it re-invokes
+// `Workflow {"name": "synthex:review-code"}` for the next cycle, passing
+// the incremented `cycle` and a compact summary of unresolved findings as
+// `priorCycleSummary` (see docs/standing-pool-routing.md's "Level 2's
+// Workflow args contract"). Finding lifecycle (fixed / carried / new)
+// across cycles is therefore the command's responsibility, tracked across
+// its repeated invocations via `priorCycleSummary` — a fresh script run
+// has no memory of a prior cycle beyond what that argument carries, so
+// this script does not (and cannot) track lifecycle transitions itself.
 
 const input = args || {};
-const reviewed = input.reviewed || 'staged changes';
+const reviewed = input.reviewed || 'the resolved diff';
 const date = input.date || '(date not provided)';
 const diffText = input.diffText || '';
 const projectContext = input.projectContext || '';
 const reviewers = Array.isArray(input.reviewers) && input.reviewers.length
   ? input.reviewers
   : ['code-reviewer', 'security-reviewer'];
-const reviewLoops = input.reviewLoops || {};
-const maxCycles = reviewLoops.maxCycles || reviewLoops.max_cycles || 2;
-const minSeverityToAddress = reviewLoops.minSeverityToAddress || reviewLoops.min_severity_to_address || 'high';
 const multiModel = input.multiModel || null;
-
-// Finding lifecycle (fixed / carried / new) is tracked in this script
-// variable across cycles, never in a tool call's `outcome` field (FR-HM16:
-// "its outcome field is undocumented").
-const findingLifecycle = new Map();
-
-function updateLifecycle(cycleNumber, findings) {
-  const seenThisCycle = new Set();
-  for (const finding of findings) {
-    if (!finding.finding_id) continue;
-    seenThisCycle.add(finding.finding_id);
-    const existing = findingLifecycle.get(finding.finding_id);
-    if (existing) {
-      existing.lastSeenCycle = cycleNumber;
-      existing.status = 'carried';
-    } else {
-      findingLifecycle.set(finding.finding_id, {
-        firstSeenCycle: cycleNumber,
-        lastSeenCycle: cycleNumber,
-        status: 'new',
-      });
-    }
-  }
-  for (const [id, record] of findingLifecycle) {
-    if (!seenThisCycle.has(id) && record.lastSeenCycle < cycleNumber) {
-      record.status = 'fixed';
-    }
-  }
-}
-
-let cycle = 0;
-let lastReport = null;
-let lastVerdict = 'PASS';
-let carrySummary = input.priorCycleSummary || null;
+const cycle = input.cycle || 1;
+const priorCycleSummary = input.priorCycleSummary || null;
 
 phase('Native Review');
+log(`[workflow cycle ${cycle}] launching ${reviewers.length} native reviewer(s) in parallel`);
 
-while (cycle < maxCycles) {
-  cycle += 1;
-  log(`[workflow cycle ${cycle}/${maxCycles}] launching ${reviewers.length} native reviewer(s) in parallel`);
-
-  const nativeResults = await parallel(
-    reviewers.map((reviewerName) => () => agent(
-      reviewerPrompt(reviewerName, diffText, projectContext, carrySummary),
-      {
-        agentType: `synthex:${reviewerName}`,
-        schema: REVIEWER_ENVELOPE_SCHEMA,
-        phase: 'Native Review',
-        label: reviewerName,
-      },
-    )),
-  );
-
-  const reviewerTable = reviewers.map((name, i) => {
-    const result = nativeResults[i];
-    const findings = result && Array.isArray(result.findings) ? result.findings : [];
-    const counts = countsBySeverity(findings);
-    const summaryParts = Object.entries(counts)
-      .filter(([, n]) => n > 0)
-      .map(([sev, n]) => `${n} ${sev.toUpperCase()}`);
-    return {
-      name,
-      verdict: result ? aggregateVerdict(findings) : 'FAIL (no response)',
-      summary: summaryParts.length ? summaryParts.join(', ') : '0 findings',
-    };
-  });
-
-  let allFindings = nativeResults.filter(Boolean).flatMap((r) => (Array.isArray(r.findings) ? r.findings : []));
-  let allPositives = nativeResults.filter(Boolean).flatMap((r) => (Array.isArray(r.positives) ? r.positives : []));
-  const nativeCount = reviewers.length;
-  let externalCount = 0;
-  let externalQualifier = null;
-  let mode = 'native-only';
-  let reason = cycle === 1 ? 'native review via the FR-HM16 workflow engine' : `re-review cycle ${cycle}`;
-
-  if (multiModel && multiModel.enabled) {
-    phase('Multi-Model Review');
-    log(`[workflow cycle ${cycle}/${maxCycles}] launching the multi-model-review-orchestrator in a second parallel() group`);
-
-    const [orchestratorResultText] = await parallel([
-      () => agent(
-        JSON.stringify({
-          command: 'review-code',
-          artifact_path: multiModel.artifactPath || reviewed,
-          touched_files: multiModel.touchedFiles || [],
-          native_reviewers: reviewers,
-          config: multiModel.config || {},
-          per_reviewer_timeout_seconds: multiModel.perReviewerTimeoutSeconds || 180,
-        }),
-        {
-          agentType: 'synthex:multi-model-review-orchestrator',
-          phase: 'Multi-Model Review',
-          label: 'multi-model-review-orchestrator',
-        },
-      ),
-    ]);
-
-    const parsed = typeof orchestratorResultText === 'string'
-      ? safeJsonParse(orchestratorResultText)
-      : orchestratorResultText;
-
-    if (parsed) {
-      if (Array.isArray(parsed.findings)) {
-        allFindings = allFindings.concat(parsed.findings);
-      }
-      if (Array.isArray(parsed.per_reviewer_results)) {
-        const externals = parsed.per_reviewer_results.filter((r) => r.source_type === 'external');
-        externalCount = externals.length;
-        const succeeded = externals.filter((r) => r.status === 'success').length;
-        if (externalCount > 0 && succeeded < externalCount) {
-          externalQualifier = `${succeeded} external succeeded`;
-        }
-      }
-      mode = 'multi-model';
-      reason = parsed.path_and_reason_header
-        ? extractReasonFromHeader(parsed.path_and_reason_header)
-        : reason;
-    } else {
-      log(`[workflow cycle ${cycle}/${maxCycles}] multi-model-review-orchestrator returned no parseable envelope; continuing native-only for this cycle`);
-    }
-  }
-
-  const dedup = dedupeFindings(allFindings);
-  updateLifecycle(cycle, dedup.findings);
-  log(`[workflow cycle ${cycle}/${maxCycles}] ${dedup.findings.length} consolidated finding(s) (${dedup.duplicatesMerged} merged)`);
-
-  phase('Verdict');
-  const verdictResult = await agent(
-    verdictSynthesisPrompt(reviewed, dedup.findings, allPositives),
+const nativeResults = await parallel(
+  reviewers.map((reviewerName) => () => agent(
+    reviewerPrompt(reviewerName, diffText, projectContext, priorCycleSummary),
     {
-      schema: VERDICT_SCHEMA,
-      effort: 'medium',
-      phase: 'Verdict',
-      label: 'verdict-synthesis',
+      agentType: `synthex:${reviewerName}`,
+      schema: REVIEWER_ENVELOPE_SCHEMA,
+      phase: 'Native Review',
+      label: reviewerName,
     },
-  );
+  )),
+);
 
-  const pathHeader = renderPathHeader({ mode, reason, nativeCount, externalCount, externalQualifier });
-  const report = renderReport({
-    pathHeader,
-    reviewed,
-    date,
-    reviewerTable,
-    findings: dedup.findings,
-    positives: allPositives,
-    summary: verdictResult && verdictResult.summary ? verdictResult.summary : 'No summary was returned.',
+// Stamp each reviewer's own identity onto every finding it returned — the
+// forced envelope schema does not require `source`, reviewer agents
+// reliably omit it, and a Task 57 live run rendered "Raised by: unknown"
+// on every finding as a result. The script, not the model, knows which
+// reviewer it just invoked, so this is authoritative.
+const stampedResults = reviewers.map((reviewerName, i) => {
+  const result = nativeResults[i];
+  const rawFindings = result && Array.isArray(result.findings) ? result.findings : [];
+  const findings = stampReviewerSource(rawFindings, {
+    reviewer_id: reviewerName,
+    family: 'anthropic',
+    source_type: 'native-team',
   });
+  const positives = result && Array.isArray(result.positives) ? result.positives : [];
+  return { name: reviewerName, ok: Boolean(result), findings, positives };
+});
 
-  // FR-HM16's text says this step "calls ReportFindings once per cycle
-  // with the consolidated list." Checked against the actual prose path
-  // (plugins/synthex/commands/review-code.md) before writing this script:
-  // review-code.md never calls a ReportFindings tool anywhere, and the
-  // Workflow script API confirmed by the Task 9 spike (meta/agent/
-  // parallel/pipeline/phase/log/args/budget/workflow) documents no such
-  // hook. Per this task's instruction to "match whatever the prose path
-  // does" when the two disagree, this call is intentionally omitted here.
-  // See docs/engines/review-code-workflow.md "ReportFindings" for the
-  // full reasoning and the condition under which this should be revisited.
+const reviewerTable = stampedResults.map(({ name, ok, findings }) => {
+  const counts = countsBySeverity(findings);
+  const summaryParts = Object.entries(counts)
+    .filter(([, n]) => n > 0)
+    .map(([sev, n]) => `${n} ${sev.toUpperCase()}`);
+  return {
+    name,
+    verdict: ok ? aggregateVerdict(findings) : 'FAIL (no response)',
+    summary: summaryParts.length ? summaryParts.join(', ') : '0 findings',
+  };
+});
 
-  lastVerdict = aggregateVerdict(dedup.findings);
-  lastReport = report;
+let allFindings = stampedResults.flatMap((r) => r.findings);
+let allPositives = stampedResults.flatMap((r) => r.positives);
+const nativeCount = reviewers.length;
+let externalCount = 0;
+let externalQualifier = null;
+let mode = 'native-only';
+let reason = cycle === 1 ? 'native review via the FR-HM16 workflow engine' : `re-review cycle ${cycle}`;
 
-  if (lastVerdict !== 'FAIL') break;
-  if (minSeverityToAddress !== 'critical' && minSeverityToAddress !== 'high') break;
-  if (cycle >= maxCycles) break;
+if (multiModel && multiModel.enabled) {
+  phase('Multi-Model Review');
+  log(`[workflow cycle ${cycle}] launching the multi-model-review-orchestrator in a second parallel() group`);
 
-  carrySummary = dedup.findings
-    .filter((f) => severityRank(f.severity) >= severityRank('high'))
-    .map((f) => `- [${String(f.severity).toUpperCase()}] ${f.title} (${f.file})`)
-    .join('\n');
+  const [orchestratorResultText] = await parallel([
+    () => agent(
+      JSON.stringify({
+        command: 'review-code',
+        artifact_path: multiModel.artifactPath || reviewed,
+        touched_files: multiModel.touchedFiles || [],
+        native_reviewers: reviewers,
+        config: multiModel.config || {},
+        per_reviewer_timeout_seconds: multiModel.perReviewerTimeoutSeconds || 180,
+      }),
+      {
+        agentType: 'synthex:multi-model-review-orchestrator',
+        phase: 'Multi-Model Review',
+        label: 'multi-model-review-orchestrator',
+      },
+    ),
+  ]);
+
+  const parsed = typeof orchestratorResultText === 'string'
+    ? safeJsonParse(orchestratorResultText)
+    : orchestratorResultText;
+
+  if (parsed) {
+    if (Array.isArray(parsed.findings)) {
+      allFindings = allFindings.concat(parsed.findings);
+    }
+    if (Array.isArray(parsed.per_reviewer_results)) {
+      const externals = parsed.per_reviewer_results.filter((r) => r.source_type === 'external');
+      externalCount = externals.length;
+      const succeeded = externals.filter((r) => r.status === 'success').length;
+      if (externalCount > 0 && succeeded < externalCount) {
+        externalQualifier = `${succeeded} external succeeded`;
+      }
+    }
+    mode = 'multi-model';
+    reason = parsed.path_and_reason_header
+      ? extractReasonFromHeader(parsed.path_and_reason_header)
+      : reason;
+  } else {
+    log(`[workflow cycle ${cycle}] multi-model-review-orchestrator returned no parseable envelope; continuing native-only for this cycle`);
+  }
 }
 
+const dedup = dedupeFindings(allFindings);
+log(`[workflow cycle ${cycle}] ${dedup.findings.length} consolidated finding(s) (${dedup.duplicatesMerged} merged)`);
+
+phase('Verdict');
+const verdictResult = await agent(
+  verdictSynthesisPrompt(reviewed, dedup.findings, allPositives),
+  {
+    schema: VERDICT_SCHEMA,
+    effort: 'medium',
+    phase: 'Verdict',
+    label: 'verdict-synthesis',
+  },
+);
+
+const pathHeader = renderPathHeader({ mode, reason, nativeCount, externalCount, externalQualifier });
+const report = renderReport({
+  pathHeader,
+  reviewed,
+  date,
+  reviewerTable,
+  findings: dedup.findings,
+  positives: allPositives,
+  summary: verdictResult && verdictResult.summary ? verdictResult.summary : 'No summary was returned.',
+});
+
+// FR-HM16's text says this step "calls ReportFindings once per cycle
+// with the consolidated list." Checked against the actual prose path
+// (plugins/synthex/commands/review-code.md) before writing this script:
+// review-code.md never calls a ReportFindings tool anywhere, and the
+// Workflow script API confirmed by the Task 9 spike (meta/agent/
+// parallel/pipeline/phase/log/args/budget/workflow) documents no such
+// hook. Per this task's instruction to "match whatever the prose path
+// does" when the two disagree, this call is intentionally omitted here.
+// See docs/engines/review-code-workflow.md "ReportFindings" for the
+// full reasoning and the condition under which this should be revisited.
+
 return {
-  report: lastReport,
-  verdict: lastVerdict,
-  cycles: cycle,
+  report,
+  verdict: aggregateVerdict(dedup.findings),
+  cycle,
 };

@@ -33,6 +33,7 @@ import {
   renderReport,
   severityRank,
   sortFindingsBySeverity,
+  stampReviewerSource,
 } from '../../plugins/synthex/workflows/lib/review-engine.mjs';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────
@@ -130,6 +131,183 @@ describe('Task 57 (FR-HM16): dedupeFindings', () => {
       finding({ finding_id: undefined, title: 'Totally unrelated beta problem' }),
     ]);
     expect(findings).toHaveLength(2);
+  });
+});
+
+// ── Live-run defect 3: cross-reviewer duplicates at the same location ────
+//
+// A Task 57 [H] live run showed code-reviewer and security-reviewer both
+// reporting the same 4 issues in a planted-issue diff, with different
+// finding_id, title, and category on every pair — the pre-fix dedupe
+// (Stage 2 gated only on a >=0.8 title Jaccard, regardless of location)
+// merged none of them, rendering 8 CRITICAL/HIGH entries instead of 4.
+describe('Task 57 (live-run defect 3): cross-reviewer duplicates at the same location', () => {
+  it('merges two findings at an overlapping location with only a moderate title match, even with different finding_id/title/category', () => {
+    // Real titles from the live run: different word order/phrasing
+    // (Jaccard 0.667 — below the 0.8 strong-match threshold) but the same
+    // symbol and overlapping line_range.
+    const a = finding({
+      finding_id: 'users-js-getuser-sql-injection',
+      category: 'Correctness',
+      title: 'getUser regressed from parameterized query to string-concatenated SQL (SQL injection)',
+      symbol: 'getUser',
+      line_range: { start: 3, end: 5 },
+    });
+    const b = finding({
+      finding_id: 'SEC-SQLI-GETUSER-STRING-CONCAT',
+      category: 'Input Validation & Injection Prevention',
+      title: 'SQL injection in getUser via string-concatenated query',
+      symbol: 'getUser',
+      line_range: { start: 5, end: 8 },
+      source: { reviewer_id: 'security-reviewer', family: 'anthropic', source_type: 'native-team' },
+    });
+    const { findings } = dedupeFindings([a, b]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].raised_by.map((r) => r.reviewer_id).sort()).toEqual(['code-reviewer', 'security-reviewer']);
+  });
+
+  it('does NOT merge two genuinely different issues at the same location and same symbol (disjoint titles)', () => {
+    // Real case from the live run: code-reviewer filed two DIFFERENT
+    // retryFetch issues at the identical line_range {8,15} — location
+    // overlap alone must not be sufficient to merge them.
+    const swallowsErrors = finding({
+      finding_id: 'users-js-retryfetch-swallows-errors',
+      title: 'retryFetch silently swallows all errors and can return undefined without signaling failure',
+      symbol: 'retryFetch',
+      line_range: { start: 8, end: 15 },
+    });
+    const secretLeaked = finding({
+      finding_id: 'users-js-retryfetch-secret-leaked-to-arbitrary-url',
+      title: 'Secret API key attached as Authorization header to an arbitrary, caller-supplied URL',
+      symbol: 'retryFetch',
+      line_range: { start: 8, end: 15 },
+    });
+    const { findings } = dedupeFindings([swallowsErrors, secretLeaked]);
+    expect(findings).toHaveLength(2);
+  });
+
+  it('matches the real 8-finding live-run fixture: collapses to exactly 4, each attributed to both reviewers', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const { fileURLToPath } = await import('node:url');
+    const fixturePath = fileURLToPath(
+      new URL('../fixtures/review-engine/live-run-t57-cross-reviewer-duplicates.json', import.meta.url),
+    );
+    const rawFindings = JSON.parse(await readFile(fixturePath, 'utf8'));
+    expect(rawFindings).toHaveLength(8);
+
+    const { findings, duplicatesMerged } = dedupeFindings(rawFindings);
+
+    expect(findings).toHaveLength(4);
+    expect(duplicatesMerged).toBe(4);
+    for (const f of findings) {
+      const reviewerIds = f.raised_by.map((r) => r.reviewer_id).sort();
+      expect(reviewerIds, `finding "${f.title}" should be attributed to both reviewers`).toEqual([
+        'code-reviewer',
+        'security-reviewer',
+      ]);
+    }
+    // No CRITICAL/HIGH finding silently vanished — every consolidated
+    // finding's severity is still CRITICAL or HIGH.
+    for (const f of findings) {
+      expect(['critical', 'high']).toContain(f.severity);
+    }
+  });
+});
+
+// ── Live-run defect 5 (category half): a merged finding must keep BOTH
+// reviewers' categories, not silently drop one on a severity tie ────────
+describe('Task 57 (live-run defect 5): merged findings preserve every contributing category', () => {
+  it('keeps both categories, joined, when two reviewers file the same issue under different categories', () => {
+    // Real case from the live run: the hardcoded secret was CRITICAL for
+    // both reviewers (a severity tie), so the old tie-break silently kept
+    // only the first-seen (code-reviewer's "Correctness"), discarding
+    // security-reviewer's "Secrets & Sensitive Data Leakage".
+    const a = finding({ finding_id: 'cr-1', category: 'Correctness', severity: 'critical' });
+    const b = finding({
+      finding_id: 'sr-1',
+      category: 'Secrets & Sensitive Data Leakage',
+      severity: 'critical',
+      source: { reviewer_id: 'security-reviewer', family: 'anthropic', source_type: 'native-team' },
+    });
+    const { findings } = dedupeFindings([a, b]);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].category).toBe('Correctness / Secrets & Sensitive Data Leakage');
+  });
+
+  it('does not duplicate a category both reviewers happened to agree on', () => {
+    const a = finding({ finding_id: 'cr-1', category: 'Correctness', severity: 'high' });
+    const b = finding({
+      finding_id: 'sr-1',
+      category: 'Correctness',
+      severity: 'high',
+      source: { reviewer_id: 'security-reviewer', family: 'anthropic', source_type: 'native-team' },
+    });
+    const { findings } = dedupeFindings([a, b]);
+    expect(findings[0].category).toBe('Correctness');
+  });
+
+  it('still defaults to "uncategorized" at render time only when every contributing finding truly had none', () => {
+    const a = finding({ finding_id: 'cr-1', category: undefined, severity: 'high' });
+    const report = renderReport({
+      pathHeader: renderPathHeader({ mode: 'native-only', reason: 'x', nativeCount: 1 }),
+      reviewed: 'x',
+      date: '2026-09-30',
+      reviewerTable: [],
+      findings: [a],
+      positives: [],
+      summary: 's',
+    });
+    expect(report).toContain('- **Category:** uncategorized');
+  });
+});
+
+// ── Live-run defect 4: "Raised by: unknown" on every finding ────────────
+//
+// The forced reviewer envelope schema does not require `source`, and
+// reviewer agents reliably omit it — the Task 57 live run rendered
+// "Raised by: unknown" on every finding. The script stamps `source` from
+// the reviewer it knows it just invoked; this is the pure function that
+// does that stamping, tested independently of the script's orchestration.
+describe('Task 57 (live-run defect 4): stampReviewerSource', () => {
+  it('sets source.reviewer_id on findings that have no source at all', () => {
+    const raw = [
+      { finding_id: 'f-1', severity: 'high', category: 'c', title: 't', description: 'd', file: 'src/x.js' },
+    ];
+    const stamped = stampReviewerSource(raw, { reviewer_id: 'code-reviewer', family: 'anthropic', source_type: 'native-team' });
+    expect(stamped[0].source).toEqual({ reviewer_id: 'code-reviewer', family: 'anthropic', source_type: 'native-team' });
+  });
+
+  it('overwrites a self-reported source rather than trusting it — the script call site is authoritative', () => {
+    const raw = [
+      { finding_id: 'f-1', severity: 'high', category: 'c', title: 't', description: 'd', file: 'src/x.js', source: { reviewer_id: 'wrong-name', family: 'anthropic', source_type: 'native-team' } },
+    ];
+    const stamped = stampReviewerSource(raw, { reviewer_id: 'security-reviewer', family: 'anthropic', source_type: 'native-team' });
+    expect(stamped[0].source.reviewer_id).toBe('security-reviewer');
+  });
+
+  it('end-to-end: an unstamped finding no longer renders "Raised by: unknown" after stamping + dedupe + render', () => {
+    const raw = stampReviewerSource(
+      [{ finding_id: 'f-1', severity: 'high', category: 'c', title: 't', description: 'd', file: 'src/x.js' }],
+      { reviewer_id: 'code-reviewer', family: 'anthropic', source_type: 'native-team' },
+    );
+    const { findings } = dedupeFindings(raw);
+    const report = renderReport({
+      pathHeader: renderPathHeader({ mode: 'native-only', reason: 'x', nativeCount: 1 }),
+      reviewed: 'x',
+      date: '2026-09-30',
+      reviewerTable: [],
+      findings,
+      positives: [],
+      summary: 's',
+    });
+    expect(report).not.toContain('Raised by: unknown');
+    expect(report).toContain('- **Raised by:** code-reviewer (anthropic)');
+  });
+
+  it('drops null/undefined entries and preserves array order', () => {
+    const raw = [{ finding_id: 'a' }, null, { finding_id: 'b' }];
+    const stamped = stampReviewerSource(raw, { reviewer_id: 'code-reviewer', family: 'anthropic', source_type: 'native-team' });
+    expect(stamped.map((f) => f.finding_id)).toEqual(['a', 'b']);
   });
 });
 

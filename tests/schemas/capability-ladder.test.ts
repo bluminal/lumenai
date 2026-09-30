@@ -121,6 +121,33 @@ describe('Task 49 (FR-HM21, D22): capability-ladder.test.ts', () => {
       expect(section).not.toMatch(/until Task 57 ships/);
     });
 
+    // ── Gate-leak fix (live-run defect 1): the level-2 condition must be
+    // resolved deterministically via config-get.sh, never left to the
+    // model's interpretation of this paragraph's prose alone. A live run
+    // with code_review.engine: prose called Workflow anyway before this
+    // fix — see plugins/synthex/docs/engines/review-code-workflow.md.
+    it('level 2 resolves its condition deterministically via config-get.sh, not by inference from prose', () => {
+      expect(section).toContain('scripts/lib/config-get.sh code_review.engine prose');
+      expect(section).toMatch(/resolve the condition deterministically/i);
+    });
+
+    it('level 2 explicitly forbids calling Workflow unless the resolved value is exactly "workflow"', () => {
+      expect(section).toMatch(/do not call `workflow` unless/i);
+      expect(section).toContain('is exactly `workflow`');
+    });
+
+    it("level 2 documents the Workflow args contract, including date (Date.now() is unavailable) and the actual diff-mode wording", () => {
+      expect(section).toMatch(/args` contract/);
+      expect(section).toContain('Date.now()');
+      expect(section).toMatch(/never a hardcoded "staged changes"/);
+    });
+
+    it('level 2 documents that a single Workflow call runs exactly one cycle, owned by the command\'s Review Loop', () => {
+      expect(section).toMatch(/runs exactly one review cycle/);
+      expect(section).toMatch(/cannot wait for a human to apply fixes/);
+      expect(section).toContain('priorCycleSummary');
+    });
+
     it('level 3 (parallel fan-out) lists every FR-HM21 candidate tool name', () => {
       expect(section).toMatch(/\*\*Parallel subagent fan-out\.\*\*/);
       for (const tool of ['`Agent`', '`Task`', '`task`', '`spawn_agent`', '`delegate_task`']) {
@@ -205,6 +232,19 @@ describe('Task 49 (FR-HM21, D22): capability-ladder.test.ts', () => {
         const body = readFileSync(join(agentsRoot, name), 'utf8');
         expect(body, `${name} should not check code_review.engine`).not.toContain('code_review.engine');
       }
+    });
+
+    // Gate-leak fix (live-run defect 1): a live run with
+    // code_review.engine: prose still called Workflow as its first tool
+    // use, because review-code.md's old Step-4 pointer sentence ("Level 2
+    // of the ladder may hand this off to the FR-HM16 engine...") read as
+    // an invitation rather than a gate. The pointer must now read as a
+    // refusal by default, deferring entirely to the ladder's deterministic
+    // condition (tested above).
+    it("review-code.md's pointer to the capability ladder reads as a guard, not an invitation to call Workflow", () => {
+      expect(reviewCode).toMatch(/never call `workflow` unless/i);
+      expect(reviewCode).toContain('capability ladder');
+      expect(reviewCode).toContain('docs/standing-pool-routing.md');
     });
   });
 

@@ -106,6 +106,28 @@ function normalizeFileKey(file) {
   return String(file || '').trim().toLowerCase();
 }
 
+/**
+ * Same-location test, mirroring the multi-model orchestrator's Stage 5b
+ * contradiction-scanner definition (docs/specs/multi-model-review/
+ * architecture.md): same symbol (when both findings name one), OR their
+ * `line_range`s overlap or sit within `maxGap` lines of each other. Used
+ * here as a dedupe corroboration signal, not a contradiction signal.
+ */
+function linesOverlapOrNear(rangeA, rangeB, maxGap = 5) {
+  if (!rangeA || !rangeB) return false;
+  if (typeof rangeA.start !== 'number' || typeof rangeB.start !== 'number') return false;
+  const endA = typeof rangeA.end === 'number' ? rangeA.end : rangeA.start;
+  const endB = typeof rangeB.end === 'number' ? rangeB.end : rangeB.start;
+  if (rangeA.start <= endB && rangeB.start <= endA) return true; // overlap
+  const gap = rangeA.start > endB ? rangeA.start - endB : rangeB.start - endA;
+  return gap <= maxGap;
+}
+
+function sameLocation(a, b) {
+  if (a.symbol && b.symbol && a.symbol === b.symbol) return true;
+  return linesOverlapOrNear(a.line_range, b.line_range);
+}
+
 function asRaisedByEntry(finding) {
   const source = finding.source || {};
   return {
@@ -138,12 +160,40 @@ function mergeTwoFindings(base, incoming) {
   const primary = incomingWins ? incoming : base;
   const severitiesSeen = new Set(mergedRaisedBy.map((r) => r.severity).filter(Boolean));
 
+  // Keep BOTH reviewers' categories rather than arbitrarily discarding
+  // one via the severity-based primary pick above — two reviewers merged
+  // into one finding (Stage 2) frequently categorize the same underlying
+  // issue differently (e.g. code-reviewer: "Correctness", security-
+  // reviewer: "Secrets & Sensitive Data Leakage" for the same hardcoded
+  // secret). "Only default when it's missing": `category` still falls
+  // back to nothing here — renderFindingBlock's `|| 'uncategorized'` is
+  // the sole default, applied only when every contributing category was
+  // empty.
+  const categories = [base.category, incoming.category].filter(Boolean);
+  const mergedCategory = [...new Set(categories)].join(' / ');
+
   return {
     ...primary,
     raised_by: mergedRaisedBy,
     severity: incomingWins ? incoming.severity : base.severity,
     severity_disagreement: severitiesSeen.size > 1,
+    ...(mergedCategory ? { category: mergedCategory } : {}),
   };
+}
+
+/**
+ * Stamps every finding with the reviewer identity the caller knows it
+ * invoked, overwriting whatever (if anything) the finding's own `source`
+ * field said. The forced per-reviewer envelope schema (`{findings[],
+ * positives[], summary}`) does not require `source`, and reviewer agents
+ * reliably omit it — a Task 57 live run rendered "Raised by: unknown" on
+ * every finding as a result. The script always knows which `agentType` it
+ * just called, so that is authoritative; this function makes stamping it
+ * a pure, testable step rather than inline object-spreading at the call
+ * site.
+ */
+export function stampReviewerSource(findings, source) {
+  return (findings || []).filter(Boolean).map((finding) => ({ ...finding, source }));
 }
 
 /**
@@ -158,12 +208,29 @@ function mergeTwoFindings(base, incoming) {
  * Stage 1 — exact `finding_id` collapse.
  * Stage 2 — within each `file` bucket (the orchestrator buckets by
  * `(file, symbol)`; native findings frequently have a null symbol, so this
- * engine buckets by `file` alone), merge pairs whose normalized-title
- * Jaccard similarity is at or above `jaccardThreshold` (default 0.8, same
- * default as `consolidation.stage2_jaccard_threshold`).
+ * engine buckets by `file` alone), merge a pair when EITHER:
+ *   (a) normalized-title Jaccard similarity is at or above
+ *       `jaccardThreshold` (default 0.8, same default as
+ *       `consolidation.stage2_jaccard_threshold`) regardless of location, or
+ *   (b) the pair is at the same location (`sameLocation`: matching symbol,
+ *       or overlapping/near `line_range`s — the same definition the
+ *       orchestrator's Stage 5b contradiction scanner uses for "same
+ *       location") AND Jaccard is at or above the lower
+ *       `locationJaccardThreshold` (default 0.3, the same "candidate same
+ *       issue" floor the orchestrator's Stage 4 pre-filter uses before its
+ *       LLM tiebreaker — used here to merge directly, with no tiebreaker).
+ * `finding_id`, `title`, and `category` are allowed to differ completely
+ * between the two findings being merged — two reviewers describing the
+ * same bug at the same location almost never agree on exact wording, but
+ * location plus a modest title overlap is strong evidence it is the same
+ * underlying issue (verified against a real two-reviewer run;
+ * review-engine-renderer.test.ts "merges cross-reviewer duplicates at the
+ * same location despite differing finding_id/title/category" is built
+ * from that run's actual 8 findings).
  */
 export function dedupeFindings(findings, opts = {}) {
   const jaccardThreshold = opts.jaccardThreshold ?? 0.8;
+  const locationJaccardThreshold = opts.locationJaccardThreshold ?? 0.3;
   const input = Array.isArray(findings) ? findings.filter(Boolean) : [];
 
   // Stage 1 — exact finding_id collapse.
@@ -207,7 +274,10 @@ export function dedupeFindings(findings, opts = {}) {
       for (let j = i + 1; j < bucket.length; j += 1) {
         if (claimed[j]) continue;
         const score = jaccardSimilarity(tokenSets[i], tokenSets[j]);
-        if (score >= jaccardThreshold) {
+        const strongTitleMatch = score >= jaccardThreshold;
+        const sameLocationModerateMatch = score >= locationJaccardThreshold
+          && sameLocation(bucket[i], bucket[j]);
+        if (strongTitleMatch || sameLocationModerateMatch) {
           current = mergeTwoFindings(current, bucket[j]);
           claimed[j] = true;
           stage2Merged += 1;
