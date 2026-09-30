@@ -1,0 +1,146 @@
+[
+  {
+    "finding_id": "users-js-hardcoded-api-key",
+    "severity": "critical",
+    "category": "Correctness",
+    "title": "Hardcoded live API key committed to source",
+    "description": "A live-looking API key (`<redacted-fake-api-key>`) is hardcoded as a module-level constant. Secrets committed to source control are exposed to anyone with repo access (and in git history permanently, even if removed later). This should be loaded from environment variables or a secrets manager, never literal in code. Rotate this key immediately since it has already been committed.",
+    "file": "src/users.js",
+    "symbol": "API_KEY",
+    "line_range": {
+      "start": 1,
+      "end": 1
+    },
+    "source": {
+      "reviewer_id": "code-reviewer",
+      "family": "anthropic",
+      "source_type": "native-team"
+    }
+  },
+  {
+    "finding_id": "users-js-getuser-sql-injection",
+    "severity": "critical",
+    "category": "Correctness",
+    "title": "getUser regressed from parameterized query to string-concatenated SQL (SQL injection)",
+    "description": "`getUser` previously used a parameterized query (`db.query('SELECT * FROM users WHERE id = ?', [id])`) but now builds the query via string concatenation: `db.query(\"SELECT * FROM users WHERE id = '\" + id + \"'\")`. This reintroduces SQL injection: any caller-controlled `id` containing a quote or SQL metacharacters can alter query semantics or exfiltrate/modify data. This is a functional regression, not just a hardening gap -- the safe pattern already existed in this same function before the change. Revert to the parameterized form: `db.query('SELECT * FROM users WHERE id = ?', [id])`.",
+    "file": "src/users.js",
+    "symbol": "getUser",
+    "line_range": {
+      "start": 3,
+      "end": 5
+    },
+    "source": {
+      "reviewer_id": "code-reviewer",
+      "family": "anthropic",
+      "source_type": "native-team"
+    }
+  },
+  {
+    "finding_id": "users-js-retryfetch-swallows-errors",
+    "severity": "high",
+    "category": "Correctness",
+    "title": "retryFetch silently swallows all errors and can return undefined without signaling failure",
+    "description": "`retryFetch` catches every exception in an empty `catch (e) {}` block and, if all 7 attempts fail, falls off the end of the function returning `undefined` with no error, log, or indication of failure. Callers that assume a `Response` object (e.g. call `.json()` or check `.ok`) will get a confusing `TypeError: Cannot read properties of undefined` far from the real cause, or worse, silently proceed with `undefined` data. At minimum, the loop should track the last error and throw it (or a wrapping error) after exhausting retries, and transient vs. non-retryable errors (e.g. 4xx) should be distinguished.\n\nSuggested fix:\n```js\nasync function retryFetch(url) {\n  let lastError;\n  for (let i = 0; i < 7; i++) {\n    try {\n      return await fetch(url, { headers: { Authorization: API_KEY } });\n    } catch (e) {\n      lastError = e;\n    }\n  }\n  throw lastError;\n}\n```",
+    "file": "src/users.js",
+    "symbol": "retryFetch",
+    "line_range": {
+      "start": 8,
+      "end": 15
+    },
+    "source": {
+      "reviewer_id": "code-reviewer",
+      "family": "anthropic",
+      "source_type": "native-team"
+    }
+  },
+  {
+    "finding_id": "users-js-retryfetch-secret-leaked-to-arbitrary-url",
+    "severity": "high",
+    "category": "Correctness",
+    "title": "Secret API key attached as Authorization header to an arbitrary, caller-supplied URL",
+    "description": "`retryFetch(url)` accepts an arbitrary URL parameter and attaches the module's secret `API_KEY` as the `Authorization` header on every request, regardless of destination host. If any caller (directly or transitively, e.g. via user input, a webhook target, or a misconfigured link) passes a URL pointing to an untrusted or attacker-controlled host, the secret key is exfiltrated to that host. A generic `fetch` helper should not have credentials baked in; instead, scope the key to specific first-party hosts (allowlist check) or require the caller to pass auth explicitly so the coupling is visible at the call site.",
+    "file": "src/users.js",
+    "symbol": "retryFetch",
+    "line_range": {
+      "start": 8,
+      "end": 15
+    },
+    "source": {
+      "reviewer_id": "code-reviewer",
+      "family": "anthropic",
+      "source_type": "native-team"
+    }
+  },
+  {
+    "finding_id": "SEC-HARDCODED-API-KEY-USERS",
+    "severity": "critical",
+    "category": "Secrets & Sensitive Data Leakage",
+    "title": "Hardcoded live API key committed to source",
+    "description": "A live-looking secret key (`<redacted-fake-api-key>`) is hardcoded as a module-level constant in src/users.js. This key is now committed to the repository's version control history, visible to anyone with read access to the repo, and will remain recoverable from git history even if removed in a later commit. If this is a genuine live key (the `sk_live_` prefix strongly suggests a Stripe-style production secret), it must be treated as compromised: rotate/revoke it immediately at the provider, purge it from git history, and move it to a secrets manager or environment variable that is never committed. Never commit real credentials while testing/prototyping this fix either -- use an obviously fake placeholder.",
+    "file": "src/users.js",
+    "symbol": "API_KEY",
+    "line_range": {
+      "start": 3,
+      "end": 3
+    },
+    "source": {
+      "reviewer_id": "security-reviewer",
+      "family": "anthropic",
+      "source_type": "native-team"
+    }
+  },
+  {
+    "finding_id": "SEC-SQLI-GETUSER-STRING-CONCAT",
+    "severity": "critical",
+    "category": "Input Validation & Injection Prevention",
+    "title": "SQL injection in getUser via string-concatenated query",
+    "description": "getUser builds its SQL query by concatenating the caller-supplied `id` directly into the query string (`\"SELECT * FROM users WHERE id = '\" + id + \"'\"`) instead of using the parameterized form (`db.query('SELECT * FROM users WHERE id = ?', [id])`) that this function previously used. Any caller-controlled value reaching `id` (e.g., `1' OR '1'='1`) can alter query semantics, exfiltrate other users' records, or be used for blind/boolean-based SQL injection. This is a regression from a previously-safe parameterized implementation.",
+    "file": "src/users.js",
+    "symbol": "getUser",
+    "line_range": {
+      "start": 5,
+      "end": 8
+    },
+    "source": {
+      "reviewer_id": "security-reviewer",
+      "family": "anthropic",
+      "source_type": "native-team"
+    }
+  },
+  {
+    "finding_id": "SEC-RETRYFETCH-SWALLOWS-ERRORS",
+    "severity": "high",
+    "category": "Error Handling & Logging",
+    "title": "retryFetch silently swallows all errors and can return undefined without signaling failure",
+    "description": "retryFetch wraps fetch in a loop with an empty `catch (e) {}` block. All network, TLS, DNS, and application-level fetch errors are discarded with no logging and no re-throw. If every attempt fails, the function falls through and implicitly returns `undefined` rather than throwing or returning an error indicator. Callers that do not explicitly check for `undefined` will treat a failed request as if it silently succeeded (e.g., attempting to read `.status` or `.json()` on `undefined` will throw a confusing, unrelated error downstream, or a caller may proceed as if data was fetched). This also means security-relevant failures (e.g., repeated auth failures against the downstream service) are never logged or surfaced, undermining audit trails.",
+    "file": "src/users.js",
+    "symbol": "retryFetch",
+    "line_range": {
+      "start": 10,
+      "end": 16
+    },
+    "source": {
+      "reviewer_id": "security-reviewer",
+      "family": "anthropic",
+      "source_type": "native-team"
+    }
+  },
+  {
+    "finding_id": "SEC-RETRYFETCH-SECRET-TO-ARBITRARY-URL",
+    "severity": "high",
+    "category": "Data Protection / SSRF",
+    "title": "Secret API key attached as Authorization header to an arbitrary, caller-supplied URL",
+    "description": "retryFetch accepts a `url` parameter directly from its caller and attaches the module's secret `API_KEY` as a bearer-style Authorization header on every request to that URL, with no allowlist or validation of the destination host/scheme. Because `retryFetch` is exported (`module.exports = { getUser, retryFetch }`), any code path that can influence the `url` argument (directly or transitively via user input) can cause the application to leak its own secret credential to an attacker-controlled server. This is both a secret-exfiltration vector and a classic SSRF pattern (unvalidated user-influenced outbound request target) -- combined, an attacker who can reach this function with a controlled URL can steal the live API key outright.",
+    "file": "src/users.js",
+    "symbol": "retryFetch",
+    "line_range": {
+      "start": 10,
+      "end": 16
+    },
+    "source": {
+      "reviewer_id": "security-reviewer",
+      "family": "anthropic",
+      "source_type": "native-team"
+    }
+  }
+]

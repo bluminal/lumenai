@@ -16,10 +16,13 @@
  *       exact, unmodified substring of the doc file it moved to.
  *   [T] review-code.md contains the three D17 gates that replaced the
  *       moved blocks (same rules cold-path-includes.test.ts enforces).
- *   [T] review-code.md is ≤ 15.5 KB (15,872 bytes). (Task 48/FR-HM24 raised
+ *   [T] review-code.md is ≤ 16,000 bytes (~15.6 KB). (Task 48/FR-HM24 raised
  *       this from 15,360 bytes to fit the D6 legacy-config-fallback clause
  *       added to the Step 1b gate line; Task 49/FR-HM21 raised it a further
- *       256 B for the Step 4 capability-ladder tool-presence gate.)
+ *       256 B for the Step 4 capability-ladder tool-presence gate; Task 57
+ *       raised it a further 128 B, to 16,000 B, for the deterministic,
+ *       FR-HM3-gated "never call Workflow unless" level-2 pointer that
+ *       fixed the live-run gate-leak defect.)
  *   [T] the promptfoo "pool-gate-enabled" case (MMT-GATE-B1) exists in
  *       tests/promptfoo.config.yaml and points at its fixture project
  *       under tests/fixtures/multi-model-teams/pool-gate-enabled/.
@@ -128,12 +131,12 @@ describe('Task 13: review-code.md cold-path split (FR-HM5, D17, NFR-HM1)', () =>
     });
   });
 
-  // ── [T] review-code.md ≤ 15.5 KB (15,872 bytes) ─────────────────────────
+  // ── [T] review-code.md ≤ 16,000 bytes (~15.6 KB) ────────────────────────
 
   describe('[T] review-code.md size budget', () => {
-    it('is at or under 15,872 bytes (15.5 KB)', () => {
+    it('is at or under 16,000 bytes (~15.6 KB)', () => {
       const bytes = Buffer.byteLength(reviewCodeContent, 'utf-8');
-      expect(bytes).toBeLessThanOrEqual(15_872);
+      expect(bytes).toBeLessThanOrEqual(16_000);
     });
   });
 
