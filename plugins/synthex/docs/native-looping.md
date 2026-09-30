@@ -30,7 +30,7 @@ Loop state lives at `<project>/.synthex/loops/<loop-id>.json`. One file per loop
   "command": "/synthex:next-priority",
   "args": "@docs/plans/main.md 3",
   "prompt_file": null,
-  "completion_promise": "ALLDONE",
+  "completion_promise": "ALLDONE3f2a9c1e-...",
   "max_iterations": 20,
   "iteration": 5,
   "consecutive_stop_blocks": 0,
@@ -52,7 +52,7 @@ Loop state lives at `<project>/.synthex/loops/<loop-id>.json`. One file per loop
 | `command` | string | The slash-command path that owns the loop (e.g., `/synthex:next-priority`). |
 | `args` | string | The arguments the command was invoked with, preserved verbatim for resume. |
 | `prompt_file` | string\|null | Populated only for `/synthex:loop --prompt-file <path>` invocations. |
-| `completion_promise` | string | The literal text the agent emits inside `<promise>…</promise>` to terminate the loop. |
+| `completion_promise` | string | The literal text the agent emits inside `<promise>…</promise>` to terminate the loop. Defaults to `ALLDONE<session_id>` (falling back to `ALLDONE<loop_id>` when no session id) when `--completion-promise` is omitted — see [Default completion promise](#promise-emission). |
 | `max_iterations` | integer | Cap. Default 20, hard ceiling 200. |
 | `iteration` | integer | Current iteration count. Incremented and persisted **before** each iteration's work begins (durability boundary per D-NL13). |
 | `isolation` | enum | `"shared-context"` (default) or `"subagent"` (when `--loop-isolated`). |
@@ -243,6 +243,12 @@ This handles the edge case where compaction summaries omit the loop-id from the 
 ## <a id="promise-emission"></a>Completion-promise convention
 
 The promise format is `<promise>X</promise>` XML tags (D-NL4). A single emission point per command produces the tag; the loop framework scans for it to decide whether to terminate.
+
+### Default completion promise
+
+`--completion-promise` is optional. When omitted on a fresh start, `loop-step.sh begin` computes the default `ALLDONE<session_id>` — the literal concatenation of `ALLDONE` and the live session id, no separator — falling back to `ALLDONE<loop_id>` when no session id is available (non-Claude hosts, or an empty `$CLAUDE_CODE_SESSION_ID`). `begin` is the single place this default is computed: it stores the value in the state file's `completion_promise` field and prints `completion promise: <value>` on stdout. Command prose reads the value back from that output or from the state file — it never recomputes it, except the no-shell fallback below. An explicit `--completion-promise` always wins over the default. `--resume` / `--resume-last` never touch `completion_promise`; the stored value (default or explicit) carries forward unchanged.
+
+**No-shell fallback (FR-HM3):** a host with no Bash tool that writes the state file directly (e.g. via a Write-style tool, bypassing `loop-step.sh`) computes the same default by the same rule: `ALLDONE` + the session id, or `ALLDONE` + the loop id when no session id is available.
 
 ### Emission rules for the agent
 
