@@ -191,6 +191,104 @@ describe('write-audit.mjs — happy path (Task 42)', () => {
   });
 });
 
+describe('write-audit.mjs — Section 5 `verification` field (FR-HM17, Task 58)', () => {
+  // The engine's adversarial-refute-pass outcome is a SEPARATE field from
+  // superseded_by_verification/verification_reasoning (Stage 5b CoVe,
+  // multi-model consolidation) — this suite locks that the script accepts
+  // and renders `verification` without touching those two.
+  function envelopeWithVerification(verification: unknown) {
+    return baseEnvelope({
+      unified_envelope: {
+        per_reviewer_results: [
+          {
+            reviewer_id: 'code-reviewer',
+            source_type: 'native-team',
+            family: 'anthropic',
+            status: 'success',
+            findings_count: 1,
+            error_code: null,
+            usage: null,
+          },
+        ],
+        findings: [
+          {
+            finding_id: 'SEC-REFUTE-001',
+            severity: 'critical',
+            category: 'security',
+            title: 'Hardcoded credential',
+            file: 'src/config.ts',
+            raised_by: [
+              { reviewer_id: 'code-reviewer', family: 'anthropic', source_type: 'native-team' },
+            ],
+            superseded_by_verification: false,
+            verification,
+          },
+        ],
+        aggregator_resolution: { name: 'code-reviewer', source: 'configured' },
+        consolidation_trace: { judge_mode_indicator: 'native-only' },
+        continuation_event: null,
+      },
+    });
+  }
+
+  it('exits 0 (the schema accepts a `verification` field on a finding)', () => {
+    const result = run(
+      envelopeWithVerification({
+        status: 'verified',
+        method: 'adversarial-refute (3 independent Sonnet 5 refuters, effort: low; 2-of-3 non-refuted survival)',
+        failure_scenario: null,
+      }),
+    );
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout).status).toBe('written');
+  });
+
+  it('Section 5 renders verification.status, .method, and .failure_scenario for a refuted finding', () => {
+    const result = run(
+      envelopeWithVerification({
+        status: 'refuted',
+        method: 'adversarial-refute (3 independent Sonnet 5 refuters, effort: low; 2-of-3 non-refuted survival)',
+        failure_scenario: 'The value is read from a test fixture, never a real credential | Unreachable in production builds',
+      }),
+    );
+    const parsed = JSON.parse(result.stdout);
+    const markdown = readFileSync(parsed.path, 'utf8');
+    expect(markdown).toContain('- **verification.status:** refuted');
+    expect(markdown).toContain('- **verification.method:** adversarial-refute');
+    expect(markdown).toContain('- **verification.failure_scenario:** The value is read from a test fixture');
+  });
+
+  it('Section 5 renders verification.failure_scenario as "null" for a verified (non-refuted) finding', () => {
+    const result = run(
+      envelopeWithVerification({ status: 'verified', method: 'adversarial-refute', failure_scenario: null }),
+    );
+    const parsed = JSON.parse(result.stdout);
+    const markdown = readFileSync(parsed.path, 'utf8');
+    expect(markdown).toContain('- **verification.status:** verified');
+    expect(markdown).toContain('- **verification.failure_scenario:** null');
+  });
+
+  it('omits the verification.* lines entirely when the field is absent (no verification key on the finding)', () => {
+    const result = run(baseEnvelope()); // baseEnvelope's finding has no `verification` key
+    const parsed = JSON.parse(result.stdout);
+    const markdown = readFileSync(parsed.path, 'utf8');
+    expect(markdown).not.toContain('verification.status');
+    expect(markdown).not.toContain('verification.method');
+    expect(markdown).not.toContain('verification.failure_scenario');
+  });
+
+  it('still renders superseded_by_verification independently — verification never replaces or reuses it', () => {
+    const result = run(
+      envelopeWithVerification({ status: 'refuted', method: 'adversarial-refute', failure_scenario: 'scenario' }),
+    );
+    const parsed = JSON.parse(result.stdout);
+    const markdown = readFileSync(parsed.path, 'utf8');
+    // Both fields present, independently, on the same finding.
+    expect(markdown).toContain('- **superseded_by_verification:** false');
+    expect(markdown).toContain('- **verification.status:** refuted');
+  });
+});
+
 describe('write-audit.mjs — skip-write when disabled (FR-MR24 step rule)', () => {
   it('exits 0, writes nothing, and returns status: "skipped"', () => {
     const result = run(baseEnvelope({ audit_config: { enabled: false } }));

@@ -21,9 +21,12 @@
  * Spec (D21)" section.
  */
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   aggregateVerdict,
+  buildVerificationRecord,
   countsBySeverity,
   dedupeFindings,
   jaccardSimilarity,
@@ -34,6 +37,7 @@ import {
   severityRank,
   sortFindingsBySeverity,
   stampReviewerSource,
+  tallyRefuterVotes,
 } from '../../plugins/synthex/workflows/lib/review-engine.mjs';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────
@@ -569,5 +573,184 @@ describe('Task 57 (FR-HM16): renderReport snapshot-matches the review-code.md te
     expect(report).toContain('No HIGH findings.');
     expect(report).toContain('No MEDIUM findings.');
     expect(report).toContain('No LOW findings.');
+  });
+});
+
+// ── FR-HM17 Adversarial Refute Pass (Task 58) ───────────────────────────
+
+function vote(overrides = {}) {
+  return { refuted: false, method: 'traced control flow', failure_scenario: null, ...overrides };
+}
+
+describe('Task 58 (FR-HM17): tallyRefuterVotes — 2-of-3 survival', () => {
+  it('0 of 3 refuted: survives', () => {
+    const result = tallyRefuterVotes([vote(), vote(), vote()]);
+    expect(result.survives).toBe(true);
+    expect(result.status).toBe('verified');
+    expect(result.refutedCount).toBe(0);
+  });
+
+  it('1 of 3 refuted: survives', () => {
+    const result = tallyRefuterVotes([
+      vote({ refuted: true, failure_scenario: 'does not reproduce' }),
+      vote(),
+      vote(),
+    ]);
+    expect(result.survives).toBe(true);
+    expect(result.status).toBe('verified');
+    expect(result.refutedCount).toBe(1);
+  });
+
+  it('2 of 3 refuted: dropped', () => {
+    const result = tallyRefuterVotes([
+      vote({ refuted: true, failure_scenario: 'a' }),
+      vote({ refuted: true, failure_scenario: 'b' }),
+      vote(),
+    ]);
+    expect(result.survives).toBe(false);
+    expect(result.status).toBe('refuted');
+    expect(result.refutedCount).toBe(2);
+  });
+
+  it('3 of 3 refuted: dropped', () => {
+    const result = tallyRefuterVotes([
+      vote({ refuted: true, failure_scenario: 'a' }),
+      vote({ refuted: true, failure_scenario: 'b' }),
+      vote({ refuted: true, failure_scenario: 'c' }),
+    ]);
+    expect(result.survives).toBe(false);
+    expect(result.status).toBe('refuted');
+    expect(result.refutedCount).toBe(3);
+  });
+
+  it('a missing vote (null, from a failed refuter agent() call) is dropped before counting, never counted as non-refuted', () => {
+    // Only 2 votes actually arrived; 1 of them refuted — 1 non-refuted
+    // vote is short of the 2-of-3 bar, so this does NOT survive, unlike
+    // "1 of 3 refuted" above with a full 3 votes.
+    const result = tallyRefuterVotes([null, vote({ refuted: true, failure_scenario: 'a' }), vote()]);
+    expect(result.totalVotes).toBe(2);
+    expect(result.survives).toBe(false);
+    expect(result.status).toBe('refuted');
+  });
+
+  it('handles a non-array/empty input without throwing', () => {
+    expect(tallyRefuterVotes([]).survives).toBe(false);
+    expect(tallyRefuterVotes(undefined).survives).toBe(false);
+    expect(tallyRefuterVotes(null).survives).toBe(false);
+  });
+});
+
+describe('Task 58 (FR-HM17): buildVerificationRecord', () => {
+  it('a verified (0-refuted) finding has a null failure_scenario', () => {
+    const record = buildVerificationRecord([vote(), vote(), vote()]);
+    expect(record.status).toBe('verified');
+    expect(record.failure_scenario).toBeNull();
+    expect(record.method).toContain('traced control flow');
+  });
+
+  it('a refuted finding carries the refuting vote(s)\' failure_scenario text, joined', () => {
+    const record = buildVerificationRecord([
+      vote({ refuted: true, method: 'attempted reproduction', failure_scenario: 'No crafted input triggers it' }),
+      vote({ refuted: true, method: 'checked for a guard', failure_scenario: 'A validation guard already rejects it' }),
+      vote(),
+    ]);
+    expect(record.status).toBe('refuted');
+    expect(record.failure_scenario).toBe('No crafted input triggers it | A validation guard already rejects it');
+  });
+
+  it('falls back to a fixed method description when no refuter supplied one', () => {
+    const record = buildVerificationRecord([
+      { refuted: false, failure_scenario: null },
+      { refuted: false, failure_scenario: null },
+    ]);
+    expect(record.method).toMatch(/adversarial-refute/);
+    expect(record.method).toMatch(/Sonnet 5/);
+    expect(record.method).toMatch(/effort: low/);
+  });
+});
+
+describe('Task 58 (FR-HM17): `verification` never reuses `superseded_by_verification`', () => {
+  // Read the CODE (not the prose comments, which legitimately name
+  // superseded_by_verification once to explain the distinction from it)
+  // of tallyRefuterVotes/buildVerificationRecord, and assert neither the
+  // source nor their output ever sets or reads that field.
+  const libSrc = readFileSync(
+    resolve(import.meta.dirname, '..', '..', 'plugins', 'synthex', 'workflows', 'lib', 'review-engine.mjs'),
+    'utf8',
+  );
+  const fnStart = libSrc.indexOf('export function tallyRefuterVotes');
+  const fnCode = libSrc
+    .slice(fnStart)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/.*$/gm, '');
+
+  it('tallyRefuterVotes/buildVerificationRecord CODE never reads or sets superseded_by_verification', () => {
+    expect(fnStart).toBeGreaterThan(-1);
+    expect(fnCode).not.toContain('superseded_by_verification');
+  });
+
+  it("tallyRefuterVotes/buildVerificationRecord's status values are their own enum, not CoVe's boolean field", () => {
+    const record = buildVerificationRecord([vote({ refuted: true, failure_scenario: 'x' }), vote({ refuted: true, failure_scenario: 'y' }), vote()]);
+    expect(record.status).toBe('refuted');
+    expect(record).not.toHaveProperty('superseded_by_verification');
+  });
+});
+
+// ── Renderer: a refuted finding must not appear in the rendered report ──
+// (Mirrors what plugins/synthex/workflows/review-code-engine.js does: run
+// tallyRefuterVotes/buildVerificationRecord per CRITICAL/HIGH finding,
+// filter the `refuted` ones out before calling renderReport, but keep
+// them — with their `verification` field — in the full findings list an
+// audit artifact would use.)
+
+describe('Task 58 (FR-HM17): a refuted finding is excluded from the rendered report', () => {
+  const survivingFinding = finding({
+    finding_id: 'f-survives',
+    severity: 'critical',
+    title: 'Hardcoded credential in config loader',
+  });
+  const refutedFinding = finding({
+    finding_id: 'f-refuted',
+    severity: 'high',
+    title: 'Possible null dereference in retry path',
+  });
+
+  const survivingVotes = [vote(), vote(), vote()];
+  const refutedVotes = [
+    vote({ refuted: true, failure_scenario: 'A non-null guard already exists three lines above' }),
+    vote({ refuted: true, failure_scenario: 'The retry path is unreachable given the caller contract' }),
+    vote(),
+  ];
+
+  const verifiedSurviving = { ...survivingFinding, verification: buildVerificationRecord(survivingVotes) };
+  const verifiedRefuted = { ...refutedFinding, verification: buildVerificationRecord(refutedVotes) };
+
+  it('sanity: one finding verifies, the other is refuted', () => {
+    expect(verifiedSurviving.verification.status).toBe('verified');
+    expect(verifiedRefuted.verification.status).toBe('refuted');
+  });
+
+  it('renderReport, called on the post-refute-pass filtered list, includes the surviving finding but not the refuted one', () => {
+    const allFindings = [verifiedSurviving, verifiedRefuted];
+    const reportFindings = allFindings.filter(
+      (f) => !(f.verification && f.verification.status === 'refuted'),
+    );
+
+    const report = renderReport({
+      pathHeader: renderPathHeader({ mode: 'native-only', reason: 'native review via the FR-HM16 workflow engine', nativeCount: 2 }),
+      reviewed: 'unstaged changes',
+      date: '2026-09-30',
+      reviewerTable: [{ name: 'code-reviewer', verdict: 'FAIL', summary: '1 CRITICAL' }],
+      findings: reportFindings,
+      positives: [],
+      summary: 'One finding survived adversarial refute; one was refuted and dropped.',
+    });
+
+    expect(report).toContain('Hardcoded credential in config loader');
+    expect(report).not.toContain('Possible null dereference in retry path');
+    // The dropped finding is still available, with its verification
+    // record, in the unfiltered list — this is what an audit-artifact
+    // writer would consume instead of re-parsing `report`.
+    expect(allFindings.some((f) => f.finding_id === 'f-refuted' && f.verification.status === 'refuted')).toBe(true);
   });
 });
