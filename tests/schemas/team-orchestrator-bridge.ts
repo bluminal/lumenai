@@ -7,7 +7,8 @@
  *     carries source.source_type: "native-team" (FR-MMT20 Bridge Rule 4)
  *
  * Per the normative contracts defined in:
- *   plugins/synthex-plus/agents/team-orchestrator-bridge.md (FR-MMT20)
+ *   plugins/synthex/agents/team-orchestrator-bridge.md (FR-MMT20; folded
+ *     from the now-removed synthex-plus plugin in Task 47)
  *   plugins/synthex/agents/_shared/canonical-finding-schema.md (FR-MR13)
  */
 

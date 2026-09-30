@@ -33,7 +33,7 @@ Pool 'slow-pool' did not return a report within 30s; falling back to fresh-spawn
 
 The note substitutes `{name}` with `pool_name` ("slow-pool") and `{timeout}` with
 `submission_timeout_seconds` (30). The verbatim text is specified in
-`plugins/synthex-plus/agents/standing-pool-submitter.md` Step 6 and
+`plugins/synthex/agents/standing-pool-submitter.md` Step 6 and
 `docs/specs/multi-model-teams/routing.md` §3.4.
 
 ### Routing decision is `fell-back-timeout`
@@ -73,7 +73,7 @@ no-pool fallback — the pool submission was attempted but the pool was too slow
 - `expected.verbatim_timeout_note` matches the pattern from standing-pool-submitter.md Step 6
 - `expected.fresh_spawn_triggered === true`
 - `setup.elapsed_seconds > setup.submission_timeout_seconds` (fixture is internally consistent)
-- `plugins/synthex-plus/agents/standing-pool-submitter.md` contains the verbatim timeout note
+- `plugins/synthex/agents/standing-pool-submitter.md` contains the verbatim timeout note
 
 ## Acceptance Criteria Covered
 

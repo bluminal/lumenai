@@ -145,12 +145,20 @@ describe('companion docs — framed as script docs, not behavioral logic (Task 5
     join(HOOKS_DIR, 'teammate-idle-gate.md'),
   ];
 
+  // Task 55 (FR-HM2): the synthex-plus plugin tree is deleted, so the
+  // prose originals it used to compare against no longer exist on disk.
+  // These byte counts are frozen from the last commit before removal
+  // (`git show <pre-Task-55-HEAD>:` + the synthex-plus hooks/<name>.md
+  // path + ` | wc -c`) — 9,609 B and 15,632 B respectively — and document
+  // the D5-inversion win the dynamic comparison used to prove live.
+  const SYNTHEX_PLUS_ORIGINAL_BYTES: Record<string, number> = {
+    'task-completed-gate.md': 9609,
+    'teammate-idle-gate.md': 15632,
+  };
+
   it.each(docs)('%s is dramatically smaller than the synthex-plus prose original', (docPath) => {
-    const synthexPlusEquivalent = join(
-      PLUGIN_ROOT, '..', 'synthex-plus', 'hooks', basename(docPath),
-    );
     const synthexBytes = readFileSync(docPath, 'utf-8').length;
-    const synthexPlusBytes = readFileSync(synthexPlusEquivalent, 'utf-8').length;
+    const synthexPlusBytes = SYNTHEX_PLUS_ORIGINAL_BYTES[basename(docPath)];
     expect(synthexBytes).toBeLessThan(synthexPlusBytes / 2);
   });
 

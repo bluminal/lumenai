@@ -7,7 +7,7 @@
  *
  * Validator source: tests/schemas/standing-pool-cleanup.ts
  * Normative schemas:
- *   - Cleanup result: plugins/synthex-plus/agents/standing-pool-cleanup.md §Output Contract
+ *   - Cleanup result: plugins/synthex/agents/standing-pool-cleanup.md §Output Contract
  *   - Inline-discovery output: FR-MMT30 (docs/reqs/multi-model-teams.md §4.9)
  *
  * Acceptance criteria covered:

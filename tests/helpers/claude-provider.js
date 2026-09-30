@@ -55,7 +55,6 @@ const CLAUDE_BIN = findClaudeBin();
 // ---------------------------------------------------------------------------
 
 const AGENTS_DIR = join(__dirname, '..', '..', 'plugins', 'synthex', 'agents');
-const COMMANDS_DIR = join(__dirname, '..', '..', 'plugins', 'synthex-plus', 'commands');
 const SYNTHEX_COMMANDS_DIR = join(__dirname, '..', '..', 'plugins', 'synthex', 'commands');
 const FIXTURES_DIR = join(__dirname, '..', 'fixtures');
 const CACHE_DIR = join(__dirname, '..', '.cache');
@@ -176,18 +175,15 @@ async function main() {
     process.exit(1);
   }
 
-  // Resolve agent/command path — check agents, then synthex-plus commands,
-  // then synthex commands. The synthex commands dir was added to support
-  // upgrade-onboarding wizard tests (configure-multi-model, dismiss-upgrade-nudge).
+  // Resolve agent/command path — check agents, then synthex commands. The
+  // synthex commands dir was added to support upgrade-onboarding wizard
+  // tests (configure-multi-model, dismiss-upgrade-nudge).
   let agentPath = join(AGENTS_DIR, `${agentName}.md`);
-  if (!existsSync(agentPath)) {
-    agentPath = join(COMMANDS_DIR, `${agentName}.md`);
-  }
   if (!existsSync(agentPath)) {
     agentPath = join(SYNTHEX_COMMANDS_DIR, `${agentName}.md`);
   }
   if (!existsSync(agentPath)) {
-    process.stderr.write(`Error: Agent/command file not found: ${agentName}.md (searched agents/, synthex-plus/commands/, synthex/commands/)\n`);
+    process.stderr.write(`Error: Agent/command file not found: ${agentName}.md (searched agents/, synthex/commands/)\n`);
     process.exit(1);
   }
 

@@ -1,10 +1,14 @@
 /**
  * Task 0: Baseline snapshots for FR-MMT regression (multi-model-teams).
  *
- * Verifies that the golden-snapshot fixtures for /team-review,
- * /synthex:review-code routing, and /synthex:performance-audit routing
- * exist in the expected location, load correctly, and contain the correct
- * `<<finding-body>>` redaction placeholders with no real finding text leaks.
+ * Verifies that the golden-snapshot fixtures for /synthex:review-code
+ * routing and /synthex:performance-audit routing exist in the expected
+ * location, load correctly, and contain the correct `<<finding-body>>`
+ * redaction placeholders with no real finding text leaks.
+ *
+ * Task 55 (FR-HM2, FR-HM24): the /team-review baseline
+ * (team-review-baseline.snapshot.md) and its dedicated assertions are
+ * retired along with the team-review command itself.
  *
  * Cost: $0 (no LLM calls — pure file assertions)
  */
@@ -34,12 +38,6 @@ const PARENT_SNAPSHOT_DIR = join(
 // ---------------------------------------------------------------------------
 
 describe('Task 0: Baseline snapshot files exist (FR-MMT regression base)', () => {
-  it('team-review-baseline.snapshot.md exists', () => {
-    expect(
-      existsSync(join(SNAPSHOT_DIR, 'team-review-baseline.snapshot.md')),
-    ).toBe(true);
-  });
-
   it('review-code-routing-baseline.snapshot.md exists', () => {
     expect(
       existsSync(
@@ -66,14 +64,6 @@ describe('Task 0: Baseline snapshot files exist (FR-MMT regression base)', () =>
 // ---------------------------------------------------------------------------
 
 describe('Redaction: <<finding-body>> placeholder present in each baseline', () => {
-  it('team-review baseline contains <<finding-body>>', () => {
-    const content = readFileSync(
-      join(SNAPSHOT_DIR, 'team-review-baseline.snapshot.md'),
-      'utf8',
-    );
-    expect(content).toContain('<<finding-body>>');
-  });
-
   it('review-code routing baseline contains <<finding-body>>', () => {
     const content = readFileSync(
       join(SNAPSHOT_DIR, 'review-code-routing-baseline.snapshot.md'),
@@ -97,7 +87,6 @@ describe('Redaction: <<finding-body>> placeholder present in each baseline', () 
 
 describe('Redaction: no real finding text leaks in any baseline', () => {
   const files = [
-    'team-review-baseline.snapshot.md',
     'review-code-routing-baseline.snapshot.md',
     'performance-audit-routing-baseline.snapshot.md',
   ];
@@ -140,24 +129,6 @@ describe('redaction-strategy.md content assertions', () => {
   it('strategy doc cites the parent redaction-strategy as source', () => {
     const content = readFileSync(strategyPath, 'utf8');
     expect(content).toMatch(/multi-model-review.*baseline.*redaction-strategy/s);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// team-review baseline: FR-MMT3 criterion 8 (no orchestrator invocation)
-// ---------------------------------------------------------------------------
-
-describe('team-review baseline: FR-MMT3 criterion 8 — no orchestrator invocation', () => {
-  it('baseline records zero multi-model-review-orchestrator Task invocations', () => {
-    const content = readFileSync(
-      join(SNAPSHOT_DIR, 'team-review-baseline.snapshot.md'),
-      'utf8',
-    );
-    // The trace section must exist and must state "none"
-    expect(content).toContain(
-      'multi-model-review-orchestrator invocations',
-    );
-    expect(content).toContain('(none');
   });
 });
 

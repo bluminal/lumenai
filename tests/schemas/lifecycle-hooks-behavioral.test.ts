@@ -4,8 +4,8 @@
  * TeammateIdle command hooks. `TaskCompleted` and `TeammateIdle` fire
  * outside any model turn, so they support only command hooks (exit 2 to
  * block/redirect, exit 0 to allow); the classification table that used to
- * live entirely in prose (plugins/synthex-plus/hooks/*.md) now lives in
- * these scripts as deterministic code, gated by `standing_pools.enabled`.
+ * live entirely in prose (synthex-plus's hooks/*.md, now removed) now lives
+ * in these scripts as deterministic code, gated by `standing_pools.enabled`.
  *
  * Task 50 [T] acceptance criteria (docs/plans/harness-modernization.md):
  *   - exit codes for both hooks (0 allow, 2 block/keep-working)

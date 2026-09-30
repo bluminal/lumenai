@@ -19,15 +19,13 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASELINE_DIR = join(__dirname, '..', '__snapshots__', 'native-looping', 'baseline');
 
-const FR_NL1_COMMANDS: Array<{ plugin: 'synthex' | 'synthex-plus'; command: string }> = [
+// Task 55 (FR-HM2, FR-HM24): the 4 synthex-plus team-* baselines are
+// retired along with the plugin and its team-* commands.
+const FR_NL1_COMMANDS: Array<{ plugin: 'synthex'; command: string }> = [
   { plugin: 'synthex', command: 'next-priority' },
   { plugin: 'synthex', command: 'write-implementation-plan' },
   { plugin: 'synthex', command: 'refine-requirements' },
   { plugin: 'synthex', command: 'review-code' },
-  { plugin: 'synthex-plus', command: 'team-implement' },
-  { plugin: 'synthex-plus', command: 'team-review' },
-  { plugin: 'synthex-plus', command: 'team-plan' },
-  { plugin: 'synthex-plus', command: 'team-refine' },
 ];
 
 describe('native-looping baseline snapshots — Task 3', () => {

@@ -41,11 +41,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..');
 
 interface PluginVariant {
-  label: 'synthex' | 'synthex-plus';
+  label: 'synthex';
   scriptPath: string;
   pluginJsonPath: string;
-  stateDir: '.synthex' | '.synthex-plus';
-  configBlock: 'multi_model_review' | 'standing_pools';
+  stateDir: '.synthex';
+  configBlock: 'multi_model_review';
   thresholdVersion: string;
   preThresholdVersion: string;
   nudgePrefix: string;
@@ -53,6 +53,14 @@ interface PluginVariant {
   dismissCommand: string;
 }
 
+// Task 55 (FR-HM2): synthex-plus is deleted. It used to have its own
+// variant here (its own upgrade-nudge.sh, .synthex-plus/ state dir, and
+// standing_pools config block); that variant is retired along with the
+// plugin. The D7 nudge in the surviving synthex variant still warns when
+// a project has a leftover `.synthex-plus/` directory from before the
+// plugin was removed (see the "D7 synthex-plus deprecation nudge" block
+// below) — that is about stale on-disk state from old installs, not
+// about the plugin still existing.
 const variants: PluginVariant[] = [
   {
     label: 'synthex',
@@ -65,18 +73,6 @@ const variants: PluginVariant[] = [
     nudgePrefix: 'Synthex upgraded to',
     configureCommand: '/synthex:configure-multi-model',
     dismissCommand: '/synthex:dismiss-upgrade-nudge',
-  },
-  {
-    label: 'synthex-plus',
-    scriptPath: join(REPO_ROOT, 'plugins', 'synthex-plus', 'scripts', 'upgrade-nudge.sh'),
-    pluginJsonPath: join(REPO_ROOT, 'plugins', 'synthex-plus', '.claude-plugin', 'plugin.json'),
-    stateDir: '.synthex-plus',
-    configBlock: 'standing_pools',
-    thresholdVersion: '0.2.0',
-    preThresholdVersion: '0.1.5',
-    nudgePrefix: 'Synthex+ upgraded to',
-    configureCommand: '/synthex-plus:configure-teams',
-    dismissCommand: '/synthex-plus:dismiss-upgrade-nudge',
   },
 ];
 

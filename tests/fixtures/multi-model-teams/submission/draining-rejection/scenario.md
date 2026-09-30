@@ -30,7 +30,7 @@ The config.json re-read is the authoritative source of truth for current pool st
 
 ## Submitter's Mandatory Step 1 Drain Check
 
-Per `plugins/synthex-plus/agents/standing-pool-submitter.md`, Step 1 (Pre-Submission Drain Check, FR-MMT14a):
+Per `plugins/synthex/agents/standing-pool-submitter.md`, Step 1 (Pre-Submission Drain Check, FR-MMT14a):
 
 1. The submitter re-reads `~/.claude/teams/standing/<pool_name>/config.json`.
 2. It inspects `pool_state`.

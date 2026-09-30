@@ -288,37 +288,27 @@ describe('cross-harness compatibility contract', () => {
     expect(workflow).toContain('.claude-plugin/marketplace.json');
     expect(workflow).toContain('plugins/synthex/.claude-plugin/plugin.json');
     expect(workflow).toContain('plugins/synthex/.codex-plugin/plugin.json');
-    expect(workflow).toContain('plugins/synthex-plus/.claude-plugin/plugin.json');
   });
 
-  it('still bumps synthex-plus in lockstep with synthex (Task 54: tombstone, not removal)', () => {
+  it('bumps only the synthex manifests (Task 55: synthex-plus removed)', () => {
     const workflow = readFileSync(
       resolve(repoRoot, '.github/workflows/release.yml'),
       'utf8',
     );
 
-    // Reads the current synthex-plus manifest version alongside synthex's.
+    // synthex-plus is gone: no manifest read, no separate bumped version,
+    // and no write-back into its own manifest or the marketplace entry.
+    expect(workflow).not.toContain('synthex-plus');
+    expect(workflow).not.toContain('PLUS_OLD');
+    expect(workflow).not.toContain('PLUS_NEW');
+    // One manifest set: the release commit message and GitHub release
+    // title both name only the synthex version (FR-HM2: "release.yml bumps
+    // one plugin manifest set").
     expect(workflow).toContain(
-      'PLUS_OLD=$(jq -r .version plugins/synthex-plus/.claude-plugin/plugin.json)',
-    );
-    // Computes a bumped version for it using the same BUMP level.
-    expect(workflow).toContain('PLUS_NEW=$(bump_semver "$PLUS_OLD" "$BUMP")');
-    // Writes the bumped version back into its own manifest...
-    expect(workflow).toContain(
-      "jq --indent 2 --arg v \"$PLUS_NEW\" '.version = $v' \\\n            plugins/synthex-plus/.claude-plugin/plugin.json",
-    );
-    // ...and into the marketplace's plugins[] entry for it, one manifest set
-    // alongside synthex (FR-HM2: "release.yml bumps one plugin manifest set").
-    expect(workflow).toContain(
-      '| (.plugins[] | select(.name == "synthex-plus").version) = $p',
-    );
-    // The release commit message and GitHub release title both name the
-    // bumped synthex-plus version, not just synthex's.
-    expect(workflow).toContain(
-      'git commit -m "release: synthex ${SYNTHEX_NEW} + synthex-plus ${PLUS_NEW}"',
+      'git commit -m "release: synthex ${SYNTHEX_NEW}"',
     );
     expect(workflow).toContain(
-      '--title "v${MARKET_NEW} — synthex ${SYNTHEX_NEW} + synthex-plus ${PLUS_NEW}"',
+      '--title "v${MARKET_NEW} — synthex ${SYNTHEX_NEW}"',
     );
   });
 

@@ -71,5 +71,6 @@ The conflict between non-standing teams does not affect standing pool state.
 ## References
 
 - `docs/specs/multi-model-teams/` — FR-MMT26: standing pool one-team-per-session exemption
-- `plugins/synthex-plus/commands/team-implement.md` — enforces FR-MMT26 in spawn logic
+- Historical: the synthex-plus plugin's `team-implement.md` enforced FR-MMT26 in spawn logic
+  before Task 55 retired the plugin and its team-* commands outright (not folded into synthex)
 - `tests/schemas/one-team-per-session.test.ts` — Layer 1 Vitest suite for this fixture
