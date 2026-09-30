@@ -202,10 +202,10 @@ describe('loop-step.sh — behavioral (jq-less PATH)', () => {
       expect(lines[1]).toBe('completion promise: ALLDONE');
     });
 
-    it('derives the command slug from a synthex-plus team command too', () => {
-      const r = run(['begin', '/synthex-plus:team-implement', '--completion-promise', 'X'], opts());
+    it('derives the command slug from any plugin prefix, not just synthex', () => {
+      const r = run(['begin', '/other-plugin:build-something', '--completion-promise', 'X'], opts());
       const lines = r.stdout.trim().split('\n');
-      expect(lines[0]).toMatch(/^team-implement-[0-9a-f]{4}$/);
+      expect(lines[0]).toMatch(/^build-something-[0-9a-f]{4}$/);
     });
 
     it('defaults --completion-promise to ALLDONE<session_id> when omitted (D1)', () => {

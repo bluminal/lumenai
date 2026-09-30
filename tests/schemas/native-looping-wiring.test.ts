@@ -18,21 +18,19 @@ const REPO_ROOT = join(__dirname, '..', '..');
 
 interface CommandSpec {
   label: string;
-  plugin: 'synthex' | 'synthex-plus';
+  plugin: 'synthex';
   filename: string;
-  isTeam: boolean;
 }
 
-// Task 54: the Phase 5 synthex-plus team-* entries (team-implement,
-// team-review, team-plan, team-refine) were dropped — synthex-plus's team
-// commands are now migration stubs with no --loop wiring, and team-* is
-// retired outright (not folded into synthex; see docs/migrations/synthex-plus.md).
+// Task 55 (FR-HM2, FR-HM24): synthex-plus and its 5 team-* commands
+// (team-review, team-implement, team-plan, team-refine, team-init) are
+// retired outright — their behavior is the capability ladder inside these
+// existing synthex commands (see docs/migrations/synthex-plus.md).
 const FR_NL1_COMMANDS: CommandSpec[] = [
-  // Phase 4 — synthex
-  { label: 'next-priority', plugin: 'synthex', filename: 'next-priority.md', isTeam: false },
-  { label: 'write-implementation-plan', plugin: 'synthex', filename: 'write-implementation-plan.md', isTeam: false },
-  { label: 'refine-requirements', plugin: 'synthex', filename: 'refine-requirements.md', isTeam: false },
-  { label: 'review-code', plugin: 'synthex', filename: 'review-code.md', isTeam: false },
+  { label: 'next-priority', plugin: 'synthex', filename: 'next-priority.md' },
+  { label: 'write-implementation-plan', plugin: 'synthex', filename: 'write-implementation-plan.md' },
+  { label: 'refine-requirements', plugin: 'synthex', filename: 'refine-requirements.md' },
+  { label: 'review-code', plugin: 'synthex', filename: 'review-code.md' },
 ];
 
 const NEW_PARAM_ANCHORS = [
@@ -52,7 +50,7 @@ const NATIVE_LOOPING_SUB_ANCHORS = [
 
 describe.each(FR_NL1_COMMANDS)(
   '$plugin/$label — --loop wiring (Task 31)',
-  ({ plugin, filename, isTeam }) => {
+  ({ plugin, filename }) => {
     const cmdPath = join(REPO_ROOT, 'plugins', plugin, 'commands', filename);
     let content: string;
 
@@ -77,18 +75,6 @@ describe.each(FR_NL1_COMMANDS)(
         expect(content).toMatch(/native-looping\.md/);
       });
     });
-
-    if (isTeam) {
-      describe('Team-specific clauses (FR-NL34, FR-NL35, E7)', () => {
-        it('documents lead-output-only promise scan (E7)', () => {
-          expect(content).toMatch(/Lead-output-only promise scan|Pool Lead's consolidated output/);
-        });
-
-        it('documents team-lifecycle independence (FR-NL35)', () => {
-          expect(content).toMatch(/Team lifecycle independence|does NOT change.*team lifecycle/i);
-        });
-      });
-    }
   }
 );
 
@@ -102,12 +88,10 @@ describe.each(FR_NL1_COMMANDS)(
 // the old multi-step (boundary check + increment + marker-print) breakdown.
 //
 // Scoped to the 4 synthex commands actually rewritten for FR-HM18 (plus
-// /synthex:loop itself, asserted separately in loop-command.test.ts). The
-// synthex-plus team commands are untouched by Task 34 (synthex-plus is
-// being phased out) and are not asserted here.
+// /synthex:loop itself, asserted separately in loop-command.test.ts).
 // ---------------------------------------------------------------------------
 
-const ADVANCE_REWRITTEN_COMMANDS = FR_NL1_COMMANDS.filter((c) => !c.isTeam);
+const ADVANCE_REWRITTEN_COMMANDS = FR_NL1_COMMANDS;
 
 describe.each(ADVANCE_REWRITTEN_COMMANDS)(
   '$plugin/$label — one loop-step.sh advance Bash call per iteration (Task 34, FR-HM18)',
@@ -157,7 +141,7 @@ describe.each(ADVANCE_REWRITTEN_COMMANDS)(
 
 const DEFAULT_PROMISE_FILES = [
   { label: 'loop', path: join(REPO_ROOT, 'plugins', 'synthex', 'commands', 'loop.md') },
-  ...FR_NL1_COMMANDS.filter((c) => !c.isTeam).map((c) => ({
+  ...FR_NL1_COMMANDS.map((c) => ({
     label: c.label,
     path: join(REPO_ROOT, 'plugins', c.plugin, 'commands', c.filename),
   })),

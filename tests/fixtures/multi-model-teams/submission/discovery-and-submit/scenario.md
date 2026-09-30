@@ -103,7 +103,7 @@ Review path: standing pool '{pool_name}' (multi-model: {yes|no}).
 ## References
 
 - `plugins/synthex/commands/review-code.md` — submitting command, inline discovery, NFR-MMT7 provenance line
-- `plugins/synthex-plus/agents/standing-pool-submitter.md` — drain check, atomic writes, polling, output contract
+- `plugins/synthex/agents/standing-pool-submitter.md` — drain check, atomic writes, polling, output contract
 - `docs/specs/multi-model-teams/routing.md` §1.4 — inline discovery is the caller's responsibility
 - FR-MMT14a — pre-submission drain check
 - FR-MMT16 — atomic task write and mailbox notification

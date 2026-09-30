@@ -105,7 +105,7 @@ priority.
 
 ## References
 
-- `plugins/synthex-plus/agents/standing-pool-submitter.md` — UUID generation (Step 2),
+- `plugins/synthex/agents/standing-pool-submitter.md` — UUID generation (Step 2),
   UUID-based filenames guarantee, `report_to` field documentation
 - `docs/specs/multi-model-teams/routing.md` §5 — FR-MMT18 race condition semantics
 - FR-MMT16 §2 — UUID filename atomicity requirement

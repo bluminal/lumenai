@@ -22,20 +22,6 @@
         "synthesis"
       ],
       "description": "AI agents modeled after a software startup org chart — specialized roles that synthesize to discover, build, ship, operate, and learn from production-quality software."
-    },
-    {
-      "name": "synthex-plus",
-      "source": "./plugins/synthex-plus",
-      "version": "1.6.0",
-      "category": "productivity",
-      "keywords": [
-        "agents",
-        "teams",
-        "orchestration",
-        "collaboration",
-        "parallel"
-      ],
-      "description": "[BETA] Teams-optimized orchestration for Synthex — sustained multi-agent collaboration via Claude Code Agent Teams. Requires the beta Agent Teams feature flag. Depends on the Synthex plugin."
     }
   ]
 }
