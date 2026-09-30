@@ -5,7 +5,11 @@
  *
  * This is the single source of truth for the dedupe, verdict-aggregation,
  * and render logic used by the `/synthex:review-code` FR-HM16 Workflow
- * engine (`../review-code.js`). It is a plain ES module with zero
+ * engine (`../review-code-engine.js` — named `review-code-engine`, not
+ * `review-code`, so the workflow's `meta.name` never shadows the
+ * `/synthex:review-code` command; see the Task 9 addendum in
+ * docs/specs/harness-modernization/spikes.md). It is a plain ES module
+ * with zero
  * dependencies so `tests/schemas/review-engine-renderer.test.ts` can
  * `import` it directly under Node/Vitest — no Workflow runtime required
  * (per Task 57's instruction that the pure functions "live in an

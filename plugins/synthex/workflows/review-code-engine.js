@@ -1,5 +1,5 @@
 export const meta = {
-  name: 'review-code',
+  name: 'review-code-engine',
   description: 'FR-HM16 workflow engine for /synthex:review-code: parallel reviewers with a forced findings envelope, JS dedupe, one effort:medium verdict-synthesis call, and the D21/FR-MR17 rendered report.',
   phases: [
     { title: 'Native Review', detail: 'run each configured reviewer in parallel with a forced findings envelope' },
@@ -9,7 +9,7 @@ export const meta = {
 };
 
 /**
- * plugins/synthex/workflows/review-code.js
+ * plugins/synthex/workflows/review-code-engine.js
  *
  * FR-HM16 workflow review engine for `/synthex:review-code` (Task 57, D4).
  * Auto-discovered from the plugin's `workflows/` directory with no
@@ -17,9 +17,21 @@ export const meta = {
  * docs/specs/harness-modernization/spikes.md "Task 9 — Workflow
  * capability spike"). Invoked by the capability ladder's level 2
  * (plugins/synthex/docs/standing-pool-routing.md, "## Capability Ladder
- * (FR-HM21)") as `Workflow {"name": "synthex:review-code"}` once the
- * command's own instruction to call it is the opt-in the Workflow tool's
- * contract requires (D31).
+ * (FR-HM21)") as `Workflow {"name": "synthex:review-code-engine"}` once
+ * the command's own instruction to call it is the opt-in the Workflow
+ * tool's contract requires (D31).
+ *
+ * IMPORTANT — why this script is NOT named `review-code`: a plugin
+ * workflow's `meta.name` is registered as the slash command
+ * `<plugin>:<name>` and SHADOWS a same-named plugin command entirely — a
+ * live Task 57 run confirmed that typing `/synthex:review-code` with a
+ * workflow also named `review-code` expanded straight to "Run the
+ * 'synthex:review-code' workflow" instead of loading
+ * `commands/review-code.md`, silently skipping every config check, the
+ * capability ladder, and the review loop. See
+ * docs/specs/harness-modernization/spikes.md's Task 9 addendum and
+ * `tests/schemas/workflow-names.test.ts`, which asserts no workflow
+ * `meta.name` ever collides with a command or agent name.
  *
  * Full behavior, config resolution, and output-parity notes:
  * plugins/synthex/docs/engines/review-code-workflow.md.
@@ -490,7 +502,7 @@ function safeJsonParse(text) {
 // cannot wait for a human to apply fixes between cycles. The command's
 // own Review Loop (review-code.md Step 6) owns the fix-and-re-review loop
 // across turns: on a FAIL verdict it re-invokes
-// `Workflow {"name": "synthex:review-code"}` for the next cycle, passing
+// `Workflow {"name": "synthex:review-code-engine"}` for the next cycle, passing
 // the incremented `cycle` and a compact summary of unresolved findings as
 // `priorCycleSummary` (see docs/standing-pool-routing.md's "Level 2's
 // Workflow args contract"). Finding lifecycle (fixed / carried / new)

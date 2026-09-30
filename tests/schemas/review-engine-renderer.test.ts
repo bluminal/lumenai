@@ -10,7 +10,7 @@
  * Node/Vitest — no Workflow runtime involved. That module is the single
  * source of truth for the dedupe, verdict-aggregation, path-header, and
  * render logic the FR-HM16 Workflow engine (plugins/synthex/workflows/
- * review-code.js) also carries, inlined, between a pair of sync markers;
+ * review-code-engine.js) also carries, inlined, between a pair of sync markers;
  * tests/schemas/review-engine-sync.test.ts guards the two copies against
  * drift, so this suite only needs the standalone module.
  *

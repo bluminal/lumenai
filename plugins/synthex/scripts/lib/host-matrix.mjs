@@ -75,7 +75,11 @@ const SKIP_THE_STEP = 'skip the step';
  * `Workflow` tool is in the caller's tool list, so review-code continues
  * down the ladder to level 3/4 and says so once instead of silently
  * taking the prose path. Task 57 shipped the engine script itself
- * (`plugins/synthex/workflows/review-code.js`), so this message no longer
+ * (`plugins/synthex/workflows/review-code-engine.js` -- named
+ * `review-code-engine`, not `review-code`, because a workflow's
+ * `meta.name` registers as a slash command and would otherwise shadow
+ * `/synthex:review-code` entirely; see the Task 9 addendum in
+ * docs/specs/harness-modernization/spikes.md), so this message no longer
  * hedges on the script's availability -- the only remaining reason to
  * fall through is the missing `Workflow` tool.
  */

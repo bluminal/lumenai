@@ -11,9 +11,13 @@
  *      running pool).
  *   2. Workflow engine (a `Workflow` tool + code_review.engine: workflow) —
  *      filled in by Task 56 (FR-HM16). The engine script itself
- *      (`workflows/review-code.js`) shipped in Task 57. On any host/config
- *      that doesn't meet the condition, this level degrades cleanly to
- *      level 3.
+ *      (`workflows/review-code-engine.js`, invoked as
+ *      `synthex:review-code-engine` — deliberately NOT `review-code`,
+ *      since a workflow's meta.name registers as a slash command and would
+ *      shadow the `/synthex:review-code` command of the same name; see the
+ *      Task 9 addendum in docs/specs/harness-modernization/spikes.md)
+ *      shipped in Task 57. On any host/config that doesn't meet the
+ *      condition, this level degrades cleanly to level 3.
  *   3. Parallel subagent fan-out (a tool named Agent, Task, task,
  *      spawn_agent, or delegate_task).
  *   4. Sequential reviewers — today's baseline, the ladder's floor.
@@ -102,14 +106,20 @@ describe('Task 49 (FR-HM21, D22): capability-ladder.test.ts', () => {
     it('level 2 documents D31: the command prose is the opt-in, and the headless allow-rule', () => {
       expect(section).toMatch(/D31/);
       expect(section).toMatch(/a committed config key alone is not an opt-in/i);
-      expect(section).toMatch(/Workflow\(synthex:<name>\)/);
+      expect(section).toMatch(/Workflow\(synthex:review-code-engine\)/);
       expect(section).toMatch(/permission allow rule/i);
     });
 
-    it('level 2 names its invocation and the shipped script (Task 57)', () => {
-      expect(section).toContain('synthex:review-code');
-      expect(section).toContain('workflows/review-code.js');
+    it('level 2 names its invocation and the shipped script (Task 57), using a name distinct from the review-code command', () => {
+      expect(section).toContain('synthex:review-code-engine');
+      expect(section).toContain('workflows/review-code-engine.js');
       expect(section).toMatch(/Task 57/);
+      // Regression guard for the live-run root cause: the ladder text must
+      // never instruct calling a Workflow literally named "review-code" —
+      // that name collides with (and shadows) the /synthex:review-code
+      // command. See tests/schemas/workflow-names.test.ts for the static
+      // check across every shipped workflow.
+      expect(section).not.toMatch(/"name":\s*"synthex:review-code"/);
     });
 
     it('level 2 degrades cleanly when the Workflow tool or config condition is not met', () => {
@@ -125,7 +135,10 @@ describe('Task 49 (FR-HM21, D22): capability-ladder.test.ts', () => {
     // resolved deterministically via config-get.sh, never left to the
     // model's interpretation of this paragraph's prose alone. A live run
     // with code_review.engine: prose called Workflow anyway before this
-    // fix — see plugins/synthex/docs/engines/review-code-workflow.md.
+    // fix; kept as defense in depth even though the confirmed root cause
+    // was the review-code/review-code-engine name-collision fixed above,
+    // not prompt wording — see
+    // plugins/synthex/docs/engines/review-code-workflow.md.
     it('level 2 resolves its condition deterministically via config-get.sh, not by inference from prose', () => {
       expect(section).toContain('scripts/lib/config-get.sh code_review.engine prose');
       expect(section).toMatch(/resolve the condition deterministically/i);

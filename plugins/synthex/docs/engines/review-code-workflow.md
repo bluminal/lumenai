@@ -14,13 +14,28 @@ key, a SQL-injection regression, a swallowed-error retry loop, and a secret
 leaked to an arbitrary caller-supplied URL) found 5 defects, all fixed in
 this revision:
 
-1. **Gate leak.** With `code_review.engine: prose`, the model still called
-   `Workflow` as its first tool use — the old Step-4 pointer in
-   `review-code.md` read as an invitation. Level 2's condition is now
-   resolved deterministically via `scripts/lib/config-get.sh
-   code_review.engine prose` (or a direct config Read when `Bash` is absent)
-   with an explicit "do NOT call `Workflow` unless..." guard, and the
-   `review-code.md` pointer was reworded to a refusal by default. See the
+1. **Gate leak — root cause: workflow/command name collision, not prompt
+   wording.** With `code_review.engine: prose`, the model still called
+   `Workflow` as its first tool use. The first investigation attributed
+   this to the old Step-4 pointer in `review-code.md` reading as an
+   invitation, and tightened it (level 2's condition is now resolved
+   deterministically via `scripts/lib/config-get.sh code_review.engine
+   prose`, or a direct config Read when `Bash` is absent, with an explicit
+   "do NOT call `Workflow` unless..." guard — kept as defense in depth).
+   **The actual root cause was different and more fundamental:** the
+   workflow script's `meta.name` was `review-code`, which Claude Code
+   registers as the slash command `synthex:review-code` — SHADOWING the
+   real `commands/review-code.md` command of the same name. Typing
+   `/synthex:review-code` never loaded the command file at all; it expanded
+   straight to "Run the 'synthex:review-code' workflow ... Invoke:
+   `Workflow({ name: "synthex:review-code" })`", bypassing every config
+   check, the capability ladder, and the review loop, regardless of
+   `code_review.engine`. Fix: the script and its `meta.name` were renamed
+   to `review-code-engine` (`plugins/synthex/workflows/review-code-engine
+   .js`, invoked as `Workflow {"name": "synthex:review-code-engine"}`), and
+   `tests/schemas/workflow-names.test.ts` now asserts no workflow's
+   `meta.name` can ever collide with a command or agent name again. See the
+   Task 9 addendum in `docs/specs/harness-modernization/spikes.md` and the
    capability ladder's level 2 in `docs/standing-pool-routing.md`.
 2. **Pointless second cycle.** The script used to loop internally over
    `review_loops.max_cycles`, re-running every reviewer with no fix step in
@@ -56,14 +71,38 @@ this revision:
 
 ## What it does
 
-`plugins/synthex/workflows/review-code.js` is a Workflow script that
-reproduces `/synthex:review-code`'s reviewer fan-out, consolidation, and
-report rendering using structured tool calls instead of markdown prose
-parsing. It is auto-discovered from the plugin's `workflows/` directory with
-no `plugin.json` entry (confirmed by the Task 9 spike,
+`plugins/synthex/workflows/review-code-engine.js` is a Workflow script
+that reproduces `/synthex:review-code`'s reviewer fan-out, consolidation,
+and report rendering using structured tool calls instead of markdown
+prose parsing. It is auto-discovered from the plugin's `workflows/`
+directory with no `plugin.json` entry (confirmed by the Task 9 spike,
 `docs/specs/harness-modernization/spikes.md` "Task 9 — Workflow capability
-spike": a script at a plugin's `workflows/` root is picked up and namespaced
-as `<plugin>:<script-name>` — here, `synthex:review-code`).
+spike": a script at a plugin's `workflows/` root is picked up and
+namespaced as `<plugin>:<script-name>` — here, `synthex:review-code-engine`,
+its `meta.name`).
+
+## Constraint: a workflow's `meta.name` must never collide with a command or agent name
+
+A plugin Workflow script's `meta.name` is registered as the slash command
+`<plugin>:<name>`, and that registration SHADOWS a same-named plugin
+command entirely — typing `/synthex:review-code` would stop loading
+`commands/review-code.md` at all. A live Task 57 `[H]` run confirmed this
+exactly: with a workflow whose `meta.name` was `review-code`, the session
+transcript's first user-facing expansion was "Run the 'synthex:review-code'
+workflow ... Invoke: `Workflow({ name: "synthex:review-code" })`" — no
+config check, no capability ladder, no multi-model gate, no review loop.
+This is why the script here is named `review-code-engine`, not
+`review-code`. See the Task 9 addendum in
+`docs/specs/harness-modernization/spikes.md` for the full incident writeup.
+
+**Enforced by `tests/schemas/workflow-names.test.ts`:** it parses every
+`plugins/synthex/workflows/*.js` file's `meta.name` (by reading the file's
+source text, never by executing it) and fails the suite if any two
+workflows share a name, or if any workflow's name matches a command
+basename in `plugins/synthex/commands/` or an agent basename in
+`plugins/synthex/agents/`. Any future workflow this plugin ships must pass
+that check — never assume a workflow can share a name with the command it
+serves.
 
 Each `Workflow` call runs exactly **one** review cycle:
 
@@ -114,7 +153,7 @@ A script cannot wait for a human to apply fixes between cycles (no
 filesystem, no `AskUserQuestion`), so it does not loop internally over
 `review_loops.max_cycles` — that loop lives entirely in the command
 (`review-code.md` Step 6, unchanged from the prose path), which re-invokes
-`Workflow {"name": "synthex:review-code"}` for each subsequent cycle on a
+`Workflow {"name": "synthex:review-code-engine"}` for each subsequent cycle on a
 FAIL verdict, incrementing `args.cycle` and passing a compact summary of
 unresolved findings as `args.priorCycleSummary`. See
 `docs/standing-pool-routing.md`'s "Level 2's `Workflow` `args` contract."
@@ -151,16 +190,17 @@ valid Workflow opt-in. The opt-in the Workflow tool's contract requires is
 "a skill or slash command whose instructions tell you to call Workflow" —
 here, the capability ladder's own level-2 prose in
 `docs/standing-pool-routing.md`, which instructs the command to call
-`Workflow {"name": "synthex:review-code"}` when the two conditions
+`Workflow {"name": "synthex:review-code-engine"}` when the two conditions
 (`Workflow` tool present, `code_review.engine: workflow` set) both hold. No
 per-session confirmation is asked beyond that.
 
 ## The headless allow rule
 
 Headless runs (no one present to answer an interactive tool-use prompt)
-additionally need a `Workflow(synthex:<name>)` permission allow rule — or
-auto/bypass mode — configured ahead of time, since the Workflow tool call
-itself would otherwise block on a permission prompt nobody can answer.
+additionally need a `Workflow(synthex:review-code-engine)` permission
+allow rule — or auto/bypass mode — configured ahead of time, since the
+Workflow tool call itself would otherwise block on a permission prompt
+nobody can answer.
 `/synthex:schedule` recipes force `engine: prose` for exactly this reason
 (FR-HM16's acceptance criteria: "the engine is never selected in headless
 runs").
@@ -212,19 +252,20 @@ token/similarity/location helpers they use, as a plain ES module with zero
 dependencies — `tests/schemas/review-engine-renderer.test.ts` imports it
 directly under Node/Vitest, no Workflow runtime required.
 
-`workflows/review-code.js` cannot `import` that module: Workflow scripts run
-in a sandboxed plain-JS context with no filesystem or Node.js module
-resolution (confirmed by the Task 9 spike; the workflow-authoring skill's
-own contract: "No filesystem or Node.js API access"). So the script instead
-carries an inlined copy of the same function bodies, between a pair of sync
-markers, with the `export` keyword stripped (a Workflow script body is not
-an ES module — only `export const meta` is special-cased by the runtime).
-`tests/schemas/review-engine-sync.test.ts` extracts both copies and diffs
-them textually, after stripping comments and `export` tokens, on every test
-run — so the two copies cannot silently drift apart. **When editing dedupe,
-verdict, or render logic, edit `lib/review-engine.mjs` first, then copy the
-same text into `review-code.js`'s marked block in the same commit**; the
-sync test will fail the commit's own test run otherwise.
+`workflows/review-code-engine.js` cannot `import` that module: Workflow
+scripts run in a sandboxed plain-JS context with no filesystem or Node.js
+module resolution (confirmed by the Task 9 spike; the workflow-authoring
+skill's own contract: "No filesystem or Node.js API access"). So the
+script instead carries an inlined copy of the same function bodies,
+between a pair of sync markers, with the `export` keyword stripped (a
+Workflow script body is not an ES module — only `export const meta` is
+special-cased by the runtime). `tests/schemas/review-engine-sync.test.ts`
+extracts both copies and diffs them textually, after stripping comments
+and `export` tokens, on every test run — so the two copies cannot
+silently drift apart. **When editing dedupe, verdict, or render logic,
+edit `lib/review-engine.mjs` first, then copy the same text into
+`review-code-engine.js`'s marked block in the same commit**; the sync
+test will fail the commit's own test run otherwise.
 
 ## Task 58 extension point (FR-HM17)
 
@@ -234,17 +275,18 @@ CRITICAL/HIGH finding (Sonnet 5, `effort: low`), 2-of-3 survival, and a
 the audit artifact. The vote-aggregation function that decides survival
 (`survives = refutedCount < 2` given 3 votes) is a pure function with the
 same "lives in `lib/review-engine.mjs`, inlined-and-synced into
-`review-code.js`" story as everything else in this document — `review-code
-.js`'s structure (the marked sync region, the per-cycle loop, the
-`dedupeFindings` → `aggregateVerdict` → `renderReport` pipeline) is built to
-receive it without a restructure. It is not implemented by Task 57.
+`review-code-engine.js`" story as everything else in this document —
+`review-code-engine.js`'s structure (the marked sync region, the
+per-cycle loop, the `dedupeFindings` → `aggregateVerdict` → `renderReport`
+pipeline) is built to receive it without a restructure. It is not
+implemented by Task 57.
 
 ## `ReportFindings`
 
 FR-HM16's prose says the script "calls `ReportFindings` once per cycle with
-the consolidated list." Before writing `review-code.js`, this was checked
-against two sources of truth, per this task's own instruction to "match
-whatever the prose path does":
+the consolidated list." Before writing `review-code-engine.js`, this was
+checked against two sources of truth, per this task's own instruction to
+"match whatever the prose path does":
 
 1. **The prose path** (`plugins/synthex/commands/review-code.md` and every
    file it reads) never calls a `ReportFindings` tool anywhere. The only
@@ -257,7 +299,7 @@ whatever the prose path does":
    `pipeline`, `phase`, `log`, `args`, `budget`, and `workflow` — no
    `ReportFindings` hook.
 
-Given both checks came back empty, `review-code.js` does not call
+Given both checks came back empty, `review-code-engine.js` does not call
 `ReportFindings`. This is documented in the script itself, immediately after
 the report is rendered, rather than silently diverging from the FR-HM16
 text. **Reversal condition:** if a future Claude Code release adds a
@@ -286,7 +328,7 @@ steps:
    Deliberately leave it unstaged — defect 5 was a hardcoded "staged
    changes" default; an unstaged diff is a better regression check than a
    staged one.
-3. Grant `Workflow(synthex:review-code)` in your permission settings, or
+3. Grant `Workflow(synthex:review-code-engine)` in your permission settings, or
    run in a mode (`--dangerously-skip-permissions`, project trust) that
    would otherwise prompt for it — the level-2 opt-in still requires the
    command's own prose to instruct the call (D31); this just avoids an
@@ -316,6 +358,16 @@ steps:
      call.
 6. **Re-check the 5 live-run defects specifically** ("Live-run fixes"
    above):
+   0. **The actual root cause of defect 1.** In the *init* event of every
+      transcript (prose or workflow run), `slash_commands` lists exactly
+      one `synthex:review-code` entry, and typing `/synthex:review-code`
+      expands to the `review-code.md` command prose (the `## Workflow`
+      heading, Step 1 "Load Configuration", etc.) — never to "Run the
+      'synthex:review-code' workflow" or a bare `Workflow({ name:
+      "synthex:review-code" })` invocation with no surrounding prose. If a
+      new workflow is ever added under `plugins/synthex/workflows/`, this
+      is what would break: `tests/schemas/workflow-names.test.ts` catches
+      it statically, but this is the live confirmation.
    1. With `engine: prose`, the `prose` run's transcript shows **no**
       `Workflow` tool call at all — not even as a first move, before any
       other tool use.

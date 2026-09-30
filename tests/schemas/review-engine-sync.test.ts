@@ -1,18 +1,21 @@
 /**
  * Task 57 (FR-HM16, D4): review-engine-sync.test.ts.
  *
- * plugins/synthex/workflows/review-code.js (a Workflow script) cannot
- * `import` plugins/synthex/workflows/lib/review-engine.mjs: Workflow
- * scripts run in a sandboxed plain-JS context with no filesystem or
- * Node.js module resolution (Task 9 spike,
- * docs/specs/harness-modernization/spikes.md; the workflow-authoring
- * skill: "No filesystem or Node.js API access"). So review-code.js
- * carries an inlined copy of every pure function from lib/review-engine.mjs
- * instead, between a pair of sync markers.
+ * plugins/synthex/workflows/review-code-engine.js (a Workflow script,
+ * named `review-code-engine` rather than `review-code` so it can never
+ * shadow the `/synthex:review-code` command — see
+ * docs/specs/harness-modernization/spikes.md's Task 9 addendum and
+ * workflow-names.test.ts) cannot `import`
+ * plugins/synthex/workflows/lib/review-engine.mjs: Workflow scripts run
+ * in a sandboxed plain-JS context with no filesystem or Node.js module
+ * resolution (Task 9 spike, docs/specs/harness-modernization/spikes.md;
+ * the workflow-authoring skill: "No filesystem or Node.js API access").
+ * So review-code-engine.js carries an inlined copy of every pure function
+ * from lib/review-engine.mjs instead, between a pair of sync markers.
  *
  * This suite is the "another deterministic means" of keeping the two
  * copies from drifting apart (Task 57's own instruction): it extracts the
- * marked region from review-code.js and the corresponding function
+ * marked region from review-code-engine.js and the corresponding function
  * definitions from lib/review-engine.mjs, normalizes away comments,
  * `export` keywords, and incidental whitespace, and asserts the two are
  * textually identical. A future edit to one copy without the other fails
@@ -25,7 +28,7 @@ import { join, resolve } from 'node:path';
 
 const repoRoot = resolve(import.meta.dirname, '..', '..');
 const workflowsRoot = join(repoRoot, 'plugins', 'synthex', 'workflows');
-const SCRIPT_PATH = join(workflowsRoot, 'review-code.js');
+const SCRIPT_PATH = join(workflowsRoot, 'review-code-engine.js');
 const LIB_PATH = join(workflowsRoot, 'lib', 'review-engine.mjs');
 
 const scriptSrc = readFileSync(SCRIPT_PATH, 'utf8');
@@ -54,12 +57,12 @@ function extractMarkedRegion(src: string): string {
 }
 
 describe('Task 57 (FR-HM16): review-engine-sync.test.ts — script/module drift guard', () => {
-  it('review-code.js has both sync markers, in order', () => {
+  it('review-code-engine.js has both sync markers, in order', () => {
     expect(scriptSrc.indexOf(BEGIN_MARKER)).toBeGreaterThan(-1);
     expect(scriptSrc.indexOf(END_MARKER)).toBeGreaterThan(scriptSrc.indexOf(BEGIN_MARKER));
   });
 
-  it('the marked region in review-code.js and lib/review-engine.mjs are functionally identical', () => {
+  it('the marked region in review-code-engine.js and lib/review-engine.mjs are functionally identical', () => {
     const scriptRegion = normalize(extractMarkedRegion(scriptSrc));
 
     const libStart = libSrc.indexOf('const SEVERITY_RANK');
@@ -72,18 +75,18 @@ describe('Task 57 (FR-HM16): review-engine-sync.test.ts — script/module drift 
     expect(scriptRegion).toBe(libRegion);
   });
 
-  it('every function exported by lib/review-engine.mjs (except the Task 58 extension point) has a same-named copy inlined in review-code.js', () => {
+  it('every function exported by lib/review-engine.mjs (except the Task 58 extension point) has a same-named copy inlined in review-code-engine.js', () => {
     const exportedNames = [...libSrc.matchAll(/^export (?:function|const) (\w+)/gm)].map((m) => m[1]);
     expect(exportedNames.length).toBeGreaterThan(0);
     const scriptRegion = extractMarkedRegion(scriptSrc);
     for (const name of exportedNames) {
-      expect(scriptRegion, `review-code.js is missing an inlined copy of ${name}`).toMatch(
+      expect(scriptRegion, `review-code-engine.js is missing an inlined copy of ${name}`).toMatch(
         new RegExp(`\\b(?:function|const)\\s+${name}\\b`),
       );
     }
   });
 
-  it('review-code.js never uses the `export` keyword in code outside `export const meta`', () => {
+  it('review-code-engine.js never uses the `export` keyword in code outside `export const meta`', () => {
     // Strip comments first — prose describing the sync mechanism
     // legitimately mentions `export` inside backticks.
     const codeOnly = scriptSrc
