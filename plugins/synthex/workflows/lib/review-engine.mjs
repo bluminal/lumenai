@@ -477,12 +477,87 @@ export function renderReport({
   ].join('\n');
 }
 
-// ── Task 58 (FR-HM17) extension point ───────────────────────────────────
+// ── Adversarial Refute Pass (FR-HM17, Task 58) ───────────────────────────
 //
-// Task 58 adds an adversarial refute-vote function here (3 independent
-// refuters per CRITICAL/HIGH finding, 2-of-3 survival) plus a
-// `verification: {status, method, failure_scenario}` field. It is a pure
-// aggregation function (survives/refuted from 3 votes) with the same
-// import-and-inline-sync story as everything else in this module. Not
-// implemented by Task 57 — see plugins/synthex/docs/engines/
-// review-code-workflow.md "Task 58 extension point".
+// Each CRITICAL/HIGH finding surviving dedupe is checked by 3 independent
+// refuter agents (Sonnet 5, `effort: low` — see Task 7 in
+// docs/specs/harness-modernization/spikes.md: Haiku 4.5 silently ignores
+// `effort`, a Sonnet 5 sub-agent's `effort: low` is honored and visible in
+// its transcript), each returning `{refuted, method, failure_scenario}`
+// for a single finding. `tallyRefuterVotes` and `buildVerificationRecord`
+// below are pure aggregation functions over those votes — the actual
+// `agent()`/`parallel()` calls that produce the votes live only in
+// `../review-code-engine.js`'s script body (they need the Workflow
+// runtime's `agent`/`parallel` globals, which this module, imported
+// directly by tests, does not have).
+//
+// IMPORTANT — do not confuse this with `superseded_by_verification`: that
+// field (agents/_shared/canonical-finding.schema.json,
+// multi-model-review-orchestrator.md Stage 5b) marks the LOSING finding of
+// a pair of MUTUALLY CONTRADICTING findings after a Chain-of-Verification
+// adjudication during multi-model consolidation. The `verification` field
+// here marks whether a SINGLE finding survived an adversarial refute pass
+// on its own merits. Neither reuses the other's field name or status
+// value; see docs/engines/review-code-workflow.md "Adversarial Refute
+// Pass (FR-HM17, Task 58)" for the full separation rationale.
+
+/**
+ * Tallies up to 3 independent refuter votes for one CRITICAL/HIGH finding.
+ * Survival rule (FR-HM17): the finding survives when at most 1 of the
+ * refuters refuted it — equivalently, at least 2 non-refuted votes. Falsy
+ * entries (a refuter `agent()` call that errored and resolved to `null`
+ * via `parallel()`'s contract) are dropped before counting, so a missing
+ * vote can only make survival harder, never easier.
+ *
+ * @param {Array<{refuted: boolean, method?: string, failure_scenario?: string|null}>} votes
+ * @returns {{survives: boolean, status: 'verified'|'refuted', refutedCount: number, nonRefutedCount: number, totalVotes: number}}
+ */
+export function tallyRefuterVotes(votes) {
+  const list = Array.isArray(votes) ? votes.filter(Boolean) : [];
+  const refutedCount = list.filter((v) => v && v.refuted === true).length;
+  const nonRefutedCount = list.length - refutedCount;
+  const survives = nonRefutedCount >= 2;
+  return {
+    survives,
+    status: survives ? 'verified' : 'refuted',
+    refutedCount,
+    nonRefutedCount,
+    totalVotes: list.length,
+  };
+}
+
+const DEFAULT_REFUTE_METHOD =
+  'adversarial-refute (3 independent Sonnet 5 refuters, effort: low; 2-of-3 non-refuted survival)';
+
+/**
+ * Builds the `verification: {status, method, failure_scenario}` field
+ * FR-HM17 specifies, from the same raw votes `tallyRefuterVotes` consumes.
+ * Every finding that went through the refute pass carries this field,
+ * whether it survived or not (per FR-HM17: "Refuted findings remain in
+ * the audit artifact with a new verification field").
+ *
+ * - `status` — `tallyRefuterVotes`' status (`'verified'` or `'refuted'`).
+ * - `method` — the distinct, non-empty `method` values the refuters
+ *   themselves reported, joined; falls back to a fixed description of the
+ *   pass when no refuter supplied one.
+ * - `failure_scenario` — the refuting vote(s)' own `failure_scenario`
+ *   text, joined; `null` when no refuter refuted the finding (0-refuted
+ *   survivals have nothing to report here).
+ *
+ * @param {Array<{refuted: boolean, method?: string, failure_scenario?: string|null}>} votes
+ * @returns {{status: 'verified'|'refuted', method: string, failure_scenario: string|null}}
+ */
+export function buildVerificationRecord(votes) {
+  const list = Array.isArray(votes) ? votes.filter(Boolean) : [];
+  const tally = tallyRefuterVotes(list);
+  const refutedVotes = list.filter((v) => v && v.refuted === true);
+  const failureScenario = refutedVotes.length
+    ? refutedVotes.map((v) => v.failure_scenario).filter(Boolean).join(' | ')
+    : null;
+  const methods = [...new Set(list.map((v) => v && v.method).filter(Boolean))];
+  return {
+    status: tally.status,
+    method: methods.length ? methods.join(', ') : DEFAULT_REFUTE_METHOD,
+    failure_scenario: failureScenario,
+  };
+}

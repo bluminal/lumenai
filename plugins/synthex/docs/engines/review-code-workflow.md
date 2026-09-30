@@ -267,19 +267,137 @@ edit `lib/review-engine.mjs` first, then copy the same text into
 `review-code-engine.js`'s marked block in the same commit**; the sync
 test will fail the commit's own test run otherwise.
 
-## Task 58 extension point (FR-HM17)
+## Adversarial Refute Pass (FR-HM17, Task 58)
 
-Task 58 adds an adversarial refute pass: three independent refuters per
-CRITICAL/HIGH finding (Sonnet 5, `effort: low`), 2-of-3 survival, and a
-`verification: {status, method, failure_scenario}` field on each finding in
-the audit artifact. The vote-aggregation function that decides survival
-(`survives = refutedCount < 2` given 3 votes) is a pure function with the
-same "lives in `lib/review-engine.mjs`, inlined-and-synced into
-`review-code-engine.js`" story as everything else in this document —
-`review-code-engine.js`'s structure (the marked sync region, the
-per-cycle loop, the `dedupeFindings` → `aggregateVerdict` → `renderReport`
-pipeline) is built to receive it without a restructure. It is not
-implemented by Task 57.
+Every CRITICAL/HIGH finding surviving `dedupeFindings` is checked by 3
+independent refuter agents — `correctness`, `does-it-reproduce`, and
+`security-impact` lenses, verbatim from FR-HM17 — each seeing only the
+artifact's single finding (never the other refuters' votes, never the
+other findings), run in their own `parallel()` group. Each refuter is
+`agent(prompt, {model: 'sonnet', effort: 'low', schema: REFUTER_VOTE_SCHEMA})`
+and returns `{refuted, method, failure_scenario}`. Per Task 7
+(`docs/specs/harness-modernization/spikes.md`): Haiku 4.5 silently drops
+`effort` with no warning, while a Sonnet 5 sub-agent's `effort: low` is
+honored and recorded as `"effort":"low"` in its own transcript even under
+a `high`/`xhigh` parent — this is why the refuters are pinned to
+`model: 'sonnet'` rather than inheriting whatever model the session is
+running.
+
+### Survival rule: 2-of-3
+
+A finding **survives** when at most 1 of its 3 refuters refuted it
+(equivalently, at least 2 non-refuted votes). `tallyRefuterVotes(votes)`
+in `lib/review-engine.mjs` is the pure aggregation function:
+
+```js
+export function tallyRefuterVotes(votes) {
+  const list = Array.isArray(votes) ? votes.filter(Boolean) : [];
+  const refutedCount = list.filter((v) => v && v.refuted === true).length;
+  const nonRefutedCount = list.length - refutedCount;
+  const survives = nonRefutedCount >= 2;
+  return { survives, status: survives ? 'verified' : 'refuted', refutedCount, nonRefutedCount, totalVotes: list.length };
+}
+```
+
+A missing vote (a refuter `agent()` call that errored and resolved to
+`null` via `parallel()`'s contract) is dropped before counting — a missing
+vote can only make survival *harder*, never easier, since the 2-non-refuted
+bar still has to be cleared out of however many votes actually came back.
+
+`buildVerificationRecord(votes)` wraps the tally into the
+`verification: {status, method, failure_scenario}` field FR-HM17
+specifies: `status` is the tally's `'verified'`/`'refuted'`; `method` joins
+the distinct `method` values the refuters themselves reported (falling
+back to a fixed description of the pass when none did); `failure_scenario`
+joins the *refuting* vote(s)' own `failure_scenario` text, and is `null`
+for a 0-refuted survival (nothing to report there). Both functions are a
+pure part of the same "lives in `lib/review-engine.mjs`, inlined between
+the `BEGIN`/`END REVIEW-ENGINE-SYNC` markers in `review-code-engine.js`"
+story as every other dedupe/verdict/render function in this document —
+`tests/schemas/review-engine-sync.test.ts` guards the sync, extended in
+Task 58 to cover the two new functions.
+
+**Do not confuse this with `superseded_by_verification`.** That field
+(`agents/_shared/canonical-finding.schema.json`,
+`multi-model-review-orchestrator.md` Stage 5b) marks the LOSING finding of
+a pair of mutually *contradicting* findings after a multi-model
+Chain-of-Verification adjudication — a completely different mechanism,
+with a different trigger (two findings disagreeing) and a different
+payload (a boolean plus `verification_reasoning`). The refute pass here
+checks ONE finding on its own merits against 3 independent skeptics; it
+never sets, reads, or is set by `superseded_by_verification`, and it uses
+its own field name (`verification`) and its own status enum
+(`'verified'`/`'refuted'`, not a boolean). `write-audit.mjs`'s Section 5
+renders both fields side by side on a finding that happens to carry both,
+without merging them.
+
+### Config: a SEPARATE key from the prose path's `verification`
+
+```yaml
+code_review:
+  refute_pass: on   # on | off (default: off)
+```
+
+`code_review.verification: prose|off` (D18, Task 56/57) gates the PROSE
+path's own "Verification pass (CRITICAL/HIGH only, top 5)" section in
+`code-reviewer.md`/`security-reviewer.md`/`performance-engineer.md` — an
+LSP-or-grep symbol check, not an adversarial refute. That key, its
+`prose`/`off` values, and those three agent files are **unchanged by Task
+58** ("Keep the prose path's prose mode behaviour unchanged").
+
+The engine's refute pass is gated on a new, separately-named key,
+`code_review.refute_pass: on|off` (default `off`), so the two opt-ins can
+never collide or be ambiguous to a model reading either gate's prose in
+isolation — extending `verification`'s own enum with a third value was
+considered and rejected: `verification-pass.test.ts` locks the literal
+string `code_review.verification: prose|off` byte-identically across all
+three prose-path agents, and those agents' gate text only enumerates
+`off`/`prose`, so a third value on the same key would leave their behavior
+under it undefined by their own wording. `refute_pass` is checked by the
+command preamble (resolved the same way as `code_review.engine` — via
+`scripts/lib/config-get.sh code_review.refute_pass off`, or a direct
+config Read when `Bash` is absent) and passed to the Workflow call as
+`args.refutePass.enabled` (see `docs/standing-pool-routing.md`'s "Level
+2's `Workflow` `args` contract").
+
+`refute_pass: on` only has any effect when the engine itself is already
+selected (`code_review.engine: workflow` AND a `Workflow` tool present) —
+on every other host or config, this key is read by nothing and costs
+nothing, matching NFR-HM1/NFR-HM3's "opt-in, zero-config-path-unchanged"
+requirement the same way `verification: off` does for the prose path.
+
+### Cost
+
+3 refuter `agent()` calls per CRITICAL/HIGH finding surviving dedupe, per
+review cycle — e.g. a cycle with 2 CRITICAL and 1 HIGH finding after
+dedupe costs 9 extra Sonnet-5-`effort:low` sub-agent calls. A cycle with
+zero CRITICAL/HIGH findings costs nothing extra (the pass is skipped
+entirely when `toVerify.length === 0`). This is additive to, and
+independent of, the multi-model second `parallel()` group's own cost.
+
+### What happens to a refuted finding
+
+A refuted CRITICAL/HIGH finding is **dropped from the rendered report**
+(`renderReport`'s `findings` input is the post-refute-pass filtered list,
+`reportFindings` in the script) but **kept in the full findings list the
+script returns** (`{report, verdict, cycle, findings}` — `findings` is the
+unfiltered `dedup.findings`, each checked finding carrying its
+`verification` field regardless of outcome) — this is FR-HM17's own
+wording: "Refuted findings remain in the audit artifact." The overall
+verdict (`aggregateVerdict`) is computed from the same post-refute-pass
+list the report renders, so a finding that gets refuted cannot force a
+FAIL it no longer appears to justify.
+
+`review-code-engine.js` itself does not call `scripts/write-audit.mjs` —
+no command in the review-code path currently does (that script is wired
+from `multi-model-review-orchestrator.md`'s Step 9 only, for the FR-MR24
+multi-model audit artifact, a separate mechanism from this engine). What
+Task 58 guarantees is that `write-audit.mjs`'s Section 5 renderer *accepts
+and renders* a `verification` field on any finding that carries one,
+should a future task wire the engine's `findings` output into an audit
+write — this is deliberately parallel to how the `ReportFindings` section
+below documents a hook that does not exist yet, rather than inventing a
+call site that has nothing to call.
 
 ## `ReportFindings`
 

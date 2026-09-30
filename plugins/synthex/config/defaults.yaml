@@ -237,6 +237,23 @@ code_review:
   # zero-config output and adds tool calls. Options: prose | off.
   verification: off
 
+  # FR-HM17 adversarial refute pass, ENGINE side (Task 58) — the `workflow`
+  # engine's own verification step, deliberately a SEPARATE key from
+  # `verification` above (which only ever gates the prose-path agents'
+  # step and is never read by the engine script). Only takes effect when
+  # `engine: workflow` is also selected AND a Workflow tool is present
+  # (docs/standing-pool-routing.md capability-ladder level 2); a no-op
+  # everywhere else. When `on`: every CRITICAL/HIGH finding surviving the
+  # engine's dedupe gets 3 independent Sonnet 5 refuters (`effort: low`,
+  # per Task 7) in `parallel()` — cost is 3x the CRITICAL/HIGH finding
+  # count in extra sub-agent calls per review cycle. A finding survives
+  # when at most 1 of the 3 refutes it (2-of-3); a refuted finding is
+  # dropped from the rendered report but kept, with a
+  # `verification: {status, method, failure_scenario}` field, in the
+  # findings this script returns for an audit trail. Opt-in and off by
+  # default (NFR-HM1, NFR-HM3). Options: on | off.
+  refute_pass: off
+
   # Additional specialist reviewers (optional).
   # Example: Add a domain-specific reviewer for regulated industries.
   # specialists:

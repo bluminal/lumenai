@@ -31,6 +31,13 @@ Input envelope (top-level object):
                               [{reviewer_id, family, source_type}],
                               severity_range?, severity_reasoning?,
                               superseded_by_verification, verification_reasoning?,
+                              verification? (FR-HM17/Task 58 — {status, method,
+                              failure_scenario}; a SEPARATE field from
+                              superseded_by_verification/verification_reasoning
+                              above, never reused for it: that pair marks a
+                              multi-model CoVe contradiction-adjudication
+                              loser, this one marks an adversarial-refute-pass
+                              outcome on a single finding),
                               minority_of_one? }], aggregator_resolution:
                               { name, source }, consolidation_trace?: {
                               stage4_calls_dispatched, stage4_calls_skipped,
@@ -218,6 +225,24 @@ function renderSection5(findings) {
     lines.push(`- **superseded_by_verification:** ${Boolean(f.superseded_by_verification)}`);
     if (f.verification_reasoning !== undefined && f.verification_reasoning !== null) {
       lines.push(`- **Verification reasoning:** ${f.verification_reasoning}`);
+    }
+    // FR-HM17 (Task 58): the engine's adversarial-refute-pass outcome.
+    // Deliberately rendered under its OWN field name, `verification`, and
+    // never folded into superseded_by_verification/verification_reasoning
+    // above — those two mark a multi-model Chain-of-Verification
+    // contradiction-adjudication loser; this one marks whether a single
+    // finding survived 3 independent refuters. Present only on findings
+    // that went through the refute pass.
+    if (f.verification !== undefined && f.verification !== null) {
+      lines.push(`- **verification.status:** ${f.verification.status}`);
+      lines.push(`- **verification.method:** ${f.verification.method}`);
+      lines.push(
+        `- **verification.failure_scenario:** ${
+          f.verification.failure_scenario === undefined || f.verification.failure_scenario === null
+            ? 'null'
+            : f.verification.failure_scenario
+        }`,
+      );
     }
   });
   return lines.join('\n');

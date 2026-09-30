@@ -65,17 +65,29 @@ describe('Task 57 (FR-HM16): review-engine-sync.test.ts — script/module drift 
   it('the marked region in review-code-engine.js and lib/review-engine.mjs are functionally identical', () => {
     const scriptRegion = normalize(extractMarkedRegion(scriptSrc));
 
+    // Task 58 (FR-HM17): the adversarial-refute-pass pure functions
+    // (tallyRefuterVotes, buildVerificationRecord) are appended at the
+    // END of lib/review-engine.mjs, after renderReport, with nothing
+    // synced-but-excluded trailing them any more — so the synced region
+    // now runs all the way to the end of the file. (Task 57 stopped
+    // early, at a "Task 58 extension point" comment that marked
+    // not-yet-implemented territory; that comment is gone now that this
+    // task implements it.)
     const libStart = libSrc.indexOf('const SEVERITY_RANK');
-    const libEnd = libSrc.indexOf('// ── Task 58');
     expect(libStart, 'lib/review-engine.mjs: const SEVERITY_RANK not found').toBeGreaterThan(-1);
-    expect(libEnd, 'lib/review-engine.mjs: Task 58 extension-point comment not found').toBeGreaterThan(libStart);
-    const libRegion = normalize(libSrc.slice(libStart, libEnd));
+    const libRegion = normalize(libSrc.slice(libStart));
 
     expect(scriptRegion).not.toBe('');
     expect(scriptRegion).toBe(libRegion);
   });
 
-  it('every function exported by lib/review-engine.mjs (except the Task 58 extension point) has a same-named copy inlined in review-code-engine.js', () => {
+  it('the synced region includes Task 58\'s tallyRefuterVotes and buildVerificationRecord (FR-HM17)', () => {
+    const scriptRegion = extractMarkedRegion(scriptSrc);
+    expect(scriptRegion).toMatch(/\bfunction\s+tallyRefuterVotes\b/);
+    expect(scriptRegion).toMatch(/\bfunction\s+buildVerificationRecord\b/);
+  });
+
+  it('every function exported by lib/review-engine.mjs has a same-named copy inlined in review-code-engine.js', () => {
     const exportedNames = [...libSrc.matchAll(/^export (?:function|const) (\w+)/gm)].map((m) => m[1]);
     expect(exportedNames.length).toBeGreaterThan(0);
     const scriptRegion = extractMarkedRegion(scriptSrc);
