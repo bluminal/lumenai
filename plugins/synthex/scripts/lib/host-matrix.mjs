@@ -70,11 +70,17 @@ const SKIP_THE_STEP = 'skip the step';
  * `review-code`/`performance-audit` may surface when the FR-HM21
  * capability ladder falls all the way to level 4 (sequential reviewers)
  * for lack of a fan-out tool, so the fallback is documented rather than
- * silent.
+ * silent. `.engineFallback` was added by Task 56 (FR-HM16) for the same
+ * reason at level 2: `code_review.engine: workflow` is configured but
+ * this invocation cannot reach the workflow engine (no Workflow tool in
+ * the caller's tool list, or Task 57's script is not yet shipped), so
+ * review-code continues down the ladder to level 3/4 and says so once
+ * instead of silently taking the prose path.
  */
 export const GAP_MESSAGES = Object.freeze({
   pool: 'Standing review pools require Agent Teams (the SendMessage and ListAgents tools); this host does not expose them, so pool commands are unavailable here -- use /synthex:review-code or /synthex:performance-audit for sequential review instead.',
   ladderFallback: 'No parallel-subagent tool (Agent, Task, task, spawn_agent, or delegate_task) is in your tool list, so reviewers run sequentially instead of fanned out in one turn -- see the capability ladder in docs/standing-pool-routing.md.',
+  engineFallback: 'code_review.engine is set to workflow, but no Workflow tool is in your tool list (or the review-code workflow script is not yet available), so this review is running the prose path instead -- see the capability ladder in docs/standing-pool-routing.md.',
 });
 
 /**

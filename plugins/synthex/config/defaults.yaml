@@ -191,6 +191,13 @@ refine_requirements:
 # -------------------------------------------------------------------
 code_review:
 
+  # FR-HM16 workflow review engine (Claude Code only, opt-in). "workflow"
+  # only takes effect when a Workflow tool is also in the caller's tool
+  # list (capability-ladder level 2, docs/standing-pool-routing.md); every
+  # other host, and any host missing the tool, keeps running the prose
+  # path below. Options: prose | workflow.
+  engine: prose
+
   # Reviewers to run in parallel during code review.
   # code-reviewer and security-reviewer are always recommended.
   # Add performance-engineer for performance-critical codebases.

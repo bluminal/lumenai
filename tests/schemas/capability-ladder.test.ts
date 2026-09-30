@@ -1,5 +1,7 @@
 /**
  * Task 49 (FR-HM21, D22): capability-ladder.test.ts.
+ * Extended by Task 56 (FR-HM4, FR-HM16, NFR-HM1) to assert level 2 is no
+ * longer a placeholder, plus the single-engine-gate rule.
  *
  * FR-HM21 defines a 4-level capability ladder `review-code` and
  * `performance-audit` walk, in order, to select their reviewer-
@@ -8,7 +10,10 @@
  *   1. Pool routing (SendMessage + ListAgents + standing_pools.enabled + a
  *      running pool).
  *   2. Workflow engine (a `Workflow` tool + code_review.engine: workflow) —
- *      a placeholder today; FR-HM16 is not implemented yet.
+ *      filled in by Task 56 (FR-HM16). The engine invocation itself
+ *      (`workflows/review-code.js`) ships in Task 57; until then, and on
+ *      any host/config that doesn't meet the condition, this level
+ *      degrades cleanly to level 3.
  *   3. Parallel subagent fan-out (a tool named Agent, Task, task,
  *      spawn_agent, or delegate_task).
  *   4. Sequential reviewers — today's baseline, the ladder's floor.
@@ -16,7 +21,6 @@
  * This suite validates every Task 49 [T] acceptance criterion:
  *   - Levels 1, 3, and 4 are documented in
  *     plugins/synthex/docs/standing-pool-routing.md and match FR-HM21.
- *   - The level-2 slot is present (even though unimplemented).
  *   - Neither routing doc names a host or uses the bare word "Workflows".
  *   - review-code-routing.test.ts and performance-audit-routing.test.ts
  *     were extended with ladder coverage (Task 49 also added assertions
@@ -28,10 +32,20 @@
  *     pre-existing pool gap message (gap-messages.test.ts has its own
  *     dedicated describe block for this; this suite spot-checks the
  *     GAP_MESSAGES export itself).
+ *
+ * Task 56 additions:
+ *   - Level 2 is documented in full (config enables it, `Workflow` tool
+ *     presence selects it, D31's opt-in and headless-allow-rule rules,
+ *     a one-line fallback notice, and Task 57's planned invocation name).
+ *   - `code_review.engine` gets exactly one gate: the ladder doc. Neither
+ *     review-code.md nor performance-audit.md re-implements the check
+ *     (the "single engine gate" rule).
+ *   - `GAP_MESSAGES.engineFallback` exists and is printed verbatim at
+ *     level 2, the same way `.ladderFallback` is printed at level 4.
  */
 
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { GAP_MESSAGES } from '../../plugins/synthex/scripts/lib/host-matrix.mjs';
 
@@ -69,12 +83,37 @@ describe('Task 49 (FR-HM21, D22): capability-ladder.test.ts', () => {
       expect(section).toContain('standing_pools.enabled');
     });
 
-    it('level 2 (Workflow engine) is present as a documented placeholder', () => {
-      expect(section).toMatch(/\*\*Workflow engine \(placeholder\)\.\*\*/);
+    it('level 2 (Workflow engine) is fully documented, no longer a placeholder (Task 56)', () => {
+      expect(section).toMatch(/\*\*Workflow engine\.\*\*/);
+      expect(section).not.toMatch(/Workflow engine \(placeholder\)/);
+      expect(section).not.toMatch(/not implemented/i);
       expect(section).toMatch(/`Workflow`/);
       expect(section).toContain('code_review.engine: workflow');
       expect(section).toMatch(/FR-HM16/);
-      expect(section).toMatch(/not implemented/i);
+    });
+
+    it('level 2 documents the config-enables / tool-selects split (Task 56, FR-HM16)', () => {
+      // The config key alone opts in; the Workflow tool's presence selects
+      // this level at runtime — two independent conditions, both required.
+      expect(section).toMatch(/`Workflow` tool is in your tool list and `code_review\.engine: workflow` is set/);
+    });
+
+    it('level 2 documents D31: the command prose is the opt-in, and the headless allow-rule', () => {
+      expect(section).toMatch(/D31/);
+      expect(section).toMatch(/a committed config key alone is not an opt-in/i);
+      expect(section).toMatch(/Workflow\(synthex:<name>\)/);
+      expect(section).toMatch(/permission allow rule/i);
+    });
+
+    it('level 2 names its planned invocation and defers the script itself to Task 57', () => {
+      expect(section).toContain('synthex:review-code');
+      expect(section).toContain('workflows/');
+      expect(section).toMatch(/Task 57/);
+    });
+
+    it('level 2 degrades cleanly while the Task 57 script is absent', () => {
+      expect(section).toMatch(/degrades cleanly/);
+      expect(section).toMatch(/continue down the ladder to level 3/);
     });
 
     it('level 3 (parallel fan-out) lists every FR-HM21 candidate tool name', () => {
@@ -142,6 +181,28 @@ describe('Task 49 (FR-HM21, D22): capability-ladder.test.ts', () => {
     });
   });
 
+  describe('single engine gate (Task 56): the ladder doc is the only code_review.engine check', () => {
+    const reviewCode = readFileSync(join(commandsRoot, 'review-code.md'), 'utf8');
+    const perfAudit = readFileSync(join(commandsRoot, 'performance-audit.md'), 'utf8');
+
+    it('review-code.md contains no code_review.engine check of its own', () => {
+      expect(reviewCode).not.toContain('code_review.engine');
+    });
+
+    it('performance-audit.md contains no code_review.engine check of its own', () => {
+      expect(perfAudit).not.toContain('code_review.engine');
+    });
+
+    it('no agent file re-implements the code_review.engine gate either', () => {
+      const agentsRoot = join(repoRoot, 'plugins', 'synthex', 'agents');
+      for (const name of readdirSync(agentsRoot)) {
+        if (!name.endsWith('.md')) continue;
+        const body = readFileSync(join(agentsRoot, name), 'utf8');
+        expect(body, `${name} should not check code_review.engine`).not.toContain('code_review.engine');
+      }
+    });
+  });
+
   describe('review-code-routing.test.ts and performance-audit-routing.test.ts were updated (Task 49)', () => {
     it.each([
       'review-code-routing.test.ts',
@@ -205,6 +266,28 @@ describe('Task 49 (FR-HM21, D22): capability-ladder.test.ts', () => {
 
     it('standing-pool-routing.md prints GAP_MESSAGES.ladderFallback verbatim at level 4', () => {
       expect(routingDoc).toContain(GAP_MESSAGES.ladderFallback);
+    });
+  });
+
+  // ── Task 56 (FR-HM16): GAP_MESSAGES covers the level-2 engine fallback ──
+  describe('GAP_MESSAGES.engineFallback exists (Task 56, FR-HM16)', () => {
+    it('is a single-sourced, non-empty, single-line sentence naming no host', () => {
+      expect(GAP_MESSAGES.engineFallback).toBeTruthy();
+      expect(typeof GAP_MESSAGES.engineFallback).toBe('string');
+      expect(GAP_MESSAGES.engineFallback).not.toContain('\n');
+      for (const hostName of HOST_NAMES) {
+        expect(GAP_MESSAGES.engineFallback).not.toContain(hostName);
+      }
+      expect(GAP_MESSAGES.engineFallback).not.toMatch(/\bWorkflows\b/);
+    });
+
+    it('mentions code_review.engine and the Workflow tool', () => {
+      expect(GAP_MESSAGES.engineFallback).toContain('code_review.engine');
+      expect(GAP_MESSAGES.engineFallback).toContain('Workflow');
+    });
+
+    it('standing-pool-routing.md prints GAP_MESSAGES.engineFallback verbatim at level 2', () => {
+      expect(routingDoc).toContain(GAP_MESSAGES.engineFallback);
     });
   });
 });

@@ -247,6 +247,7 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 | `implementation_plan.reviewers` | architect, design-system-agent, tech-lead | Sub-agents that review draft implementation plans |
 | `implementation_plan.concurrent_tasks` | 3 | Max parallelizable tasks per milestone in the plan |
 | `implementation_plan.review_loops.max_cycles` | 3 | Per-command override (higher for high-stakes plans) |
+| `code_review.engine` | `prose` | FR-HM16 workflow review engine (Claude Code only, opt-in); `workflow` only takes effect with a `Workflow` tool in the caller's tool list (capability-ladder level 2, `docs/standing-pool-routing.md`) |
 | `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `review-code` command |
 | `code_review.max_diff_lines` | 300 | Warn when diff exceeds this size |
 | `code_review.spec_paths` | `[docs/specs]` | Specifications for compliance checking |

@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { loadSnapshot } from '../helpers/snapshot-manager.js';
+import { loadDefaultsYaml } from '../helpers/load-defaults';
 
 const SNAPSHOT_DIR = join(
   import.meta.dirname,
@@ -87,6 +88,12 @@ describe('Task 0: Baseline snapshots for FR-MR23 regression', () => {
       );
       expect(content).toMatch(/38\(a\)/);
       expect(content).toMatch(/45\(b\)/);
+    });
+
+    it('Task 56 (FR-HM4/FR-HM16/NFR-HM1): with engine prose and verification off (both zero-config defaults), this baseline still applies', async () => {
+      const cfg = await loadDefaultsYaml();
+      expect(cfg.code_review.engine).toBe('prose');
+      expect(cfg.code_review.verification).toBe('off');
     });
 
     it('no real finding text leaks (raw-string scan for known-good content)', () => {
