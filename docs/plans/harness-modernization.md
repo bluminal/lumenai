@@ -336,7 +336,7 @@ Per D20: Tasks 47–54 = PR 1 (`harness/one-plugin`); Task 55 = PR 2.
 ### Milestone 7.1: Engine
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 56 | FR-HM4 + FR-HM16 + NFR-HM1: `code_review.engine: prose\|workflow` (default `prose`) fills ladder level 2 in `docs/standing-pool-routing.md` (config enables, `Workflow` presence selects, D31). `review-code.md` keeps only its ≤ 3-line ladder pointer and adds no separate gate. A one-line notice prints on fallback. | S | Tasks 9, 49 | pending |
+| 56 | FR-HM4 + FR-HM16 + NFR-HM1: `code_review.engine: prose\|workflow` (default `prose`) fills ladder level 2 in `docs/standing-pool-routing.md` (config enables, `Workflow` presence selects, D31). `review-code.md` keeps only its ≤ 3-line ladder pointer and adds no separate gate. A one-line notice prints on fallback. | S | Tasks 9, 49 | in progress |
 | 57 | FR-HM16: the workflow script (D4) plus `docs/engines/review-code-workflow.md`: parallel reviewers with a forced `{findings[],positives[],summary}` envelope; JS dedupe; one `effort: medium` verdict; template renderer with D21/FR-MR17 literals; `ReportFindings` once per cycle; a `max_cycles` loop; a multi-model second `parallel()` group; lifecycle held in variables | L | Tasks 43, 56 | pending |
 | 58 | FR-HM17 engine: 3 refuters per CRITICAL/HIGH on Sonnet 5 (`model: sonnet`) at `effort: low` per Task 7 (Haiku 4.5 ignores effort; a Sonnet 5 sub-agent's `effort: low` is honored and recorded as `"effort":"low"` in its transcript even when the parent runs at `high`), 2-of-3 survival, `verification: {status, method, failure_scenario}` in the audit | M | Tasks 42, 57 | pending |
 
