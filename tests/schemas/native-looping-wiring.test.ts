@@ -146,3 +146,47 @@ describe.each(ADVANCE_REWRITTEN_COMMANDS)(
     });
   },
 );
+
+// ---------------------------------------------------------------------------
+// Default completion promise (docs/plans/loop-default-completion-promise.md
+// Task 2, D1-D5): --completion-promise is no longer required. Each of the 5
+// loop-capable synthex commands (loop.md plus the 4 non-team FR-NL1
+// commands), and native-looping.md itself, must document the
+// ALLDONE<session_id> default and the ALLDONE<loop_id> fallback, and none
+// may still claim the flag is "Required with `--loop`".
+// ---------------------------------------------------------------------------
+
+const DEFAULT_PROMISE_FILES = [
+  { label: 'loop', path: join(REPO_ROOT, 'plugins', 'synthex', 'commands', 'loop.md') },
+  ...FR_NL1_COMMANDS.filter((c) => !c.isTeam).map((c) => ({
+    label: c.label,
+    path: join(REPO_ROOT, 'plugins', c.plugin, 'commands', c.filename),
+  })),
+  {
+    label: 'native-looping.md',
+    path: join(REPO_ROOT, 'plugins', 'synthex', 'docs', 'native-looping.md'),
+  },
+];
+
+describe.each(DEFAULT_PROMISE_FILES)(
+  '$label — default completion promise (loop-default-completion-promise Task 2)',
+  ({ path }) => {
+    let content: string;
+
+    beforeAll(() => {
+      content = readFileSync(path, 'utf-8');
+    });
+
+    it('does not say --completion-promise is "Required with `--loop`"', () => {
+      expect(content).not.toMatch(/Required with `--loop`/);
+    });
+
+    it('documents the ALLDONE<session_id> default', () => {
+      expect(content).toMatch(/ALLDONE<session_id>/);
+    });
+
+    it('documents the ALLDONE<loop_id> fallback', () => {
+      expect(content).toMatch(/ALLDONE<loop_id>/);
+    });
+  },
+);

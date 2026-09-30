@@ -142,14 +142,21 @@ function loopStepLifecycle(ctx, includeNode) {
   const loopsDir = join(ctx.workDir, '.synthex', 'loops');
   const opts = { pathDir, cwd: ctx.workDir, env: { SYNTHEX_LOOPS_DIR: loopsDir } };
 
+  // No --completion-promise: exercises the docs/plans/loop-default-completion-
+  // promise.md Task 1 default (D1/D2) — `begin` must still succeed (exit 0),
+  // defaulting the promise rather than refusing.
   const begin = runScript(ctx.scriptAbsPath, [
     'begin', '/synthex:next-priority',
-    '--completion-promise', 'ALLDONE',
     '--name', 'smoke-loop',
     '--max', '3',
   ], opts);
   assert(begin.code === 0, `begin exited ${begin.code}: ${begin.stderr}`);
-  assert(begin.stdout.trim() === 'smoke-loop', `begin printed ${JSON.stringify(begin.stdout)}`);
+  const beginLines = begin.stdout.trim().split('\n');
+  assert(beginLines[0] === 'smoke-loop', `begin printed ${JSON.stringify(begin.stdout)}`);
+  assert(
+    beginLines[1] === 'completion promise: ALLDONEsmoke-loop',
+    `begin printed ${JSON.stringify(begin.stdout)}`,
+  );
 
   const advance = runScript(ctx.scriptAbsPath, ['advance', 'smoke-loop'], opts);
   assert(advance.code === 0, `advance exited ${advance.code}: ${advance.stderr}`);

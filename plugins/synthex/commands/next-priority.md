@@ -16,7 +16,7 @@ Automatically identify and execute the next highest-priority tasks from the impl
 | `concurrent_tasks` | Number of parallel tasks to work on simultaneously | Value from `next_priority.concurrent_tasks` config, or `3` | No |
 | `exit_on_milestone_complete` | When running under `--loop`, emit the completion promise after finishing a milestone even if later milestones remain. Useful for inserting a checkpoint between milestones. | `false` | No |
 | `--loop` | Enable native looping (FR-NL1/FR-NL2). When set, the command iterates per the "Native Looping" section below until the completion promise is emitted or `--max-iterations` is reached. | off | No |
-| `--completion-promise <string>` | Promise text the agent emits as `<promise>X</promise>` to terminate the loop. | — | Required with `--loop` (unless `--resume*`) |
+| `--completion-promise <string>` | Promise text the agent emits as `<promise>X</promise>` to terminate the loop. | `ALLDONE<session_id>` (falls back to `ALLDONE<loop_id>`) | No |
 | `--max-iterations <int>` | Iteration cap. Hard ceiling 200. | `20` | No |
 | `--loop-isolated` | Fresh-subagent isolation mode per iteration. | off (shared-context default) | No |
 | `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
@@ -199,7 +199,7 @@ FR-HM18: step 1 is now ONE Bash call, `plugins/synthex/scripts/loop-step.sh adva
 
 #### State-file schema (v1) — inline reference
 
-Write the state file with exactly these fields. The `status` enum is closed — do NOT invent values like `"loop_exhausted_no_promise"` or `"in_flight"`. Read `$CLAUDE_CODE_SESSION_ID` via Bash for `session_id` — the [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook only drives the loop when this matches the live session, so `null` leaves it permanently undriven (see [native-looping.md § Obtaining the session id](../docs/native-looping.md#obtaining-the-session-id)).
+Write the state file with exactly these fields. The `status` enum is closed — do NOT invent values like `"loop_exhausted_no_promise"` or `"in_flight"`. Read `$CLAUDE_CODE_SESSION_ID` via Bash for `session_id` — the [`loop-advance-gate`](../hooks/loop-advance-gate.md) Stop hook only drives the loop when this matches the live session, so `null` leaves it permanently undriven (see [native-looping.md § Obtaining the session id](../docs/native-looping.md#obtaining-the-session-id)). `completion_promise` comes from `loop-step.sh begin`'s `completion promise: <value>` line, or from this file's own `completion_promise` field on resume — never recompute it, except the no-shell fallback below.
 
 ```json
 {
@@ -209,7 +209,7 @@ Write the state file with exactly these fields. The `status` enum is closed — 
   "command": "/synthex:next-priority",
   "args": "<CLI args, verbatim>",
   "prompt_file": null,
-  "completion_promise": "<value of --completion-promise>",
+  "completion_promise": "<--completion-promise if given, else default ALLDONE<session_id> (ALLDONE<loop_id> with no session id)>",
   "max_iterations": <int, default 20, max 200>,
   "iteration": <int, 0 on creation>,
   "isolation": "shared-context",
@@ -222,6 +222,8 @@ Write the state file with exactly these fields. The `status` enum is closed — 
 ```
 
 `status ∈ {"running","completed","cancelled","max-iterations-reached","crashed"}` — exactly these five values, lowercase, hyphenated. See [`state`](../docs/native-looping.md#state) for full field-by-field semantics.
+
+**No-shell fallback (FR-HM3):** on a host with no Bash tool, when writing this file directly (e.g. via the Write tool) and no `--completion-promise` was given, compute `completion_promise` the same way `loop-step.sh begin` does: `ALLDONE` + the session id, or `ALLDONE` + the loop id when no session id is available.
 
 #### What ends the loop (only these)
 
@@ -246,7 +248,7 @@ It blocks until the plan file changes, the loop leaves `running` (e.g. `/synthex
 
 ### Emission Point
 
-Emit `<promise>{completion_promise}</promise>` (literal text from `--completion-promise`) in the iteration's final response when ANY of the following hold:
+Emit `<promise>{completion_promise}</promise>` (the resolved `completion_promise`) in the iteration's final response when ANY of the following hold:
 
 - Every task across all milestones and phases of the implementation plan has status `done`. This is the primary exit condition.
 - `exit_on_milestone_complete` is `true` AND every task in the current milestone is `done` (milestone-boundary exit).
