@@ -104,7 +104,7 @@ the gated pool commands (`start-review-team`, `stop-review-team`,
 
 That sentence is `GAP_MESSAGES.pool`, single-sourced in
 `plugins/synthex/scripts/lib/host-matrix.mjs`. `tests/compat/lib/harnesses.mjs`
-imports it (never copies it) into `poolCapabilityGaps`, one entry per gapped
+imports it (never copies it) into `poolCapabilityGaps` (`lib/pool-gaps.mjs`), one entry per gapped
 host, so this README, the pool commands, and the compat test can never drift
 from one another. Hermes' Kanban board is noted as a possible future pool
 backend — not implemented.

@@ -25,10 +25,10 @@ import {
   capabilityPolicy,
   harnessIds,
   harnesses as harnessMetadata,
-  poolCapabilityGaps,
   profiles,
   supportsProfile,
 } from '../compat/lib/harnesses.mjs';
+import { poolCapabilityGaps } from '../compat/lib/pool-gaps.mjs';
 import {
   AGENT_COUNT,
   COMMAND_COUNT,
