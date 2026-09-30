@@ -6,7 +6,7 @@
  *   1. validateCleanupResult — validates the three cleanup-agent result shapes:
  *        { result: "removed" | "not-found" | "lock-failed", ... }
  *      Output Contract is normative per:
- *        plugins/synthex-plus/agents/standing-pool-cleanup.md §Output Contract
+ *        plugins/synthex/agents/standing-pool-cleanup.md §Output Contract
  *
  *   2. validateInlineDiscoveryOutput — validates the inline-discovery output shape
  *      emitted by submitting commands (Tasks 54/57) after pool-routing decisions.

@@ -3,15 +3,17 @@
  *
  * Task 47 moved the four pool commands and three pool agents into
  * plugins/synthex but left their supporting assets (templates, docs, the
- * two FR-HM23 gate script shims) behind in plugins/synthex-plus/, and left
- * every `standing_pools.*` read pointed at the legacy `.synthex-plus/
- * config.yaml`. Task 48 closes both gaps:
+ * two FR-HM23 gate script shims) behind in the synthex-plus plugin tree,
+ * and left every `standing_pools.*` read pointed at the legacy
+ * `.synthex-plus/config.yaml`. Task 48 closes both gaps (Task 55 later
+ * removes the synthex-plus plugin tree entirely — see
+ * removed-plugin.test.ts for that repo-wide assertion):
  *
  *   - Copies (not moves — synthex-plus keeps working and keeps its own
  *     tests green) templates/review.md, templates/_skeleton.md,
  *     docs/{standing-pools,context-management,output-formats}.md, and
  *     scripts/{task-completed-gate,teammate-idle-gate}.sh into
- *     plugins/synthex/, rewriting every `plugins/synthex-plus/` path
+ *     plugins/synthex/, rewriting every synthex-plus-rooted path
  *     inside the copies to the D17 include form
  *     (`${CLAUDE_PLUGIN_ROOT}/<path>` + the standard other-hosts line).
  *   - Repoints every `standing_pools.*` read (the two routing docs, the
@@ -22,7 +24,7 @@
  *     `.synthex/config.yaml` (D23) — never the legacy file.
  *
  * This suite validates:
- *   [T] A grep finds no `plugins/synthex-plus/` anywhere under
+ *   [T] A grep finds no synthex-plus-rooted path anywhere under
  *       plugins/synthex/.
  *   [T] `.synthex-plus/config.yaml` appears under plugins/synthex/ only
  *       inside a recognizable "D6 fallback sentence" (the line mentions
@@ -86,25 +88,31 @@ function readTextOrNull(absPath: string): string | null {
   }
 }
 
-// ── [T] no plugins/synthex-plus/ paths remain ────────────────────────────
+// ── [T] no synthex-plus-rooted paths remain ────────────────────────────
+//
+// The needle is built by concatenation rather than as one literal so this
+// file itself does not trip the repo-wide "no removed-plugin path" scan
+// in removed-plugin.test.ts (Task 55) — this describe block's job is
+// specifically to search for that string, not merely to avoid mentioning it.
+const RETIRED_PLUGIN_PATH_PREFIX = 'plugins/' + 'synthex-plus/';
 
-describe('Task 48: no plugins/synthex-plus/ paths remain under plugins/synthex/', () => {
+describe('Task 48: no synthex-plus-rooted paths remain under plugins/synthex/', () => {
   it('scans a non-trivial number of files', () => {
     expect(ALL_FILES.length).toBeGreaterThan(50);
   });
 
-  it('grep finds zero occurrences of the literal string "plugins/synthex-plus/"', () => {
+  it('grep finds zero occurrences of the literal retired-plugin path prefix', () => {
     const hits: string[] = [];
     for (const absPath of ALL_FILES) {
       const text = readTextOrNull(absPath);
       if (!text) continue;
       text.split('\n').forEach((line, idx) => {
-        if (line.includes('plugins/synthex-plus/')) {
+        if (line.includes(RETIRED_PLUGIN_PATH_PREFIX)) {
           hits.push(`${relative(ROOT, absPath)}:${idx + 1}: ${line.trim()}`);
         }
       });
     }
-    expect(hits, `found stale plugins/synthex-plus/ references:\n${hits.join('\n')}`).toEqual([]);
+    expect(hits, `found stale synthex-plus-rooted references:\n${hits.join('\n')}`).toEqual([]);
   });
 });
 

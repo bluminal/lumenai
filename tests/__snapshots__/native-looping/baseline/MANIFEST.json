@@ -29,34 +29,6 @@
       "snapshot": "tests/__snapshots__/native-looping/baseline/synthex__review-code.json",
       "heading_count": 31,
       "has_params_table": true
-    },
-    {
-      "plugin": "synthex-plus",
-      "command": "team-implement",
-      "snapshot": "tests/__snapshots__/native-looping/baseline/synthex-plus__team-implement.json",
-      "heading_count": 27,
-      "has_params_table": true
-    },
-    {
-      "plugin": "synthex-plus",
-      "command": "team-review",
-      "snapshot": "tests/__snapshots__/native-looping/baseline/synthex-plus__team-review.json",
-      "heading_count": 31,
-      "has_params_table": true
-    },
-    {
-      "plugin": "synthex-plus",
-      "command": "team-plan",
-      "snapshot": "tests/__snapshots__/native-looping/baseline/synthex-plus__team-plan.json",
-      "heading_count": 34,
-      "has_params_table": true
-    },
-    {
-      "plugin": "synthex-plus",
-      "command": "team-refine",
-      "snapshot": "tests/__snapshots__/native-looping/baseline/synthex-plus__team-refine.json",
-      "heading_count": 27,
-      "has_params_table": true
     }
   ]
 }

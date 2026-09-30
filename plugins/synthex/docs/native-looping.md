@@ -114,14 +114,14 @@ The scan is best-effort: it does not block on filesystem errors, and individual 
 ```
 .synthex/loops/
 ├── next-priority-3f2a.json         # running
-├── team-implement-7e1d.json        # running
+├── review-code-7e1d.json           # running
 └── .archive/
     ├── refine-requirements-9b22-2026-05-13T18-22-04Z.json   # completed
     ├── loop-write-rfc-1a08-2026-05-13T16-44-31Z.json        # max-iterations-reached
-    └── team-plan-4c66-2026-05-13T15-10-22Z.json             # cancelled
+    └── write-implementation-plan-4c66-2026-05-13T15-10-22Z.json  # cancelled
 ```
 
-The `.archive/` directory is gitignored (covered by the `.synthex/loops/` entry that `init.md` Step 5 / `team-init.md` Step 6 add).
+The `.archive/` directory is gitignored (covered by the `.synthex/loops/` entry that `init.md` Step 5 adds).
 
 #### Retention
 
@@ -155,10 +155,6 @@ FR-HM18: `loop-step.sh begin` implements every rule below (validation, auto-gene
 | `/synthex:refine-requirements` | `refine-requirements` |
 | `/synthex:review-code` | `review-code` |
 | `/synthex:loop` | `loop` |
-| `/synthex-plus:team-implement` | `team-implement` |
-| `/synthex-plus:team-review` | `team-review` |
-| `/synthex-plus:team-plan` | `team-plan` |
-| `/synthex-plus:team-refine` | `team-refine` |
 
 ### Collision handling
 
@@ -184,7 +180,7 @@ FR-HM18: steps 1–4 collapse into a SINGLE Bash call, `plugins/synthex/scripts/
    - If `iteration >= max_iterations`: sets `status: "max-iterations-reached"`, `exited_at`, `exit_reason: "Reached max_iterations=<N> without completion promise"`, writes state, exits non-zero. Prints the resume hint per FR-NL21.
 3. **Increment iteration counter and persist** (`loop-step.sh advance`, part 2 of 3 — D-NL13 durability boundary). Writes `iteration += 1` and `last_updated` to the state file **before** doing iteration work. A crash mid-iteration costs one iteration of work but the counter remains accurate.
 4. **Print iteration marker** (`loop-step.sh advance`, part 3 of 3 — its stdout on exit 0). See `markers` anchor.
-5. **Execute the command's normal workflow.** This is the existing body of `next-priority`, `team-implement`, etc., or the user's prompt for `/synthex:loop`.
+5. **Execute the command's normal workflow.** This is the existing body of `next-priority`, `review-code`, etc., or the user's prompt for `/synthex:loop`.
 6. **Promise detection.** After the workflow's final response, scan that response for the literal regex `<promise>\s*<completion_promise_text>\s*</promise>`. If matched, run `loop-step.sh finish <loop-id> completed` (sets `status: "completed"`, `exit_reason: "completion-promise-emitted"`, `exited_at`, writes state), exit.
 7. **Cancellation check.** Subsumed by step 2 on the NEXT iteration: if another session set `status: "cancelled"` (via `/synthex:cancel-loop`, i.e. `loop-step.sh cancel`), the next `advance` (or `hold`) call exits non-zero and the command stops. No separate re-read is needed.
 8. **Loop back to step 2.**
@@ -266,15 +262,7 @@ Each `--loop`-bearing command's "Native Looping" section declares its emission p
 | `write-implementation-plan` | When the plan covers all PRD requirements without TBDs. |
 | `refine-requirements` | When the PRD's open questions are resolved enough to start planning. |
 | `review-code` | When a review cycle ends with zero blocking findings AND zero recommended changes. |
-| `team-implement` | When the team has completed all assigned tasks across the plan. |
-| `team-review` | When the consolidated report has no remaining open critiques. |
-| `team-plan` | When the team's plan covers the PRD without TBDs. |
-| `team-refine` | When the team's refined requirements resolve all open questions. |
 | `/synthex:loop` | User-defined (the user's prompt specifies the completion condition). |
-
-### Team commands: lead-output-only scan (E7)
-
-For team commands, only the **lead teammate's** consolidated output is scanned for the promise. Transient teammate outputs are not promise sources. This prevents accidental loop termination when a single teammate emits the tag in their own report.
 
 ## <a id="markers"></a>Iteration markers
 

@@ -187,7 +187,7 @@ See `docs/agent-interactions.md` for the complete interaction map and `docs/rese
 
 When a standing review pool is running (started via `/synthex:start-review-team`), `/review-code` and `/performance-audit` automatically route to it instead of invoking the default single-model reviewer sequence. Pool routing requires `standing_pools.enabled: true` in `.synthex/config.yaml` (a project still on `.synthex-plus/config.yaml` keeps working for one major version — see `docs/migrations/synthex-plus.md`). See `docs/specs/multi-model-teams/` for full pool specifications (architecture, lifecycle, routing rules, and recovery).
 
-> **synthex-plus is deprecated.** Its pool commands, pool agents, templates, docs, capability ladder, and lifecycle hooks were folded into `synthex` (Milestone 6.1). See `docs/migrations/synthex-plus.md`.
+> **synthex-plus is removed.** Its pool commands, pool agents, templates, docs, capability ladder, and lifecycle hooks were folded into `synthex` (Milestone 6.1); the plugin itself shipped a tombstone release and was then removed from the marketplace (Milestone 6.2). See `docs/migrations/synthex-plus.md`.
 
 ## Project Configuration Framework
 

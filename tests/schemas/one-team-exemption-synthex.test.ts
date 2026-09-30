@@ -1,9 +1,10 @@
 /**
- * Task 50 (FR-HM23) port note, updated by Task 54 (FR-HM2 tombstone), for
- * the old synthex-plus Task 49 FR-MMT26/FR-MMT28 suite
- * (tests/schemas/one-team-exemption.test.ts, deleted in Task 54).
+ * Task 50 (FR-HM23) port note, updated by Task 54 (FR-HM2 tombstone) and
+ * again by Task 55 (FR-HM2 removal), for the old synthex-plus Task 49
+ * FR-MMT26/FR-MMT28 suite (tests/schemas/one-team-exemption.test.ts,
+ * deleted in Task 54).
  *
- * That deleted file validated plugins/synthex-plus/commands/
+ * That deleted file validated synthex-plus's commands/
  * team-implement.md and team-init.md — the one-team-per-session standing
  * -pool exemption (FR-MMT26) and orphan-scan warning (FR-MMT28). Under
  * FR-HM24, `team-implement` and `team-init` (along with team-review,
@@ -18,20 +19,17 @@
  * TeammateIdle hook: a standing pool's lifecycle is never governed by
  * per-session/per-event bookkeeping that applies to ordinary (non-standing)
  * teams. idle-gate-standing-synthex.test.ts asserts the hook doc's
- * explicit exemption framing and its FR-MMT26 cross-reference; this file
- * now asserts the synthex-plus original is a migration stub (Task 54
- * tombstone — see docs/migrations/synthex-plus.md) rather than the
- * "untouched" regression guard it was before Task 54.
+ * explicit exemption framing and its FR-MMT26 cross-reference. Task 54's
+ * migration-stub assertion (against the synthex-plus tombstone release) no
+ * longer applies — Task 55 deletes the synthex-plus plugin tree outright,
+ * so this file now asserts that removal instead.
  */
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
-const SYNTHEX_PLUS_TEAM_IMPLEMENT = join(
-  import.meta.dirname,
-  '..', '..', 'plugins', 'synthex-plus', 'commands', 'team-implement.md'
-);
+const SYNTHEX_PLUS_ROOT = join(import.meta.dirname, '..', '..', 'plugins', 'synthex-plus');
 const SYNTHEX_TEAM_IMPLEMENT = join(
   import.meta.dirname,
   '..', '..', 'plugins', 'synthex', 'commands', 'team-implement.md'
@@ -41,16 +39,13 @@ const IDLE_GATE_DOC = join(
   '..', '..', 'plugins', 'synthex', 'hooks', 'teammate-idle-gate.md'
 );
 
-describe('one-team-exemption (FR-MMT26) — Task 50 scope note', () => {
+describe('one-team-exemption (FR-MMT26) — Task 55 scope note', () => {
   it('team-implement.md / team-init.md are retired, not folded (FR-HM24) — no synthex copy exists', () => {
     expect(existsSync(SYNTHEX_TEAM_IMPLEMENT)).toBe(false);
   });
 
-  it('the synthex-plus original is now a migration stub (Task 54 tombstone)', () => {
-    expect(existsSync(SYNTHEX_PLUS_TEAM_IMPLEMENT)).toBe(true);
-    const content = readFileSync(SYNTHEX_PLUS_TEAM_IMPLEMENT, 'utf-8');
-    expect(content).toContain('docs/migrations/synthex-plus.md');
-    expect(content).not.toContain('FR-MMT26');
+  it('the synthex-plus plugin tree is fully removed (Task 55, FR-HM2)', () => {
+    expect(existsSync(SYNTHEX_PLUS_ROOT)).toBe(false);
   });
 
   it('the FR-MMT26 exemption principle carries into the synthex TeammateIdle hook doc', () => {

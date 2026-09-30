@@ -1,8 +1,9 @@
 /**
  * Task 50 (FR-HM23) port of idle-gate-standing.test.ts (Task 28's
- * standing-pool branch coverage), adapted for the real TeammateIdle command
- * hook: plugins/synthex-plus/hooks/teammate-idle-gate.md described a
- * prompt-mediated standing-pool branch (config.json reads, mkdir-based
+ * standing-pool branch coverage; both the original test and its subject,
+ * the now-removed synthex-plus plugin's hooks/teammate-idle-gate.md, were
+ * deleted in Task 55), adapted for the real TeammateIdle command hook: that
+ * doc described a prompt-mediated standing-pool branch (config.json reads, mkdir-based
  * locking, a max(existing, new) debounced dual-write) that a real command
  * hook cannot perform — it fires with no model turn attached, so it cannot
  * call TaskUpdate or write files on the teammate's behalf.
@@ -18,7 +19,7 @@
  * tests/schemas/one-team-exemption.test.ts) — see the doc's own callout —
  * which is why this file also covers that exemption language rather than
  * porting one-team-exemption.test.ts by itself: FR-MMT26's subject files
- * (plugins/synthex-plus/commands/team-implement.md and team-init.md) are
+ * (synthex-plus's commands/team-implement.md and team-init.md) are
  * retired outright under FR-HM24 (Tasks 51-55), never folded into synthex,
  * so there is no synthex command file to point an equivalent test at.
  *

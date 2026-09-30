@@ -89,40 +89,9 @@ The organization spans the full software lifecycle: **discover, build, ship, ope
 | **reliability-review** | Operational readiness assessment | SRE Agent + Terraform Plan Reviewer (opt.) |
 | **performance-audit** | Full-stack performance analysis | Performance Engineer |
 
-### Synthex+ (Beta, deprecated)
+### Synthex+ (removed)
 
-> **Deprecated.** Synthex+'s standing-review-pool capability now lives in Synthex itself. See [`docs/migrations/synthex-plus.md`](./docs/migrations/synthex-plus.md) for the migration steps, the command mapping, and the removal timeline.
-
-A **companion plugin** to Synthex that adds persistent team orchestration via Claude Code's beta Agent Teams API. Synthex+ reuses Synthex agent definitions — it does not duplicate or modify them.
-
-> **BETA** — Requires the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` feature flag. Both the Agent Teams API and this plugin are under active development.
-
-```bash
-/plugin install synthex-plus
-```
-
-Where standard Synthex spawns ephemeral subagents (each unaware of the others), Synthex+ creates persistent teams where agents share a task list, exchange messages via mailboxes, and coordinate autonomously.
-
-| Synthex Command | Synthex+ Equivalent | What Changes |
-|----------------|--------------------|----|
-| `next-priority` | `team-implement` | Persistent team with real-time coordination instead of sequential subagent invocations |
-| `review-code` | `team-review` | Cross-domain messaging between reviewers (e.g., code reviewer alerts security reviewer) |
-| `write-implementation-plan` | `team-plan` | Reviewers persist across review cycles, retaining full context |
-| `refine-requirements` | `team-refine` | Persistent reviewers with cross-perspective messaging during PRD refinement |
-
-#### Commands (5)
-
-| Command | Purpose | Synthex Agents Used |
-|---------|---------|-------------------|
-| **team-init** | Initialize Synthex+ configuration | -- |
-| **team-implement** | Sustained multi-agent implementation | Tech Lead + Frontend Engineer + Quality Engineer + Code Reviewer + Security Reviewer |
-| **team-review** | Multi-perspective code review with cross-domain communication | Code Reviewer + Security Reviewer + Performance Engineer (opt.) + Design System Agent (opt.) |
-| **team-plan** | Collaborative implementation planning with persistent reviewers | Product Manager + Architect + Design System Agent + Tech Lead |
-| **team-refine** | Collaborative PRD refinement with persistent reviewers | Product Manager + Tech Lead + Lead Frontend Engineer |
-
-**When to use Synthex+ over Synthex:** Multi-component work spanning 3+ files across 2+ system layers, large code reviews (500+ LOC), security-sensitive changes, planning for 10+ requirements, or refining large PRDs (20+ requirements). For quick, focused tasks, standard Synthex is lighter and more cost-effective.
-
-See the [Synthex+ README](./plugins/synthex-plus/README.md) for full documentation.
+> **Removed.** Synthex+ was a companion plugin for persistent team orchestration via Claude Code's beta Agent Teams API. Its standing-review-pool capability was folded into Synthex; the plugin then shipped a tombstone release and was removed from the marketplace. Its `team-*` commands (`team-review`, `team-implement`, `team-plan`, `team-refine`, `team-init`) are retired outright — their behavior is Synthex's capability ladder inside `review-code`, `next-priority`, `write-implementation-plan`, and `refine-requirements`, not a 1:1 port. See [`docs/migrations/synthex-plus.md`](./docs/migrations/synthex-plus.md) for the migration steps, the command mapping, and the full removal timeline.
 
 ## Multi-Model Review
 
@@ -136,7 +105,7 @@ See [`docs/specs/multi-model-review/architecture.md`](docs/specs/multi-model-rev
 
 ## Native Looping
 
-Synthex 0.8+ ships a native `--loop` flag on iteration-friendly commands (`next-priority`, `write-implementation-plan`, `refine-requirements`, `review-code`, and all four Synthex+ team commands), plus a generic `/synthex:loop` for arbitrary prompts. Loops iterate in the same agent thread by default (auto-compaction handles the context window) and persist per-session state at `.synthex/loops/<loop-id>.json` for resume across sessions. See [`plugins/synthex/docs/native-looping.md`](plugins/synthex/docs/native-looping.md) for the full framework spec.
+Synthex 0.8+ ships a native `--loop` flag on iteration-friendly commands (`next-priority`, `write-implementation-plan`, `refine-requirements`, `review-code`), plus a generic `/synthex:loop` for arbitrary prompts. Loops iterate in the same agent thread by default (auto-compaction handles the context window) and persist per-session state at `.synthex/loops/<loop-id>.json` for resume across sessions. See [`plugins/synthex/docs/native-looping.md`](plugins/synthex/docs/native-looping.md) for the full framework spec.
 
 ## Automated Testing
 
@@ -148,7 +117,7 @@ All agents are tested using a three-layer testing pyramid. Since agents are pure
 | 2 - Behavioral | Regex/JS assertions against cached agent outputs | ~$3/run (cached) | Manual trigger |
 | 3 - Semantic | LLM-as-judge evaluates accuracy and quality | ~$8/run | Manual trigger |
 
-**Current coverage:** 404 tests across 18 test suites — 206 for Synthex agents + 131 for Synthex+ templates, hooks, and command outputs + 67 for shared infrastructure. See [CLAUDE.md](./CLAUDE.md) for full details.
+**Current coverage:** see `tests/schemas/` for the full Layer 1 suite (Synthex agents, commands, and shared infrastructure). See [CLAUDE.md](./CLAUDE.md) for full details.
 
 ```bash
 cd tests && npx vitest run schemas/   # Layer 1: instant, free
@@ -170,20 +139,13 @@ lumenai/
 │   │   ├── commands/                   # Command definitions (.md files)
 │   │   ├── skills/                     # Generated Agent Skills entrypoints
 │   │   └── config/defaults.yaml        # Default project configuration
-│   └── synthex-plus/                   # Synthex+ plugin (BETA)
-│       ├── .claude-plugin/plugin.json  # Plugin manifest (5 commands)
-│       ├── commands/                   # Team command definitions (.md files)
-│       ├── templates/                  # Team composition templates
-│       ├── hooks/                      # Hook behavioral specs + hooks.json
-│       ├── scripts/                    # Thin shell shims for hook events
-│       ├── config/defaults.yaml        # Default configuration
-│       └── docs/                       # Decision guide, context management, output formats
+│   # Synthex+ (plugins/synthex-plus/) was removed in Task 55 — its pool
+│   # capability lives in plugins/synthex/ above. See
+│   # docs/migrations/synthex-plus.md.
 ├── tests/                              # Automated agent testing framework
 │   ├── schemas/                        # Layer 1: Schema validators + Vitest tests
-│   │   └── synthex-plus/               # Synthex+ validators (templates, hooks, outputs)
 │   ├── helpers/                        # Invocation wrapper, cache, parser, snapshots
 │   ├── fixtures/                       # Synthetic test inputs with planted issues
-│   │   └── synthex-plus/               # Synthex+ fixtures
 │   └── promptfoo.config.yaml           # Layer 2+3: Behavioral + semantic tests
 ├── docs/
 │   ├── reqs/main.md                    # Product requirements

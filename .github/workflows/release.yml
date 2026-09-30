@@ -175,42 +175,34 @@ jobs:
 
           MARKET_OLD=$(jq -r .version .claude-plugin/marketplace.json)
           SYNTHEX_OLD=$(jq -r .version plugins/synthex/.claude-plugin/plugin.json)
-          PLUS_OLD=$(jq -r .version plugins/synthex-plus/.claude-plugin/plugin.json)
 
           MARKET_NEW=$(bump_semver "$MARKET_OLD" "$BUMP")
           SYNTHEX_NEW=$(bump_semver "$SYNTHEX_OLD" "$BUMP")
-          PLUS_NEW=$(bump_semver "$PLUS_OLD" "$BUMP")
 
           {
             echo "market_old=$MARKET_OLD"
             echo "market_new=$MARKET_NEW"
             echo "synthex_old=$SYNTHEX_OLD"
             echo "synthex_new=$SYNTHEX_NEW"
-            echo "plus_old=$PLUS_OLD"
-            echo "plus_new=$PLUS_NEW"
           } >> "$GITHUB_OUTPUT"
 
           echo "marketplace: $MARKET_OLD -> $MARKET_NEW"
           echo "synthex:     $SYNTHEX_OLD -> $SYNTHEX_NEW"
-          echo "synthex+:    $PLUS_OLD -> $PLUS_NEW"
 
       - name: Update version manifests
         if: steps.bump.outputs.bump != 'none'
         env:
           MARKET_NEW: ${{ steps.versions.outputs.market_new }}
           SYNTHEX_NEW: ${{ steps.versions.outputs.synthex_new }}
-          PLUS_NEW: ${{ steps.versions.outputs.plus_new }}
         run: |
           set -euo pipefail
 
           tmp=$(mktemp)
           jq --indent 2 \
              --arg m "$MARKET_NEW" \
-             --arg s "$SYNTHEX_NEW" \
-             --arg p "$PLUS_NEW" '
+             --arg s "$SYNTHEX_NEW" '
             .version = $m
             | (.plugins[] | select(.name == "synthex").version) = $s
-            | (.plugins[] | select(.name == "synthex-plus").version) = $p
           ' .claude-plugin/marketplace.json > "$tmp"
           mv "$tmp" .claude-plugin/marketplace.json
 
@@ -238,11 +230,6 @@ jobs:
           ' .grok-plugin/marketplace.json > "$tmp"
           mv "$tmp" .grok-plugin/marketplace.json
 
-          tmp=$(mktemp)
-          jq --indent 2 --arg v "$PLUS_NEW" '.version = $v' \
-            plugins/synthex-plus/.claude-plugin/plugin.json > "$tmp"
-          mv "$tmp" plugins/synthex-plus/.claude-plugin/plugin.json
-
           # mktemp creates files with mode 0600. The compatibility matrix runs
           # as an unprivileged user and bind-mounts this staged release tree,
           # so preserve public read access after each atomic replacement.
@@ -251,8 +238,7 @@ jobs:
             .grok-plugin/marketplace.json \
             plugins/synthex/.claude-plugin/plugin.json \
             plugins/synthex/.codex-plugin/plugin.json \
-            plugins/synthex/.grok-plugin/plugin.json \
-            plugins/synthex-plus/.claude-plugin/plugin.json
+            plugins/synthex/.grok-plugin/plugin.json
 
       - name: Generate CHANGELOG entry
         if: steps.bump.outputs.bump != 'none'
@@ -260,7 +246,6 @@ jobs:
         env:
           LAST_TAG: ${{ steps.bump.outputs.last_tag }}
           SYNTHEX_NEW: ${{ steps.versions.outputs.synthex_new }}
-          PLUS_NEW: ${{ steps.versions.outputs.plus_new }}
         run: |
           set -euo pipefail
 
@@ -289,7 +274,7 @@ jobs:
 
           ENTRY_FILE="$RUNNER_TEMP/entry.md"
           {
-            printf '## [synthex %s / synthex-plus %s] - %s\n\n' "$SYNTHEX_NEW" "$PLUS_NEW" "$DATE"
+            printf '## [synthex %s] - %s\n\n' "$SYNTHEX_NEW" "$DATE"
             if [ -n "$ADDED" ]; then
               printf '### Added\n\n'
               printf '%s\n' "$ADDED" | sed 's/^/- /'
@@ -370,7 +355,6 @@ jobs:
         env:
           MARKET_NEW: ${{ steps.versions.outputs.market_new }}
           SYNTHEX_NEW: ${{ steps.versions.outputs.synthex_new }}
-          PLUS_NEW: ${{ steps.versions.outputs.plus_new }}
         run: |
           set -euo pipefail
 
@@ -383,10 +367,9 @@ jobs:
             plugins/synthex/.claude-plugin/plugin.json \
             plugins/synthex/.codex-plugin/plugin.json \
             plugins/synthex/.grok-plugin/plugin.json \
-            plugins/synthex-plus/.claude-plugin/plugin.json \
             CHANGELOG.md
 
-          git commit -m "release: synthex ${SYNTHEX_NEW} + synthex-plus ${PLUS_NEW}"
+          git commit -m "release: synthex ${SYNTHEX_NEW}"
           git tag "v${MARKET_NEW}"
 
           git push origin HEAD:main
@@ -398,13 +381,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MARKET_NEW: ${{ steps.versions.outputs.market_new }}
           SYNTHEX_NEW: ${{ steps.versions.outputs.synthex_new }}
-          PLUS_NEW: ${{ steps.versions.outputs.plus_new }}
           ENTRY_FILE: ${{ steps.changelog.outputs.entry_file }}
         run: |
           set -euo pipefail
 
           gh release create "v${MARKET_NEW}" \
-            --title "v${MARKET_NEW} — synthex ${SYNTHEX_NEW} + synthex-plus ${PLUS_NEW}" \
+            --title "v${MARKET_NEW} — synthex ${SYNTHEX_NEW}" \
             --notes-file "$ENTRY_FILE"
 
       # ───────────────────────────────────────────────────────────────
@@ -485,7 +467,6 @@ jobs:
           -------
           New release tag:       v${{ steps.versions.outputs.market_new }}
           synthex new version:   ${{ steps.versions.outputs.synthex_new }}
-          synthex-plus new ver:  ${{ steps.versions.outputs.plus_new }}
           Previous release tag:  ${{ steps.bump.outputs.last_tag }}
           Changelog entry file:  ${{ steps.changelog.outputs.entry_file }}
           Source repo:           ${{ github.repository }} (current checkout, full history)
@@ -506,7 +487,6 @@ jobs:
              (HEAD^ excludes the release commit itself, which only bumps
              version files + CHANGELOG.) Inspect commits that touched
              plugins/synthex/agents/, plugins/synthex/commands/,
-             plugins/synthex-plus/agents/, plugins/synthex-plus/commands/,
              or plugin manifests — those are the user-visible changes most
              likely to need docs updates.
 
@@ -525,14 +505,14 @@ jobs:
                - Update any agent / command reference page that documents an
                  added or changed agent or command in this release.
                - Update version numbers wherever they appear hardcoded in
-                 docs to reference the synthex / synthex-plus versions.
+                 docs to reference the synthex version.
                - Skip frontend-only or test-only commits — those don't need
                  docs updates.
 
           5. Commit, push the branch, and open a DRAFT pull request via gh:
                gh pr create --repo bluminal/slashsynthex.com --draft \
                  --base main --head release-v${{ steps.versions.outputs.market_new }}-docs \
-                 --title "docs: v${{ steps.versions.outputs.market_new }} — synthex ${{ steps.versions.outputs.synthex_new }} + synthex-plus ${{ steps.versions.outputs.plus_new }}" \
+                 --title "docs: v${{ steps.versions.outputs.market_new }} — synthex ${{ steps.versions.outputs.synthex_new }}" \
                  --body "<your body here>"
 
              PR body must include:

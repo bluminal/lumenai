@@ -1,12 +1,15 @@
 /**
- * Layer 1: team-review multi-model spawn-prompt blob assertions.
+ * Layer 1: multi-model spawn-prompt blob assertions (pool Lead / reviewer
+ * overlay in plugins/synthex/templates/review.md).
  *
- * Task 17 — FR-MMT4, FR-MMT20, D22 resolution.
+ * Task 17 — FR-MMT4, FR-MMT20, D22 resolution. Repointed by Task 55
+ * (FR-HM2, FR-HM24) — see team-review-multi-model.ts for why the source
+ * template moved but the assertions still apply.
  *
- * Test surface: raw-string match on what the team-review command would write
- * into the spawn-prompt blob for Lead and native reviewers when multi_model=true.
- * These tests do NOT invoke live teammates (D22 assertion surface = composed
- * spawn-prompt blob, not a live teammate).
+ * Test surface: raw-string match on what gets written into the spawn-prompt
+ * blob for Lead and native reviewers when multi_model=true. These tests do
+ * NOT invoke live teammates (D22 assertion surface = composed spawn-prompt
+ * blob, not a live teammate).
  *
  * FR-MMT4 suppression text (from templates/review.md §Lead Suppression):
  *   "Multi-model mode is active for this team. Do NOT produce your own

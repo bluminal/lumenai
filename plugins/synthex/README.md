@@ -226,7 +226,7 @@ Synthex 0.8+ ships a **native looping primitive** that iterates a command until 
 /synthex:cancel-loop my-loop-name
 ```
 
-`--loop` is supported on `next-priority`, `write-implementation-plan`, `refine-requirements`, and `review-code` (plus the four Synthex+ team commands). The flag is opt-in — when absent, every command behaves identically to today. See [`plugins/synthex/docs/native-looping.md`](./docs/native-looping.md) for the full framework spec, state-file schema, and emission-point details per command.
+`--loop` is supported on `next-priority`, `write-implementation-plan`, `refine-requirements`, and `review-code`. The flag is opt-in — when absent, every command behaves identically to today. See [`plugins/synthex/docs/native-looping.md`](./docs/native-looping.md) for the full framework spec, state-file schema, and emission-point details per command.
 
 ## Autonomous Decisions (`--auto-decide`)
 
