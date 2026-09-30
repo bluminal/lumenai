@@ -5,6 +5,45 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 2.0.0 / synthex-plus 2.0.0] - 2026-09-30
+
+### Added
+
+- (synthex) default loop-step.sh begin's --completion-promise (Task 1)
+- tombstone synthex-plus; pool capability now ships in synthex
+- (synthex-plus) tombstone the plugin (Task 54, FR-HM2)
+- (synthex) spawn pool reviewers via agentType, retire D26 re-paste (Task 51, FR-HM22)
+- (synthex) real TaskCompleted/TeammateIdle lifecycle hooks (Task 50, FR-HM23)
+- (synthex) document the FR-HM21 capability ladder and gate its reviewer fan-out (Task 49)
+- (synthex) fold pool assets and repoint config to .synthex/config.yaml (Task 48, FR-HM24)
+- (synthex) fold pool-management commands and agents into synthex (Task 47, FR-HM24, D11)
+
+### Fixed
+
+- (tests) move poolCapabilityGaps out of harnesses.mjs so compat containers can load it
+- (synthex-plus) print the full migration-guide URL in stubs and the D7 nudge (Task 54)
+- (synthex) task-completed-gate.sh can never let a reviewed task through
+
+### Changed
+
+- (plans) sync loop-default-completion-promise plan with PR #20
+- (plans) loop default completion promise complete
+- (synthex) default --completion-promise to ALLDONE<session_id> (Task 2)
+- (plans) queue loop default completion promise (ALLDONE<session_id>)
+- (plans) queue loop default completion promise (ALLDONE<session_id>)
+- (plans) record Task 54 done; PR 1 (Tasks 47-54) ready
+- (plans) record Tasks 51 and 53 done; Task 54 in progress
+- (migrations) tombstone ships with the fold; fix fallback timeline and post-upgrade pool stop (Task 53)
+- (synthex) migration guide and D7 deprecation nudge for synthex-plus
+- (plans) record Task 52 done
+- (synthex) surface the FR-HM25 standing-pool gap in the user-facing README
+- (synthex) document FR-HM25 standing-pool gap for Codex, Gemini, OpenCode, Grok
+- (plans) record Task 50 done; Milestone 6.1 complete; Tasks 51-53 in progress
+- (plans) record Task 49 done
+- (plans) record Task 48 done; Tasks 49-50 in progress
+- (plans) record Task 47 done; Task 48 in progress
+- (plans) mark Task 47 in progress
+
 ## [synthex 1.6.0 / synthex-plus 1.6.0] - 2026-09-28
 
 ### Added
