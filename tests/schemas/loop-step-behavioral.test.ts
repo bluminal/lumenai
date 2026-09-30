@@ -1,7 +1,7 @@
 /**
  * Layer 2: Behavioral fixtures for plugins/synthex/scripts/loop-step.sh —
  * the FR-HM18 portable state-file bookkeeping script that takes over the
- * seven refusal paths, the archive algorithm, and the list/cancel output
+ * refusal paths, the archive algorithm, and the list/cancel output
  * formats previously described only as prose in loop.md, list-loops.md,
  * cancel-loop.md, and plugins/synthex/docs/native-looping.md.
  *
@@ -16,6 +16,13 @@
  *   - `advance` prints `[loop <id> iteration N/M]` and exits non-zero on
  *     cancel/max.
  *   - `hold` does not increment.
+ *
+ * docs/plans/loop-default-completion-promise.md Task 1 (D1-D5): a fresh
+ * `begin` with no/empty --completion-promise now defaults it instead of
+ * refusing (the former refusal path 3, "missing --completion-promise", is
+ * gone — 6 refusal paths remain), and every successful `begin` prints
+ * `completion promise: <value>` as its second stdout line, after the
+ * loop-id (which stays first, unchanged, for existing consumers).
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -165,13 +172,15 @@ describe('loop-step.sh — behavioral (jq-less PATH)', () => {
   const opts = (): RunOpts => ({ path: nojqWithNode });
 
   describe('begin', () => {
-    it('creates a fresh state file and prints the resolved loop-id', () => {
+    it('creates a fresh state file and prints the resolved loop-id, then the completion promise', () => {
       const r = run(
         ['begin', '/synthex:loop', '--completion-promise', 'DONE', '--name', 'my-loop', '--max', '5'],
         opts(),
       );
       expect(r.code).toBe(0);
-      expect(r.stdout.trim()).toBe('my-loop');
+      const lines = r.stdout.trim().split('\n');
+      expect(lines[0]).toBe('my-loop');
+      expect(lines[1]).toBe('completion promise: DONE');
       const state = readLoop('my-loop');
       expect(state).toMatchObject({
         schema_version: 1,
@@ -188,15 +197,50 @@ describe('loop-step.sh — behavioral (jq-less PATH)', () => {
     it('auto-generates <command-slug>-<hex4> when --name is omitted', () => {
       const r = run(['begin', '/synthex:next-priority', '--completion-promise', 'ALLDONE'], opts());
       expect(r.code).toBe(0);
-      expect(r.stdout.trim()).toMatch(/^next-priority-[0-9a-f]{4}$/);
+      const lines = r.stdout.trim().split('\n');
+      expect(lines[0]).toMatch(/^next-priority-[0-9a-f]{4}$/);
+      expect(lines[1]).toBe('completion promise: ALLDONE');
     });
 
     it('derives the command slug from a synthex-plus team command too', () => {
       const r = run(['begin', '/synthex-plus:team-implement', '--completion-promise', 'X'], opts());
-      expect(r.stdout.trim()).toMatch(/^team-implement-[0-9a-f]{4}$/);
+      const lines = r.stdout.trim().split('\n');
+      expect(lines[0]).toMatch(/^team-implement-[0-9a-f]{4}$/);
     });
 
-    describe('refusal paths (7 total across begin/advance/hold)', () => {
+    it('defaults --completion-promise to ALLDONE<session_id> when omitted (D1)', () => {
+      const r = run(
+        ['begin', '/synthex:loop', '--name', 'default-sid', '--session-id', 'X'],
+        opts(),
+      );
+      expect(r.code).toBe(0);
+      const lines = r.stdout.trim().split('\n');
+      expect(lines[0]).toBe('default-sid');
+      expect(lines[1]).toBe('completion promise: ALLDONEX');
+      expect(readLoop('default-sid').completion_promise).toBe('ALLDONEX');
+    });
+
+    it('falls back to ALLDONE<loop_id> when both --completion-promise and --session-id are omitted (D2)', () => {
+      const r = run(['begin', '/synthex:loop', '--name', 'default-noid'], opts());
+      expect(r.code).toBe(0);
+      const lines = r.stdout.trim().split('\n');
+      expect(lines[0]).toBe('default-noid');
+      expect(lines[1]).toBe('completion promise: ALLDONEdefault-noid');
+      expect(readLoop('default-noid').completion_promise).toBe('ALLDONEdefault-noid');
+    });
+
+    it('stores an explicit --completion-promise verbatim rather than the default', () => {
+      const r = run(
+        ['begin', '/synthex:loop', '--name', 'explicit1', '--session-id', 'X', '--completion-promise', 'CUSTOM-TOKEN'],
+        opts(),
+      );
+      expect(r.code).toBe(0);
+      const lines = r.stdout.trim().split('\n');
+      expect(lines[1]).toBe('completion promise: CUSTOM-TOKEN');
+      expect(readLoop('explicit1').completion_promise).toBe('CUSTOM-TOKEN');
+    });
+
+    describe('refusal paths (6 total across begin/advance/hold)', () => {
       it('1. invalid --name pattern (FR-NL11)', () => {
         const r = run(
           ['begin', '/synthex:loop', '--completion-promise', 'X', '--name', 'Bad_Name!'],
@@ -215,33 +259,27 @@ describe('loop-step.sh — behavioral (jq-less PATH)', () => {
         expect(r.stderr).toMatch(/--max-iterations must be an integer in \[1, 200\]/);
       });
 
-      it('3. missing --completion-promise on a fresh start (FR-NL37 generalization)', () => {
-        const r = run(['begin', '/synthex:loop', '--name', 'no-promise'], opts());
-        expect(r.code).not.toBe(0);
-        expect(r.stderr).toMatch(/--completion-promise <text> is required/);
-      });
-
-      it('4. --name collision with an already-running loop', () => {
+      it('3. --name collision with an already-running loop', () => {
         run(['begin', '/synthex:loop', '--completion-promise', 'X', '--name', 'dupe'], opts());
         const r = run(['begin', '/synthex:loop', '--completion-promise', 'Y', '--name', 'dupe'], opts());
         expect(r.code).not.toBe(0);
         expect(r.stderr).toMatch(/is already running/);
       });
 
-      it('5. --resume with an unknown loop-id (FR-NL40)', () => {
+      it('4. --resume with an unknown loop-id (FR-NL40)', () => {
         const r = run(['begin', '/synthex:loop', '--resume', 'never-existed'], opts());
         expect(r.code).not.toBe(0);
         expect(r.stderr).toMatch(/No loop found: never-existed/);
       });
 
-      it('6. --resume with an unknown schema_version (FR-NL41)', () => {
+      it('5. --resume with an unknown schema_version (FR-NL41)', () => {
         writeLoop('old-schema', { schema_version: 2 });
         const r = run(['begin', '/synthex:loop', '--resume', 'old-schema'], opts());
         expect(r.code).not.toBe(0);
         expect(r.stderr).toMatch(/schema_version=2/);
       });
 
-      it('7. --resume of a terminal (non-running) loop', () => {
+      it('6. --resume of a terminal (non-running) loop', () => {
         writeLoop('done-loop', { status: 'completed', exited_at: '2026-05-13T19:00:00Z', exit_reason: 'x' });
         const r = run(['begin', '/synthex:loop', '--resume', 'done-loop'], opts());
         expect(r.code).not.toBe(0);
@@ -256,6 +294,32 @@ describe('loop-step.sh — behavioral (jq-less PATH)', () => {
       const state = readLoop('rsm');
       expect(state.session_id).toBe('new-session');
       expect(state.status).toBe('running');
+    });
+
+    // D4: --resume (and, by the same code path, the command-level
+    // --resume-last, which resolves to a loop-id and calls this same
+    // `begin --resume <loop-id>`, per loop.md) never recomputes or
+    // overwrites the stored completion_promise — even when a default was
+    // used on the original fresh start, and even when --session-id changes
+    // on resume.
+    it('--resume leaves an explicitly-set stored promise unchanged and prints it (D4)', () => {
+      run(['begin', '/synthex:loop', '--completion-promise', 'KEEP-ME', '--name', 'rsm-explicit', '--session-id', 'orig'], opts());
+      const r = run(['begin', '/synthex:loop', '--resume', 'rsm-explicit', '--session-id', 'new-session'], opts());
+      expect(r.code).toBe(0);
+      const lines = r.stdout.trim().split('\n');
+      expect(lines[0]).toBe('rsm-explicit');
+      expect(lines[1]).toBe('completion promise: KEEP-ME');
+      expect(readLoop('rsm-explicit').completion_promise).toBe('KEEP-ME');
+    });
+
+    it('--resume leaves a defaulted stored promise unchanged, even though --session-id differs now (D4)', () => {
+      run(['begin', '/synthex:loop', '--name', 'rsm-default', '--session-id', 'orig'], opts());
+      expect(readLoop('rsm-default').completion_promise).toBe('ALLDONEorig');
+      const r = run(['begin', '/synthex:loop', '--resume', 'rsm-default', '--session-id', 'different-session'], opts());
+      expect(r.code).toBe(0);
+      const lines = r.stdout.trim().split('\n');
+      expect(lines[1]).toBe('completion promise: ALLDONEorig');
+      expect(readLoop('rsm-default').completion_promise).toBe('ALLDONEorig');
     });
 
     it('archives terminal-status files on every begin invocation (native-looping.md § Archive)', () => {
@@ -513,7 +577,9 @@ describe('loop-step.sh — hosts without jq or node (sed/awk fallback)', () => {
       opts(),
     );
     expect(begin.code).toBe(0);
-    expect(begin.stdout.trim()).toBe('nojq-e2e');
+    const beginLines = begin.stdout.trim().split('\n');
+    expect(beginLines[0]).toBe('nojq-e2e');
+    expect(beginLines[1]).toBe('completion promise: ALLDONE');
 
     const adv1 = run(['advance', 'nojq-e2e'], opts());
     expect(adv1.stdout.trim()).toBe('[loop nojq-e2e iteration 1/5]');
@@ -538,6 +604,20 @@ describe('loop-step.sh — hosts without jq or node (sed/awk fallback)', () => {
     const r = run(['advance', 'nojq-cancelled'], { path: bin });
     expect(r.code).not.toBe(0);
     expect(r.stderr).toMatch(/is cancelled — nothing to do/);
+  });
+
+  it('defaults --completion-promise the same way under the sed/awk fallback (D1/D2)', () => {
+    const withSession = run(
+      ['begin', '/synthex:loop', '--name', 'nojq-default-sid', '--session-id', 'X'],
+      { path: bin },
+    );
+    expect(withSession.code).toBe(0);
+    expect(readLoop('nojq-default-sid').completion_promise).toBe('ALLDONEX');
+    expect(withSession.stdout.trim().split('\n')[1]).toBe('completion promise: ALLDONEX');
+
+    const withoutSession = run(['begin', '/synthex:loop', '--name', 'nojq-default-noid'], { path: bin });
+    expect(withoutSession.code).toBe(0);
+    expect(readLoop('nojq-default-noid').completion_promise).toBe('ALLDONEnojq-default-noid');
   });
 
   it('cancel --all still works end to end', () => {
