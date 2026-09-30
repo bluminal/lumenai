@@ -35,7 +35,7 @@ const ALLOWLIST = new Set([
   // The 3 pool-management slash commands surfaced by one team-init wizard
   // step (start-review-team / stop-review-team / list-teams) -- a
   // fixture-local list, not the plugin manifest's command inventory.
-  'tests/schemas/team-init-fixtures.test.ts:168',
+  'tests/schemas/team-init-fixtures.test.ts:163',
 ]);
 
 function collectSourceFiles(root: string): string[] {

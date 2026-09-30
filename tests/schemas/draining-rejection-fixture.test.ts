@@ -35,9 +35,10 @@ const FIXTURE_DIR = join(
   '..', 'fixtures', 'multi-model-teams', 'submission', 'draining-rejection'
 );
 
-const SUBMITTER_MD_PATH = join(
+// Task 47 (FR-HM24, D11) port; Task 54 tombstoned the synthex-plus original.
+const SUBMITTER_MD_SYNTHEX_PATH = join(
   import.meta.dirname,
-  '..', '..', 'plugins', 'synthex-plus', 'agents', 'standing-pool-submitter.md'
+  '..', '..', 'plugins', 'synthex', 'agents', 'standing-pool-submitter.md'
 );
 
 // ── Fixture structure ─────────────────────────────────────────────────────────
@@ -163,14 +164,15 @@ describe('draining-rejection — race condition correctly modeled in fixture', (
 
 });
 
-// ── Agent documentation checks ────────────────────────────────────────────────
+// ── Agent documentation checks (Task 54: synthex-plus tombstoned; the ────────
+// plugins/synthex/agents/standing-pool-submitter.md port from Task 47 is the
+// sole surviving copy) ────────────────────────────────────────────────────
 
-describe('draining-rejection — standing-pool-submitter.md documents drain check', () => {
+describe('draining-rejection — plugins/synthex/agents/standing-pool-submitter.md documents drain check', () => {
 
-  const submitterContent = readFileSync(SUBMITTER_MD_PATH, 'utf-8');
+  const submitterContent = readFileSync(SUBMITTER_MD_SYNTHEX_PATH, 'utf-8');
 
   it('standing-pool-submitter.md contains "re-reads" and "config.json" in Step 1 context', () => {
-    // Drain check is documented: submitter re-reads config.json before writing tasks
     const hasReread = submitterContent.includes('re-read') || submitterContent.includes('re-reads');
     const hasConfigJson = submitterContent.includes('config.json');
     expect(hasReread, 'submitter.md must contain "re-read" or "re-reads"').toBe(true);
@@ -186,7 +188,6 @@ describe('draining-rejection — standing-pool-submitter.md documents drain chec
   });
 
   it('standing-pool-submitter.md documents that drain check fires before writing tasks', () => {
-    // Step 1 must come before task writing (Step 3)
     const step1Index = submitterContent.indexOf('Step 1');
     const step3Index = submitterContent.indexOf('Step 3');
     expect(step1Index).toBeGreaterThan(-1);

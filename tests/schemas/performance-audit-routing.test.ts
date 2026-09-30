@@ -197,4 +197,20 @@ describe('performance-audit.md — Task 57 [T] acceptance criteria (inline disco
     expect(reviewCodeCommandContent).toMatch(gateRe);
   });
 
+  // ── [T] Task 49 (FR-HM21): Capability Ladder — this doc points at the canonical one ──
+  describe('Task 49 (FR-HM21): capability ladder', () => {
+    it('this doc points at the canonical Capability Ladder section in the review-code routing doc', () => {
+      expect(content).toMatch(/## Capability Ladder \(FR-HM21\)/);
+      expect(content).toContain('docs/standing-pool-routing.md');
+    });
+
+    it('performance-audit.md Step 4 selects spawn vs. inline by tool presence, per the ladder', () => {
+      expect(commandContent).toMatch(
+        /if a tool named `Agent`, `Task`, `task`, `spawn_agent`, or `delegate_task` is in your tool list/,
+      );
+      expect(commandContent).toMatch(/otherwise, perform the performance-engineer role inline/i);
+      expect(commandContent).toContain('FR-HM21 levels 3-4');
+    });
+  });
+
 });

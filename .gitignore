@@ -30,6 +30,11 @@ credentials.*
 
 # Synthex per-developer state (config, loops, etc.)
 .synthex/
+
+# Legacy synthex-plus per-developer state (config, loops, etc.). synthex-plus
+# is deprecated (docs/migrations/synthex-plus.md); this stays ignored so a
+# project still on the D6 config fallback, or mid-migration, doesn't get a
+# dirty working tree either way.
 .synthex-plus/
 
 # Test cache (LLM output cache for agent testing)

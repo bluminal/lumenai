@@ -12,7 +12,10 @@
  *   (d) non-interactive-tty-false              — CI mode: auto-skip, non-blocking
  *   (e) interactive-default-enter              — empty Enter treated as Skip
  *
- * Cross-file checks verify team-init.md contains FR-MMT27-mandated text.
+ * Task 54: the cross-file team-init.md string-presence checks were removed —
+ * synthex-plus's team-init.md is tombstoned to a migration stub and team-init
+ * has no synthex equivalent (retired outright per the migration guide). The
+ * fixture-only scenario checks below are unaffected and still apply.
  *
  * Cost: $0 (no LLM calls — pure file parsing)
  */
@@ -41,8 +44,6 @@ let enableBoth: Record<string, unknown>;
 let nonInteractiveTtyFalse: Record<string, unknown>;
 let interactiveDefaultEnter: Record<string, unknown>;
 
-let teamInitContent: string;
-
 beforeAll(() => {
   skipBoth = loadFixture('skip-both');
   enablePoolsSkipMultiModel = loadFixture(
@@ -51,12 +52,6 @@ beforeAll(() => {
   enableBoth = loadFixture('enable-both');
   nonInteractiveTtyFalse = loadFixture('non-interactive-tty-false');
   interactiveDefaultEnter = loadFixture('interactive-default-enter');
-
-  const teamInitPath = resolve(
-    __dirname,
-    '../../plugins/synthex-plus/commands/team-init.md',
-  );
-  teamInitContent = readFileSync(teamInitPath, 'utf-8');
 });
 
 // ── Shared: scenario field non-empty ────────────────────────────
@@ -277,46 +272,5 @@ describe('team-init init fixture (e): interactive-default-enter', () => {
   it('expected.step9_pool_commands_shown is false', () => {
     const expected = interactiveDefaultEnter.expected as Record<string, unknown>;
     expect(expected.step9_pool_commands_shown).toBe(false);
-  });
-});
-
-// ── Cross-file: team-init.md string-presence checks ─────────────
-
-describe('team-init.md — cross-file FR-MMT27 string-presence checks', () => {
-  it('contains "Enable / Skip" prompt format', () => {
-    expect(teamInitContent).toContain('Enable / Skip');
-  });
-
-  it('contains "standing_pools.enabled: true"', () => {
-    expect(teamInitContent).toContain('standing_pools.enabled: true');
-  });
-
-  it('contains a no-spawn-at-init instruction (FR-MMT27 criterion 3)', () => {
-    const hasNoSpawn =
-      teamInitContent.includes('pool_spawned_at_init') ||
-      teamInitContent.includes('Do NOT spawn') ||
-      teamInitContent.includes('do not spawn');
-    expect(hasNoSpawn).toBe(true);
-  });
-
-  it('contains /synthex-plus:start-review-team with verbatim description', () => {
-    expect(teamInitContent).toContain('/synthex-plus:start-review-team');
-    expect(teamInitContent).toContain(
-      'Start a standing review pool (keeps reviewers warm between reviews)',
-    );
-  });
-
-  it('contains /synthex-plus:stop-review-team with verbatim description', () => {
-    expect(teamInitContent).toContain('/synthex-plus:stop-review-team');
-    expect(teamInitContent).toContain(
-      'Stop a running pool (graceful shutdown with drain)',
-    );
-  });
-
-  it('contains /synthex-plus:list-teams with verbatim description', () => {
-    expect(teamInitContent).toContain('/synthex-plus:list-teams');
-    expect(teamInitContent).toContain(
-      'View all active pools and their status',
-    );
   });
 });

@@ -60,8 +60,10 @@ const skillsRoot = join(pluginRoot, 'portable-skills');
 // the PM now writes and edits the plan in place), commit-message-author
 // (Task 46, FR-HM27, replaced by a one-sentence rule plus
 // scripts/commit-lint.sh), and plan-linter (Task 45, FR-HM26, replaced by
-// scripts/lint-plan.mjs), dropping 28 to 23.
-const TOTAL_AGENT_COUNT = 23;
+// scripts/lint-plan.mjs), dropping 28 to 23. Task 47 (FR-HM24, D11) then
+// folded in 3 pool agents from synthex-plus (standing-pool-cleanup,
+// standing-pool-submitter, team-orchestrator-bridge), taking 23 to 26.
+const TOTAL_AGENT_COUNT = 26;
 
 // Every utility agent Phase 5 retires (docs/plans/harness-modernization.md)
 // is gone: context-bundle-assembler (Task 41), audit-artifact-writer

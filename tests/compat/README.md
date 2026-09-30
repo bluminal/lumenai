@@ -92,6 +92,23 @@ OpenCode's activation image includes `ripgrep` because its native `skill` tool
 uses `rg` to resolve skill files. Harness versions remain pinned in
 `versions.lock.json`.
 
+## Standing review pool gap (FR-HM25)
+
+Standing review pools need Claude Code's Agent Teams tools (`SendMessage` and
+`ListAgents`), which only Claude Code exposes. Codex (ephemeral in-session
+teams only), Gemini CLI, OpenCode, and Grok are a documented capability gap:
+the gated pool commands (`start-review-team`, `stop-review-team`,
+`list-teams`) print this sentence verbatim instead of running there:
+
+> Standing review pools require Agent Teams (the SendMessage and ListAgents tools); this host does not expose them, so pool commands are unavailable here -- use /synthex:review-code or /synthex:performance-audit for sequential review instead.
+
+That sentence is `GAP_MESSAGES.pool`, single-sourced in
+`plugins/synthex/scripts/lib/host-matrix.mjs`. `tests/compat/lib/harnesses.mjs`
+imports it (never copies it) into `poolCapabilityGaps` (`lib/pool-gaps.mjs`), one entry per gapped
+host, so this README, the pool commands, and the compat test can never drift
+from one another. Hermes' Kanban board is noted as a possible future pool
+backend — not implemented.
+
 ## Authenticated canary
 
 `.github/workflows/authenticated-compatibility-canary.yml` runs nightly and can

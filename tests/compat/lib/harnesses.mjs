@@ -1,3 +1,4 @@
+
 export const profiles = ['offline', 'activation', 'canary'];
 
 export const harnesses = {

@@ -200,12 +200,21 @@ export const KNOWN_UNGATED: KnownUngatedEntry[] = [
   // plugins/synthex/agents/codex-review-prompter.md:132 —
   //   "2. **Waits for the parent's decision** via a follow-up `SendMessage`
   //   from the orchestrator carrying the decision payload."
-  // Backticked `SendMessage`, not wrapped in a tool-presence gate. This is
-  // the only real D3 reference to SendMessage found in commands/ or
-  // agents/ today (a second, non-backticked, non-"tool"-suffixed mention
-  // of SendMessage exists at line 152 but does not meet the D3 token rule,
-  // so it is not a "reference" and needs no allowlist entry).
+  // Backticked `SendMessage`, not wrapped in a tool-presence gate. (A
+  // second, non-backticked, non-"tool"-suffixed mention of SendMessage
+  // exists at line 152 but does not meet the D3 token rule, so it is not
+  // a "reference" and needs no allowlist entry.)
   { file: 'plugins/synthex/agents/codex-review-prompter.md', tool: 'SendMessage' },
+
+  // Task 49 (FR-HM21) removed the two Task 47 pool entries below by
+  // properly gating that prose instead of allowlisting it: the downstream
+  // `SendMessage` mentions in stop-review-team.md's Step 3 and
+  // team-orchestrator-bridge.md's Step 3 were de-backticked (no longer a
+  // D3 "reference" at all — they are operational mentions of a tool
+  // already confirmed available by an upstream Step 0 gate, not a
+  // capability branch), matching the pattern start-review-team.md and
+  // list-teams.md already used for their own downstream mentions. See
+  // docs/plans/harness-modernization.md Task 49.
 ];
 
 // ── Acceptance criteria ─────────────────────────────────────────────────

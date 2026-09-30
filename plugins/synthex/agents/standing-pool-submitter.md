@@ -1,5 +1,7 @@
 ---
 model: haiku
+description: "Submits review tasks to a standing pool's task list and polls for the consolidated report envelope."
+tools: Bash, Read, Write
 ---
 
 # Standing Pool Submitter

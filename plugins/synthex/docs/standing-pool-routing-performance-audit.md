@@ -1,12 +1,12 @@
 # Standing Pool Discovery and Routing — performance-audit variant (FR-MMT15)
 
-Cold-path detail for `/synthex:performance-audit` Step 1b (FR-HM5, D17, Task 14). Read only when `standing_pools.enabled: true` in `.synthex-plus/config.yaml`; the gate that includes this file lives at `plugins/synthex/commands/performance-audit.md`. This is not a standalone command — it has no frontmatter and is never registered in `plugin.json`.
+Cold-path detail for `/synthex:performance-audit` Step 1b (FR-HM5, D17, Task 14). Read only when `standing_pools.enabled: true` resolves per the D6 fallback (Step 1b's own gate line in `plugins/synthex/commands/performance-audit.md`, which is what actually includes this file, spells out the fallback). This is not a standalone command — it has no frontmatter and is never registered in `plugin.json`.
 
 This is a sibling of `docs/standing-pool-routing.md` (the `/synthex:review-code` variant, moved in Task 13). The two bodies are NOT byte-identical: `performance-audit` has a static single-element required-reviewer-set (`[performance-engineer]`, no `--reviewers` flag or per-command config resolver), submits exactly one pool task instead of one-per-reviewer, and its consolidated-report/skip-step language differs ("audit report", "Skip Steps 2–6" vs review-code's "Skip Steps 2–7"). Task 14 (FR-HM5) therefore kept this as a separate doc rather than forcing a single parameterized file; the four D25/NFR-MMT7 user-visible strings (routing notification, submission confirmation, waiting indicator, provenance line) remain verbatim-identical across both docs — see `performance-audit-routing.test.ts`'s cross-file check.
 
 ### 1b. Standing Pool Discovery and Routing (FR-MMT15)
 
-**Only execute this step when `standing_pools.enabled: true` in `.synthex-plus/config.yaml`. If `.synthex-plus/config.yaml` does not exist or `standing_pools.enabled` is `false` or absent, skip this step entirely and proceed to Step 2 with normal fresh-spawn review.**
+**Only execute this step when `standing_pools.enabled: true` resolves from `.synthex/config.yaml`. If `.synthex/config.yaml` does not define `standing_pools.enabled`, fall back for one major version to the legacy `.synthex-plus/config.yaml` and print a deprecation warning (D6) -- migrate to `.synthex/config.yaml` before the next major release. If neither file resolves `standing_pools.enabled` to `true`, skip this step entirely and proceed to Step 2 with normal fresh-spawn review.**
 
 This step executes at command-invocation time, before any scope resolution or reviewer spawning.
 
@@ -26,7 +26,7 @@ Filter pools in the index:
 **Stale-pool detection (FR-MMT22):** During filtering, if a pool meets EITHER stale condition:
   - Condition 1: The pool's `metadata_dir` no longer exists on disk
   - Condition 2: `last_active_at` is older than `max(ttl_minutes minutes, 24 hours)`
-  → Invoke the `standing-pool-cleanup` agent at `plugins/synthex-plus/agents/standing-pool-cleanup.md` with the pool name and detection reason.
+  → Invoke the `standing-pool-cleanup` agent at `plugins/synthex/agents/standing-pool-cleanup.md` with the pool name and detection reason.
   → Emit this verbatim one-time-per-session warning (substituting pool name and fallback action): `"Standing pool '{name}' was stale and has been cleaned up. {fallback_action}."`
   → Treat the cleaned-up pool as absent.
 
@@ -56,7 +56,7 @@ Pick the **first matching pool** by name sort order. Produce the inline-discover
    - `subject`: e.g., `"Performance audit: {scope}"`
    - `description`: the audit scope, project context, available performance data, and the performance engineer's specific focus area (same context that would be passed to a fresh-spawn reviewer in Step 4)
 
-3. Invoke the `standing-pool-submitter` agent at `plugins/synthex-plus/agents/standing-pool-submitter.md` with:
+3. Invoke the `standing-pool-submitter` agent at `plugins/synthex/agents/standing-pool-submitter.md` with:
    ```json
    {
      "pool_name": "<matched pool name>",
@@ -101,7 +101,7 @@ Pick the **first matching pool** by name sort order. Produce the inline-discover
 
 #### 1b-iv. Routing Mode Semantics
 
-Apply `standing_pools.routing_mode` from `.synthex-plus/config.yaml` (default: `prefer-with-fallback`):
+Apply `standing_pools.routing_mode` (default: `prefer-with-fallback`). Resolve `standing_pools.*` from `.synthex/config.yaml`; if it is not defined there, fall back for one major version to the legacy `.synthex-plus/config.yaml` and print a deprecation warning (D6) -- migrate to `.synthex/config.yaml` before the next major release.
 
 **`prefer-with-fallback` (default):**
 - If `routing_decision` is any `fell-back-*`: proceed silently to Step 2 (fresh-spawn review). No error.
@@ -113,9 +113,13 @@ Apply `standing_pools.routing_mode` from `.synthex-plus/config.yaml` (default: `
   Routing mode is 'explicit-pool-required', so this command will not fall back to
   fresh-spawn reviewers. To proceed, either:
     1. Start a matching pool:
-         /synthex-plus:start-review-team --reviewers performance-engineer
-    2. Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml
+         /synthex:start-review-team --reviewers performance-engineer
+    2. Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml
   ```
 
 ---
+
+## Capability Ladder (FR-HM21)
+
+The pool routing above is level 1 of the same FR-HM21 capability ladder `docs/standing-pool-routing.md`'s Capability Ladder section documents in full (levels 1-4, the level-2 placeholder, and the depth-1 inline rule). `performance-audit`'s required-reviewer-set is always the single static `[performance-engineer]`, so its levels 3 and 4 differ only in whether that one reviewer is spawned as a sub-agent (a tool named `Agent`, `Task`, `task`, `spawn_agent`, or `delegate_task` is in your tool list) or performed inline in this session (otherwise, or when a spawn is refused — the depth-1 inline rule) — there is no multi-reviewer fan-out or consolidation step to gate here, unlike `review-code`.
 

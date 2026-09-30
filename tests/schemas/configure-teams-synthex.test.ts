@@ -1,5 +1,10 @@
 /**
- * Layer 1: Structural tests for /synthex-plus:configure-teams wizard.
+ * Task 47 (FR-HM24, D11) port: same structural assertions as
+ * configure-teams.test.ts, run against the copy folded into
+ * plugins/synthex/commands/configure-teams.md. Keeps the synthex-plus
+ * original (and its own test) passing unmodified.
+ *
+ * Layer 1: Structural tests for /synthex:configure-teams wizard.
  *
  * Task 19 acceptance criteria:
  *   - frontmatter (model: haiku)
@@ -23,7 +28,7 @@ const WIZARD_PATH = join(
   '..',
   '..',
   'plugins',
-  'synthex-plus',
+  'synthex',
   'commands',
   'configure-teams.md'
 );

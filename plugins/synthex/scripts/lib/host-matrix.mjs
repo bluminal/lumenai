@@ -57,6 +57,27 @@ export const SKIP_LIST_TOOL_NAMES = Object.freeze([
 const SKIP_THE_STEP = 'skip the step';
 
 /**
+ * FR-HM24/FR-HM25 (D11): the single-sourced, neutral documented-gap
+ * sentence `start-review-team`, `stop-review-team`, and `list-teams` print
+ * verbatim instead of running when `SendMessage` and `ListAgents` are not
+ * both in the caller's tool list. One sentence, no line breaks, so it reads
+ * correctly both printed standalone in a terminal and dropped into a table
+ * cell (a future per-host gap-inventory table, FR-HM25 Task 52). Every
+ * host entry below points at this same object; Task 52 is where per-host
+ * phrasing (if any) would be layered on. `.ladderFallback` was added by
+ * Task 49 (FR-HM21) alongside `.pool` -- it is not a hard gate like
+ * `.pool` (nothing aborts), it is the neutral, single-sourced sentence
+ * `review-code`/`performance-audit` may surface when the FR-HM21
+ * capability ladder falls all the way to level 4 (sequential reviewers)
+ * for lack of a fan-out tool, so the fallback is documented rather than
+ * silent.
+ */
+export const GAP_MESSAGES = Object.freeze({
+  pool: 'Standing review pools require Agent Teams (the SendMessage and ListAgents tools); this host does not expose them, so pool commands are unavailable here -- use /synthex:review-code or /synthex:performance-audit for sequential review instead.',
+  ladderFallback: 'No parallel-subagent tool (Agent, Task, task, spawn_agent, or delegate_task) is in your tool list, so reviewers run sequentially instead of fanned out in one turn -- see the capability ladder in docs/standing-pool-routing.md.',
+});
+
+/**
  * Per-host tool-name map, one entry per `CLAUDE_TOOL_NAMES` name. Values are
  * copied verbatim from the FR-HM12 table cells (a shared value across a
  * grouped row, e.g. "Read / Edit / Write" or the skip-list row, is repeated
@@ -86,10 +107,11 @@ function skipListEntries(value) {
  * - `id` / `displayName`: stable identifier and prose name for docs/wrappers.
  * - `toolMap`: Claude tool name -> this host's closest tool (or translation
  *   instruction), one entry per `CLAUDE_TOOL_NAMES`, verbatim from FR-HM12.
- * - `gapMessages`: placeholder for the single-sourced documented-gap
- *   sentence (FR-HM24 / D11) printed by `start-review-team`,
- *   `stop-review-team`, and `list-teams` when a tool is absent. Populated by
- *   Task 47; left `null` until then.
+ * - `gapMessages`: the single-sourced documented-gap sentence object
+ *   (FR-HM24 / D11, `GAP_MESSAGES` above) printed verbatim by
+ *   `start-review-team`, `stop-review-team`, and `list-teams` when
+ *   `SendMessage`/`ListAgents` are not both in the caller's tool list.
+ *   Populated (Task 47); every host points at the same shared object.
  * - `headless`: FR-HM41 / FR-HM18 headless recipe (Task 35): the approval
  *   flag a headless run needs so state writes succeed, the host's shell-call
  *   ceiling in seconds, the `SYNTHEX_LOOP_IDLE_MAX` each host should export
@@ -124,8 +146,8 @@ export const HOSTS = Object.freeze({
       AskUserQuestion: 'AskUserQuestion',
       ...skipListEntries('native; never skipped on Claude Code'),
     }),
-    // TODO(Task 47, D11): populate GAP_MESSAGES once FR-HM24 lands.
-    gapMessages: null,
+    // FR-HM24/FR-HM25 (D11): populated -- see GAP_MESSAGES above.
+    gapMessages: GAP_MESSAGES,
     // TODO(Task 46, D25): populate the hook allowlist once Task 46 lands.
     hookAllowlist: null,
     // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM18 (600 s Bash ceiling); loop-idle-wait.sh default 540 s.
@@ -152,8 +174,8 @@ export const HOSTS = Object.freeze({
         'request_user_input (plan mode only), else ask in chat and end the turn',
       ...skipListEntries(SKIP_THE_STEP),
     }),
-    // TODO(Task 47, D11): populate GAP_MESSAGES once FR-HM24 lands.
-    gapMessages: null,
+    // FR-HM24/FR-HM25 (D11): populated -- see GAP_MESSAGES above.
+    gapMessages: GAP_MESSAGES,
     // D25/FR-HM27: commit-lint only, matcher = this host's own Bash tool
     // name (toolMap.Bash above). Rendered into hooks/codex-hooks.json by
     // generate-codex-skills.mjs; never Stop/SessionStart/TaskCompleted/
@@ -185,8 +207,8 @@ export const HOSTS = Object.freeze({
       AskUserQuestion: 'ask_user (denied headless)',
       ...skipListEntries(SKIP_THE_STEP),
     }),
-    // TODO(Task 47, D11): populate GAP_MESSAGES once FR-HM24 lands.
-    gapMessages: null,
+    // FR-HM24/FR-HM25 (D11): populated -- see GAP_MESSAGES above.
+    gapMessages: GAP_MESSAGES,
     // TODO(Task 46, D25): populate the hook allowlist once Task 46 lands.
     hookAllowlist: null,
     // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM32 recipe; PRD FR-HM18 'Gemini CLI at most 240 s (5-minute hard cap)'.
@@ -212,8 +234,8 @@ export const HOSTS = Object.freeze({
       AskUserQuestion: 'question (denied headless)',
       ...skipListEntries(SKIP_THE_STEP),
     }),
-    // TODO(Task 47, D11): populate GAP_MESSAGES once FR-HM24 lands.
-    gapMessages: null,
+    // FR-HM24/FR-HM25 (D11): populated -- see GAP_MESSAGES above.
+    gapMessages: GAP_MESSAGES,
     // TODO(Task 46, D25): populate the hook allowlist once Task 46 lands.
     hookAllowlist: null,
     // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM32 recipe; PRD FR-HM18 'Grok Build and OpenCode at most 90 s (120 s default)'.
@@ -239,8 +261,8 @@ export const HOSTS = Object.freeze({
       AskUserQuestion: 'ask_user_question if listed, else ask in chat',
       ...skipListEntries(`${SKIP_THE_STEP}; never use Grok's /workflow`),
     }),
-    // TODO(Task 47, D11): populate GAP_MESSAGES once FR-HM24 lands.
-    gapMessages: null,
+    // FR-HM24/FR-HM25 (D11): populated -- see GAP_MESSAGES above.
+    gapMessages: GAP_MESSAGES,
     // TODO(Task 46, D25): populate the hook allowlist once Task 46 lands.
     hookAllowlist: null,
     // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM32 recipe; PRD FR-HM18 90 s / 120 s default and background-poll bullet.
@@ -266,8 +288,8 @@ export const HOSTS = Object.freeze({
       AskUserQuestion: 'clarify (unsafe headless)',
       ...skipListEntries(SKIP_THE_STEP),
     }),
-    // TODO(Task 47, D11): populate GAP_MESSAGES once FR-HM24 lands.
-    gapMessages: null,
+    // FR-HM24/FR-HM25 (D11): populated -- see GAP_MESSAGES above.
+    gapMessages: GAP_MESSAGES,
     // TODO(Task 46, D25): populate the hook allowlist once Task 46 lands.
     hookAllowlist: null,
     // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM32 recipe and spikes.md Task 8; PRD FR-HM18 'Hermes no cap known' (Claude values reused).

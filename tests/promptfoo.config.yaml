@@ -1001,6 +1001,78 @@ tests:
       - type: not-icontains
         value: "DECOY-PROJECT-DOCS-MARKER"
 
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # POOL CONFIG FOLD (Layer 2) — docs/plans/harness-modernization.md,
+  # Task 48 (FR-HM24, D6). Manual-trigger only, same NL-B/AD-B/MMT-GATE-B
+  # convention as above (billed; cache-populated via
+  # `npx promptfoo eval --filter-pattern "MMT-GATE-B"`).
+  #
+  # B2 fixture: tests/fixtures/multi-model-teams/pool-gate-new-config-only/
+  # — has ONLY .synthex/config.yaml with standing_pools.enabled: true; no
+  # legacy .synthex-plus/config.yaml exists in the project at all. Proves
+  # the new config location alone is sufficient to fire the gate.
+  #
+  # B3 reuses the B1 fixture (tests/fixtures/multi-model-teams/
+  # pool-gate-enabled/), which has ONLY the legacy .synthex-plus/
+  # config.yaml with standing_pools.enabled: true and no .synthex/
+  # config.yaml — i.e. it was always a "legacy file alone" project, just
+  # not asked about the D6 fallback until now. Proves the gate still
+  # fires via the D6 fallback and that the model surfaces the deprecation
+  # warning.
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  - description: "MMT-GATE-B2: pool-gate-new-config-only — review-code Step 1b routes when standing_pools.enabled is set in .synthex/config.yaml alone"
+    vars:
+      agent: review-code
+      input: |
+        You are running /synthex:review-code in a project whose ONLY
+        Synthex config file is `.synthex/config.yaml`, containing:
+
+          standing_pools:
+            enabled: true
+            ttl_minutes: 60
+            default_name: review-pool
+            matching_mode: covers
+            routing_mode: prefer-with-fallback
+
+        This project has no `.synthex-plus/config.yaml` file at all —
+        there is nothing to fall back to, and none is needed.
+
+        Per Step 1b of your workflow ("Standing Pool Discovery and
+        Routing"), does the gate fire? State, verbatim, the exact file
+        path your Read tool call would target.
+    assert:
+      - type: icontains
+        value: "${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md"
+
+  - description: "MMT-GATE-B3: pool-gate-enabled (legacy-only) — review-code Step 1b still routes via the D6 fallback and surfaces the deprecation warning"
+    vars:
+      agent: review-code
+      input: |
+        You are running /synthex:review-code in a project whose ONLY
+        Synthex config file is the legacy `.synthex-plus/config.yaml`,
+        containing:
+
+          standing_pools:
+            enabled: true
+            ttl_minutes: 60
+            default_name: review-pool
+            matching_mode: covers
+            routing_mode: prefer-with-fallback
+
+        This project has no `.synthex/config.yaml` file at all.
+
+        Per Step 1b of your workflow ("Standing Pool Discovery and
+        Routing"), does the gate still fire per the D6 fallback? State,
+        verbatim, the exact file path your Read tool call would target,
+        and state whether you would surface a deprecation warning to the
+        user about the legacy config location, quoting it if so.
+    assert:
+      - type: icontains
+        value: "${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md"
+      - type: icontains
+        value: "deprecat"
+
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # NATIVE LOOPING — ONE loop-step.sh advance CALL PER ITERATION (Task 34, FR-HM18)
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

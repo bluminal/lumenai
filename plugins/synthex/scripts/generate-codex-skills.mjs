@@ -138,6 +138,26 @@ export const COMMAND_DESCRIPTIONS = {
     description: 'Ask whether the user wants to star the Lumenai repo on GitHub, then help them do it.',
     argumentHint: '(no arguments)',
   },
+  // Task 47 (FR-HM24, D11): folded in from synthex-plus. start-review-team,
+  // stop-review-team, and list-teams print GAP_MESSAGES.pool (host-matrix.mjs)
+  // and stop instead of running when SendMessage/ListAgents are not both in
+  // the caller's tool list; configure-teams is ungated (writes config only).
+  'configure-teams': {
+    description: 'Wizard to enable or reconfigure standing review pool routing (routing_mode, matching_mode).',
+    argumentHint: '[config_path]',
+  },
+  'start-review-team': {
+    description: 'Spawn a standing review pool of persistent reviewer agents that review commands route to.',
+    argumentHint: '[name] [reviewers] [multi_model] [ttl_minutes]',
+  },
+  'stop-review-team': {
+    description: 'Gracefully shut down one or all standing review pools, draining in-flight tasks first.',
+    argumentHint: '[name] | --all [--force]',
+  },
+  'list-teams': {
+    description: 'List active standing pools and non-standing per-invocation teams with roster, tasks, TTL.',
+    argumentHint: '(no arguments)',
+  },
 };
 
 // FR-HM10: agent wrappers are model-invocable, not user-invocable, and stay
@@ -188,6 +208,16 @@ export const AGENT_DESCRIPTIONS = {
   'security-reviewer':
     'Reviews code for vulnerabilities, secret leaks, and access-control defects as a security gate.',
   'sre-agent': 'Defines SLOs, designs observability, writes runbooks, and assesses deployment risk.',
+  // Task 47 (FR-HM24, D11): folded in from synthex-plus. Every string below
+  // must match the agent's own frontmatter description: byte-for-byte
+  // (agentDescription() prefers frontmatter; this table is the fallback
+  // wrapper-catalog.test.ts checks agree with it).
+  'standing-pool-cleanup':
+    "Atomically removes a stale standing pool's index entry and metadata directory under the cross-session lock.",
+  'standing-pool-submitter':
+    "Submits review tasks to a standing pool's task list and polls for the consolidated report envelope.",
+  'team-orchestrator-bridge':
+    'Bridges native team reviewer mailbox messages into the canonical finding envelope for multi-model review.',
   'tech-lead': 'Primary coding and orchestration agent; implements features and delegates to specialists.',
   'technical-writer': 'Writes and maintains API docs, user guides, migration guides, and changelogs.',
   'terraform-plan-reviewer':
@@ -417,7 +447,8 @@ Set \`SYNTHEX_HOST=<id>\` before running any \`scripts/*.sh\` so \`loop-step.sh 
 // docs/reqs/harness-modernization.md's host notes) rather than the
 // hand-authored hooks/hooks.json Claude Code uses, because Codex must never
 // inherit Claude-only events (`Stop`, `SessionStart`, `TaskCompleted`,
-// `TeammateIdle` -- the last two don't exist yet, added by Task 50). Built
+// `TeammateIdle` -- the last two are real command hooks in hooks/hooks.json
+// as of Task 50, FR-HM23, but Codex never gets them either way). Built
 // entirely from `HOSTS.codex.hookAllowlist` (single-sourced in
 // host-matrix.mjs) so the set of events Codex gets can only ever be a
 // subset of what that allowlist authorizes; today that is commit-lint's

@@ -426,6 +426,77 @@ describe.each(variants)(
       },
     );
 
+    (variant.label === 'synthex' ? describe : describe.skip)(
+      'D7 synthex-plus deprecation nudge (Task 53, NFR-HM7)',
+      () => {
+        it('warns when .synthex-plus/ exists, even at steady state and with other nudges dismissed', () => {
+          mkdirSync(join(projectDir, variant.stateDir), { recursive: true });
+          mkdirSync(join(projectDir, '.synthex-plus'), { recursive: true });
+          writeStateJson(projectDir, variant.stateDir, {
+            last_seen_version: currentVersion,
+            dismissed: true,
+            starred: true,
+            star_dismissed: true,
+          });
+
+          const { stdout, status } = runHook(variant.scriptPath, projectDir);
+
+          expect(status).toBe(0);
+          expect(stdout).toContain('Synthex Plus is deprecated');
+          expect(stdout).toContain('docs/migrations/synthex-plus.md');
+        });
+
+        it('warns when only a legacy .synthex-plus/config.yaml is left behind', () => {
+          mkdirSync(join(projectDir, variant.stateDir), { recursive: true });
+          mkdirSync(join(projectDir, '.synthex-plus'), { recursive: true });
+          writeFileSync(
+            join(projectDir, '.synthex-plus', 'config.yaml'),
+            'standing_pools:\n  enabled: true\n'
+          );
+
+          const { stdout, status } = runHook(variant.scriptPath, projectDir);
+
+          expect(status).toBe(0);
+          expect(stdout).toContain('Synthex Plus is deprecated');
+        });
+
+        it('fires on a fresh-install session (no prior state) when .synthex-plus/ exists', () => {
+          mkdirSync(join(projectDir, variant.stateDir), { recursive: true });
+          mkdirSync(join(projectDir, '.synthex-plus'), { recursive: true });
+
+          const { stdout, status } = runHook(variant.scriptPath, projectDir);
+
+          expect(status).toBe(0);
+          expect(stdout).toContain('Synthex Plus is deprecated');
+        });
+
+        it('does NOT warn when .synthex-plus/ is absent', () => {
+          mkdirSync(join(projectDir, variant.stateDir), { recursive: true });
+          writeStateJson(projectDir, variant.stateDir, {
+            last_seen_version: currentVersion,
+            dismissed: true,
+            starred: true,
+            star_dismissed: true,
+          });
+
+          const { stdout, status } = runHook(variant.scriptPath, projectDir);
+
+          expect(status).toBe(0);
+          expect(stdout).not.toContain('Synthex Plus is deprecated');
+        });
+
+        it('does NOT warn when the project has no .synthex/ dir at all (D-UO8 / E12 still wins)', () => {
+          mkdirSync(join(projectDir, '.synthex-plus'), { recursive: true });
+          // No .synthex/ dir created.
+
+          const { stdout, status } = runHook(variant.scriptPath, projectDir);
+
+          expect(status).toBe(0);
+          expect(stdout).toBe('');
+        });
+      },
+    );
+
     describe('NFR-UO1 / NFR-UO2 timing budgets (Task 26)', () => {
       it('NFR-UO1: steady-state p95 ≤ 50 ms over 30 invocations', () => {
         mkdirSync(join(projectDir, variant.stateDir), { recursive: true });

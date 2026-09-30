@@ -21,12 +21,11 @@ type Cmd = { name: string; file: string; followupContext: string };
 // so it moved into the SAME doc file rather than a fork, kept verbatim
 // under a "## performance-audit variant" heading. This entry now also
 // reads docs/sandbox-yolo.md.
+// Task 54: dropped the /synthex-plus:start-review-team entry — synthex-plus
+// is tombstoned to a migration stub with no sandbox-yolo confirmation prose
+// left to assert (see docs/migrations/synthex-plus.md). The folded
+// /synthex:start-review-team entry below carries the same content forward.
 const COMMANDS: Cmd[] = [
-  {
-    name: '/synthex-plus:start-review-team',
-    file: join(PLUGINS, 'synthex-plus', 'commands', 'start-review-team.md'),
-    followupContext: 'pool',
-  },
   {
     name: '/synthex:review-code',
     file: join(PLUGINS, 'synthex', 'docs', 'sandbox-yolo.md'),
@@ -36,6 +35,14 @@ const COMMANDS: Cmd[] = [
     name: '/synthex:performance-audit',
     file: join(PLUGINS, 'synthex', 'docs', 'sandbox-yolo.md'),
     followupContext: 'audit',
+  },
+  // Task 47 (FR-HM24, D11): start-review-team folded into synthex verbatim
+  // (Step 5a and its Sandbox-Yolo Confirmation body are unchanged from the
+  // synthex-plus original above).
+  {
+    name: '/synthex:start-review-team',
+    file: join(PLUGINS, 'synthex', 'commands', 'start-review-team.md'),
+    followupContext: 'pool',
   },
 ];
 

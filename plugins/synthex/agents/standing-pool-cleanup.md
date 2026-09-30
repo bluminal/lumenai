@@ -1,5 +1,7 @@
 ---
 model: haiku
+description: "Atomically removes a stale standing pool's index entry and metadata directory under the cross-session lock."
+tools: Bash, Read, Write
 ---
 
 # Standing Pool Cleanup

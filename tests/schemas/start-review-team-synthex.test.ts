@@ -1,7 +1,19 @@
 /**
+ * Task 47 (FR-HM24, D11) port: same structural assertions as
+ * start-review-team.test.ts, run against the copy folded into
+ * plugins/synthex/commands/start-review-team.md (which also carries the
+ * new Step 0 host-capability gate; see gap-messages.test.ts for that).
+ * Keeps the synthex-plus original (and its own test) passing unmodified.
+ *
+ * Task 51 (FR-HM22, ADR-plus-002) update: this copy (unlike the synthex-plus
+ * original) no longer spawns reviewers with the read-on-spawn instruction or
+ * the "Standing Pool Identity Confirm Overlay". T11 below was updated to
+ * assert the replacement `agentType: synthex:<agent-name>` spawn mechanism
+ * and its `ListAgents`-based verification step instead.
+ *
  * Layer 1: Structural validation tests for the start-review-team command.
  *
- * Validates all [T] acceptance criteria from Task 41:
+ * Validates all [T] acceptance criteria from Task 41 (T11 superseded by Task 51):
  *   T1  — All 10 workflow steps present
  *   T2  — Pool name validation regex ^[a-z0-9][a-z0-9-]{0,47}$ present verbatim
  *   T3  — Verbatim rejection message ("Pool name '", "is invalid", "Names must be 1–48")
@@ -12,7 +24,8 @@
  *   T8  — .index.json.tmp + rename (atomic index update)
  *   T9  — Cost advisory verbatim text
  *   T10 — submission_timeout_seconds in step 10 confirmation
- *   T11 — Step 7 overlay: "Standing Pool Identity Confirm Overlay" present
+ *   T11 — Step 7 reviewer identity: `agentType: synthex:<agent-name>` spawn, verified via
+ *         ListAgents (not config.json); no read-on-spawn/overlay-re-paste instruction (ADR-plus-002)
  *   T12 — Step 7 overlay: "Standing Pool Lifecycle Overlay" present
  *   T13 — Lifecycle overlay only for Pool Lead (exclusive language near "Lifecycle Overlay")
  *   T14 — Multi-model overlay conditional on multi_model: true
@@ -26,7 +39,7 @@ import { join } from 'path';
 
 const COMMAND_PATH = join(
   import.meta.dirname,
-  '..', '..', 'plugins', 'synthex-plus', 'commands', 'start-review-team.md'
+  '..', '..', 'plugins', 'synthex', 'commands', 'start-review-team.md'
 );
 
 const content = readFileSync(COMMAND_PATH, 'utf-8');
@@ -166,9 +179,21 @@ describe('commands/start-review-team.md — Task 41 [T] acceptance criteria', ()
     expect(content).toContain('submission_timeout_seconds');
   });
 
-  // ── [T11] Step 7 overlay: Standing Pool Identity Confirm Overlay ──────────
-  it('[T11] "Standing Pool Identity Confirm Overlay" is referenced in the document', () => {
-    expect(content).toContain('Standing Pool Identity Confirm Overlay');
+  // ── [T11] Step 7 reviewer identity: agentType spawn, ListAgents verification (ADR-plus-002) ──
+  it('[T11] reviewer spawn uses agentType: "synthex:<agent-name>" (ADR-plus-002)', () => {
+    expect(content).toContain('agentType: "synthex:<agent-name>"');
+  });
+
+  it('[T11] spawn identity verification uses ListAgents, not config.json (FR-HM22 acceptance)', () => {
+    expect(content).toContain('ListAgents');
+    const verifyIdx = content.indexOf('Verify Spawn Identity');
+    expect(verifyIdx).toBeGreaterThanOrEqual(0);
+    const window = content.slice(verifyIdx, verifyIdx + 700);
+    expect(window).toMatch(/Do NOT verify identity by reading.*config\.json/i);
+  });
+
+  it('[T11] "Standing Pool Identity Confirm Overlay" is NOT referenced as an active instruction', () => {
+    expect(content).not.toContain('### Standing Pool Identity Confirm Overlay');
   });
 
   // ── [T12] Step 7 overlay: Standing Pool Lifecycle Overlay ─────────────────

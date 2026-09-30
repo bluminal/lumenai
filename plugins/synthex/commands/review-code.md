@@ -47,7 +47,7 @@ Check for a project configuration file at `@{config_path}`. If it exists, load t
 
 ### 1b. Standing Pool Discovery and Routing (FR-MMT15)
 
-If `standing_pools.enabled` is true, Read `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md` and follow it; otherwise skip to Step 2. On other hosts, resolve the plugin root from `.synthex/state.json`'s `plugin_root` field and read the same file relative to it.
+If `standing_pools.enabled` is true (`.synthex/config.yaml`; falls back per D6 to the legacy `.synthex-plus/config.yaml` for one major version, printing a deprecation warning), Read `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md` and follow it; otherwise skip to Step 2. On other hosts, resolve the plugin root from `.synthex/state.json`'s `plugin_root` field and read the same file relative to it.
 
 ---
 
@@ -118,9 +118,9 @@ Before launching reviewers, gather context they'll need:
 - Read convention sources from config (e.g., `.eslintrc`, `.prettierrc`)
 - Identify the programming language(s) and frameworks in the diff
 
-### 4. Launch Reviewers in Parallel
+### 4. Launch Reviewers
 
-For each enabled reviewer, launch a sub-agent IN PARALLEL, providing the full diff and project context, and expecting structured output with a PASS/WARN/FAIL verdict and severity-ranked findings:
+FR-HM21 levels 3-4 (Capability Ladder, `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md`): if a tool named `Agent`, `Task`, `task`, `spawn_agent`, or `delegate_task` is in your tool list, launch each enabled reviewer as a sub-agent IN PARALLEL, in one turn; otherwise, run them sequentially, one at a time (GAP_MESSAGES.ladderFallback explains why). A refused spawn on a depth-1 host applies the inline rule, not level 4. Provide the full diff and project context; expect a PASS/WARN/FAIL verdict with severity-ranked findings:
 
 - **Code Reviewer:** craftsmanship review (correctness, maintainability, convention adherence, specification compliance, reuse opportunities).
 - **Security Reviewer:** security-focused review (vulnerabilities, secrets, injection, access control).

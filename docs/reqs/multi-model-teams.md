@@ -1,5 +1,14 @@
 # Product Requirements Document: Multi-Model Review on Synthex+ Teams + Standing Review Pools
 
+> **Superseded.** Synthex+ is deprecated. Feature B (standing review pools)
+> was folded into `synthex` — see `docs/specs/multi-model-teams/` and
+> `docs/plans/harness-modernization.md` Milestone 6.1–6.2 for the current
+> design. Feature A (`/team-review --multi-model`) is retired along with
+> `team-*`; multi-model review on standard `synthex` commands is covered by
+> `multi-model-review.md`, not this document. Kept for historical context
+> only. See [`docs/migrations/synthex-plus.md`](../migrations/synthex-plus.md)
+> to migrate an existing Synthex+ project.
+
 ## 1. Vision & Purpose
 
 **Why this exists:** Two real costs constrain Synthex+ review workflows today.

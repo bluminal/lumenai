@@ -126,14 +126,14 @@ describe('Task 31 (FR-HM15, D29): Model Resolution paragraph', () => {
     expect(registered.has(`./docs/${GATED_DOC}`)).toBe(false);
   });
 
-  it('review-code.md stays at or under its 15,360-byte D17 budget (Task 13)', () => {
+  it('review-code.md stays at or under its 15,872-byte D17 budget (Task 13; raised by Task 48/D6, then Task 49/FR-HM21 by 256 B for the Step 4 capability-ladder gate)', () => {
     const content = readFileSync(join(COMMANDS_DIR, 'review-code.md'), 'utf-8');
-    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(15_360);
+    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(15_872);
   });
 
-  it('performance-audit.md stays at or under its 8,704-byte D17 budget (Task 14)', () => {
+  it('performance-audit.md stays at or under its 9,472-byte D17 budget (Task 14; raised by Task 48/D6, then Task 49/FR-HM21 by 512 B for the Step 4 capability-ladder gate)', () => {
     const content = readFileSync(join(COMMANDS_DIR, 'performance-audit.md'), 'utf-8');
-    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(8_704);
+    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(9_472);
   });
 
   it('write-implementation-plan.md stays at or under its 26,112-byte D17 budget (Task 14)', () => {

@@ -28,12 +28,14 @@ import {
   profiles,
   supportsProfile,
 } from '../compat/lib/harnesses.mjs';
+import { poolCapabilityGaps } from '../compat/lib/pool-gaps.mjs';
 import {
   AGENT_COUNT,
   COMMAND_COUNT,
   diffInventoryAgainstManifest,
   WRAPPER_COUNT,
 } from '../compat/lib/inventory.mjs';
+import { GAP_MESSAGES } from '../../plugins/synthex/scripts/lib/host-matrix.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const pluginRoot = resolve(repoRoot, 'plugins/synthex');
@@ -289,7 +291,38 @@ describe('cross-harness compatibility contract', () => {
     expect(workflow).toContain('plugins/synthex-plus/.claude-plugin/plugin.json');
   });
 
-  it('marks the cross-harness distribution release as a one-time major bump', () => {
+  it('still bumps synthex-plus in lockstep with synthex (Task 54: tombstone, not removal)', () => {
+    const workflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/release.yml'),
+      'utf8',
+    );
+
+    // Reads the current synthex-plus manifest version alongside synthex's.
+    expect(workflow).toContain(
+      'PLUS_OLD=$(jq -r .version plugins/synthex-plus/.claude-plugin/plugin.json)',
+    );
+    // Computes a bumped version for it using the same BUMP level.
+    expect(workflow).toContain('PLUS_NEW=$(bump_semver "$PLUS_OLD" "$BUMP")');
+    // Writes the bumped version back into its own manifest...
+    expect(workflow).toContain(
+      "jq --indent 2 --arg v \"$PLUS_NEW\" '.version = $v' \\\n            plugins/synthex-plus/.claude-plugin/plugin.json",
+    );
+    // ...and into the marketplace's plugins[] entry for it, one manifest set
+    // alongside synthex (FR-HM2: "release.yml bumps one plugin manifest set").
+    expect(workflow).toContain(
+      '| (.plugins[] | select(.name == "synthex-plus").version) = $p',
+    );
+    // The release commit message and GitHub release title both name the
+    // bumped synthex-plus version, not just synthex's.
+    expect(workflow).toContain(
+      'git commit -m "release: synthex ${SYNTHEX_NEW} + synthex-plus ${PLUS_NEW}"',
+    );
+    expect(workflow).toContain(
+      '--title "v${MARKET_NEW} — synthex ${SYNTHEX_NEW} + synthex-plus ${PLUS_NEW}"',
+    );
+  });
+
+  it('marks the synthex-plus tombstone release as a one-time major bump (Task 54, D7/D8)', () => {
     const intent = JSON.parse(
       readFileSync(resolve(repoRoot, '.release-intent.json'), 'utf8'),
     );
@@ -299,7 +332,7 @@ describe('cross-harness compatibility contract', () => {
     );
 
     expect(intent.bump).toBe('major');
-    expect(intent.reason).toContain('Codex CLI');
+    expect(intent.reason).toContain('docs/migrations/synthex-plus.md');
     expect(workflow).toContain('RELEASE_INTENT_FILE=".release-intent.json"');
     expect(workflow).toContain('Release intent raised bump');
   });
@@ -338,5 +371,40 @@ describe('cross-harness compatibility contract', () => {
     } finally {
       rmSync(temporaryRoot, { recursive: true, force: true });
     }
+  });
+
+  it('records the FR-HM25 standing-pool gap for Codex, Gemini, OpenCode, and Grok', () => {
+    // Task 52 (FR-HM25): standing review pools are a documented gap on
+    // every host except Claude Code. Grok has no Docker-based lifecycle in
+    // `harnesses`/`harnessIds` above, so it is asserted separately here
+    // rather than folded into the `%s` cases above.
+    expect(Object.keys(poolCapabilityGaps).sort()).toEqual([
+      'codex',
+      'gemini',
+      'grok',
+      'opencode',
+    ]);
+    expect(poolCapabilityGaps).not.toHaveProperty('claude');
+    expect(poolCapabilityGaps).not.toHaveProperty('hermes');
+
+    // Single-sourced: every entry is GAP_MESSAGES.pool imported, not copied.
+    for (const gapMessage of Object.values(poolCapabilityGaps)) {
+      expect(gapMessage).toBe(GAP_MESSAGES.pool);
+    }
+
+    // The compat README's gap section quotes GAP_MESSAGES.pool verbatim and
+    // notes Hermes' Kanban board as future work, not implemented.
+    const compatReadme = readFileSync(resolve(compatRoot, 'README.md'), 'utf8');
+    expect(compatReadme).toContain(GAP_MESSAGES.pool);
+    expect(compatReadme).toMatch(/Hermes.{0,40}Kanban/is);
+    expect(compatReadme).toMatch(/future/i);
+
+    // The user-facing plugin README (`## Installation`) quotes the same
+    // sentence verbatim so users -- not just compat-suite maintainers --
+    // learn about the gap.
+    const pluginReadme = readFileSync(resolve(pluginRoot, 'README.md'), 'utf8');
+    expect(pluginReadme).toContain(GAP_MESSAGES.pool);
+    expect(pluginReadme).toMatch(/Hermes.{0,40}Kanban/is);
+    expect(pluginReadme).toMatch(/future/i);
   });
 });

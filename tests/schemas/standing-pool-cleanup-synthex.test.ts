@@ -1,4 +1,9 @@
 /**
+ * Task 47 (FR-HM24, D11) port: same structural assertions as
+ * standing-pool-cleanup.test.ts, run against the copy folded into
+ * plugins/synthex/agents/standing-pool-cleanup.md. Keeps the synthex-plus
+ * original (and its own test) passing unmodified.
+ *
  * Layer 1: Schema validation tests for the standing-pool-cleanup agent file.
  *
  * Validates acceptance criteria [T] for Task 32:
@@ -21,7 +26,7 @@ import { resolve } from 'node:path';
 
 const AGENT_PATH = resolve(
   __dirname,
-  '../../plugins/synthex-plus/agents/standing-pool-cleanup.md'
+  '../../plugins/synthex/agents/standing-pool-cleanup.md'
 );
 
 const AGENT_CONTENT = (() => {
@@ -56,12 +61,22 @@ function splitByH2(content: string): Map<string, string> {
 
 describe('[T1] Frontmatter: model: haiku', () => {
   it('file starts with YAML frontmatter declaring model: haiku', () => {
-    // Regex: frontmatter block at start of file with model: haiku
-    const FRONTMATTER_RE = /^---\s*\nmodel:\s*haiku\s*\n---/m;
+    // Task 47 (FR-HM24, D11): the synthex copy also carries a
+    // description: and tools: key (agent-frontmatter.test.ts), so unlike
+    // the synthex-plus original the closing `---` no longer immediately
+    // follows `model: haiku` -- assert the frontmatter block opens with
+    // model: haiku and still closes before the first heading, instead of
+    // requiring model: haiku to be the block's only line.
+    const OPEN_RE = /^---\s*\nmodel:\s*haiku\s*\n/;
     expect(
-      FRONTMATTER_RE.test(AGENT_CONTENT),
-      'Expected file to begin with ---\\nmodel: haiku\\n--- frontmatter block'
+      OPEN_RE.test(AGENT_CONTENT),
+      'Expected file to begin with ---\\nmodel: haiku\\n...'
     ).toBe(true);
+
+    const fmEnd = AGENT_CONTENT.indexOf('\n---\n', 4);
+    expect(fmEnd, 'Expected a closing --- frontmatter fence').toBeGreaterThan(0);
+    const headingIdx = AGENT_CONTENT.indexOf('\n# ');
+    expect(headingIdx).toBeGreaterThan(fmEnd);
   });
 });
 

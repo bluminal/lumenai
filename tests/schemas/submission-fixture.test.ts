@@ -15,7 +15,7 @@
  *   [8] submitter_outputs has correct envelope shape (status, report, error, metadata)
  *   [9] submitter_inputs.tasks is a non-empty array
  *   [10] plugins/synthex/commands/review-code.md contains provenance line text verbatim
- *   [11] plugins/synthex-plus/agents/standing-pool-submitter.md documents .tmp + rename pattern
+ *   [11] plugins/synthex/agents/standing-pool-submitter.md documents .tmp + rename pattern
  */
 
 import { describe, it, expect } from 'vitest';
@@ -51,9 +51,10 @@ const REVIEW_CODE_MD_PATH = join(
   '..', '..', 'plugins', 'synthex', 'docs', 'standing-pool-routing.md'
 );
 
-const SUBMITTER_MD_PATH = join(
+// Task 47 (FR-HM24, D11) port; Task 54 tombstoned the synthex-plus original.
+const SUBMITTER_MD_SYNTHEX_PATH = join(
   import.meta.dirname,
-  '..', '..', 'plugins', 'synthex-plus', 'agents', 'standing-pool-submitter.md'
+  '..', '..', 'plugins', 'synthex', 'agents', 'standing-pool-submitter.md'
 );
 
 const fixtureRaw = JSON.parse(readFileSync(FIXTURE_PATH, 'utf-8'));
@@ -398,9 +399,11 @@ describe('[10] plugins/synthex/docs/standing-pool-routing.md contains provenance
 });
 
 // ── [11] standing-pool-submitter.md documents .tmp + rename pattern ───────
+// (Task 54: synthex-plus tombstoned; plugins/synthex/agents/standing-pool-
+// submitter.md, ported in Task 47, is the sole surviving copy)
 
-describe('[11] plugins/synthex-plus/agents/standing-pool-submitter.md documents .tmp + rename', () => {
-  const submitterContent = readFileSync(SUBMITTER_MD_PATH, 'utf-8');
+describe('[11] plugins/synthex/agents/standing-pool-submitter.md documents .tmp + rename', () => {
+  const submitterContent = readFileSync(SUBMITTER_MD_SYNTHEX_PATH, 'utf-8');
 
   it('standing-pool-submitter.md is readable and non-empty', () => {
     expect(submitterContent.length).toBeGreaterThan(0);
@@ -415,7 +418,6 @@ describe('[11] plugins/synthex-plus/agents/standing-pool-submitter.md documents 
   });
 
   it('documents the .tmp + rename as atomic write pattern (FR-MMT16 §2)', () => {
-    // The doc must contain both the .tmp pattern and the rename together in context
     const hasTmpPattern = submitterContent.includes('.json.tmp');
     const hasRenamePattern = submitterContent.includes('mv -f');
     expect(hasTmpPattern).toBe(true);
@@ -431,10 +433,8 @@ describe('[11] plugins/synthex-plus/agents/standing-pool-submitter.md documents 
   });
 
   it('documents the .tmp + rename rule in the Behavioral Rules section', () => {
-    // Behavioral Rules section must reference the .tmp + rename pattern
     const rulesSection = submitterContent.includes('Behavioral Rules');
     expect(rulesSection).toBe(true);
-    // The rule must appear in the document alongside .tmp
     const ruleWithTmp = submitterContent.includes('.tmp') && submitterContent.includes('rename');
     expect(ruleWithTmp).toBe(true);
   });

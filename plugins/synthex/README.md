@@ -62,6 +62,14 @@ cd <project> && hermes skills trust
 
 Never nest `commands/` or `agents/` inside a skill folder — Hermes's Skills Guard scans project skills at load and quarantines (fail-closed) any it scores `dangerous`, and the canonical `commands/`/`agents/` files trip several of its heuristics (path traversal, agent-config modification) when placed inside a skill directory. The symlink layout above keeps them outside every skill folder, so nothing is quarantined. `hermes skills trust` is per git checkout; run it again after re-cloning. See `docs/specs/harness-modernization/spikes.md`, Task 8, for the full spike this recipe is based on.
 
+### Standing review pools
+
+Standing review pools (`/synthex:start-review-team`) need Claude Code's Agent Teams tools and are a documented gap elsewhere:
+
+> Standing review pools require Agent Teams (the SendMessage and ListAgents tools); this host does not expose them, so pool commands are unavailable here -- use /synthex:review-code or /synthex:performance-audit for sequential review instead.
+
+Codex, Gemini CLI, OpenCode, and Grok hit this gap. `/synthex:review-code` and `/synthex:performance-audit` still work everywhere through the capability ladder: parallel sub-agents where the host has one, sequential reviewers otherwise. Hermes' Kanban board is noted as possible future pool-backend work, not implemented.
+
 For copyable installation and update instructions, see [Agent compatibility](https://slashsynthex.com/docs/agent-compatibility).
 
 ### Upgrading a manual install
@@ -230,11 +238,11 @@ This is scoped narrowly: `[H]` (human-validated) acceptance criteria are **never
 /synthex:next-priority --loop --completion-promise "ALLDONE" --auto-decide
 ```
 
-## Standing Review Pools (via Synthex+)
+## Standing Review Pools
 
-When [Synthex+](../synthex-plus/README.md) is installed and a standing review pool is running, `/review-code` and `/performance-audit` automatically route to the pool — no flags required. Routing is **off by default unless synthex-plus is initialized with `standing_pools.enabled: true`**.
+When a standing review pool is running (`/synthex:start-review-team`), `/review-code` and `/performance-audit` automatically route to the pool — no flags required. Routing is **off by default unless `standing_pools.enabled: true`** in `.synthex/config.yaml` (or, for one major version, the legacy `.synthex-plus/config.yaml`; see D6).
 
-For setup and configuration, see the [Standing Pools guide](../synthex-plus/docs/standing-pools.md).
+For setup and configuration, see the [Standing Pools guide](./docs/standing-pools.md). Coming from Synthex+? See [`docs/migrations/synthex-plus.md`](../../docs/migrations/synthex-plus.md).
 
 ## Cost
 

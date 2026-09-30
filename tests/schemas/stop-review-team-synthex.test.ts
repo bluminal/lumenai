@@ -1,4 +1,10 @@
 /**
+ * Task 47 (FR-HM24, D11) port: same structural assertions as
+ * stop-review-team.test.ts, run against the copy folded into
+ * plugins/synthex/commands/stop-review-team.md (which also carries the
+ * new Step 0 host-capability gate; see gap-messages.test.ts for that).
+ * Keeps the synthex-plus original (and its own test) passing unmodified.
+ *
  * Layer 1: Schema validation tests for stop-review-team command.
  *
  * Validates all [T] acceptance criteria from Task 42:
@@ -19,7 +25,7 @@ import { join } from 'path';
 
 const COMMAND_PATH = join(
   import.meta.dirname,
-  '..', '..', 'plugins', 'synthex-plus', 'commands', 'stop-review-team.md'
+  '..', '..', 'plugins', 'synthex', 'commands', 'stop-review-team.md'
 );
 
 const content = readFileSync(COMMAND_PATH, 'utf-8');

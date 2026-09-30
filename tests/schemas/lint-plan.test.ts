@@ -442,9 +442,11 @@ describe('plan-linter retirement (FR-HM26, Task 45)', () => {
   });
 
   // Not pinned to an exact value: Task 46 (commit-message-author retirement)
-  // is concurrent on a sibling branch and will move this further. Upper
-  // bound only — see the coordination note in Task 45's brief.
+  // was concurrent on a sibling branch and moved this further; Task 47
+  // (FR-HM24, D11, Phase 6) then folded 3 pool agents in from synthex-plus,
+  // raising the ceiling again. Upper bound only — see the coordination note
+  // in Task 45's brief; inventory.mjs pins the exact current count.
   it('[T] agent count reflects the retirement (upper bound)', () => {
-    expect(AGENT_COUNT).toBeLessThanOrEqual(24);
+    expect(AGENT_COUNT).toBeLessThanOrEqual(26);
   });
 });

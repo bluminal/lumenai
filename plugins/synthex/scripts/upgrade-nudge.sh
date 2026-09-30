@@ -1,14 +1,21 @@
 #!/usr/bin/env sh
 # upgrade-nudge.sh — synthex SessionStart hook
 #
-# Two nudges, both fired at most once per upgrade:
+# Three nudges:
 #
-#   1. Feature nudge: when a user upgrades across the 0.5.0 threshold
-#      (where multi-model review was introduced) and has not yet
-#      configured the feature.
+#   1. Feature nudge: fires at most once per upgrade, when a user
+#      upgrades across the 0.5.0 threshold (where multi-model review was
+#      introduced) and has not yet configured the feature.
 #
-#   2. Star nudge: on any upgrade, when the user has neither starred
-#      the Lumenai marketplace nor explicitly dismissed the request.
+#   2. Star nudge: fires at most once per upgrade, on any upgrade, when
+#      the user has neither starred the Lumenai marketplace nor
+#      explicitly dismissed the request.
+#
+#   3. synthex-plus deprecation nudge (D7, Task 53, NFR-HM7): fires on
+#      every session, not just upgrades, while this project still has a
+#      .synthex-plus/ directory. Unlike 1 and 2, it is not gated by
+#      "dismissed" and is not a once-per-upgrade nudge -- it clears itself
+#      once the project's legacy directory is gone.
 #
 # State is per-project in .synthex/state.json. Idempotent. Never blocks
 # the session. Never reads stdin. Never prompts.
@@ -47,6 +54,20 @@ CONFIG_FILE="$SYNTHEX_DIR/config.yaml"
 
 # D-UO8 / E12: do not write state outside a plugin-initialized project.
 [ -d "$SYNTHEX_DIR" ] || exit 0
+
+# D7 (Task 53, NFR-HM7): synthex-plus is deprecated and folded into
+# synthex (Tasks 47-53); Task 54 tombstones it and Task 55 removes it.
+# Warn on every session -- independent of the per-version nudges below,
+# and not gated by "dismissed" -- while this project still carries a
+# .synthex-plus/ directory (the D6 legacy-config location read by
+# config-get.sh). Removal does not uninstall the plugin, so this is the
+# only signal a project-scoped hook can act on; it self-clears once the
+# project's standing_pools settings move to .synthex/config.yaml and the
+# leftover directory is deleted.
+LEGACY_PLUS_DIR="$PROJECT_ROOT/.synthex-plus"
+if [ -d "$LEGACY_PLUS_DIR" ]; then
+    printf 'Synthex Plus is deprecated: its pool commands and agents now live in Synthex, and this project still has a .synthex-plus/ directory. See https://github.com/bluminal/lumenai/blob/main/docs/migrations/synthex-plus.md to move standing_pools to .synthex/config.yaml (or run /synthex:configure-teams) and uninstall synthex-plus.\n'
+fi
 
 LAST_SEEN=""
 DISMISSED="false"

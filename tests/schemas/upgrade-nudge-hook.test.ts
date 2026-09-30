@@ -18,16 +18,14 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..');
 
+// Task 54: dropped the synthex-plus variant — its hooks.json is now the
+// empty tombstone form ({"hooks": {}}), so there is no SessionStart entry
+// left to assert (see docs/migrations/synthex-plus.md and
+// synthex-plus-tombstone.test.ts).
 const variants = [
   {
     label: 'synthex',
     pluginDir: join(REPO_ROOT, 'plugins', 'synthex'),
-    hookEvent: 'SessionStart',
-    scriptRelPath: '${CLAUDE_PLUGIN_ROOT}/scripts/upgrade-nudge.sh',
-  },
-  {
-    label: 'synthex-plus',
-    pluginDir: join(REPO_ROOT, 'plugins', 'synthex-plus'),
     hookEvent: 'SessionStart',
     scriptRelPath: '${CLAUDE_PLUGIN_ROOT}/scripts/upgrade-nudge.sh',
   },
@@ -141,25 +139,7 @@ describe('synthex hooks.json — compact entry (FR-HM20, Task 36)', () => {
   });
 });
 
-describe('synthex-plus hooks.json — TaskCompleted + TeammateIdle preserved', () => {
-  it('preserves TaskCompleted and TeammateIdle alongside SessionStart (Task 14)', () => {
-    const path = join(
-      REPO_ROOT,
-      'plugins',
-      'synthex-plus',
-      'hooks',
-      'hooks.json'
-    );
-    const json = JSON.parse(readFileSync(path, 'utf-8'));
-    expect(json.hooks.TaskCompleted).toBeTruthy();
-    expect(json.hooks.TeammateIdle).toBeTruthy();
-    expect(json.hooks.SessionStart).toBeTruthy();
-    // Ensure existing TaskCompleted/TeammateIdle commands haven't drifted.
-    expect(json.hooks.TaskCompleted[0].hooks[0].command).toBe(
-      '${CLAUDE_PLUGIN_ROOT}/scripts/task-completed-gate.sh'
-    );
-    expect(json.hooks.TeammateIdle[0].hooks[0].command).toBe(
-      '${CLAUDE_PLUGIN_ROOT}/scripts/teammate-idle-gate.sh'
-    );
-  });
-});
+// Task 54: the "synthex-plus hooks.json — TaskCompleted + TeammateIdle
+// preserved" describe block (Task 14) was removed — synthex-plus's
+// hooks.json is now the empty tombstone form. See
+// synthex-plus-tombstone.test.ts for the tombstone's own coverage.

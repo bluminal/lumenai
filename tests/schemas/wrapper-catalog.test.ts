@@ -55,9 +55,9 @@ function frontmatterBlock(contents: string): string {
 }
 
 describe('wrapper catalog diet (Task 19, FR-HM9/FR-HM10)', () => {
-  it('has a COMMAND_DESCRIPTIONS entry for all 18 commands and an AGENT_DESCRIPTIONS entry for all 23 agents', () => {
-    expect(Object.keys(COMMAND_DESCRIPTIONS)).toHaveLength(18);
-    expect(Object.keys(AGENT_DESCRIPTIONS)).toHaveLength(23);
+  it('has a COMMAND_DESCRIPTIONS entry for all 22 commands and an AGENT_DESCRIPTIONS entry for all 26 agents', () => {
+    expect(Object.keys(COMMAND_DESCRIPTIONS)).toHaveLength(22);
+    expect(Object.keys(AGENT_DESCRIPTIONS)).toHaveLength(26);
   });
 
   it('keeps every command wrapper description at or under 120 characters and equal to its COMMAND_DESCRIPTIONS entry', () => {
@@ -112,7 +112,7 @@ describe('wrapper catalog diet (Task 19, FR-HM9/FR-HM10)', () => {
 
   it('never gives a canonical command definition a frontmatter description: key (OQ-2 guard)', () => {
     const files = readdirSync(commandsRoot).filter((file) => file.endsWith('.md'));
-    expect(files.length).toBe(18);
+    expect(files.length).toBe(22);
 
     for (const file of files) {
       const contents = readFileSync(join(commandsRoot, file), 'utf8');

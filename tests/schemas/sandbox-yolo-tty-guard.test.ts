@@ -13,11 +13,11 @@ import { join } from 'path';
 
 const PLUGINS = join(__dirname, '..', '..', 'plugins');
 
+// Task 54: dropped the /synthex-plus:start-review-team entry — synthex-plus
+// is tombstoned to a migration stub with no TTY-guard prose left to assert
+// (see docs/migrations/synthex-plus.md). The folded /synthex:start-review-team
+// entry below carries the same content forward.
 const COMMANDS = [
-  {
-    name: '/synthex-plus:start-review-team',
-    file: join(PLUGINS, 'synthex-plus', 'commands', 'start-review-team.md'),
-  },
   {
     name: '/synthex:review-code',
     file: join(PLUGINS, 'synthex', 'commands', 'review-code.md'),
@@ -25,6 +25,11 @@ const COMMANDS = [
   {
     name: '/synthex:performance-audit',
     file: join(PLUGINS, 'synthex', 'commands', 'performance-audit.md'),
+  },
+  // Task 47 (FR-HM24, D11): start-review-team folded into synthex verbatim.
+  {
+    name: '/synthex:start-review-team',
+    file: join(PLUGINS, 'synthex', 'commands', 'start-review-team.md'),
   },
 ];
 

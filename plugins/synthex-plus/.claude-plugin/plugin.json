@@ -1,16 +1,13 @@
 {
   "name": "synthex-plus",
   "version": "1.6.0",
-  "description": "[BETA] Teams-optimized orchestration for Synthex — sustained multi-agent collaboration via Claude Code Agent Teams. Requires the beta Agent Teams feature flag (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1). Depends on the Synthex plugin for agent definitions.",
+  "description": "Deprecated — see https://github.com/bluminal/lumenai/blob/main/docs/migrations/synthex-plus.md. synthex-plus's standing-pool and team capabilities now live in the synthex plugin; every command here is a stub that prints migration steps.",
   "author": {
     "name": "Bluminal Labs"
   },
   "keywords": [
-    "agents",
-    "teams",
-    "orchestration",
-    "collaboration",
-    "parallel"
+    "deprecated",
+    "migration"
   ],
   "commands": [
     "./commands/team-init.md",
@@ -25,9 +22,5 @@
     "./commands/list-teams.md",
     "./commands/star.md"
   ],
-  "agents": [
-    "./agents/team-orchestrator-bridge.md",
-    "./agents/standing-pool-cleanup.md",
-    "./agents/standing-pool-submitter.md"
-  ]
+  "agents": []
 }

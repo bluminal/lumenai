@@ -1,6 +1,11 @@
 /**
+ * Task 47 (FR-HM24, D11) port: same structural assertions as
+ * standing-pool-submitter.test.ts, run against the copy folded into
+ * plugins/synthex/agents/standing-pool-submitter.md. Keeps the
+ * synthex-plus original (and its own test) passing unmodified.
+ *
  * Layer 1: Structural validation tests for the Standing Pool Submitter agent
- * at plugins/synthex-plus/agents/standing-pool-submitter.md.
+ * at plugins/synthex/agents/standing-pool-submitter.md.
  *
  * Validates all [T] acceptance criteria from Task 35:
  *   [T1]  Agent declares model: haiku in YAML frontmatter
@@ -18,7 +23,7 @@ import { join } from 'path';
 
 const AGENT_PATH = join(
   import.meta.dirname,
-  '..', '..', 'plugins', 'synthex-plus', 'agents', 'standing-pool-submitter.md'
+  '..', '..', 'plugins', 'synthex', 'agents', 'standing-pool-submitter.md'
 );
 
 const content = readFileSync(AGENT_PATH, 'utf-8');
@@ -34,7 +39,16 @@ describe('standing-pool-submitter.md — Task 35 [T] acceptance criteria', () =>
     it('[T1] frontmatter block (---) opens and closes before the first heading', () => {
       // Frontmatter must be at the top of the file
       expect(content).toMatch(/^---\n/);
-      expect(content).toMatch(/^---\nmodel: haiku\n---/m);
+      // Task 47 (FR-HM24, D11): the synthex copy also carries a
+      // description: and tools: key (agent-frontmatter.test.ts), so unlike
+      // the synthex-plus original the closing `---` no longer immediately
+      // follows `model: haiku` -- assert the block opens with model: haiku
+      // and still closes before the first heading.
+      expect(content).toMatch(/^---\nmodel: haiku\n/);
+      const fmEnd = content.indexOf('\n---\n', 4);
+      expect(fmEnd, 'Expected a closing --- frontmatter fence').toBeGreaterThan(0);
+      const headingIdx = content.indexOf('\n# ');
+      expect(headingIdx).toBeGreaterThan(fmEnd);
     });
   });
 

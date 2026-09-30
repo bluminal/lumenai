@@ -13,8 +13,8 @@
  *   [5]  expected.report_to_paths_differ === true
  *   [6]  expected.no_report_collision === true
  *   [7]  expected.pool_serializes_work === true
- *   [8]  plugins/synthex-plus/agents/standing-pool-submitter.md contains "UUID" or "uuid"
- *   [9]  plugins/synthex-plus/agents/standing-pool-submitter.md contains "report_to" field doc
+ *   [8]  plugins/synthex/agents/standing-pool-submitter.md contains "UUID" or "uuid"
+ *   [9]  plugins/synthex/agents/standing-pool-submitter.md contains "report_to" field doc
  *   [10] docs/specs/multi-model-teams/routing.md contains "FR-MMT18"
  *   [11] expected.fr_mmt18_documented_behavior is a non-empty string
  */
@@ -40,9 +40,10 @@ const FIXTURE_PATH = join(
   '..', 'fixtures', 'multi-model-teams', 'submission', 'concurrent-submitters', 'fixture.json'
 );
 
-const SUBMITTER_MD_PATH = join(
+// Task 47 (FR-HM24, D11) port; Task 54 tombstoned the synthex-plus original.
+const SUBMITTER_MD_SYNTHEX_PATH = join(
   import.meta.dirname,
-  '..', '..', 'plugins', 'synthex-plus', 'agents', 'standing-pool-submitter.md'
+  '..', '..', 'plugins', 'synthex', 'agents', 'standing-pool-submitter.md'
 );
 
 const ROUTING_MD_PATH = join(
@@ -267,10 +268,12 @@ describe('[7] expected.pool_serializes_work is true', () => {
   });
 });
 
-// ── [8] standing-pool-submitter.md contains UUID documentation ────────────
+// ── [8]/[9] standing-pool-submitter.md (Task 54: synthex-plus tombstoned;
+// plugins/synthex/agents/standing-pool-submitter.md, ported in Task 47, is
+// the sole surviving copy) ────────────────────────────────────────────────
 
-describe('[8] standing-pool-submitter.md contains UUID or uuid (UUID-based filename guarantee)', () => {
-  const submitterContent = readFileSync(SUBMITTER_MD_PATH, 'utf-8');
+describe('[8] plugins/synthex/agents/standing-pool-submitter.md contains UUID or uuid', () => {
+  const submitterContent = readFileSync(SUBMITTER_MD_SYNTHEX_PATH, 'utf-8');
 
   it('standing-pool-submitter.md is readable and non-empty', () => {
     expect(submitterContent.length).toBeGreaterThan(0);
@@ -282,7 +285,6 @@ describe('[8] standing-pool-submitter.md contains UUID or uuid (UUID-based filen
   });
 
   it('documents UUID-based filenames for uniqueness across concurrent submitters', () => {
-    // Must reference UUID in the context of uniqueness / concurrent submitters
     const hasUniqueUUID =
       submitterContent.includes('UUID') &&
       (submitterContent.includes('unique') || submitterContent.includes('concurrent'));
@@ -295,17 +297,14 @@ describe('[8] standing-pool-submitter.md contains UUID or uuid (UUID-based filen
   });
 });
 
-// ── [9] standing-pool-submitter.md documents report_to field ─────────────
-
-describe('[9] standing-pool-submitter.md contains report_to field documentation', () => {
-  const submitterContent = readFileSync(SUBMITTER_MD_PATH, 'utf-8');
+describe('[9] plugins/synthex/agents/standing-pool-submitter.md contains report_to field documentation', () => {
+  const submitterContent = readFileSync(SUBMITTER_MD_SYNTHEX_PATH, 'utf-8');
 
   it('standing-pool-submitter.md contains "report_to"', () => {
     expect(submitterContent).toContain('report_to');
   });
 
   it('documents report_to path as uuid-based (unique per submission)', () => {
-    // The submitter must document that the report_to path uses the report_uuid
     const hasReportToWithUuid =
       submitterContent.includes('report_to') &&
       (submitterContent.includes('report_uuid') || submitterContent.includes('<report_uuid>'));
@@ -313,9 +312,7 @@ describe('[9] standing-pool-submitter.md contains report_to field documentation'
   });
 
   it('documents report_to as shared across tasks in the same batch', () => {
-    // "report_to field is shared across all tasks in this batch"
     expect(submitterContent).toContain('report_to');
-    // The submitter doc explains this path goes in each task file
     expect(submitterContent).toContain('report-to path');
   });
 });

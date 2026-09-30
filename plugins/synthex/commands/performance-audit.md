@@ -40,7 +40,7 @@ Check for a project configuration file at `@{config_path}`. Load any performance
 
 ### 1b. Standing Pool Discovery and Routing (FR-MMT15)
 
-If `standing_pools.enabled` is true, Read `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing-performance-audit.md` and follow it; otherwise skip to Step 2. On other hosts, resolve the plugin root via `.synthex/state.json`.
+If `standing_pools.enabled` is true (`.synthex/config.yaml`; falls back per D6 to the legacy `.synthex-plus/config.yaml` for one major version, printing a deprecation warning), Read `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing-performance-audit.md` and follow it; otherwise skip to Step 2. On other hosts, resolve the plugin root via `.synthex/state.json`.
 
 ---
 
@@ -74,7 +74,7 @@ Before invoking the Performance Engineer, gather context:
 
 ### 4. Launch Performance Engineer
 
-Invoke the **Performance Engineer sub-agent** with:
+FR-HM21 levels 3-4 (Capability Ladder, `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing-performance-audit.md`): if a tool named `Agent`, `Task`, `task`, `spawn_agent`, or `delegate_task` is in your tool list, invoke the **Performance Engineer sub-agent**; otherwise, perform the performance-engineer role inline in this session (GAP_MESSAGES.ladderFallback explains why; also the depth-1 inline rule's outcome on a refused spawn). Either way, it runs with:
 
 - The audit scope
 - The URL for frontend analysis (if provided)

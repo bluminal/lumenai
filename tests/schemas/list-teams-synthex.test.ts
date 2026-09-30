@@ -1,4 +1,9 @@
 /**
+ * Task 47 (FR-HM24, D11) port: same structural assertions as
+ * list-teams.test.ts, run against the copy folded into
+ * plugins/synthex/commands/list-teams.md. Keeps the synthex-plus
+ * original (and its own test) passing unmodified.
+ *
  * Layer 1: Structural validation tests for the list-teams command.
  *
  * Validates all [T] acceptance criteria from Task 43:
@@ -20,7 +25,7 @@ import { join } from 'path';
 
 const LIST_TEAMS_PATH = join(
   import.meta.dirname,
-  '..', '..', 'plugins', 'synthex-plus', 'commands', 'list-teams.md'
+  '..', '..', 'plugins', 'synthex', 'commands', 'list-teams.md'
 );
 
 const content = readFileSync(LIST_TEAMS_PATH, 'utf-8');
