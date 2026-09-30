@@ -16,7 +16,7 @@ Transform a Product Requirements Document (PRD) into a prioritized, value-driven
 | `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
 | `concurrent_tasks` | Max tasks to recommend for parallel execution per milestone | `3` (from config) | No |
 | `--loop` | Enable native looping (FR-NL1/FR-NL2). When set, the command iterates per the "Native Looping" section below until the completion promise is emitted or `--max-iterations` is reached. | off | No |
-| `--completion-promise <string>` | Promise text the agent emits as `<promise>X</promise>` to terminate the loop. | — | Required with `--loop` (unless `--resume*`) |
+| `--completion-promise <string>` | Promise text the agent emits as `<promise>X</promise>` to terminate the loop. | `ALLDONE<session_id>` (falls back to `ALLDONE<loop_id>`) | No |
 | `--max-iterations <int>` | Iteration cap. Hard ceiling 200. | `20` | No |
 | `--loop-isolated` | Fresh-subagent isolation mode per iteration. | off (shared-context default) | No |
 | `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
@@ -397,7 +397,7 @@ This command supports the native Synthex looping primitive (introduced by `docs/
 
 ### Emission Point
 
-Emit `<promise>{completion_promise}</promise>` (literal text from `--completion-promise`) in the iteration's final response when ALL of the following hold:
+Emit `<promise>{completion_promise}</promise>` (the resolved `completion_promise`) in the iteration's final response when ALL of the following hold:
 
 - The implementation plan file has been written to disk.
 - Every PRD requirement is reflected in at least one task in the plan.

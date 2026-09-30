@@ -14,7 +14,7 @@ The mechanical iteration framework — state-file schema, loop-id rules, shared-
 |-----------|-------------|---------|----------|
 | `--prompt <string>` | Literal prompt text to loop. Mutually exclusive with `--prompt-file`. | — | One of `--prompt` / `--prompt-file` / `--resume*` required |
 | `--prompt-file <path>` | Path to a file whose contents become the prompt. Mutually exclusive with `--prompt`. | — | One of `--prompt` / `--prompt-file` / `--resume*` required |
-| `--completion-promise <string>` | Literal text the agent emits inside `<promise>…</promise>` to terminate the loop. | — | Required unless `--resume` / `--resume-last` |
+| `--completion-promise <string>` | Literal text the agent emits inside `<promise>…</promise>` to terminate the loop. | `ALLDONE<session_id>` (falls back to `ALLDONE<loop_id>`) | No |
 | `--max-iterations <int>` | Iteration cap. Hard ceiling is 200. | `20` | No |
 | `--loop-isolated` | Spawn a fresh subagent per iteration (no shared context). See [`subagent-iter`](../docs/native-looping.md#subagent-iter). | off (shared-context default per [D-NL1](../docs/native-looping.md#shared-iter)) | No |
 | `--name <slug>` | User-supplied loop-id (slug `^[a-z0-9][a-z0-9-]{0,63}$`). | auto: `loop-<4-char-hex>` | No |
@@ -38,13 +38,12 @@ Apply these **before** calling the script. Each prints a single-line error to st
 
 ### begin — resolve or create the loop (one Bash call)
 
-Call `loop-step.sh begin /synthex:loop --completion-promise <text> --name <slug> --max <n> --args <verbatim CLI args> [--prompt-file <path>] [--isolation shared-context|subagent] --session-id <$CLAUDE_CODE_SESSION_ID>` for a fresh start, or `loop-step.sh begin /synthex:loop --resume <loop-id> --session-id <$CLAUDE_CODE_SESSION_ID> [--isolation ...]` to resume. Read `$CLAUDE_CODE_SESSION_ID` via Bash first (the gate matches on it; `null`/empty leaves the loop undriven — see [native-looping.md § Obtaining the session id](../docs/native-looping.md#obtaining-the-session-id)). On success it prints the resolved `loop-id` on stdout; remember it (re-derive from `.synthex/loops/` on compaction loss, never cache the state-file path itself). It also performs the archive scan as a side effect (D-NL10) — no separate step needed.
+Call `loop-step.sh begin /synthex:loop [--completion-promise <text>] --name <slug> --max <n> --args <verbatim CLI args> [--prompt-file <path>] [--isolation shared-context|subagent] --session-id <$CLAUDE_CODE_SESSION_ID>` for a fresh start, or `loop-step.sh begin /synthex:loop --resume <loop-id> --session-id <$CLAUDE_CODE_SESSION_ID> [--isolation ...]` to resume. Read `$CLAUDE_CODE_SESSION_ID` via Bash first (the gate matches on it; `null`/empty leaves the loop undriven — see [native-looping.md § Obtaining the session id](../docs/native-looping.md#obtaining-the-session-id)). On success it prints the resolved `loop-id` on stdout, plus `completion promise: <value>` — the persisted `completion_promise`, either your `--completion-promise` text or, when omitted, the default `ALLDONE<session_id>` (`ALLDONE<loop_id>` with no session id; see [native-looping.md § Default completion promise](../docs/native-looping.md#promise-emission)). Remember both (re-derive from `.synthex/loops/` on compaction loss, never cache the state-file path itself). It also performs the archive scan as a side effect (D-NL10) — no separate step needed.
 
-The remaining four refusal paths (FR-NL11, FR-NL41, FR-NL42, and the FR-NL37 completion-promise-required case) — plus FR-NL40's "no such loop" and the "already running" / "terminal, cannot resume" collision cases — are the script's own refusals; print its stderr verbatim and stop:
+The remaining three refusal paths (FR-NL11, FR-NL41, FR-NL42) — plus FR-NL40's "no such loop" and the "already running" / "terminal, cannot resume" collision cases — are the script's own refusals; print its stderr verbatim and stop:
 
 - **`--name <slug>` violates the loop-id pattern** — `Invalid --name "<slug>". Must match ^[a-z0-9][a-z0-9-]{0,63}$.`
 - **`--max-iterations` > 200 OR < 1 OR non-integer** — `--max-iterations must be an integer in [1, 200]; got <value>.`
-- **`--loop` (implicit here) without `--completion-promise`**, and no resume — `--completion-promise <text> is required when starting a new loop. Resume an existing loop with --resume <loop-id> or --resume-last.`
 - **`--name <slug>` collides with an already-running loop** — `Loop "<slug>" is already running (iteration <N>/<M>). Use /synthex:loop --resume <slug> to continue or /synthex:cancel-loop <slug> to stop it.`
 - **`--resume <loop-id>` unknown** (FR-NL40) — `No loop found: <slug>. Run /synthex:list-loops.`
 - **`--resume <loop-id>` has an unrecognized `schema_version`** (FR-NL41) — names the mismatch and the delete-then-restart instructions.
