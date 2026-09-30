@@ -1,3 +1,13 @@
+export const meta = {
+  name: 'review-code',
+  description: 'FR-HM16 workflow engine for /synthex:review-code: parallel reviewers with a forced findings envelope, JS dedupe, one effort:medium verdict-synthesis call, and the D21/FR-MR17 rendered report.',
+  phases: [
+    { title: 'Native Review', detail: 'run each configured reviewer in parallel with a forced findings envelope' },
+    { title: 'Multi-Model Review', detail: 'run the multi-model-review-orchestrator in a second parallel() group when enabled' },
+    { title: 'Verdict', detail: 'a single effort: medium call synthesizes the summary prose' },
+  ],
+};
+
 /**
  * plugins/synthex/workflows/review-code.js
  *
@@ -39,15 +49,6 @@
  * no other source of non-determinism here.
  */
 
-export const meta = {
-  name: 'review-code',
-  description: 'FR-HM16 workflow engine for /synthex:review-code: parallel reviewers with a forced findings envelope, JS dedupe, one effort:medium verdict-synthesis call, and the D21/FR-MR17 rendered report.',
-  phases: [
-    { title: 'Native Review', detail: 'run each configured reviewer in parallel with a forced findings envelope' },
-    { title: 'Multi-Model Review', detail: 'run the multi-model-review-orchestrator in a second parallel() group when enabled' },
-    { title: 'Verdict', detail: 'a single effort: medium call synthesizes the summary prose', model: undefined },
-  ],
-};
 
 // ---------------------------------------------------------------------------
 // BEGIN REVIEW-ENGINE-SYNC (mirrors plugins/synthex/workflows/lib/review-engine.mjs)
