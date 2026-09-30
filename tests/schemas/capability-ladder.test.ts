@@ -10,10 +10,10 @@
  *   1. Pool routing (SendMessage + ListAgents + standing_pools.enabled + a
  *      running pool).
  *   2. Workflow engine (a `Workflow` tool + code_review.engine: workflow) —
- *      filled in by Task 56 (FR-HM16). The engine invocation itself
- *      (`workflows/review-code.js`) ships in Task 57; until then, and on
- *      any host/config that doesn't meet the condition, this level
- *      degrades cleanly to level 3.
+ *      filled in by Task 56 (FR-HM16). The engine script itself
+ *      (`workflows/review-code.js`) shipped in Task 57. On any host/config
+ *      that doesn't meet the condition, this level degrades cleanly to
+ *      level 3.
  *   3. Parallel subagent fan-out (a tool named Agent, Task, task,
  *      spawn_agent, or delegate_task).
  *   4. Sequential reviewers — today's baseline, the ladder's floor.
@@ -36,7 +36,8 @@
  * Task 56 additions:
  *   - Level 2 is documented in full (config enables it, `Workflow` tool
  *     presence selects it, D31's opt-in and headless-allow-rule rules,
- *     a one-line fallback notice, and Task 57's planned invocation name).
+ *     a one-line fallback notice, and the invocation name — Task 57 later
+ *     shipped the script behind that name).
  *   - `code_review.engine` gets exactly one gate: the ladder doc. Neither
  *     review-code.md nor performance-audit.md re-implements the check
  *     (the "single engine gate" rule).
@@ -105,15 +106,19 @@ describe('Task 49 (FR-HM21, D22): capability-ladder.test.ts', () => {
       expect(section).toMatch(/permission allow rule/i);
     });
 
-    it('level 2 names its planned invocation and defers the script itself to Task 57', () => {
+    it('level 2 names its invocation and the shipped script (Task 57)', () => {
       expect(section).toContain('synthex:review-code');
-      expect(section).toContain('workflows/');
+      expect(section).toContain('workflows/review-code.js');
       expect(section).toMatch(/Task 57/);
     });
 
-    it('level 2 degrades cleanly while the Task 57 script is absent', () => {
+    it('level 2 degrades cleanly when the Workflow tool or config condition is not met', () => {
       expect(section).toMatch(/degrades cleanly/);
       expect(section).toMatch(/continue down the ladder to level 3/);
+      // Task 57 shipped the script — the fallback notice no longer hedges
+      // on script availability, only on the Workflow tool/config condition.
+      expect(section).not.toMatch(/script is not yet (shipped|available)/);
+      expect(section).not.toMatch(/until Task 57 ships/);
     });
 
     it('level 3 (parallel fan-out) lists every FR-HM21 candidate tool name', () => {

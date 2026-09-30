@@ -1,0 +1,52 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Task 57 (FR-HM16): renderReport snapshot-matches the review-code.md template > matches the fixed markdown template structure 1`] = `
+"Review path: native-only (native review via the FR-HM16 workflow engine; reviewers: 2 native)
+
+## Code Review Report
+
+### Reviewed: staged changes
+### Date: 2026-09-30
+
+---
+
+### Overall Verdict: FAIL
+
+| Reviewer | Verdict | Findings |
+|----------|---------|----------|
+| code-reviewer | FAIL | 1 HIGH |
+| security-reviewer | PASS | 0 findings |
+
+---
+
+### CRITICAL Findings
+No CRITICAL findings.
+
+### HIGH Findings
+#### [HIGH] Missing null check
+- **Category:** correctness
+- **Location:** src/foo.js:12-14 (processFoo)
+- **Issue:** foo can be null before use
+- **Raised by:** code-reviewer (anthropic)
+
+### MEDIUM Findings
+No MEDIUM findings.
+
+### LOW Findings
+#### [LOW] Inconsistent quote style
+- **Category:** style
+- **Location:** src/bar.js
+- **Issue:** Mixed single/double quotes in the same file
+- **Raised by:** code-reviewer (anthropic)
+
+---
+
+### What's Done Well
+- Clean function decomposition
+- Good test coverage
+
+---
+
+### Summary
+One HIGH finding should be addressed before merge; otherwise the change looks solid."
+`;

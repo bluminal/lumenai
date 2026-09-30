@@ -120,6 +120,8 @@ Before launching reviewers, gather context they'll need:
 
 ### 4. Launch Reviewers
 
+Level 2 of the ladder may hand this off to the FR-HM16 engine (`docs/engines/review-code-workflow.md`).
+
 FR-HM21 levels 3-4 (Capability Ladder, `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md`): if a tool named `Agent`, `Task`, `task`, `spawn_agent`, or `delegate_task` is in your tool list, launch each enabled reviewer as a sub-agent IN PARALLEL, in one turn; otherwise, run them sequentially, one at a time (GAP_MESSAGES.ladderFallback explains why). A refused spawn on a depth-1 host applies the inline rule, not level 4. Provide the full diff and project context; expect a PASS/WARN/FAIL verdict with severity-ranked findings:
 
 - **Code Reviewer:** craftsmanship review (correctness, maintainability, convention adherence, specification compliance, reuse opportunities).
