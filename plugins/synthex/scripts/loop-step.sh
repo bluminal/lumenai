@@ -6,7 +6,7 @@
 # plugins/synthex/docs/native-looping.md (state, loop-id, shared-iter anchors).
 #
 # Usage:
-#   loop-step.sh begin <command> --completion-promise <text> [--name <slug>]
+#   loop-step.sh begin <command> [--completion-promise <text>] [--name <slug>]
 #                [--max <n>] [--args <string>] [--prompt-file <path>]
 #                [--isolation shared-context|subagent] [--session-id <id>]
 #                [--resume <loop-id>]
@@ -18,7 +18,14 @@
 #   loop-step.sh cancel <loop-id> | --all
 #   loop-step.sh check-writable [dir]
 #
-# `begin` prints the resolved loop-id on stdout. `advance` prints the
+# `begin` prints the resolved loop-id, then a `completion promise: <value>`
+# line, both on stdout (loop-id first, unchanged position, so existing
+# first-line consumers keep working). On a fresh start, `--completion-promise`
+# is optional: an empty/absent value defaults to `ALLDONE<session_id>` (D1),
+# or `ALLDONE<loop_id>` when no session id is available (D2). An explicit
+# value is always stored verbatim, and `--resume`/`--resume-last` always keep
+# the promise already stored in the state file (D4) — the printed line then
+# reflects that stored value, not a recomputed one. `advance` prints the
 # iteration marker `[loop <id> iteration N/M]`. `hold` re-validates a loop is
 # still running without consuming an iteration (FR-HM18 D30 decision-wait
 # re-entry) and prints nothing on success. `finish`/`cancel` print a one-line
@@ -36,7 +43,9 @@
 #   SYNTHEX_NOW         overrides "now" (UTC ISO 8601) for deterministic tests.
 #
 # Exit codes:
-#   0 - success (state written / listed / cancelled / still writable).
+#   0 - success (state written / listed / cancelled / still writable). A
+#       fresh `begin` with no/empty --completion-promise is success, not a
+#       refusal — see the D1/D2 default above (no longer an exit-1 cause).
 #   1 - refusal: invalid arguments or a validation failure.
 #   2 - loop-id not found.
 #   3 - loop is not running (cancelled/completed/crashed) — advance/hold refuse.
@@ -503,7 +512,7 @@ command_slug() {
 
 cmd_begin() {
   command_name="${1:-}"
-  [ -z "$command_name" ] && { echo "Usage: loop-step.sh begin <command> --completion-promise <text> [--name <slug>] [--max <n>] [...]" >&2; exit 1; }
+  [ -z "$command_name" ] && { echo "Usage: loop-step.sh begin <command> [--completion-promise <text>] [--name <slug>] [--max <n>] [...]" >&2; exit 1; }
   shift
 
   name=""; max="20"; args=""; prompt_file=""; isolation="shared-context"
@@ -563,6 +572,7 @@ cmd_begin() {
     SV_LAST_UPDATED="$now"
     render_state "$path" || { echo "begin: failed to write $path" >&2; exit 5; }
     printf '%s\n' "$resume_id"
+    printf 'completion promise: %s\n' "$SV_COMPLETION_PROMISE"
     exit 0
   fi
 
@@ -595,9 +605,16 @@ cmd_begin() {
     done
   fi
 
+  # D1/D2: an absent/empty --completion-promise on a fresh start defaults to
+  # ALLDONE<session_id> (no separator), or ALLDONE<loop_id> when no session
+  # id is available. An explicit --completion-promise is always stored
+  # verbatim (checked above the default: this branch only fires when empty).
   if [ -z "$completion_promise" ]; then
-    echo "--completion-promise <text> is required when starting a new loop. Resume an existing loop with --resume <loop-id> or --resume-last." >&2
-    exit 1
+    if [ -n "$session_id" ]; then
+      completion_promise="ALLDONE${session_id}"
+    else
+      completion_promise="ALLDONE${loop_id}"
+    fi
   fi
 
   if ! is_int "$max" || [ "$max" -lt 1 ] || [ "$max" -gt 200 ]; then
@@ -627,6 +644,7 @@ cmd_begin() {
 
   render_state "$path" || { echo "begin: failed to write $path" >&2; exit 5; }
   printf '%s\n' "$loop_id"
+  printf 'completion promise: %s\n' "$SV_COMPLETION_PROMISE"
   exit 0
 }
 
