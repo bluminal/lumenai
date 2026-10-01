@@ -292,15 +292,15 @@ The state-file contract (`.synthex/loops/<id>.json`, session ownership rule, pro
 
 **FR-HM19: Stage 2, Workflow-driven loop on Claude Code**
 
-When a `Workflow` tool is in the tool list, `--loop` runs the iteration body as `agent(iterationPrompt(i), {schema: {done, idle, blocked_on_human[], summary}, agentType: 'synthex:tech-lead'})` inside a script loop, so termination is a validated field rather than a `<promise>` regex scan. On `idle` the command calls `ScheduleWakeup` with the existing backoff instead of a 600 s sleep and resumes from `runId`. On `blocked_on_human` it returns to the command, which runs `AskUserQuestion` (or writes the decision inbox, FR-HM31) and resumes. The state file carries an optional `runId`; the Stop-hook gate skips when one is present.
+The engine is opt-in through `native_looping.engine: prose|workflow` (default `prose`, following `code_review.engine`). When it is `workflow` **and** a `Workflow` tool is in the tool list, every `--loop` command (`next-priority`, `loop`, `review-code`, `refine-requirements`, `write-implementation-plan`) gets each iteration's verdict from a workflow. A read-only Sonnet verdict leaf returns `{done, idle, blocked_on_human[], summary}` under a forced schema, and a second confirm leaf must agree before `done` ends the loop, so termination is a validated field rather than a `<promise>` regex scan. Workflow `agent()` calls run leaf work only; the command context orchestrates, owns every side effect, and spawns Tech Leads with the Agent tool (D31, D33). On `idle` the command keeps the Stage 1 in-turn wait (`loop-idle-wait.sh` with the existing backoff); `ScheduleWakeup` is not used. While the plan or artifact is unchanged there is no verdict run and no turn end. On `blocked_on_human` the command runs `AskUserQuestion` (or writes the decision inbox, FR-HM31) and resumes. The state file carries an optional `runId` for the in-flight verdict run; the Stop-hook gate skips only while that `runId` is fresh. With `prose`, or without a `Workflow` tool, Stage 1 behavior is unchanged (D34).
 
 **Acceptance Criteria:**
 - Loop protocol prose on the Claude path drops by at least 8 KB.
 - Cancel is honored between resumes by re-reading the state file.
 - A stale `runId` (state file `last_updated` older than a documented threshold) is cleared so a crashed Workflow run does not make the Stop-hook gate skip forever.
 - Timestamps come from `loop-step.sh` calls or `args`, never from the script.
-- A spike confirms (a) a plugin can ship a Workflow script, (b) a workflow subagent running `tech-lead` can itself spawn Agent-tool subagents (next-priority fans out to `concurrent_tasks` Tech Leads), and (c) a resume can be triggered from `ScheduleWakeup` without a user turn. If (b) fails, the iteration body is orchestrated by the command and only the Tech Lead tasks run as workflow agents.
-- `Monitor` is not required; when absent (headless, Bedrock) the Stage 1 in-turn wait is used.
+- A spike confirms (a) a plugin can ship a Workflow script, (b) a workflow subagent running `tech-lead` can itself spawn Agent-tool subagents (next-priority fans out to `concurrent_tasks` Tech Leads), and (c) a resume can be triggered from `ScheduleWakeup` without a user turn. Result (Tasks 9–10): (a) confirmed; (b) refuted, so the command orchestrates the iteration and spawns Tech Leads with the Agent tool while the workflow runs only the verdict leaves (D33); (c) refuted headless, so `ScheduleWakeup` is not used (D32, D34).
+- `Monitor` is not required; idle uses the Stage 1 in-turn wait on every host, including headless and Bedrock (D34).
 
 **FR-HM20: Compaction recovery**
 

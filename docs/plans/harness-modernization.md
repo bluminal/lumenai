@@ -50,8 +50,9 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 | D29 | Frontmatter = `balanced`; `economy`/`premium` are per-agent deltas. | NFR-HM5. |
 | D30 | Decision waits use `loop-step.sh hold`; the Stop gate allows a stop while a decision is pending; stale `runId` is cleared. | A10. |
 | D31 | Resolved by Task 9(d): a Synthex slash command whose text says to call Workflow is the opt-in; no per-session confirmation. Headless runs need a `Workflow(synthex:<name>)` allow rule or auto mode. | Q5. |
-| D32 | `ScheduleWakeup` does not resume a headless session (Task 9c); loops keep the in-turn wait everywhere. Task 54 may test a `run_in_background` sleep as a substitute, since task notifications do re-invoke headless sessions. *Assumed; confirm.* | Fallback fired. |
+| D32 | `ScheduleWakeup` does not resume a headless session (Task 9c); loops keep the in-turn wait everywhere. Task 54 may test a `run_in_background` sleep as a substitute, since task notifications do re-invoke headless sessions. Confirmed by D34 (2026-10-01). | Fallback fired. |
 | D33 | Workflow subagents cannot spawn subagents (Task 10). The command context orchestrates every fan-out; `agent()` runs leaf work only. | Fallback fired. |
+| D34 | Task 59 Stage 2 loop engine (A.J. Brown, 2026-10-01, after the Task 59 design panel): (1) opt-in via the global key `native_looping.engine: prose\|workflow`, default `prose`; (2) idle stays the in-turn `loop-idle-wait.sh` everywhere and `ScheduleWakeup` is not used (confirms D32); an unchanged plan or artifact means no verdict run and no turn end; (3) the Stage 1 loop protocol moves byte-identically out of the command files into the D17 cold-path doc `plugins/synthex/docs/next-priority-loop.md`, behind a tool-presence- and config-gated selector; (4) the engine applies to all 5 `--loop` commands: `next-priority`, `loop`, `review-code`, `refine-requirements`, `write-implementation-plan`. | (1) Follows the `code_review.engine` precedent. Each verdict run ends a turn, so other tools' Stop hooks fire once per iteration; keeping `prose` as the default protects NFR-HM1/NFR-HM3. The default may flip after an `[O]` per-iteration token measurement. (2) The in-turn wait is proven headless and wakes on a plan change or a cancel. `ScheduleWakeup` was refuted headless (Task 9c), and a wake that never fires leaves no Stop event to recover from. (3) The command file is injected in full, so moving the prose out is how the ≥ 8 KB Claude-path cut is met; byte-identity keeps Stage 1 unchanged on every host. (4) Keeps FR-HM19's original `--loop` scope, overriding the panel's next-priority-only recommendation. A18. |
 
 **PRD amendments** (apply in the same PR as this plan):
 - A1: FR-HM4/16 engine paths.
@@ -71,6 +72,7 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 - A15: §9 constraint: major bump via `.release-intent.json`; removal commit `chore:`.
 - A16: FR-HM24 `configure-teams` is ungated.
 - A17: PRD §8 OpenCode catalog metric becomes "≤ 13,353 bytes (measured + 5%); descriptions ≤ 6,000 chars" (Task 22).
+- A18: FR-HM19 opt-in engine key, leaf-only verdict with a confirm leaf, in-turn idle, fresh-`runId` gate skip, all `--loop` commands (D34).
 
 ## Open Questions
 
@@ -346,8 +348,8 @@ Per D20: Tasks 47–54 = PR 1 (`harness/one-plugin`); Task 55 = PR 2.
 
 **Parallelizable:** 56 → 57 → 58.
 **Milestone Value:** Opt-in refuted reviews on Claude Code (−6–9k tokens per cycle). **Status: complete (2026-09-30)** — Phase 7 complete. The engine is opt-in via `code_review.engine: workflow` and the refute pass via `code_review.refute_pass: on`.
+**Observational Outcomes:** `[O]` Measured per-cycle token savings of the workflow engine vs prose recorded in `docs/testing.md` (the Milestone Value claims −6–9k per cycle).
 **Learning:** Fixtures must never contain secret-shaped strings: a fake `sk_live_` key copied from the live-run diff was blocked by GitHub push protection, and the unpushed commits were rewritten to redact it.
-**Follow-up (token savings):** `[O]` Measure the engine's actual per-cycle token savings against prose; the Milestone Value claims −6–9k per cycle.
 **Follow-up (refute pass live check):** Optional live run of the refute pass on Claude Code; the `[T]` criteria are met offline and no `[H]` was required.
 
 ## Phase 8: Workflow Loop (PRD Phase 7; gated by Tasks 9, 10)
@@ -355,10 +357,11 @@ Per D20: Tasks 47–54 = PR 1 (`harness/one-plugin`); Task 55 = PR 2.
 ### Milestone 8.1: Stage 2 Loop
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 59 | FR-HM19: when a `Workflow` tool is present, `--loop` runs the iteration via a script with schema `{done, idle, blocked_on_human[], summary}`. `idle` triggers `ScheduleWakeup` backoff; `runId` is written to state and the Stop gate skips while it is set; stale `runId` is cleared (D30); cancel is re-read between resumes; timestamps come from `loop-step.sh`. Prose goes to `docs/engines/loop-workflow.md`; use the Task 10 shape. Orchestration shape per Task 10: the command context stays the orchestrator and spawns Tech Leads with the Agent tool; workflow `agent()` calls run leaf tasks only (no delegation inside them); `ScheduleWakeup` is not used headless (D32). | L | Tasks 10, 34, 57 | pending |
+| 59 | FR-HM19 (D31–D34): an opt-in Stage 2 loop engine for all 5 `--loop` commands (`next-priority`, `loop`, `review-code`, `refine-requirements`, `write-implementation-plan`), enabled by `native_looping.engine: prose\|workflow` (default `prose`). It runs only when the key is `workflow` **and** a `Workflow` tool is in the tool list. Each iteration's verdict `{done, idle, blocked_on_human[], summary}` comes from a read-only Sonnet verdict leaf (plus a confirm leaf for `done`) in a workflow. The command context orchestrates and spawns Tech Leads with the Agent tool (D33); workflow `agent()` calls run leaf work only. `idle` uses the in-turn idle wait, `loop-idle-wait.sh` (D32/D34), and `ScheduleWakeup` is not used. While the plan or artifact is unchanged there is no verdict run and no turn end. `runId` is written to state; the Stop gate skips while a fresh `runId` is set; a stale one is cleared after a configurable threshold (default 900 s, D30). Cancel is re-read between resumes; timestamps come from `loop-step.sh`. The engine protocol goes to `docs/engines/loop-workflow.md`. The Stage 1 loop protocol moves byte-identically out of the command files into the D17 cold-path doc `plugins/synthex/docs/next-priority-loop.md`, behind a tool-presence- and config-gated selector in each loop command. | L | Tasks 10, 34, 57 | in progress |
 
-**Task 59 Acceptance Criteria:** `[T]` `loop-state-file.ts` accepts `runId`; `loop-advance-gate-behavioral` exits 0 with a fresh `runId` and blocks once it is stale. `[T]` Claude-path loop prose is ≥ 8 KB smaller. `[T]` Without `Workflow`/`Monitor`, native-looping tests pass unchanged. `[H]` A live multi-iteration run with a mid-run cancel.
+**Task 59 Acceptance Criteria:** `[T]` `loop-state-file.ts` accepts `runId`; `loop-advance-gate-behavioral` exits 0 with a fresh `runId` and blocks once it is stale. `[T]` Claude-path loop prose is ≥ 8 KB smaller. `[T]` Without `Workflow`/`Monitor`, native-looping tests pass unchanged. `[T]` Each of the 5 loop commands has the engine selector; Stage 1 behavior is byte-identical with the engine off. `[H]` A live multi-iteration run with a mid-run cancel.
 **Milestone Value:** Validated loop termination; idle loops stop burning turns.
+**Design:** 3-angle design panel + judge (2026-10-01); decisions D34.
 
 ## Phase 9: Unattended Operation (PRD Phase 8)
 
@@ -367,7 +370,7 @@ Per D20: Tasks 47–54 = PR 1 (`harness/one-plugin`); Task 55 = PR 2.
 |---|------|-----------|--------------|--------|
 | 60 | FR-HM30 + FR-HM31: at `[H]` or a high-impact escalation (`--auto-decide` off), `--loop` writes `.synthex/decisions/<loop-id>-<task-id>.json` (self-ignoring dir) before asking. Headless hosts wait via `loop-idle-wait.sh` using `hold` (D30). If `PushNotification` is present and `notifications.push_on_gate` is set, a notification is sent. | M | Task 34 | pending |
 | 61 | FR-HM31: `/synthex:decide <id> <option>` validates, writes the answer, and prints the result | S | Task 60 | pending |
-| 62 | FR-HM32 + FR-HM1: `/synthex:schedule` presets (`nightly-priority`, `weekly-retro`, `pr-review`); recipes from `docs/hosts.md`; OS cron or CI by default; cloud routines only if Q1 resolves yes; engine forced to `prose` (D31); routines written to config with iteration caps | M | Tasks 35, 60 | pending |
+| 62 | FR-HM32 + FR-HM1: `/synthex:schedule` presets (`nightly-priority`, `weekly-retro`, `pr-review`); recipes from `docs/hosts.md`; OS cron or CI by default; cloud routines only if Q1 resolves yes; `code_review.engine` and `native_looping.engine` both forced to `prose` (D31, D34); routines written to config with iteration caps | M | Tasks 35, 60 | pending |
 
 **Task 60 Acceptance Criteria:** `[T]` `next-priority-auto-decide.test.ts:84-100` passes. `decision-inbox.test.ts`: shape `{loop_id, task_id, question, options[], recommendation, links, created_at}`, write-before-ask order, non-consumption sentence, `.gitignore` containing `*`. `[T]` The gate allows the stop while a decision is pending. `[T]` Notification body: `Synthex decision <id>: <one-line question> — run /synthex:decide <id> <option>`.
 **Task 61 Acceptance Criteria:** `[T]` `decide-command.test.ts` locks: `Decision <id> recorded: <option>. Loop <loop-id> resumes task <task-id> at its next wake.` / `No pending decision <id>. Pending: <ids or "none">.` / `Option "<option>" is not valid for <id>. Choose one of: <options>.` / `Decision <id> was already answered (<option>, <timestamp>); no change.` Inventory +1 command; wrappers regenerated.
