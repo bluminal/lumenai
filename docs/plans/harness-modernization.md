@@ -348,8 +348,8 @@ Per D20: Tasks 47–54 = PR 1 (`harness/one-plugin`); Task 55 = PR 2.
 
 **Parallelizable:** 56 → 57 → 58.
 **Milestone Value:** Opt-in refuted reviews on Claude Code (−6–9k tokens per cycle). **Status: complete (2026-09-30)** — Phase 7 complete. The engine is opt-in via `code_review.engine: workflow` and the refute pass via `code_review.refute_pass: on`.
+**Observational Outcomes:** `[O]` Measured per-cycle token savings of the workflow engine vs prose recorded in `docs/testing.md` (the Milestone Value claims −6–9k per cycle).
 **Learning:** Fixtures must never contain secret-shaped strings: a fake `sk_live_` key copied from the live-run diff was blocked by GitHub push protection, and the unpushed commits were rewritten to redact it.
-**Follow-up (token savings):** `[O]` Measure the engine's actual per-cycle token savings against prose; the Milestone Value claims −6–9k per cycle.
 **Follow-up (refute pass live check):** Optional live run of the refute pass on Claude Code; the `[T]` criteria are met offline and no `[H]` was required.
 
 ## Phase 8: Workflow Loop (PRD Phase 7; gated by Tasks 9, 10)
