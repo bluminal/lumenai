@@ -50,8 +50,9 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 | D29 | Frontmatter = `balanced`; `economy`/`premium` are per-agent deltas. | NFR-HM5. |
 | D30 | Decision waits use `loop-step.sh hold`; the Stop gate allows a stop while a decision is pending; stale `runId` is cleared. | A10. |
 | D31 | Resolved by Task 9(d): a Synthex slash command whose text says to call Workflow is the opt-in; no per-session confirmation. Headless runs need a `Workflow(synthex:<name>)` allow rule or auto mode. | Q5. |
-| D32 | `ScheduleWakeup` does not resume a headless session (Task 9c); loops keep the in-turn wait everywhere. Task 54 may test a `run_in_background` sleep as a substitute, since task notifications do re-invoke headless sessions. *Assumed; confirm.* | Fallback fired. |
+| D32 | `ScheduleWakeup` does not resume a headless session (Task 9c); loops keep the in-turn wait everywhere. Task 54 may test a `run_in_background` sleep as a substitute, since task notifications do re-invoke headless sessions. Confirmed by D34 (2026-10-01). | Fallback fired. |
 | D33 | Workflow subagents cannot spawn subagents (Task 10). The command context orchestrates every fan-out; `agent()` runs leaf work only. | Fallback fired. |
+| D34 | Task 59 Stage 2 loop engine (A.J. Brown, 2026-10-01, after the Task 59 design panel): (1) opt-in via the global key `native_looping.engine: prose\|workflow`, default `prose`; (2) idle stays the in-turn `loop-idle-wait.sh` everywhere and `ScheduleWakeup` is not used (confirms D32); an unchanged plan or artifact means no verdict run and no turn end; (3) the Stage 1 loop protocol moves byte-identically out of the command files into the D17 cold-path doc `plugins/synthex/docs/next-priority-loop.md`, behind a tool-presence- and config-gated selector; (4) the engine applies to all 5 `--loop` commands: `next-priority`, `loop`, `review-code`, `refine-requirements`, `write-implementation-plan`. | (1) Follows the `code_review.engine` precedent. Each verdict run ends a turn, so other tools' Stop hooks fire once per iteration; keeping `prose` as the default protects NFR-HM1/NFR-HM3. The default may flip after an `[O]` per-iteration token measurement. (2) The in-turn wait is proven headless and wakes on a plan change or a cancel. `ScheduleWakeup` was refuted headless (Task 9c), and a wake that never fires leaves no Stop event to recover from. (3) The command file is injected in full, so moving the prose out is how the ≥ 8 KB Claude-path cut is met; byte-identity keeps Stage 1 unchanged on every host. (4) Keeps FR-HM19's original `--loop` scope, overriding the panel's next-priority-only recommendation. A18. |
 
 **PRD amendments** (apply in the same PR as this plan):
 - A1: FR-HM4/16 engine paths.
@@ -71,6 +72,7 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 - A15: §9 constraint: major bump via `.release-intent.json`; removal commit `chore:`.
 - A16: FR-HM24 `configure-teams` is ungated.
 - A17: PRD §8 OpenCode catalog metric becomes "≤ 13,353 bytes (measured + 5%); descriptions ≤ 6,000 chars" (Task 22).
+- A18: FR-HM19 opt-in engine key, leaf-only verdict with a confirm leaf, in-turn idle, fresh-`runId` gate skip, all `--loop` commands (D34).
 
 ## Open Questions
 
@@ -355,10 +357,11 @@ Per D20: Tasks 47–54 = PR 1 (`harness/one-plugin`); Task 55 = PR 2.
 ### Milestone 8.1: Stage 2 Loop
 | # | Task | Complexity | Dependencies | Status |
 |---|------|-----------|--------------|--------|
-| 59 | FR-HM19: when a `Workflow` tool is present, `--loop` runs the iteration via a script with schema `{done, idle, blocked_on_human[], summary}`. `idle` triggers `ScheduleWakeup` backoff; `runId` is written to state and the Stop gate skips while it is set; stale `runId` is cleared (D30); cancel is re-read between resumes; timestamps come from `loop-step.sh`. Prose goes to `docs/engines/loop-workflow.md`; use the Task 10 shape. Orchestration shape per Task 10: the command context stays the orchestrator and spawns Tech Leads with the Agent tool; workflow `agent()` calls run leaf tasks only (no delegation inside them); `ScheduleWakeup` is not used headless (D32). | L | Tasks 10, 34, 57 | in progress |
+| 59 | FR-HM19 (D31–D34): an opt-in Stage 2 loop engine for all 5 `--loop` commands (`next-priority`, `loop`, `review-code`, `refine-requirements`, `write-implementation-plan`), enabled by `native_looping.engine: prose\|workflow` (default `prose`). It runs only when the key is `workflow` **and** a `Workflow` tool is in the tool list. Each iteration's verdict `{done, idle, blocked_on_human[], summary}` comes from a read-only Sonnet verdict leaf (plus a confirm leaf for `done`) in a workflow. The command context orchestrates and spawns Tech Leads with the Agent tool (D33); workflow `agent()` calls run leaf work only. `idle` uses the in-turn idle wait, `loop-idle-wait.sh` (D32/D34), and `ScheduleWakeup` is not used. While the plan or artifact is unchanged there is no verdict run and no turn end. `runId` is written to state; the Stop gate skips while a fresh `runId` is set; a stale one is cleared after a configurable threshold (default 900 s, D30). Cancel is re-read between resumes; timestamps come from `loop-step.sh`. The engine protocol goes to `docs/engines/loop-workflow.md`. The Stage 1 loop protocol moves byte-identically out of the command files into the D17 cold-path doc `plugins/synthex/docs/next-priority-loop.md`, behind a tool-presence- and config-gated selector in each loop command. | L | Tasks 10, 34, 57 | in progress |
 
-**Task 59 Acceptance Criteria:** `[T]` `loop-state-file.ts` accepts `runId`; `loop-advance-gate-behavioral` exits 0 with a fresh `runId` and blocks once it is stale. `[T]` Claude-path loop prose is ≥ 8 KB smaller. `[T]` Without `Workflow`/`Monitor`, native-looping tests pass unchanged. `[H]` A live multi-iteration run with a mid-run cancel.
+**Task 59 Acceptance Criteria:** `[T]` `loop-state-file.ts` accepts `runId`; `loop-advance-gate-behavioral` exits 0 with a fresh `runId` and blocks once it is stale. `[T]` Claude-path loop prose is ≥ 8 KB smaller. `[T]` Without `Workflow`/`Monitor`, native-looping tests pass unchanged. `[T]` Each of the 5 loop commands has the engine selector; Stage 1 behavior is byte-identical with the engine off. `[H]` A live multi-iteration run with a mid-run cancel.
 **Milestone Value:** Validated loop termination; idle loops stop burning turns.
+**Design:** 3-angle design panel + judge (2026-10-01); decisions D34.
 
 ## Phase 9: Unattended Operation (PRD Phase 8)
 
