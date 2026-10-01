@@ -53,6 +53,8 @@ For `--resume-last`: enumerate `.synthex/loops/*.json` yourself (exclude `.archi
 
 ### Iteration loop
 
+**Loop engine (FR-HM19, D34):** if `--loop-isolated` is not set, a `Workflow` tool is in your tool list, and `plugins/synthex/scripts/lib/config-get.sh native_looping.engine prose` (from the installed plugin root) prints exactly `workflow`, Read `${CLAUDE_PLUGIN_ROOT}/docs/engines/loop-workflow.md` and follow it (this instruction is the `Workflow` opt-in, D31); otherwise follow this command's Stage 1 loop prose unchanged, never a host feature named Workflow. Other hosts resolve the plugin root via `.synthex/state.json`.
+
 Follow [`shared-iter`](../docs/native-looping.md#shared-iter) (shared-context, default) or [`subagent-iter`](../docs/native-looping.md#subagent-iter) (fresh-subagent, when `--loop-isolated` is set). Each iteration:
 
 1. **Advance — one Bash call, the durability boundary (D-NL13).** Run `loop-step.sh advance <loop-id>`. On exit 0 its stdout IS the iteration marker `[loop <loop-id> iteration <N>/<max>]` (see [`markers`](../docs/native-looping.md#markers)) — print it, then continue to step 2. On any non-zero exit, STOP: print the script's stderr and exit. This single call replaces the old boundary-check + increment + marker-print steps, and it also catches cancellation and the max-iterations cap (no separate checks needed — a cancelled or exhausted loop simply makes the NEXT `advance` call fail).

@@ -65,6 +65,7 @@ Loop state lives at `<project>/.synthex/loops/<loop-id>.json`. One file per loop
 | `last_gate_iteration` | integer | Optional; gate-managed. The `iteration` value the last time the Stop hook fired — used to detect progress between turn-ends. Defaults to -1 when absent. |
 | `idle_streak` | integer | Optional; managed only by `scripts/loop-idle-wait.sh`. Consecutive idle iterations; selects the idle-wait backoff limit. Defaults to 0 when absent. |
 | `last_idle_iteration` | integer | Optional; managed only by `scripts/loop-idle-wait.sh`. The `iteration` of the most recent idle wait — the streak continues only when the next idle wait is at `iteration + 1`. Defaults to -1 when absent. |
+| `runId` | string | Optional; FR-HM19 Stage 2 only, and the one camelCase key. `<loop_id>-i<N>`, written only by `loop-step.sh advance --run` or `hold --run` while a read-only `synthex:loop-engine` verdict run is pending; cleared by plain `advance` and `hold`, `finish`, `cancel`, `begin --resume`, and by the Stop gate once `last_updated` is `SYNTHEX_LOOP_RUN_STALE` (default 900) seconds old. Absent on Stage 1 loops. |
 
 ### Obtaining the session id
 
@@ -184,6 +185,8 @@ FR-HM18: steps 1–4 collapse into a SINGLE Bash call, `plugins/synthex/scripts/
 6. **Promise detection.** After the workflow's final response, scan that response for the literal regex `<promise>\s*<completion_promise_text>\s*</promise>`. If matched, run `loop-step.sh finish <loop-id> completed` (sets `status: "completed"`, `exit_reason: "completion-promise-emitted"`, `exited_at`, writes state), exit.
 7. **Cancellation check.** Subsumed by step 2 on the NEXT iteration: if another session set `status: "cancelled"` (via `/synthex:cancel-loop`, i.e. `loop-step.sh cancel`), the next `advance` (or `hold`) call exits non-zero and the command stops. No separate re-read is needed.
 8. **Loop back to step 2.**
+
+**Stage 2 (FR-HM19, D34).** On Claude Code with `native_looping.engine: workflow`, a `Workflow` tool, and no `--loop-isolated`, every `--loop` command follows [`engines/loop-workflow.md`](engines/loop-workflow.md) instead of steps 5–6: a read-only `synthex:loop-engine` run returns the validated `{done, idle, blocked_on_human[], summary}` verdict, and the loop finishes only on a confirmed `done`. Every other host, and every other configuration, keeps the flow above.
 
 ### Stay in-turn; the Stop hook is the safety net
 
