@@ -288,3 +288,46 @@ describe('validateLoopStateFile — FR-NL8 schema', () => {
     });
   });
 });
+
+describe('runId (FR-HM19, Task 59)', () => {
+  it('accepts a runId of the form <loop_id>-i<N> on a running state', () => {
+    for (const runId of ['next-priority-3f2a-i5', 'next-priority-3f2a-i1', 'next-priority-3f2a-i200']) {
+      const r = validateLoopStateFile({ ...VALID_RUNNING_STATE, runId });
+      expect(r.valid, runId).toBe(true);
+    }
+  });
+
+  it('accepts runId null and absent', () => {
+    expect(validateLoopStateFile({ ...VALID_RUNNING_STATE, runId: null }).valid).toBe(true);
+    expect(validateLoopStateFile({ ...VALID_COMPLETED_STATE, runId: null }).valid).toBe(true);
+    expect('runId' in VALID_RUNNING_STATE).toBe(false);
+    expect(validateLoopStateFile(VALID_RUNNING_STATE).valid).toBe(true);
+  });
+
+  it('rejects a non-string, empty or pattern-invalid runId', () => {
+    const bad: unknown[] = [5, true, {}, '', 'next-priority-3f2a', 'next-priority-3f2a-i', 'next-priority-3f2a-i1234', 'next-priority-3f2a-iX', 'Next-priority-3f2a-i5'];
+    for (const runId of bad) {
+      const r = validateLoopStateFile({ ...VALID_RUNNING_STATE, runId });
+      expect(r.valid, JSON.stringify(runId)).toBe(false);
+      if (!r.valid) expect(r.errors.some((e) => /runId/.test(e))).toBe(true);
+    }
+    const r = validateLoopStateFile({ ...VALID_RUNNING_STATE, runId: 7 });
+    if (!r.valid) expect(r.errors).toContain('runId must be a string or null');
+  });
+
+  it('rejects a runId that does not belong to loop_id', () => {
+    for (const runId of ['other-loop-i5', 'next-priority-3f2a-ix-i5']) {
+      const r = validateLoopStateFile({ ...VALID_RUNNING_STATE, runId });
+      expect(r.valid, runId).toBe(false);
+      if (!r.valid) expect(r.errors).toContain('runId must be "next-priority-3f2a-i<N>"');
+    }
+  });
+
+  it('rejects a non-null runId on a terminal status', () => {
+    for (const status of ['completed', 'cancelled', 'max-iterations-reached', 'crashed'] as const) {
+      const r = validateLoopStateFile({ ...VALID_COMPLETED_STATE, status, runId: 'next-priority-3f2a-i5' });
+      expect(r.valid, status).toBe(false);
+      if (!r.valid) expect(r.errors).toContain('runId requires status "running"');
+    }
+  });
+});

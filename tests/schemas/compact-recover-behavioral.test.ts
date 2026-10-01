@@ -55,6 +55,12 @@ function writeLoop(id: string, fields: Record<string, unknown> = {}): void {
   writeFileSync(join(loopsDir, `${id}.json`), JSON.stringify(full));
 }
 
+/** FR-HM19 Stage 2 (Task 59): the exact pending-run second line. */
+const pendingLine = (runId: string, id: string): string =>
+  `Verdict run ${runId} is pending for ${id}: wait for its Workflow notification, then run loop-step.sh hold ${id} first (docs/engines/loop-workflow.md); do not advance.`;
+const runningLine = (id: string, it: number, max: number): string =>
+  `Synthex loop ${id} is running (iteration ${it}/${max}); state: .synthex/loops/${id}.json — continue with loop-step.sh advance ${id}`;
+
 function runHook(): string {
   return execFileSync('bash', [HOOK], {
     cwd: projectDir,
@@ -135,6 +141,23 @@ describe('compact-recover.sh — prints running-loop identity', () => {
     mkdirSync(loopsDir, { recursive: true });
     expect(() => runHook()).not.toThrow();
   });
+
+  it('prints the pending-run second line when a running loop has a runId', () => {
+    writeLoop('next-priority-ab12', { iteration: 4, max_iterations: 20, runId: 'next-priority-ab12-i4' });
+    expect(runHook()).toBe(
+      `${runningLine('next-priority-ab12', 4, 20)}\n${pendingLine('next-priority-ab12-i4', 'next-priority-ab12')}\n`,
+    );
+  });
+
+  it('output is byte-identical to the single line when runId is absent or null', () => {
+    writeLoop('np-plain', { iteration: 2, max_iterations: 9 });
+    const absent = runHook();
+    expect(absent).toBe(`${runningLine('np-plain', 2, 9)}\n`);
+    writeLoop('np-plain', { iteration: 2, max_iterations: 9, runId: null });
+    expect(runHook()).toBe(absent);
+    writeLoop('np-plain', { iteration: 2, max_iterations: 9, runId: '' });
+    expect(runHook()).toBe(absent);
+  });
 });
 
 /** A PATH containing only the POSIX tools the script needs, minus node — the
@@ -175,5 +198,24 @@ describe('compact-recover.sh — hosts without node', () => {
   it('still prints nothing when no loop is running', () => {
     writeLoop('np-done', { status: 'completed' });
     expect(runNoNode()).toBe('');
+  });
+
+  it('prints the pending-run second line via the awk reader', () => {
+    writeLoop('np-fallback', { iteration: 6, max_iterations: 12, runId: 'np-fallback-i6' });
+    const expected = `${runningLine('np-fallback', 6, 12)}\n${pendingLine('np-fallback-i6', 'np-fallback')}\n`;
+    expect(runNoNode()).toBe(expected);
+    // loop-step.sh's own pretty-printed serialization (runId last) parses the same way.
+    writeFileSync(
+      join(loopsDir, 'np-fallback.json'),
+      JSON.stringify(
+        { schema_version: 1, loop_id: 'np-fallback', status: 'running', iteration: 6, max_iterations: 12, runId: 'np-fallback-i6' },
+        null,
+        2,
+      ) + '\n',
+    );
+    expect(runNoNode()).toBe(expected);
+    // null runId: the single line only.
+    writeLoop('np-fallback', { iteration: 6, max_iterations: 12, runId: null });
+    expect(runNoNode()).toBe(`${runningLine('np-fallback', 6, 12)}\n`);
   });
 });

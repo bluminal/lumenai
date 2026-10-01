@@ -9,8 +9,19 @@
 # For a running loop matching this session, the gate ALLOWS the stop when:
 #   - the completion promise is in the last assistant message (loop terminating), OR
 #   - the last assistant turn is a pending AskUserQuestion ([H]-approval escape), OR
-#   - the per-loop no-progress block counter has reached the Synthex cap.
+#   - the per-loop no-progress block counter has reached the Synthex cap, OR
+#   - the loop carries a fresh `runId` (FR-HM19 Stage 2, D30, Task 59): a
+#     read-only synthex:loop-engine verdict Workflow run is in flight and its
+#     completion notification will re-drive the session (skip 5a).
 # Otherwise it BLOCKS and tells the model to run the next iteration.
+#
+# Env overrides:
+#   SYNTHEX_LOOP_BLOCK_CAP   no-progress block cap (default 7).
+#   SYNTHEX_LOOP_RUN_STALE   seconds after last_updated at which a runId lease
+#                            is stale and deleted (default 900; a non-integer
+#                            value falls back to 900).
+#   SYNTHEX_NOW              overrides "now" (UTC ISO 8601) for the runId age
+#                            check and the last_updated stamp (tests).
 #
 # Progress-aware counter (ADR-003 §3): consecutive_stop_blocks resets to 0 each
 # time the loop's `iteration` advances, and increments on a no-progress stop.
@@ -72,6 +83,22 @@ done
 
 [ -z "$LOOP_ID" ] && exit 0
 
+# Skip 5a (FR-HM19 Stage 2, D30, Task 59): a fresh `runId` means a read-only
+# synthex:loop-engine verdict run is in flight and its Workflow notification
+# will re-drive this session, so allow the stop silently (no output, no
+# write). Fresh = -300 <= now - last_updated < SYNTHEX_LOOP_RUN_STALE (default
+# 900 s). A stale lease, an unparseable last_updated (fractional seconds
+# included — fromdateiso8601 rejects them), or one more than 300 s in the
+# future is cleared with an atomic `del(.runId)` and evaluation continues.
+RUN_ID="$(jq -r '.runId // ""' "$STATE_FILE" 2>/dev/null)"
+if [ -n "$RUN_ID" ]; then
+  RUN_STALE="${SYNTHEX_LOOP_RUN_STALE:-900}"; case "$RUN_STALE" in ''|*[!0-9]*) RUN_STALE=900 ;; esac
+  RUN_NOW="${SYNTHEX_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+  RUN_AGE="$(jq -r --arg now "$RUN_NOW" 'try ((($now | fromdateiso8601) - (.last_updated | fromdateiso8601)) | floor | tostring) catch "x"' "$STATE_FILE" 2>/dev/null)"
+  if [[ "$RUN_AGE" =~ ^-?[0-9]+$ ]] && [ "$RUN_AGE" -ge -300 ] && [ "$RUN_AGE" -lt "$RUN_STALE" ]; then exit 0; fi
+  TMP="$STATE_FILE.tmp.$$"; if jq 'del(.runId)' "$STATE_FILE" > "$TMP" 2>/dev/null; then mv -f "$TMP" "$STATE_FILE" 2>/dev/null || rm -f "$TMP" 2>/dev/null; else rm -f "$TMP" 2>/dev/null; fi
+fi
+
 TRANSCRIPT="$(printf '%s' "$INPUT" | jq -r '.transcript_path // ""' 2>/dev/null)"
 [ -r "$TRANSCRIPT" ] || exit 0
 
@@ -115,7 +142,7 @@ else
 fi
 
 # Persist the counter (atomic write).
-NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+NOW="${SYNTHEX_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 TMP="$STATE_FILE.tmp.$$"
 if jq --argjson it "$ITERATION" --argjson c "$CONSEC" --arg now "$NOW" \
      '.consecutive_stop_blocks = $c | .last_gate_iteration = $it | .last_updated = $now' \

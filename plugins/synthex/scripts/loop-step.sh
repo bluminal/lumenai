@@ -10,8 +10,8 @@
 #                [--max <n>] [--args <string>] [--prompt-file <path>]
 #                [--isolation shared-context|subagent] [--session-id <id>]
 #                [--resume <loop-id>]
-#   loop-step.sh advance <loop-id>
-#   loop-step.sh hold <loop-id>
+#   loop-step.sh advance <loop-id> [--run]
+#   loop-step.sh hold <loop-id> [--run]
 #   loop-step.sh finish <loop-id> <status> [exit_reason]
 #   loop-step.sh archive
 #   loop-step.sh list
@@ -32,6 +32,19 @@
 # confirmation. `list` prints the RUNNING/COMPLETED enumeration (FR-NL32/33).
 # `check-writable` is silent on success.
 #
+# FR-HM19 Stage 2 (Task 59): `--run` leases a read-only verdict Workflow run
+# (synthex:loop-engine) whose completion notification re-drives the session.
+#   - `advance --run` sets runId=<loop-id>-i<N> (N = the NEW iteration) and
+#     prints `run-id: <runId>` as line 2; the iteration marker stays line 1.
+#   - `hold --run` sets runId for the CURRENT iteration without incrementing
+#     and prints `run-id: <runId>` as its only line.
+#   - Every other mutation clears runId: plain advance, plain hold, finish,
+#     cancel, cancel --all, begin --resume, and the max-iterations transition.
+#   - runId is the one camelCase key in the state file, and it is written
+#     (as the LAST key) only while non-empty, so Stage 1 files never carry it.
+#   - The Stop gate (loop-advance-gate.sh) skips while it is fresh and deletes
+#     it once last_updated is SYNTHEX_LOOP_RUN_STALE (default 900) seconds old.
+#
 # jq is never required: state files are flat (no nested objects/arrays), so
 # reads/writes go through `node` when present (guarded by `command -v node`)
 # or a plain sed/awk fallback that understands this script's own one-
@@ -50,7 +63,8 @@
 #   2 - loop-id not found.
 #   3 - loop is not running (cancelled/completed/crashed) — advance/hold refuse.
 #   4 - loop reached max_iterations (advance only; state is now max-iterations-reached).
-#   5 - writability check failed (check-writable, or a write was skipped).
+#   5 - writability check failed (check-writable, or a write was skipped)
+#       (hold --run exits 5 instead of plain hold's best-effort 0).
 
 set -u
 
@@ -201,9 +215,14 @@ field_unquote() {
 }
 
 # state_get <file> <key> — resolved value (empty string for null/missing).
+# Task 59 fix: a JSON null used to fall through to field_unquote and come
+# back as the literal "__NULL__", so on node-less hosts every re-render
+# rewrote session_id/prompt_file/exited_at/exit_reason as "__NULL__" (and the
+# archive name became <id>-__NULL__.json). Null now resolves to "", so
+# load_state's *_NULL derivations emit JSON null again.
 state_get() {
   raw="$(field_get_raw "$1" "$2")"
-  [ -z "$raw" ] && { printf ''; return; }
+  if [ -z "$raw" ] || [ "$raw" = "null" ]; then printf ''; return; fi
   field_unquote "$raw"
 }
 
@@ -329,7 +348,13 @@ render_state() {
     printf '  "consecutive_stop_blocks": %s,\n' "${SV_CONSECUTIVE_STOP_BLOCKS:-0}"
     printf '  "last_gate_iteration": %s,\n' "${SV_LAST_GATE_ITERATION:--1}"
     printf '  "idle_streak": %s,\n' "${SV_IDLE_STREAK:-0}"
-    printf '  "last_idle_iteration": %s\n' "${SV_LAST_IDLE_ITERATION:--1}"
+    if [ -n "${SV_RUNID:-}" ]; then
+      # FR-HM19 Stage 2 lease: the one camelCase key, last, only while set.
+      printf '  "last_idle_iteration": %s,\n' "${SV_LAST_IDLE_ITERATION:--1}"
+      printf '  "runId": "%s"\n' "$(jesc "${SV_RUNID:-}")"
+    else
+      printf '  "last_idle_iteration": %s\n' "${SV_LAST_IDLE_ITERATION:--1}"
+    fi
     printf '}\n'
   } > "$tmp" || { rm -f "$tmp" 2>/dev/null; return 1; }
 
@@ -354,6 +379,7 @@ node_dump_state() {
       "completion_promise","max_iterations","iteration","isolation","status",
       "started_at","last_updated","exited_at","exit_reason",
       "consecutive_stop_blocks","last_gate_iteration","idle_streak","last_idle_iteration",
+      "runId",
     ];
     let out = "";
     for (const f of fields) {
@@ -410,6 +436,7 @@ load_state() {
   SV_LAST_GATE_ITERATION="$(state_get_or "$file" last_gate_iteration -1)"
   SV_IDLE_STREAK="$(state_get_or "$file" idle_streak 0)"
   SV_LAST_IDLE_ITERATION="$(state_get_or "$file" last_idle_iteration -1)"
+  SV_RUNID="$(state_get_or "$file" runId "")"
 }
 
 state_path() { printf '%s/%s.json' "$(loops_dir)" "$1"; }
@@ -569,6 +596,7 @@ cmd_begin() {
     fi
     [ -n "$session_id" ] && { SV_SESSION_ID="$session_id"; SV_SESSION_ID_NULL=0; }
     [ -n "$isolation" ] && [ "$isolation" != "shared-context" ] && SV_ISOLATION="$isolation"
+    SV_RUNID=""   # a resumed loop never inherits a pending verdict lease
     SV_LAST_UPDATED="$now"
     render_state "$path" || { echo "begin: failed to write $path" >&2; exit 5; }
     printf '%s\n' "$resume_id"
@@ -641,6 +669,7 @@ cmd_begin() {
   SV_LAST_GATE_ITERATION=-1
   SV_IDLE_STREAK=0
   SV_LAST_IDLE_ITERATION=-1
+  SV_RUNID=""
 
   render_state "$path" || { echo "begin: failed to write $path" >&2; exit 5; }
   printf '%s\n' "$loop_id"
@@ -652,9 +681,29 @@ cmd_begin() {
 # advance — the durability boundary. One Bash call per iteration.
 # --------------------------------------------------------------------------
 
+# parse_run_args <usage> <args...> — shared by advance/hold: sets loop_id and
+# want_run (1 when --run is present). Any other flag, a second positional,
+# or a missing loop-id prints <usage> to stderr and exits 1.
+parse_run_args() {
+  usage="$1"; shift
+  loop_id=""; want_run=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --run) want_run=1 ;;
+      -*) echo "$usage" >&2; exit 1 ;;
+      *)
+        if [ -n "$loop_id" ]; then echo "$usage" >&2; exit 1; fi
+        loop_id="$1"
+        ;;
+    esac
+    shift
+  done
+  [ -z "$loop_id" ] && { echo "$usage" >&2; exit 1; }
+  return 0
+}
+
 cmd_advance() {
-  loop_id="${1:-}"
-  [ -z "$loop_id" ] && { echo "Usage: loop-step.sh advance <loop-id>" >&2; exit 1; }
+  parse_run_args "Usage: loop-step.sh advance <loop-id> [--run]" "$@"
   path="$(state_path "$loop_id")"
   if [ ! -f "$path" ]; then
     echo "No loop found: $loop_id. Run /synthex:list-loops." >&2
@@ -680,6 +729,7 @@ cmd_advance() {
     SV_EXITED_AT="$now"; SV_EXITED_AT_NULL=0
     SV_EXIT_REASON="Reached max_iterations=${SV_MAX_ITERATIONS} without completion promise"; SV_EXIT_REASON_NULL=0
     SV_LAST_UPDATED="$now"
+    SV_RUNID=""
     render_state "$path" || { echo "advance: failed to write $path" >&2; exit 5; }
     echo "Loop \"$loop_id\" reached max_iterations=${SV_MAX_ITERATIONS}. Resume is not possible once terminal; start a new loop with /synthex:loop or the owning command's --loop flag." >&2
     exit 4
@@ -687,8 +737,10 @@ cmd_advance() {
 
   SV_ITERATION=$((SV_ITERATION + 1))
   SV_LAST_UPDATED="$now"
+  if [ "$want_run" = "1" ]; then SV_RUNID="${loop_id}-i${SV_ITERATION}"; else SV_RUNID=""; fi
   render_state "$path" || { echo "advance: failed to write $path" >&2; exit 5; }
   printf '[loop %s iteration %s/%s]\n' "$loop_id" "$SV_ITERATION" "$SV_MAX_ITERATIONS"
+  [ "$want_run" = "1" ] && printf 'run-id: %s\n' "$SV_RUNID"
   exit 0
 }
 
@@ -699,8 +751,7 @@ cmd_advance() {
 # --------------------------------------------------------------------------
 
 cmd_hold() {
-  loop_id="${1:-}"
-  [ -z "$loop_id" ] && { echo "Usage: loop-step.sh hold <loop-id>" >&2; exit 1; }
+  parse_run_args "Usage: loop-step.sh hold <loop-id> [--run]" "$@"
   path="$(state_path "$loop_id")"
   if [ ! -f "$path" ]; then
     echo "No loop found: $loop_id. Run /synthex:list-loops." >&2
@@ -715,13 +766,24 @@ cmd_hold() {
 
   d="$(dirname "$path")"
   if ! check_writable_dir "$d"; then
-    # A hold's timestamp touch is best-effort; an unwritable dir does not
-    # invalidate an otherwise-running loop, so still allow the re-entry.
+    # A plain hold's timestamp touch is best-effort; an unwritable dir does
+    # not invalidate an otherwise-running loop, so still allow the re-entry.
+    # `hold --run` must record its lease, so it fails loudly instead.
+    if [ "$want_run" = "1" ]; then
+      echo "hold: cannot write to $d — $(writability_hint)" >&2
+      exit 5
+    fi
     exit 0
   fi
 
+  if [ "$want_run" = "1" ]; then SV_RUNID="${loop_id}-i${SV_ITERATION}"; else SV_RUNID=""; fi
   SV_LAST_UPDATED="$(now_iso)"
-  render_state "$path" || true
+  if [ "$want_run" = "1" ]; then
+    render_state "$path" || { echo "hold: failed to write $path" >&2; exit 5; }
+    printf 'run-id: %s\n' "$SV_RUNID"
+  else
+    render_state "$path" || true
+  fi
   exit 0
 }
 
@@ -768,6 +830,7 @@ cmd_finish() {
   fi
 
   now="$(now_iso)"
+  SV_RUNID=""
   SV_STATUS="$status"
   SV_EXITED_AT="$now"; SV_EXITED_AT_NULL=0
   SV_EXIT_REASON="$reason"; SV_EXIT_REASON_NULL=0
@@ -929,6 +992,7 @@ cancel_one_file() {
   d="$(dirname "$f")"
   check_writable_dir "$d" || return 2
   load_state "$f"
+  SV_RUNID=""
   now="$(now_iso)"
   SV_STATUS="cancelled"
   SV_EXITED_AT="$now"; SV_EXITED_AT_NULL=0
