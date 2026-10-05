@@ -46,7 +46,7 @@ See adapter-common.md; embed `canonical-finding-schema.md`.
 claude --model <config.model> --output-format json --permission-mode acceptEdits --tools "" -p "<prompt>"
 ```
 
-**Sandbox flags (FR-MR26):** Claude CLI has no `--sandbox` flag identical to Codex's. Variance from Codex: `--permission-mode acceptEdits` (edits only, no shell) + `--tools ""` (disables all built-in tools) together give the same read-only, non-blocking intent as `--sandbox read-only --approval-mode never`, under different flag names. Write raw stdout to `raw_output_path`; non-zero exit → `cli_failed`.
+**Sandbox flags (FR-MR26):** Claude CLI has no `--sandbox` flag identical to Codex's. Variance from Codex: `--permission-mode acceptEdits` (edits only, no shell) + `--tools ""` (disables all built-in tools) together give the same read-only, non-blocking intent as Codex's `codex exec --sandbox read-only` (which never prompts), under different flag names. Write raw stdout to `raw_output_path`; non-zero exit → `cli_failed`.
 
 ### 5. Output Parsing
 
@@ -87,7 +87,7 @@ Auth: `claude auth login`, verify via `claude auth status`.
 1. **Self-preference risk.** Host + this adapter both Anthropic adds count without adding family diversity; preflight emits a self-preference warning (FR-MR15).
 2. **Model must differ from host.** Same model as host = no diversity benefit — a misconfiguration the orchestrator's diversity check catches, not this adapter.
 3. **Auth shared with host.** Same credential store as the Claude Code session — a separate login is not usually required.
-4. **Sandbox flag variance from Codex.** `--permission-mode acceptEdits --tools ""` replaces `--sandbox read-only --approval-mode never`; verify against `claude --help` when upgrading.
+4. **Sandbox flag variance from Codex.** `--permission-mode acceptEdits --tools ""` replaces Codex's `--sandbox read-only`; verify against `claude --help` when upgrading.
 
 ---
 

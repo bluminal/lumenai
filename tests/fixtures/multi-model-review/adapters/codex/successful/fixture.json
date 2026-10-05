@@ -1,22 +1,63 @@
 {
   "scenario": "successful",
-  "description": "Codex CLI invoked successfully; two findings returned, normalized to canonical envelope.",
-  "recorded_cli_stdout": {
-    "model": "codex-1",
-    "usage": {
-      "input_tokens": 4521,
-      "output_tokens": 312
+  "description": "Codex CLI invoked successfully via `codex exec --sandbox read-only --ephemeral --json --output-schema ... -o <last>`; the -o last-message file holds two schema-shaped findings, the JSONL stream's last turn.completed event carries usage; normalized to the canonical envelope.",
+  "auth_check": {
+    "command": "codex login status",
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": "Logged in using ChatGPT"
+  },
+  "recorded_last_message": {
+    "findings": [
+      {
+        "finding_id": "security.handleLogin.missing-csrf-check",
+        "severity": "high",
+        "category": "security",
+        "title": "Missing CSRF check in handleLogin",
+        "description": "The handleLogin function does not validate CSRF tokens, allowing cross-site request forgery attacks.",
+        "file": "src/auth/handleLogin.ts",
+        "symbol": "handleLogin",
+        "line_range": null,
+        "confidence": "high"
+      },
+      {
+        "finding_id": "maintainability.tokenStore.unbounded-cache",
+        "severity": "medium",
+        "category": "maintainability",
+        "title": "Unbounded in-memory token cache in TokenStore",
+        "description": "The token cache in TokenStore grows indefinitely; no eviction policy or max-size cap is applied, risking OOM under sustained load.",
+        "file": "src/auth/tokenStore.ts",
+        "symbol": "TokenStore",
+        "line_range": null,
+        "confidence": "medium"
+      }
+    ]
+  },
+  "recorded_cli_stdout_jsonl": [
+    {
+      "type": "thread.started",
+      "thread_id": "<thread-id>"
     },
-    "response": {
-      "message": {
-        "content": [
-          {
-            "type": "text",
-            "text": "[{\"finding_id\":\"security.handleLogin.missing-csrf-check\",\"severity\":\"high\",\"category\":\"security\",\"title\":\"Missing CSRF check in handleLogin\",\"description\":\"The handleLogin function does not validate CSRF tokens, allowing cross-site request forgery attacks.\",\"file\":\"src/auth/handleLogin.ts\",\"symbol\":\"handleLogin\",\"line_range\":null,\"confidence\":\"high\"},{\"finding_id\":\"maintainability.tokenStore.unbounded-cache\",\"severity\":\"medium\",\"category\":\"maintainability\",\"title\":\"Unbounded in-memory token cache in TokenStore\",\"description\":\"The token cache in TokenStore grows indefinitely; no eviction policy or max-size cap is applied, risking OOM under sustained load.\",\"file\":\"src/auth/tokenStore.ts\",\"symbol\":\"TokenStore\",\"line_range\":null,\"confidence\":\"medium\"}]"
-          }
-        ]
+    {
+      "type": "turn.started"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_0",
+        "type": "agent_message",
+        "text": "{\"findings\":[{\"finding_id\":\"security.handleLogin.missing-csrf-check\",\"severity\":\"high\",\"category\":\"security\",\"title\":\"Missing CSRF check in handleLogin\",\"description\":\"The handleLogin function does not validate CSRF tokens, allowing cross-site request forgery attacks.\",\"file\":\"src/auth/handleLogin.ts\",\"symbol\":\"handleLogin\",\"line_range\":null,\"confidence\":\"high\"},{\"finding_id\":\"maintainability.tokenStore.unbounded-cache\",\"severity\":\"medium\",\"category\":\"maintainability\",\"title\":\"Unbounded in-memory token cache in TokenStore\",\"description\":\"The token cache in TokenStore grows indefinitely; no eviction policy or max-size cap is applied, risking OOM under sustained load.\",\"file\":\"src/auth/tokenStore.ts\",\"symbol\":\"TokenStore\",\"line_range\":null,\"confidence\":\"medium\"}]}"
+      }
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 4521,
+        "cached_input_tokens": 0,
+        "output_tokens": 312
       }
     }
-  },
+  ],
+  "resolved_model": "codex-1",
   "raw_output_path": "docs/reviews/raw/codex-a1b2c3d4.json"
 }

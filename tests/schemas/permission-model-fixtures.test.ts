@@ -3,7 +3,8 @@
  *
  * Three [T] criteria:
  *   (1) Layer 1 schema test validates `external_permission_mode` enum per CLI
- *   (2) Layer 2 fixture: Codex `app-server` requestApproval flow proxied to parent
+ *   (2) Layer 2 fixture: Codex parent-mediated mode (runs Pattern 1 until Pattern 3 is
+ *       rebuilt on the real app-server protocol)
  *   (3) Layer 2 fixture: Gemini `--readonly` invocation (no destructive tool-use)
  *
  * Plus: Layer 2 fixture for the sandbox-yolo confirmation prompt (Task 83 surface).
@@ -85,69 +86,82 @@ describe('Task 84 [T] (1): Layer 1 schema — external_permission_mode enum per 
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// [T] Criterion 2: Layer 2 fixture — Codex app-server requestApproval flow
+// [T] Criterion 2: Layer 2 fixture — Codex parent-mediated mode
+//
+// Was: a Codex `app-server` flow built on a bare JSON-RPC `requestApproval` method and a
+// terminal `result` message. Neither exists in the Codex CLI 0.160.0 app-server protocol
+// (`codex app-server generate-json-schema`: initialize, thread/start, turn/start;
+// item/commandExecution/requestApproval, item/fileChange/requestApproval, ...), and the
+// adapter's `codex app-server --help` fallback probe exits 0, so the default never reached
+// `codex exec`. Until Pattern 3 is rebuilt on the real protocol, parent-mediated runs
+// Pattern 1 with one WARN line; this fixture pins that.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('Task 84 [T] (2): Layer 2 fixture — Codex app-server requestApproval proxied to parent', () => {
-  const FIX = join(FIXTURES, 'multi-model-review', 'adapters', 'codex', 'app-server-request-approval');
+describe('Task 84 [T] (2): Layer 2 fixture — Codex parent-mediated runs Pattern 1 (read-only) with a WARN', () => {
+  const FIX = join(FIXTURES, 'multi-model-review', 'adapters', 'codex', 'parent-mediated-read-only');
+  const ADAPTER = join(REPO_ROOT, 'plugins', 'synthex', 'agents', 'codex-review-prompter.md');
   let fixture: any;
   let expected: any;
   let scenario: string;
   let invocation: string;
+  let adapter: string;
 
   beforeAll(() => {
     fixture = JSON.parse(readFileSync(join(FIX, 'fixture.json'), 'utf8'));
     expected = JSON.parse(readFileSync(join(FIX, 'expected-envelope.json'), 'utf8'));
     scenario = readFileSync(join(FIX, 'scenario.md'), 'utf8');
     invocation = readFileSync(join(FIX, 'recorded-cli-invocation.txt'), 'utf8');
+    adapter = readFileSync(ADAPTER, 'utf8');
   });
 
-  it('fixture declares parent-mediated permission mode', () => {
+  it('fixture declares parent-mediated permission mode, effective read-only', () => {
     expect(fixture.permission_mode).toBe('parent-mediated');
+    expect(fixture.effective_pattern).toBe('read-only');
   });
 
-  it('recorded CLI invocation uses `app-server` subcommand (raw-string check)', () => {
-    expect(invocation).toContain('codex app-server');
-    expect(invocation).toContain('--json');
+  it('the default config resolves codex to parent-mediated, and that reaches codex exec', async () => {
+    const parsed = await loadDefaultsYaml();
+    expect(parsed.multi_model_review.external_permission_mode.codex).toBe(fixture.permission_mode);
+    expect(invocation).toMatch(/^codex exec --sandbox read-only --ephemeral /);
+    expect(invocation).toContain('--output-schema');
+    expect(invocation).toMatch(/ -o \S+ - < /);
   });
 
-  it('stdout messages include a JSON-RPC requestApproval message with required envelope fields', () => {
-    const reqApproval = fixture.stdout_messages.find((m: any) => m.kind === 'request-approval');
-    expect(reqApproval).toBeDefined();
-    expect(reqApproval.envelope.jsonrpc).toBe('2.0');
-    expect(reqApproval.envelope.method).toBe('requestApproval');
-    expect(reqApproval.envelope.id).toBeTruthy();
-    expect(reqApproval.envelope.params.tool).toBeTruthy();
+  it('never invokes or probes codex app-server', () => {
+    expect(invocation).not.toContain('app-server');
+    expect(fixture.forbidden_invocations).toEqual(['codex app-server', 'codex app-server --help']);
   });
 
-  it('adapter surfaces requestApproval to parent via fenced codex-approval-request block', () => {
-    expect(fixture.adapter_surface_to_parent.fenced_block_tag).toBe('codex-approval-request');
-    expect(fixture.adapter_surface_to_parent.fenced_block_payload.id).toBe(
-      fixture.stdout_messages[0].envelope.id,
-    );
+  it('exactly one WARN line, and the adapter documents the same text', () => {
+    expect(fixture.expected_warnings).toHaveLength(1);
+    expect(adapter).toContain(fixture.expected_warnings[0]);
   });
 
-  it('parent decision is written back as a JSON-RPC result envelope to Codex stdin', () => {
-    expect(fixture.parent_decision_sent_to_stdin.jsonrpc).toBe('2.0');
-    expect(fixture.parent_decision_sent_to_stdin.id).toBe(
-      fixture.stdout_messages[0].envelope.id,
-    );
-    expect(fixture.parent_decision_sent_to_stdin.result.approved).toBe(true);
+  it('auth check records the status line on stderr (codex login status prints nothing on stdout)', () => {
+    expect(fixture.auth_check.command).toBe('codex login status');
+    expect(fixture.auth_check.exit_status).toBe(0);
+    expect(fixture.auth_check.stdout).toBe('');
+    expect(fixture.auth_check.stderr).toMatch(/^Logged in using /);
   });
 
-  it('final result envelope normalizes into canonical adapter envelope (success path)', () => {
+  it('final result normalizes into canonical adapter envelope (success path)', () => {
     expect(expected.status).toBe('success');
     expect(expected.error_code).toBeNull();
-    expect(expected.findings).toHaveLength(1);
+    expect(expected.findings).toHaveLength(fixture.recorded_last_message.findings.length);
     expect(expected.findings[0].source.reviewer_id).toBe('codex-review-prompter');
     expect(expected.findings[0].source.family).toBe('openai');
     expect(expected.findings[0].source.source_type).toBe('external');
+    const usage = fixture.recorded_cli_stdout_jsonl.filter((e: any) => e.type === 'turn.completed').pop().usage;
+    expect(expected.usage.input_tokens).toBe(usage.input_tokens);
+    expect(expected.usage.output_tokens).toBe(usage.output_tokens);
+    expect(expected.raw_output_path).toBe(fixture.raw_output_path);
   });
 
-  it('scenario.md describes the Pattern 3 round-trip', () => {
+  it('scenario.md explains why Pattern 3 is not used and names the real protocol', () => {
     expect(scenario).toContain('Pattern 3');
-    expect(scenario).toContain('requestApproval');
-    expect(scenario).toContain('parent');
+    expect(scenario).toContain('Pattern 1');
+    expect(scenario).toContain('turn/start');
+    expect(scenario).toMatch(/exits 0/);
   });
 });
 
