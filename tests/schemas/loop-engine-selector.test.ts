@@ -28,8 +28,8 @@ const COMMANDS = join(SYNTHEX, 'commands');
 const CONFIG_GET = join(SYNTHEX, 'scripts', 'lib', 'config-get.sh');
 
 const J_SEL =
-  '**Loop engine (FR-HM19, D34):** when `--loop` is set, if `--loop-isolated` is not set, a `Workflow` tool is in your tool list, and `plugins/synthex/scripts/lib/config-get.sh native_looping.engine prose` (from the installed plugin root) prints exactly `workflow`, Read `${CLAUDE_PLUGIN_ROOT}/docs/engines/loop-workflow.md` and follow it (this instruction is the `Workflow` opt-in, D31); otherwise follow this command\'s Stage 1 loop prose unchanged, never a host feature named Workflow. Other hosts resolve the plugin root via `.synthex/state.json`.';
-const L_SEL = J_SEL.replace('when `--loop` is set, if', 'if');
+  '**Loop engine (FR-HM19, D34):** when `--loop` is set, before the first iteration run `bash <plugin-root>/scripts/lib/config-get.sh native_looping.engine prose`; if it prints exactly `workflow`, `--loop-isolated` is not set, and a `Workflow` tool is in your tool list, Read `${CLAUDE_PLUGIN_ROOT}/docs/engines/loop-workflow.md` and follow it (this instruction is the `Workflow` opt-in, D31); otherwise follow this command\'s Stage 1 loop prose unchanged, never a host feature named Workflow. `<plugin-root>` is the installed plugin root (other hosts: `plugin_root` in `.synthex/state.json`).';
+const L_SEL = J_SEL.replace('when `--loop` is set, before', 'before');
 
 const JUDGE_COMMANDS = ['review-code.md', 'refine-requirements.md', 'write-implementation-plan.md'];
 
@@ -104,9 +104,9 @@ describe('Task 59 (FR-HM19, D34): loop engine selector in the other --loop comma
   });
 
   it('every selector is FR-HM3 gated and D17-formed without a ${CLAUDE_PLUGIN_ROOT}/scripts/ call', () => {
-    expect(Buffer.byteLength(J_SEL)).toBe(547);
-    expect(Buffer.byteLength(L_SEL)).toBe(525);
-    expect(L_SEL.startsWith('**Loop engine (FR-HM19, D34):** if `--loop-isolated`')).toBe(true);
+    expect(Buffer.byteLength(J_SEL)).toBe(589);
+    expect(Buffer.byteLength(L_SEL)).toBe(567);
+    expect(L_SEL.startsWith('**Loop engine (FR-HM19, D34):** before the first iteration run')).toBe(true);
     for (const sel of [J_SEL, L_SEL]) {
       expect(sel.includes('\n')).toBe(false);
       for (const needle of [
@@ -116,12 +116,15 @@ describe('Task 59 (FR-HM19, D34): loop engine selector in the other --loop comma
         '--loop-isolated',
         'native_looping.engine',
         '${CLAUDE_PLUGIN_ROOT}/docs/engines/loop-workflow.md',
-        'Other hosts',
+        'other hosts',
         'plugin root',
       ]) {
         expect(sel.includes(needle), needle).toBe(true);
       }
       expect(sel.includes('${CLAUDE_PLUGIN_ROOT}/scripts/')).toBe(false);
+      // Live Task 59 run (2026-10-05): a descriptive "…config-get.sh … prints exactly" clause was
+      // skipped and the engine never engaged; the selector must tell the model to RUN the check.
+      expect(sel.includes('before the first iteration run `bash <plugin-root>/scripts/lib/config-get.sh native_looping.engine prose`')).toBe(true);
     }
   });
 

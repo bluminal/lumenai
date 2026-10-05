@@ -246,7 +246,7 @@ code_review:
 
 ## Native Looping
 
-**Loop engine (FR-HM19, D34):** when `--loop` is set, if `--loop-isolated` is not set, a `Workflow` tool is in your tool list, and `plugins/synthex/scripts/lib/config-get.sh native_looping.engine prose` (from the installed plugin root) prints exactly `workflow`, Read `${CLAUDE_PLUGIN_ROOT}/docs/engines/loop-workflow.md` and follow it (this instruction is the `Workflow` opt-in, D31); otherwise follow this command's Stage 1 loop prose unchanged, never a host feature named Workflow. Other hosts resolve the plugin root via `.synthex/state.json`.
+**Loop engine (FR-HM19, D34):** when `--loop` is set, before the first iteration run `bash <plugin-root>/scripts/lib/config-get.sh native_looping.engine prose`; if it prints exactly `workflow`, `--loop-isolated` is not set, and a `Workflow` tool is in your tool list, Read `${CLAUDE_PLUGIN_ROOT}/docs/engines/loop-workflow.md` and follow it (this instruction is the `Workflow` opt-in, D31); otherwise follow this command's Stage 1 loop prose unchanged, never a host feature named Workflow. `<plugin-root>` is the installed plugin root (other hosts: `plugin_root` in `.synthex/state.json`).
 
 ### Emission Point
 
