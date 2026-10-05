@@ -1,0 +1,40 @@
+{
+  "scenario": "parent-mediated-read-only",
+  "description": "external_permission_mode.codex resolves to parent-mediated (the shipped default). Pattern 3 is not implemented against the real `codex app-server` protocol, so the adapter logs one WARN line and runs Pattern 1 (`codex exec --sandbox read-only --ephemeral`). It never probes `codex app-server --help` (that exits 0 on Codex CLI 0.160.0 whether or not the adapter could drive the protocol) and never invokes `codex app-server`.",
+  "permission_mode": "parent-mediated",
+  "effective_pattern": "read-only",
+  "expected_warnings": [
+    "codex: parent-mediated (Pattern 3) is not implemented; running read-only."
+  ],
+  "forbidden_invocations": [
+    "codex app-server",
+    "codex app-server --help"
+  ],
+  "auth_check": {
+    "command": "codex login status",
+    "exit_status": 0,
+    "stdout": "",
+    "stderr": "Logged in using ChatGPT"
+  },
+  "recorded_last_message": {
+    "findings": [
+      {
+        "finding_id": "security.handleLogin.missing-csrf-check",
+        "severity": "high",
+        "category": "security",
+        "title": "Missing CSRF check in handleLogin",
+        "description": "The handleLogin function does not validate CSRF tokens, allowing cross-site request forgery attacks.",
+        "file": "src/auth/handleLogin.ts",
+        "symbol": "handleLogin",
+        "line_range": null,
+        "confidence": "high"
+      }
+    ]
+  },
+  "recorded_cli_stdout_jsonl": [
+    { "type": "thread.started", "thread_id": "thread-parent-mediated-001" },
+    { "type": "turn.started" },
+    { "type": "turn.completed", "usage": { "input_tokens": 4521, "cached_input_tokens": 0, "output_tokens": 312 } }
+  ],
+  "raw_output_path": "docs/reviews/raw/codex-parent-mediated-001.json"
+}

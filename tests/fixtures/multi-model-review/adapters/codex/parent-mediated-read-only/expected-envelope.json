@@ -23,7 +23,7 @@
   "usage": {
     "input_tokens": 4521,
     "output_tokens": 312,
-    "model": "codex-1"
+    "model": "codex-default"
   },
-  "raw_output_path": "docs/reviews/raw/codex-app-server-001.json"
+  "raw_output_path": "docs/reviews/raw/codex-parent-mediated-001.json"
 }
