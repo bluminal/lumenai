@@ -2,7 +2,7 @@
 
 ## Overview
 
-Implements `docs/reqs/multi-model-review.md` — the multi-model review orchestrator that fans review prompts out to multiple LLM-family proposers via CLI adapters, then consolidates findings into one deduplicated, severity-reconciled, attributed list. Ships off by default and CLI-only (no API keys in Synthex). v1 covers `review-code` (with complexity gating) and `write-implementation-plan` integrations across the v1 adapter set; remaining commands and advanced consolidation features defer to v2.
+Implements `docs/reqs/multi-model-review.md` — the multi-model review orchestrator that fans review prompts out to multiple LLM-family proposers via CLI adapters, then consolidates findings into one deduplicated, severity-reconciled, attributed list. Ships off by default and CLI-only (no API keys in Synthex). v1 covers `review-code` (with complexity gating) and `write-implementation-plan` integrations across the v1 adapter set; remaining commands and advanced consolidation features defer to v2. Phase 9 adds Grok and Cursor as opt-in, text-only external proposers (D24–D32).
 
 ## Decisions
 
@@ -31,6 +31,15 @@ Implements `docs/reqs/multi-model-review.md` — the multi-model review orchestr
 | D21 | **Path-and-reason header has a machine-readable format with three invariants.** (1) Begins `Review path:`. (2) Parenthetical reason clause follows. (3) `reviewers:` suffix states `N native` and, when externals were attempted, `+ M external` (or `, M external <qualifier>` for the failed-externals variant). Literal regex: `Review path: [^()]+\([^)]+; reviewers: \d+ native(?:\s*[+,]\s*\d+ external(?:\s+\w+)?)?\)`. | Cycle-1 designer: examples weren't binding; cycle-2 H2: prior invariant #3 mandated `N native + M external` and contradicted PRD examples 4, 5, 6. | Without a binding format, Task 37 had no spec to validate against. Loosened invariant #3 admits all six PRD examples while preserving determinism. |
 | D22 | **Init pre-validates auth before showing the "Enable with detected CLIs" option label.** Lightweight auth checks run during the detection scan; the option label only includes CLIs that pass both `which` AND auth. CLIs detected but unauthenticated are surfaced separately with remediation hints. | Cycle-1 designer: post-confirm auth errors are poor UX | Avoids the post-confirm error path entirely. Maintains <2s preflight target by short-circuiting auth checks (single command, fail-fast). |
 | D23 | **Stage 3 embedding source: host-session fallback when `llm embed` unavailable.** When the user has the `llm` CLI installed AND the `llm-sentence-transformers` (or equivalent embedding) plugin available, Stage 3 uses `llm embed` for embeddings. When `llm embed` is unavailable (CLI missing, plugin missing, or `llm embed --version` errors), Stage 3 falls back to **host-session embedding** — the host Claude session computes embeddings inline via the model's native embedding capability. This mirrors the orchestrator's host-fallback pattern for aggregator resolution (D17 fallback to host session). | Q1 / Phase 7 milestone 7.1 prerequisite | Maintains zero-install-required default consistent with Synthex's "off by default, no preconditions" stance. Users who want deterministic embedding behavior install `llm` + `llm-sentence-transformers`. Users on minimal hosts get the feature anyway via host-session. |
+| D24 | **Scope: adapters only.** *Confirmed (A.J. Brown, 2026-10-05).* Add `grok-review-prompter` and `cursor-review-prompter` as external proposers. When `SYNTHEX_HOST=grok`, the wizard lists grok in a manual opt-in bucket with a self-review note. Host-aware native-family accounting is Task 71 (Milestone 9.2, separate PR). Cursor-as-host is out of scope. | Brief open decision 1; critique gap 16 (the request could also mean host support). | Grok is already a Synthex host and needs only family accounting. Cursor-as-host needs a host-matrix entry, wrappers and compat tests, which makes it a separate feature. |
+| D25 | **Text-only tier in v1 for both CLIs.** *Confirmed (A.J. Brown, 2026-10-05).* Each runner runs its CLI from an untrusted `/tmp` scratch dir with every built-in tool removed or denied, and inlines the review bundle into the prompt. Grok: `--disallowed-tools <every built-in>,Agent`, `--deny '*'`, `--deny 'mcp__*'`, `--permission-mode dontAsk`, `--sandbox read-only`, `--no-subagents`, `--disable-web-search`, HOME isolation. Cursor: `--mode ask`, `--sandbox enabled`, scratch workspace, tool_call allowlist scan. An agentic tier is a later follow-up (Q7). Its candidate is the `--permission-mode plan` repo-cwd Grok variant, observed working in a project-local adapter on 2026-10-05. | Critique gaps 3, 4, 5 and 12. | Grok's read allow-rules are not a closed allowlist (read-only tools auto-approve even under `dontAsk`), and running from the repo fires the user's trusted project hooks and MCP servers. Text-only is the only fail-closed read scope available today; ollama, llm and bedrock already work this way. |
+| D26 | **Billing: subscription-only by default.** *Confirmed (A.J. Brown, 2026-10-05).* The Grok runner unsets `XAI_API_KEY` unless `per_reviewer.grok-review-prompter.allow_api_key_billing: true`. Cursor stays off unless an explicit non-Auto `model` AND an explicit `family` are set; otherwise `cursor-review.sh --auth-check` exits 12, so preflight never counts it as available. | Critique gaps 6 and 9; the Grok docs disagree on whether the key or the session takes precedence. | This holds whichever credential takes precedence, so no review is usage-billed by surprise. Preflight cannot derive a family from a slug, so the family has to come from config. |
+| D27 | **Plan location: a new phase (Phase 9) in this plan.** *Confirmed (A.J. Brown, 2026-10-05).* It continues this plan's task and D-row numbering. | Brief open decision 10. | Keeps all multi-model review work in one plan. |
+| D28 | **CLI logic lives in executable runner scripts** (`plugins/synthex/scripts/adapters/grok-review.sh` and `cursor-review.sh`). Both the adapter agent and the orchestrator's depth-1 path use them. Orchestrator Step 3 gains one generic sentence: if an adapter's CLI Invocation names a runner under `scripts/adapters/`, run it with `--input <file> --envelope-out <file>` (backgrounded and polled when the host shell cap is below `per_reviewer_timeout_seconds`) and use the envelope it writes; preflight 0a runs the runner's `--auth-check`. This is a one-time adapter-contract extension, so NFR-MR5 still holds for future adapters. *Adopted default (brief recommendation).* | Critique gap 1 (critical): on depth-1 hosts the orchestrator calls CLIs directly, so prose-only isolation depends on the host LLM rebuilding it correctly. Also gaps 7, 13 and 15. | Only executable code survives depth-1 hosts. It also frees adapter bytes and lets the criteria be tested with stub CLIs. Scripts are bash under harness-modernization D19 (no python). |
+| D29 | **`sandbox-yolo` is a no-op alias of read-only for grok and cursor.** `parent-mediated` is unsupported and returns `cli_unsupported_mode` without spawning the CLI. *Adopted default.* | Brief open decision 8. | The shared `sandbox.sb` blocks the API egress both CLIs need, and Grok's built-in profiles fail open, which breaks the FR-MR26 fail-fast rule. bedrock, llm and ollama already behave this way. |
+| D30 | **No Grok `--json-schema` in v1.** The schema goes in the prompt, and `validate-findings` re-validates the output. *Assumed; confirm.* `--json-schema` with `structuredOutput` was observed working in a project-local adapter (2026-10-05) when the schema omits the fields the validator injects (such as `source`), but that run did not use D25's `--deny '*'`, which may block the injected StructuredOutput tool. Task 67 decides. Adopting it needs a superseding D-row and a derived findings schema. | Brief open decision 9; coordinator evidence, 2026-10-05. | Avoids an unverified tool-injection conflict with the deny set. `validate-findings` remains the single validator either way. |
+| D31 | **Both runners honour `config.judge_mode_prompt`:** Grok through `--rules`, Cursor through a `--- ROLE ---` prompt prefix. **`aggregator.tier_table` does not change** (D17 untouched). The docs advise pinning `aggregator.command` when Cursor uses a flagship slug. *Adopted default.* The six existing adapters also ignore `judge_mode_prompt`; fixing them is a separate follow-up. | Critique gap 8: a Cursor reviewer with a flagship slug can win `auto` aggregator selection. | Makes either adapter safe to select as the aggregator without an orchestrator change. |
+| D32 | **`validate-findings` hardening** (FR-MR16 grows to eight codes). It accepts `--error cli_unsupported_mode`, returns `parse_failed` for a top-level object with no `findings` key and for NDJSON with no finding-shaped line, and adds `--usage-json`. *Adopted default.* | Critique gap 2: today a raw Grok wrapper or a `{type:error}` object returns `status: success, findings: []`. | A silent zero-finding "pass" becomes a visible failure for every adapter. Four adapters already document `cli_unsupported_mode`, but the script rejects it. |
 
 ## Open Questions
 
@@ -42,6 +51,8 @@ Implements `docs/reqs/multi-model-review.md` — the multi-model review orchestr
 | Q4 | ~~Audit-artifact validation approach.~~ **Resolved → D19.** | — | Resolved |
 | Q5 | Do adapter `.md` files declare their family inline (matching `family:` config) or only describe the family they default to? | Affects FR-MR4 family-diversity preflight. Recommend: inline declaration as default, user `family:` override as escape hatch. | Open |
 | Q6 | (OQ-6) Aggregator failure handling — pick (b) host-session fallback per PRD? **Note:** D17 commits to (b) when the tier table yields no match; this question now narrowly addresses runtime failure of a tier-selected aggregator CLI. | Affects orchestrator failure-path implementation. Recommend: (b). | Open |
+| Q7 | Which fail-closed read scope would allow an agentic tier for Grok and Cursor? The candidate is the `--permission-mode plan` repo-cwd Grok variant, observed working in a project-local adapter (2026-10-05). It still needs read scoping and project-hook suppression (D25). | A follow-up after Phase 9; it would give Grok and Cursor reviews cross-file context. | Open |
+| Q8 | Does `CURSOR_CONFIG_DIR=<scratch>` with deny rules (`Write(**)`, `Shell(*)`, `Mcp(*:*)`, `WebFetch(*)`) isolate Cursor's config, MCP servers and hooks while keeping the login? | If yes, Task 69 adds it as an isolation layer. | Open → Task 67 (U17) |
 
 ## Phase 1 — Foundation: Schema, Context, Configuration
 
@@ -781,6 +792,197 @@ Lower-priority but planned work that ships in subsequent releases. Not required 
 
 **Parallelizable:** Sequential.
 **Milestone Value:** Release shipped. Plugin upgrade detection works for users.
+
+## Phase 9 — Grok and Cursor External Proposers
+
+Adds `grok-review-prompter` (xAI Grok Build CLI) and `cursor-review-prompter` (Cursor Agent CLI) as opt-in, `text-only` external proposers (D24–D32). Sources: the 2026-10-05 Grok/Cursor research brief and its critique, field evidence from a working project-local Grok adapter, and the Codex CLI 0.159.3 breakage. **Delivery:** Tasks 66–70 land on `feature/mm-grok-cursor` and merge to `main` as one PR, so no auto-release ships allow-list prose naming adapters that do not exist yet. Task 71 is a separate follow-up PR. **Outside this plan:** a separate quick-fix PR repairs the existing Codex adapter (`codex login status`; `codex exec --sandbox read-only --ephemeral`; a stricter `--output-schema`). Rebase onto `main` after it merges, before Task 66 edits `codex-review-prompter.md`. **D-numbering:** D24 onward are this plan's rows. harness-modernization.md reuses D24–D33, so cite other plans' rows with the plan name (e.g., harness-modernization D19, the bash, no-python script rules). **Out of scope:** Cursor-as-host (D24); an agentic tier (D25, Q7); Pattern 2 `sandbox-yolo` (D29); `judge_mode_prompt` support in the six existing adapters (D31 follow-up). **Gate after every task:** `cd tests && npx vitest run schemas/` fully green, and `node plugins/synthex/scripts/generate-codex-skills.mjs --check` clean.
+
+### Milestone 9.1: Grok and Cursor Adapters (one PR)
+| # | Task | Complexity | Dependencies | Status |
+|---|------|-----------|--------------|--------|
+| 66 | **Contract hardening and permission-key plumbing** (D29, D32). `scripts/validate-findings`: accept `--error cli_unsupported_mode`; return `parse_failed` for a top-level object with no `findings` key and for NDJSON with no finding-shaped line; add `--usage-json`; mirror all three on the jq path. Add `external_permission_mode.grok` and `.cursor` (`read-only`) to `defaults.yaml`, add the new keys to the permission test sets, and add `grok, cursor` to the safe-name allow-list literal in all six existing adapters. In `adapter-common.md`, list eight adapters and add a runner-script paragraph and the `judge_mode_prompt` rule. | M | None (rebase after the Codex quick-fix PR) | pending |
+| 67 | **Live CLI verification spike** (human-approved; consumes plan usage). Verifies Grok and Cursor behaviour on the installed CLI versions before any runner code is written, and resolves or gates U1–U24 (table below). Free checks (no prompt sent) run first; live prompts run only under the `[H]` rules. Every docs-derived flag and subcommand is a hypothesis: the Codex adapter shipped `codex auth status`, `codex exec --approval-mode never` and `codex exec -a never`, and Codex CLI 0.159.3 accepts none of them. Captures version-stamped `--help` fixtures for each invocation form the runners use, and writes the evidence to `docs/specs/multi-model-review/spike-grok-cursor.md`. | M | None (parallel with 66) | pending |
+| 68 | **Runner contract, Grok runner and adapter, orchestrator sentence** (D25, D26, D28, D31). `plugins/synthex/scripts/adapters/grok-review.sh` is one `set -eu` process with an `--input <envelope.json> [--envelope-out <path>]` mode and an `--auth-check` mode. It: creates its scratch dir with `mktemp -d /tmp/synthex-grok.XXXXXX`, then canonicalises it, guards it and removes it with a trap; applies HOME isolation and the D25 flags; unsets `XAI_API_KEY` unless the user opts in; enforces a wall-clock guard of `per_reviewer_timeout_seconds` minus 10, clamped in the foreground to the host shell cap minus 15, using `timeout`/`gtimeout` or else a bash watchdog; writes raw output atomically before parsing; unwraps the output and maps errors to FR-MR16 codes; retries once on `parse_failed`; calls `validate-findings --usage-json`; and passes `judge_mode_prompt` via `--rules`. The thin `grok-review-prompter.md` writes the input envelope to the literal path `.synthex/tmp/grok-review-prompter-<uuid>.input.json` and runs the runner in one line. Orchestrator Step 3 gains the D28 sentence. Register the agent and add recipes `## 8. Grok`. | L | Tasks 66, 67 (Grok items, help fixtures) | pending |
+| 69 | **Cursor runner and adapter** (D25, D26, D31). `scripts/adapters/cursor-review.sh` follows Task 68's conventions. It: runs the model and family guard before spawning the CLI; builds one prompt with the bundle inlined, never writing bundle files to disk (prompts up to 96 KiB go inline, larger ones through `review-input.txt` plus a pointer prompt); runs `cursor-agent -p --mode ask --sandbox enabled --trust --output-format stream-json --model <slug>` from the scratch dir with stdin from `/dev/null`; runs the tool_call allowlist scan (allowlist frozen by Task 67), mapping violations to `sandbox_violation`; unwraps the last `result` event; prefixes the prompt with `judge_mode_prompt`; and adds the `CURSOR_CONFIG_DIR` deny-rule layer only if Task 67 adopts it. Thin `cursor-review-prompter.md`; register the agent; add recipes `## 9. Cursor`. | L | Tasks 66, 67 (Cursor items, help fixtures), 68 (conventions; serialized count bumps) | pending |
+| 70 | **Wizard, config examples and docs** (D24, D26). In `configure-multi-model.md`, add: `grok` and `cursor-agent` detection rows that call the runners' `--auth-check`; a CLI-to-adapter mapping table; a "detected — opt in manually" listing (Cursor always, and grok on exit 12 or `SYNTHEX_HOST=grok`); FR-MR27 additions; and Option 2 snippet lines. In `defaults.yaml`, add commented reviewer examples, block-style `per_reviewer` examples and an aggregator pinning comment. Also update the PRD, the README, the root `CLAUDE.md`, the `start-review-team.md` roster and `docs/testing.md`. | M | Tasks 68, 69 | pending |
+
+**Task 66 Acceptance Criteria:**
+- `[T]` `validate-findings --error cli_unsupported_mode --message x` exits 0 and prints a failed envelope (`error_code: cli_unsupported_mode`, `usage: null`) on the node, jq-fallback and no-dependency paths. The script header says eight codes. `adapter-contract.md` FR-MR16 and `tests/schemas/adapter-contract.ts` list the code, and the adapter-contract, adapter-envelope and fastfollow-adapter-envelopes tests accept it.
+- `[T]` On both the node and jq paths, each of these gives `parse_failed`: a raw Grok `{text, stopReason, usage}` wrapper; a Grok `{type:"error", message}`; a `{response: …}` object; and Cursor stream-json NDJSON with no finding lines. A bare array, the existing bare-finding NDJSON case and `findings: null` still pass.
+- `[T]` `--usage-json '{"input_tokens":1,"output_tokens":2,"model":"m"}'` populates envelope usage when the model output has none. A malformed `--usage-json` yields `usage: null`, not an error.
+- `[T]` Every existing adapter fixture suite passes unchanged: the codex, gemini and ollama fixtures and the fast-follow envelopes (Risk 6).
+- `[T]` In `defaults.yaml`, `external_permission_mode` has `grok: read-only` and `cursor: read-only` with rationale comments. The allowed-keys comment lists both and names their binaries (`grok`, `cursor-agent`), and the gemini comment no longer says `--readonly`. Updated to match: the mmt-defaults-yaml-task82 read-only table and its regexes, `ALL_V1_CLIS` in permission-model-fixtures, `SAFE_KEY_SET`, and the sandbox-yolo-confirmation fixture's `resolved_permission_mode_per_cli`. `PARENT_MEDIATED_CLIS` stays `{codex, claude}`.
+- `[T]` All six existing adapters carry the literal `{codex, claude, gemini, bedrock, llm, ollama, grok, cursor, default}`, and the key-validation regex matches it. `codex-review-prompter.md` is at most 6,144 B, measured after rebasing onto the Codex quick-fix PR.
+- `[T]` `adapter-common.md` lists eight adapters, says "eight times", has the "Runner scripts (optional)" paragraph, and states that adapters MUST surface `config.judge_mode_prompt` when present.
+
+**Task 67 Acceptance Criteria:**
+- `[H]` The user approves each live prompt before it runs, against a per-CLI run budget agreed up front. Grok runs use the grok.com session only (`XAI_API_KEY` unset). Cursor runs use an explicit model that is neither Auto nor Max. All runs use throwaway repos and `/tmp` scratch dirs with no secrets. No agent runs live prompts unattended; free checks need no approval.
+- `[T]` Help fixtures exist under `tests/fixtures/multi-model-review/adapters/{grok,cursor}/cli-help/`: a `version.txt`, plus the `--help` output of each invocation form the runners use (`grok`, `grok models`, `cursor-agent`, `cursor-agent status`).
+- `[T]` `docs/specs/multi-model-review/spike-grok-cursor.md` records both CLI versions and has one row for each of U1–U24, marked `resolved` (with evidence) or `gated`. The items are listed under "Phase 9 Spike Checklist (Task 67)" below Milestone 9.1.
+- `[H]` Before Tasks 68 and 69 start, the user reviews the spike report. It confirms every flag and subcommand in the D25 argv and in both `--auth-check` paths against the help for that exact form (top-level or subcommand). Each mismatch is recorded and the design corrected.
+- `[H]` The report records Grok results for U1–U11. They include: a planted `.grok/hooks/x.json` in a trusted throwaway repo does not fire (the cwd is scratch); an adversarial prompt cannot read a planted canary file outside the scratch dir; and whether `--max-turns 1` suffices for a zero-tool run.
+- `[H]` The report records Cursor results for U12–U21. They include: an adversarial prompt (create a file, run shell, call MCP, read the canary) changes nothing outside `$W` and leaks nothing; and the complete set of tool_call payload types from benign and adversarial runs.
+- `[T]` Sanitized recordings (no tokens, account IDs or emails, verified by a scan) are saved under `tests/fixtures/multi-model-review/adapters/{grok,cursor}/`. Tasks 68 and 69 use them instead of synthetic fixtures.
+- `[H]` The spike outcomes are recorded as D-rows through the product-manager subagent, and the user approves them: D30 (`--json-schema`), Q8 (`CURSOR_CONFIG_DIR`), the frozen allowlist, and any flag corrections.
+
+**Task 68 Acceptance Criteria:**
+- `[T]` `grok-review.sh` passes `portable-scripts.test.ts`: a bash shebang, an `# Exit codes:` header, node guarded by `command -v node`, a jq fallback, and no python. It has at least 2 `SMOKE_CASES` in `tests/compat/lib/script-smoke.mjs` (a stub happy path and a jq-only fallback).
+- `[T]` `grok-review-runner-behavioral.test.ts` puts a stub `grok` on PATH that records argv, env and `pwd -P`. The test asserts all of the following:
+  - argv has the full D25 set and none of `--yolo`, `--always-approve`, `bypassPermissions` or `--trust`;
+  - HOME is under the `/tmp` scratch dir, GROK_HOME is canonical, `GROK_FOLDER_TRUST` and `GROK_CONFIG` are absent, and the compat vars are `0`;
+  - `XAI_API_KEY` is absent unless `allow_api_key_billing: true`;
+  - the cwd is the canonical scratch dir (not the repo), and the scratch dir is removed afterwards;
+  - the source has the `[ -n "$W" ] && [ -d "$W" ] && [ "$W" != "$PWD" ]` guard under `set -eu`.
+- `[T]` **CLI-surface cross-check.** Every option (`-x`/`--flag`) in each argv the stub records, in both `--input` and `--auth-check` modes, and every subcommand (`models`), appears in Task 67's `--help` fixture for that exact invocation form. The test prints the fixture's CLI version and fails offline on a nonexistent flag or a flag from the wrong command level.
+- `[T]` Fixture mapping, run on Task 67's sanitized recordings (synthetic fixtures only where a case cannot be recorded):
+  - success gives `source.family: xai`, `source_type: external`, and usage from the wrapper, with `usage.model` taken verbatim from the `modelUsage` key (the serving model, e.g. `grok-4.7-build`, not `-m`);
+  - "Not signed in" gives `cli_auth_failed`;
+  - a generic `{type:error}` gives `cli_failed`;
+  - empty text with a max_tokens stop gives `cli_failed`;
+  - a double parse failure gives `parse_failed` after exactly 2 invocations;
+  - a stub that runs past the budget gives `timeout`, and the partial raw is kept;
+  - exit 130 gives `cli_failed`;
+  - `parent-mediated` gives `cli_unsupported_mode` with 0 invocations;
+  - `judge_mode_prompt` is the `--rules` value.
+- `[T]` `--auth-check` exits 0 for a session login, 11 when not authenticated, 12 when only a key is present without opt-in, and 10 when the binary is missing. It runs `grok models` under the same HOME isolation and `GROK_DISABLE_AUTOUPDATER=1` as the review call.
+- `[T]` `grok-review-prompter.md` meets all of the following:
+  - at most 6,144 B, with the 8 FR-MR8 labels and the Read gate;
+  - the `grok` safe-name assertion between Steps 1 and 2;
+  - a `## Permission Model` section naming `--deny '*'`, FR-MMT21 and `cli_unsupported_mode`;
+  - `capability_tier: text-only` and family `xai`;
+  - the install one-liner `curl -fsSL https://x.ai/cli/install.sh | bash`;
+  - Known Gotchas and Source Authority sections;
+  - no backticked ungated tool names.
+
+  These tests pass: the new `grok-adapter-md.test.ts`, `adapter-size`, `external-permission-mode-key-validation` (ADAPTERS += grok) and `external-adapter-permission-model` (readOnlyMarker `--deny '*'`).
+- `[T]` Orchestrator Step 3 carries the D28 runner sentence (asserted in `orchestrator-md.test.ts`). The D17 chain and preflight pins still pass, and no orchestrator size budget is breached (U24).
+- `[T]` Registration and counts:
+  - the agent is in `plugin.json` (alphabetical);
+  - its `AGENT_DESCRIPTIONS` entry is byte-equal to the frontmatter description and at most 120 chars;
+  - portable skills are regenerated, and `--check` is clean;
+  - counts reach 27 agents and 49 wrappers (`inventory.mjs`, `agent-frontmatter`, `wrapper-catalog`, and the `write-implementation-plan-md` and `lint-plan` ceilings), 16 portability-prose sites, and 17 cold-path-includes.
+- `[T]` `adapter-recipes.md` gains `## 8. Grok`, covering install, auth, flagship model, FR-MR26 flags, Known Gotchas and Task 67's isolation evidence. §7 keeps its number, and the line-3 adapter list is updated.
+
+**Task 69 Acceptance Criteria:**
+- `[T]` `cursor-review.sh` passes the portable-scripts contract and has at least 2 `SMOKE_CASES`.
+- `[T]` `cursor-review-runner-behavioral.test.ts` uses a stub `cursor-agent`. The test asserts all of the following:
+  - argv contains `-p --mode ask --sandbox enabled --trust --output-format stream-json --model <slug>` and never `--force`, `--yolo` or `--approve-mcps`;
+  - stdin is `/dev/null`, and the cwd is the scratch dir;
+  - no `AGENTS.md`, `CLAUDE.md`, `.cursor/` or `.md` file is ever written to `$W`;
+  - a prompt over 96 KiB goes through `review-input.txt` plus a pointer, and one at or under 96 KiB goes inline;
+  - `CURSOR_CONFIG_DIR` is absent unless Task 67 adopted that layer.
+- `[T]` The Task 68 CLI-surface cross-check passes against the Cursor help fixtures (`cursor-agent`, `cursor-agent status`).
+- `[T]` Model and family guard: a `model` that is null, `''` or `auto*`, or a missing `family`, gives `cli_failed` with 0 invocations, and `--auth-check` exits 12.
+- `[T]` Fixture mapping, run on Task 67's recordings:
+  - success carries the configured family;
+  - `is_error` gives `cli_failed`, and so does a missing `result` event;
+  - a write outside `$W`, a shell call, an MCP call, or any tool_call type outside the frozen allowlist gives `sandbox_violation`, and the raw is kept;
+  - a read inside `$W` is not a violation;
+  - a logged-out status gives `cli_auth_failed`;
+  - `judge_mode_prompt` is prefixed to the prompt;
+  - a timeout keeps the partial raw.
+- `[T]` `cursor-review-prompter.md` meets all of the following:
+  - at most 6,144 B, with the 8 labels and the Read gate;
+  - the `cursor-agent` safe-name assertion, plus an explicit line that the adapter never uses `agent`;
+  - a `## Permission Model` section (readOnlyMarker `--mode ask`);
+  - a statement that model AND family are required;
+  - an advisory slug table covering anthropic, openai, google, xai and unknown, in which `composer` maps to `unknown` until its lineage is confirmed (critique gap 17);
+  - the install one-liner `curl https://cursor.com/install -fsS | bash`.
+
+  `cursor-adapter-md.test.ts` passes, and so does `cursor-reviewer-config-shape.test.ts`: every cursor reviewer entry in the defaults examples, the wizard snippet and the init fixtures has block-style `model` (never `auto*`) and `family`.
+- `[T]` Registration and counts reach 28 agents, 50 wrappers, 17 portability-prose sites and 18 cold-path-includes, and `--check` is clean. Recipes `## 9. Cursor` covers the billing pools, the second hop, Task 67's hook and MCP findings, and aggregator pinning.
+
+**Task 70 Acceptance Criteria:**
+- `[T]` `configure-multi-model.md` Step 1a meets all of the following:
+  - the candidates gain `grok` and `cursor-agent` (never `which agent`), with auth checked through each runner's `--auth-check`;
+  - each auth-check line is followed by the canonical other-hosts sentence, bringing portability-prose to 18 sites;
+  - it has the CLI-to-adapter mapping table, and line 121 is corrected to say `reviewers` holds adapter names;
+  - it reads exit codes 0, 10, 11 and 12 for these two CLIs.
+- `[T]` Step 1b adds a "detected — opt in manually" listing, shown as text rather than as a new option. Cursor is always listed. Grok is listed on auth exit 12 (with the opt-in instruction) and when `SYNTHEX_HOST=grok` (with the self-review note). Option 1 writes only detected, authenticated, non-manual CLIs, and the `AskUserQuestion` count stays at most 5.
+- `[T]` The FR-MR27 warning names xAI and Cursor, Cursor's second hop and its billing. The Option 2 snippet has commented grok and cursor reviewer lines, block-style `per_reviewer.cursor-review-prompter` `model` and `family` placeholders, and grok's `allow_api_key_billing: false`. The init fixtures are updated to match.
+- `[T]` `defaults.yaml` has the commented reviewer examples, the block-style `per_reviewer` examples and the aggregator pinning comment. `tier_table` and the D17 chain are unchanged, and no validator rejects `allow_api_key_billing` (U23).
+- `[T]` Updated docs:
+  - the PRD: FR-MR10 rows, FR-MR26 flags, the FR-MR4 and FR-MR27 providers, and an NFR-MR5 runner-script note;
+  - the `docs/multi-model-review/README.md` adapter row;
+  - the root `CLAUDE.md` Utility Layer rows;
+  - the `start-review-team.md` roster;
+  - the `docs/testing.md` lists.
+
+  Layer 1 is fully green.
+- `[H]` The user reviews the wizard copy: the manual opt-in listing, the self-review note and the FR-MR27 additions.
+- `[H]` On a machine with grok installed, a manual `/synthex:configure-multi-model` run puts grok in the correct bucket and sends no model prompt: no new session directory appears under `~/.grok/sessions`.
+
+**Parallelizable:** Tasks 66 and 67 run concurrently. Schedule 67 first, starting with its free checks and help capture, because its `[H]` approvals gate 68 and 69. Task 68 starts once 66 and 67's Grok items are done. Task 69's runner and tests can be drafted alongside 68 once 67's Cursor items are done, but its registration step rebases after 68. The counts move in sequence:
+- agents: 26 → 27 → 28;
+- wrappers: 48 → 49 → 50;
+- cold-path-includes: 16 → 17 → 18;
+- portability-prose: 15 → 16 → 17 → 18 (the last step is Task 70).
+
+Task 70 follows 68 and 69.
+
+**Observational Outcomes:** `[O]` In the first weeks after release, real Grok and Cursor reviews produce no `sandbox_violation` on benign runs, and no user reports API-key or on-demand charges they did not opt into.
+**Milestone Value:** Users can add Grok (on a subscription session) and Cursor (with an explicit model and family) as external proposers. Both get text-only isolation that fails closed, including on depth-1 hosts. `validate-findings` no longer reports an unwrapped CLI wrapper or error object as a clean zero-finding review.
+
+### Phase 9 Spike Checklist (Task 67)
+
+Unverified items U1–U24, all owned by Task 67. "Free" means no prompt is sent; "live" needs `[H]` approval.
+
+| U | Item | Check |
+|---|------|-------|
+| U1 | Grok accepts the full D25 flag set (`--deny '*'`, `--deny 'mcp__*'`, `--disallowed-tools` including `Agent`), and a zero-tool session still returns `.text` | Help fixture, then live |
+| U2 | The deny rules actually load (a rule naming an unknown tool is skipped with a warning), and `--deny '*'` removes the MCP meta-tools | Free `grok inspect --json`; live `system/init` tools list |
+| U3 | `--sandbox read-only` applies with HOME in `/tmp` (no "continues without enforcement" warning); whether `~/.grok` resolves through GROK_HOME or HOME | Live |
+| U4 | OAuth token refresh still persists to `$GROK_HOME/auth.json` | Observe across live runs |
+| U5 | Exit code and message of an unauthenticated or expired headless run | Live, isolated GROK_HOME, no key |
+| U6 | Whether the session or `XAI_API_KEY` takes precedence (the docs disagree) | Moot under D26; test only if the user opts in |
+| U7 | `usage` and `modelUsage` are present for session traffic (observed elsewhere under plan mode) | Live, runner flags |
+| U8 | Which hooks and plugins still load under HOME isolation, including Synthex via `.grok-plugin` | Free `grok inspect --json` |
+| U9 | The first-line strings and exit code of `grok models` (observed: "You are logged in", exit 0), and whether it fires hooks | Free |
+| U10 | Where `--json-schema` results land, and how it interacts with `--deny '*'` (observed working without the deny set) | Live; decides D30 |
+| U11 | The `npm install -g @xai-official/grok` path (only a third-party guide mentions it) | Free; else document the curl installer only |
+| U12 | Whether `-p --mode ask` without `--force` refuses writes and shell; the full set of tool_call payload types | Live, benign plus adversarial; freezes the allowlist |
+| U13 | Exit codes and fields of `cursor-agent status --format json`, logged in and out; its latency; whether it auto-updates | Free |
+| U14 | Whether the installer ships the `cursor-agent` alias, and where it lands | Free |
+| U15 | Whether `--trust` persists scratch-dir trust into `~/.cursor` | Live, diff before and after |
+| U16 | Whether `~/.cursor/hooks.json` or Claude-compat hooks fire in `-p` runs | Live, disposable profile |
+| U17 | Whether `CURSOR_CONFIG_DIR` or `HOME=<scratch>` isolates config, MCP and hooks while keeping the login (macOS keychain) | Free `status`, then live |
+| U18 | Whether the prompt can be supplied on stdin | Not used in v1; record only |
+| U19 | Whether a file-route read of a 150 KB `review-input.txt` returns the whole file and needs no approval | Live |
+| U20 | The `system/init.model` format; the stream-json usage shape; how to recognise Max and fast variants by slug | Live plus `cursor-agent models` |
+| U21 | Whether `CURSOR_API_KEY` draws on the same plan pools, and whether on-demand spillover is visible from the CLI | Docs and account page; record only |
+| U22 | Whether depth-1 hosts (OpenCode, Hermes) can background-and-poll the runner within their shell caps, and what the clamped budget should be | Free (hosts.md, host matrix); else stays Risk 8 |
+| U23 | Whether any validator constrains `per_reviewer` keys (affects `allow_api_key_billing`) | Free repo grep; Task 70 uses it |
+| U24 | Whether there is an orchestrator byte or line budget test | Free repo grep; Task 68 uses it |
+
+### Milestone 9.2: Follow-Up — Host-Aware Native-Family Accounting (separate PR)
+| # | Task | Complexity | Dependencies | Status |
+|---|------|-----------|--------------|--------|
+| 71 | Preflight 0b maps `SYNTHEX_HOST` to the native reviewers' family: claude → anthropic, codex → openai, gemini → google, grok → xai. An unset or unknown host maps to anthropic, which is today's behaviour. As a result, a same-family external gets no diversity credit. This replaces the FR-MR4 rule that natives always count as `anthropic`. | S | Milestone 9.1 merged | pending |
+
+**Task 71 Acceptance Criteria:**
+- `[T]` The orchestrator-preflight tests cover the host-to-family map, including the default for an unset or unknown host.
+- `[T]` A fixture with `SYNTHEX_HOST=grok` and `grok-review-prompter` as the only external emits the family-diversity warning and counts 1 family, not 2. The equivalent codex-host and gemini-host cases also pass.
+- `[T]` The D17 chain pins and the existing orchestrator tests stay green.
+- `[H]` The user approves a superseding D-row, written through the product-manager subagent, that replaces the FR-MR4 rule that natives count as `anthropic`. The D24 wizard self-review note stays.
+
+**Parallelizable:** A single task, independent of other work once Milestone 9.1 merges.
+**Milestone Value:** Family-diversity preflight is correct on Grok, Codex and Gemini hosts, including for existing configs. The D24 wizard guard is no longer the only protection.
+
+**Phase 9 Risks** (each one is handled by a task or accepted here):
+1. **Text-only blind spots.** Reviewers see only the bundle, so they can miss cross-file issues. This is the accepted cost of D25; ollama, llm and bedrock already work this way.
+2. **Residual Grok hooks.** Native `$GROK_HOME/hooks`, and hooks from plugins installed in GROK_HOME (possibly Synthex via `.grok-plugin`), still fire once per review. Isolating GROK_HOME would stop them but loses the OAuth session. Task 67 enumerates them (U8), and recipes §8 documents them.
+3. **Fail-open sandboxes.** Grok's built-in sandbox profiles fail open, and the macOS child-network block is a no-op. The guarantee is tool removal (D25); the sandbox is defence in depth only.
+4. **Cursor read-only rests on `--mode ask`**, and its enforcement in `-p` is undocumented. The allowlist scan only detects after the fact. Global `~/.cursor/mcp.json` servers auto-load and no flag disables them, and `~/.cursor/hooks.json` may fire. Mitigations: the scratch workspace, `--sandbox enabled`, never `--force`, and Task 67 (U12, U16, U17). Anything still open becomes a Known Gotcha.
+5. **Billing.** Every Cursor run and retry uses plan usage and can spill into on-demand. Auto, Max-mode and Teams surcharges apply, and Grok retries also count. Mitigations: D26, Cursor always opted in manually, an explicit model, and the FR-MR27 copy.
+6. **Hardening side effects (D32).** An existing adapter that passes an un-unwrapped wrapper now gets `parse_failed` plus one billed retry, instead of a silent zero-finding success. Task 66 runs every existing adapter fixture suite to catch this.
+7. **Diversity miscount until Task 71.** The D24 wizard guard covers new configs only. Existing configs on Grok, Codex or Gemini hosts are not re-checked.
+8. **Depth-1 shell caps** (120 s, 90 s idle, on Grok, Codex and OpenCode). A host that cannot background-and-poll gets a clamped budget, so long reviews return `timeout` (U22).
+9. **CLI drift and docs-vs-binary mismatch.** Both CLIs auto-update, so flags, `grok models` strings and stream-json payload types can change, and the docs can be wrong. The Codex adapter broke this way on Codex CLI 0.159.3. Mitigations: `GROK_DISABLE_AUTOUPDATER=1`; defensive parsing; version-stamped help fixtures and the CLI-surface cross-check (Tasks 67–69); and re-running Task 67's free checks after each version bump.
+10. **Field evidence is not runner evidence.** The working project-local Grok adapter ran from the repo in `--permission-mode plan`, with `--json-schema` and without D25's deny set. What it showed must be re-checked under the runner's flags (Task 67: U1, U7, U9, U10): `structuredOutput` was populated; `modelUsage` was keyed by the serving model (e.g. `grok-4.7-build`), which can differ from `-m`; and `grok models` printed "You are logged in" and exited 0.
+11. **Binary-name collision.** Cursor's installer drops `agent` into `~/.local/bin`, which can collide with Grok's `agent` symlink. Cursor may also drop the `cursor-agent` alias that the adapter hardcodes (U14).
+12. **Orchestrator contract extension (D28).** It touches the file that NFR-MR5 says new adapters should not need. It is scoped as a one-time change, not a precedent.
+13. **Count-pin churn.** Agent, wrapper, portability-prose and cold-path counts change in Tasks 68–70, so their registration steps must be serialized.
+14. **Codex byte headroom.** At today's 6,115 B, about 15 B remain after the allow-list edit, and the Codex quick-fix PR also changes that file. Task 66 re-measures after the rebase. Any future shared prose added to every adapter must trim Codex first.
 
 ## Cross-Cutting Notes for Engineering
 
