@@ -5,6 +5,14 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 2.0.1] - 2026-09-30
+
+### Changed
+
+- (plans) record Task 55 done; Milestone 6.2 and Phase 6 complete
+- remove synthex-plus plugin and retire team-* commands (Task 55)
+- (plans) mark Task 55 in progress after v2.0.0 tombstone release
+
 ## [synthex 2.0.0 / synthex-plus 2.0.0] - 2026-09-30
 
 ### Added
