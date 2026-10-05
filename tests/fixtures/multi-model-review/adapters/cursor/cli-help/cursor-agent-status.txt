@@ -1,0 +1,7 @@
+Usage: agent status|whoami [options]
+
+View authentication status
+
+Options:
+  --format <format>  Output format (choices: "text", "json", default: "text")
+  -h, --help         Display help for command

@@ -1,0 +1,28 @@
+{
+  "text": "{\"findings\":[{\"finding_id\":\"users.js:sql-injection\",\"severity\":\"critical\",\"category\":\"security\",\"title\":\"SQL injection via string-concatenated user id\",\"description\":\"getUser now builds the SQL string by concatenating id inside single quotes instead of passing it as a bound parameter. A caller-controlled id can close the quote and inject arbitrary SQL (read or modify data, depending on DB privileges). Restore the parameterized query: db.query('SELECT * FROM users WHERE id = ?', [id]).\",\"file\":\"src/users.js\",\"symbol\":\"getUser\",\"line_range\":{\"start\":4,\"end\":4},\"confidence\":\"high\"},{\"finding_id\":\"users.js:retry-swallows-errors\",\"severity\":\"high\",\"category\":\"error-handling\",\"title\":\"retryFetch swallows every failure and returns undefined\",\"description\":\"The empty catch discards every exception, and after seven attempts the function falls off the end and returns undefined. Callers cannot tell a network failure from a successful response, and the original error is lost. Rethrow the last error (or return a Result) once retries are exhausted, and do not use an empty catch.\",\"file\":\"src/users.js\",\"symbol\":\"retryFetch\",\"line_range\":{\"start\":8,\"end\":12},\"confidence\":\"high\"},{\"finding_id\":\"users.js:retry-ignores-http-status\",\"severity\":\"medium\",\"category\":\"correctness\",\"title\":\"retryFetch treats HTTP error responses as success\",\"description\":\"fetch rejects only on network failure. A 4xx or 5xx response is returned immediately and is never retried. Check response.ok (or status) and retry or throw on unsuccessful HTTP statuses.\",\"file\":\"src/users.js\",\"symbol\":\"retryFetch\",\"line_range\":{\"start\":9,\"end\":11},\"confidence\":\"high\"},{\"finding_id\":\"users.js:retry-no-backoff\",\"severity\":\"low\",\"category\":\"reliability\",\"title\":\"Retries run back-to-back with no delay or timeout\",\"description\":\"The loop issues up to seven fetches immediately, with no backoff and no AbortSignal timeout. A hung or failing endpoint is hammered and a single attempt can block indefinitely because fetch has no default timeout. Add jittered backoff and a per-attempt timeout.\",\"file\":\"src/users.js\",\"symbol\":\"retryFetch\",\"line_range\":{\"start\":9,\"end\":11},\"confidence\":\"high\"}]}",
+  "stopReason": "end_turn",
+  "sessionId": "<redacted-id>",
+  "requestId": "<redacted-id>",
+  "thought": "<redacted-thought>",
+  "usage": {
+    "input_tokens": 11093,
+    "cache_read_input_tokens": 1152,
+    "cache_creation_input_tokens": 0,
+    "output_tokens": 1758,
+    "reasoning_tokens": 1224,
+    "total_tokens": 14003
+  },
+  "num_turns": 1,
+  "total_cost_usd": 0.0113254,
+  "total_cost_usd_ticks": 113254000,
+  "modelUsage": {
+    "grok-4.7-build": {
+      "inputTokens": 11093,
+      "outputTokens": 1758,
+      "cacheReadInputTokens": 1152,
+      "cacheCreationInputTokens": 0,
+      "modelCalls": 1,
+      "costUSD": 0.0113254
+    }
+  }
+}

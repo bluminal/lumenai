@@ -1,0 +1,1 @@
+grok --prompt-file <scratch>/prompt.txt --output-format json --disallowed-tools read_file\,grep\,list_dir\,run_terminal_cmd\,search_replace\,write_file\,web_search\,web_fetch\,todo_write\,task\,Agent --deny \* --deny mcp__\* --permission-mode dontAsk --no-subagents --disable-web-search --max-turns 3 -m grok-nonexistent-model 
