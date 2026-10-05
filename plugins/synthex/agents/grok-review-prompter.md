@@ -47,7 +47,7 @@ The runner writes raw stdout to `config.raw_output_path` atomically before parsi
 
 ### 5. Output Parsing
 
-Done by the runner: a `{type:"error"}` object → `cli_failed` (`cli_auth_failed` for login errors); a `stopReason` other than `end_turn`, or `max turns reached` on stderr → `cli_failed`, the code was not reviewed (D36); otherwise `structuredOutput` (else `.text`) goes to `validate-findings --usage-json`.
+Done by the runner: a `{type:"error"}` object → `cli_failed` (`cli_auth_failed` for login errors); a `stopReason` other than exactly `end_turn`, or `max turns reached` on stderr → `cli_failed` (`cli_auth_failed` on a non-zero exit with a login error on stderr), the code was not reviewed (D36); otherwise `structuredOutput` (else `.text`) goes to `validate-findings --usage-json`.
 
 ### 6. Retry-Once on Parse Failure
 

@@ -33,8 +33,13 @@
 #   - XAI_API_KEY and its alias GROK_CODE_XAI_API_KEY are unset unless
 #     multi_model_review.per_reviewer.grok-review-prompter.allow_api_key_billing
 #     (or the envelope's config.allow_api_key_billing) is true (D26);
+#   - cwd is checked inside the subshell that execs grok (cd || exit 125,
+#     then pwd -P must equal the scratch dir); errexit alone is not enough
+#     there, because the auth probe runs as `auth_probe || rc=$?`. A failed
+#     check runs no grok and fails closed (unknown_error; --auth-check 11);
 #   - argv: --prompt-file, --output-format json, --json-schema <strict
-#     findings schema> (D33), --disallowed-tools <every built-in>,
+#     findings schema> (D33), --disallowed-tools <every built-in: the
+#     spike's names plus every one grok's own docs name>,
 #     --deny '*', --deny 'mcp__*', --permission-mode dontAsk,
 #     --sandbox read-only (D34), --no-subagents, --disable-web-search,
 #     --max-turns 3 (D36), -m only when config.model is set, --rules
@@ -47,8 +52,10 @@
 # refusal is cli_failed.
 #
 # D36: before any parsing, a wrapper whose stopReason is not exactly
-# end_turn (absent included), or stderr containing "max turns reached", is
-# cli_failed: the code was not reviewed, so its text is never passed on.
+# end_turn (absent included; node/jq decide, so "end_turn\n" fails), or
+# stderr containing "max turns reached", is cli_failed: the code was not
+# reviewed, so its text is never passed on. When such a run also exits
+# non-zero with a login error on stderr, it is cli_auth_failed instead.
 #
 # Prefers node (guarded by `command -v node`); falls back to jq; with
 # neither, prints an unknown_error envelope. No python (harness-modernization
@@ -60,11 +67,15 @@
 #   2 - usage error (unknown argument, or --input missing/unreadable).
 #   10 - --auth-check: the grok binary is not on PATH.
 #   11 - --auth-check: not authenticated (or the probe output was not
-#        recognised, or `grok models` did not answer in time; this fails
-#        closed).
+#        recognised, `grok models` did not answer in time, or the scratch
+#        dir could not be entered so grok was not run; this fails closed).
 #   12 - --auth-check: only XAI_API_KEY (or GROK_CODE_XAI_API_KEY) is
 #        available and per-token billing is not opted into
 #        (allow_api_key_billing is not true).
+#   130 - interrupted by SIGINT; 143 - by SIGTERM. grok is stopped first;
+#        in --input mode a cli_failed envelope ("grok-review.sh was
+#        interrupted; the code was not reviewed.") is still printed and
+#        written to --envelope-out, and a partial raw output is kept.
 
 set -eu
 
@@ -82,7 +93,11 @@ HOSTS_ENV="$PLUGIN_ROOT/config/hosts.env"
 SCHEMA_FILE="$PLUGIN_ROOT/agents/_shared/codex-findings.schema.json"
 
 REVIEWER_ID="grok-review-prompter"
-DISALLOWED_TOOLS="read_file,grep,list_dir,run_terminal_cmd,search_replace,write_file,web_search,web_fetch,todo_write,task,Agent"
+# Every built-in (D25): the names the 1.0.46 spike ran with, plus every one
+# grok's own docs name (user-guide 01 "Tools", 07 "Tool Discovery", 10 "Tool
+# Name Aliases"). Unknown names are accepted silently (U1), so a name some
+# version lacks costs nothing.
+DISALLOWED_TOOLS="read_file,grep,list_dir,run_terminal_cmd,run_terminal_command,search_replace,write_file,web_search,web_fetch,todo_write,task,spawn_subagent,memory_search,search_tool,use_tool,Agent"
 MAX_TURNS=3
 PROBE_CAP=30
 REFUSAL_A="could not resolve runtime-socket deny path"
@@ -136,7 +151,14 @@ clean_msg() {
 
 RAW=""
 RAW_ABS=""
+W=""
+WATCHDOG_PID=""
+GROK_PID=""
+FAIL_EXIT=0
+# emit and fail ignore INT/TERM, so an interrupt cannot re-enter them and
+# replace the envelope they are writing.
 emit() {
+  trap '' INT TERM
   if [ -n "$ENVELOPE_OUT" ]; then
     case "$ENVELOPE_OUT" in */*) mkdir -p -- "${ENVELOPE_OUT%/*}" 2>/dev/null || true ;; esac
     printf '%s\n' "$1" > "$ENVELOPE_OUT.tmp.$$" && mv -f -- "$ENVELOPE_OUT.tmp.$$" "$ENVELOPE_OUT"
@@ -145,6 +167,7 @@ emit() {
 }
 
 fail() {
+  trap '' INT TERM
   local out
   if [ -n "$RAW" ]; then
     out="$(bash "$VALIDATE" --error "$1" --message "$(clean_msg "$2")" --raw-output-path "$RAW")"
@@ -152,8 +175,28 @@ fail() {
     out="$(bash "$VALIDATE" --error "$1" --message "$(clean_msg "$2")")"
   fi
   emit "$out"
-  exit 0
+  exit "$FAIL_EXIT"
 }
+
+stop_grok() {
+  if [ -n "$GROK_PID" ]; then kill -TERM "$GROK_PID" 2>/dev/null || true; GROK_PID=""; fi
+  if [ -n "$WATCHDOG_PID" ]; then kill "$WATCHDOG_PID" 2>/dev/null || true; WATCHDOG_PID=""; fi
+}
+
+# on_signal <exit>: the runner itself was interrupted. Stop grok; in
+# --input mode keep any partial raw output and still leave an envelope.
+on_signal() {
+  trap '' INT TERM
+  stop_grok
+  if [ "$MODE" = "review" ]; then
+    if [ -n "$RAW_ABS" ] && [ -e "$RAW_ABS.tmp" ]; then mv -f -- "$RAW_ABS.tmp" "$RAW_ABS" 2>/dev/null || true; fi
+    FAIL_EXIT="$1"
+    fail cli_failed "grok-review.sh was interrupted; the code was not reviewed."
+  fi
+  exit "$1"
+}
+trap 'on_signal 130' INT
+trap 'on_signal 143' TERM
 
 # --- JSON helpers: node first, jq fallback ------------------------------
 
@@ -226,12 +269,16 @@ minify_schema() {
 }
 
 # read_wrapper <stdout-file>: writes $W/w.kind (object|error|invalid),
-# $W/w.stop (stopReason, or <absent>), $W/w.msg (an error's message),
-# $W/w.payload (serialized structuredOutput when present, else .text) and
-# $W/w.usage ({input_tokens, output_tokens, model} from the wrapper, or
-# empty). usage.model is the modelUsage key verbatim (the serving model).
+# $W/w.done ("yes" only when stopReason === "end_turn", decided here so no
+# shell read can trim it), $W/w.stop (stopReason for messages: a bare token
+# as is, anything else JSON-quoted, or <absent>), $W/w.msg (an error's
+# message), $W/w.payload (serialized structuredOutput when present, else
+# .text) and $W/w.usage ({input_tokens, output_tokens, model?} from the
+# wrapper, or empty). usage.model is the modelUsage key verbatim (the
+# serving model); without modelUsage it is left out, and validate-findings
+# then takes --model (the configured model).
 read_wrapper() {
-  : > "$W/w.kind"; : > "$W/w.stop"; : > "$W/w.msg"; : > "$W/w.payload"; : > "$W/w.usage"
+  : > "$W/w.kind"; : > "$W/w.done"; : > "$W/w.stop"; : > "$W/w.msg"; : > "$W/w.payload"; : > "$W/w.usage"
   if [ "$JSON_TOOL" = "node" ]; then
     node -e '
 const fs = require("fs");
@@ -242,7 +289,9 @@ try { w = JSON.parse(fs.readFileSync(src, "utf8")); } catch { put("kind", "inval
 if (!w || typeof w !== "object" || Array.isArray(w)) { put("kind", "invalid"); process.exit(0); }
 if (w.type === "error") { put("kind", "error"); put("msg", typeof w.message === "string" ? w.message : JSON.stringify(w.message ?? "")); process.exit(0); }
 put("kind", "object");
-put("stop", typeof w.stopReason === "string" ? w.stopReason : "<absent>");
+const s = w.stopReason;
+put("done", s === "end_turn" ? "yes" : "no");
+put("stop", typeof s !== "string" ? "<absent>" : /^[A-Za-z0-9_-]+$/.test(s) ? s : JSON.stringify(s));
 if (w.structuredOutput !== undefined && w.structuredOutput !== null) put("payload", JSON.stringify(w.structuredOutput));
 else if (typeof w.text === "string") put("payload", w.text);
 else if (w.text !== undefined && w.text !== null) put("payload", JSON.stringify(w.text));
@@ -264,7 +313,8 @@ if (u && typeof u === "object" && typeof u.input_tokens === "number" && typeof u
     if [ "$kind" = "error" ]; then
       jq -rj '.message // "" | if type == "string" then . else tojson end' "$1" > "$W/w.msg" 2>/dev/null || true
     elif [ "$kind" = "object" ]; then
-      jq -rj 'if (.stopReason | type) == "string" then .stopReason else "<absent>" end' "$1" > "$W/w.stop" 2>/dev/null || true
+      jq -rj 'if .stopReason == "end_turn" then "yes" else "no" end' "$1" > "$W/w.done" 2>/dev/null || true
+      jq -rj 'if (.stopReason | type) == "string" then (.stopReason | if test("\\A[A-Za-z0-9_-]+\\z") then . else tojson end) else "<absent>" end' "$1" > "$W/w.stop" 2>/dev/null || true
       jq -rj 'if .structuredOutput != null then (.structuredOutput | tojson) elif (.text | type) == "string" then .text elif .text != null then (.text | tojson) else empty end' "$1" > "$W/w.payload" 2>/dev/null || true
       jq -cj 'if (.usage | type) == "object" and (.usage.input_tokens | type) == "number" and (.usage.output_tokens | type) == "number"
           then {input_tokens: .usage.input_tokens, output_tokens: .usage.output_tokens}
@@ -299,12 +349,8 @@ elif command -v gtimeout >/dev/null 2>&1; then
   TIMEOUT_BIN="gtimeout"
 fi
 
-W=""
-WATCHDOG_PID=""
-GROK_PID=""
 cleanup() {
-  if [ -n "$GROK_PID" ]; then kill -TERM "$GROK_PID" 2>/dev/null || true; fi
-  if [ -n "$WATCHDOG_PID" ]; then kill "$WATCHDOG_PID" 2>/dev/null || true; fi
+  stop_grok
   if [ -n "$W" ] && [ -d "$W" ] && [ "$W" != "/" ]; then rm -rf -- "$W"; fi
 }
 
@@ -314,14 +360,15 @@ make_scratch() {
   if [ -n "$W" ]; then W="$(cd -P -- "$W" && pwd -P || true)"; fi
   [ -n "$W" ] && [ -d "$W" ] && [ "$W" != "$PWD" ] || return 1
   trap cleanup EXIT
-  trap 'exit 130' INT
-  trap 'exit 143' TERM
   mkdir -p -- "$W/home"
 }
 
-# isolate: call only inside a subshell. Applies the D25/D26 environment.
+# isolate: call only inside a subshell. Enters the scratch dir, checking it
+# explicitly (errexit is ignored when the caller runs as `auth_probe ||
+# rc=$?`), then applies the D25/D26 environment. Exit 125 runs no grok.
 isolate() {
-  cd -- "$W"
+  cd -- "$W" 2>/dev/null || exit 125
+  [ "$(pwd -P)" = "$W" ] || exit 125
   export HOME="$W/home"
   export GROK_HOME="$REAL_GROK_HOME"
   export GROK_DISABLE_AUTOUPDATER=1
@@ -336,24 +383,28 @@ isolate() {
 
 # guarded <limit> <stdout-file> <stderr-file> <grok args...>: one isolated
 # grok call, backgrounded and waited on (so an INT/TERM trap runs promptly
-# and cleanup can stop the child), killed after <limit> seconds by
-# timeout/gtimeout or else by a bash watchdog. Sets RC and TIMED_OUT. Both
+# and can stop the child), killed after <limit> seconds by timeout/gtimeout
+# or else by a bash watchdog. Sets RC, TIMED_OUT and ISOLATE_FAILED. Both
 # the auth probe and the review go through here, so the two timeout
-# branches always run the same argv.
+# branches always run the same argv. The output files are opened only by
+# the exec, after isolate's checks, so a failed check (exit 125 and no
+# <stderr-file>) writes nothing and runs no grok.
 RC=0
 TIMED_OUT=0
+ISOLATE_FAILED=0
 guarded() {
   local limit="$1" out="$2" err="$3"
   shift 3
   if [ "$limit" -lt 1 ]; then limit=1; fi
   RC=0
   TIMED_OUT=0
-  rm -f -- "$W/.timedout"
+  ISOLATE_FAILED=0
+  rm -f -- "$W/.timedout" "$out" "$err" 2>/dev/null || true
   if [ -n "$TIMEOUT_BIN" ]; then
-    (isolate; exec "$TIMEOUT_BIN" -k 5 "$limit" grok "$@") > "$out" 2> "$err" < /dev/null &
+    (isolate; exec "$TIMEOUT_BIN" -k 5 "$limit" grok "$@" > "$out" 2> "$err") < /dev/null &
     GROK_PID=$!
   else
-    (isolate; exec grok "$@") > "$out" 2> "$err" < /dev/null &
+    (isolate; exec grok "$@" > "$out" 2> "$err") < /dev/null &
     GROK_PID=$!
     local pid=$GROK_PID
     (sleep "$limit"; : > "$W/.timedout"; kill -TERM "$pid" 2>/dev/null; sleep 5; kill -KILL "$pid" 2>/dev/null) \
@@ -366,12 +417,16 @@ guarded() {
     kill "$WATCHDOG_PID" 2>/dev/null || true
     WATCHDOG_PID=""
   fi
-  if [ -n "$TIMEOUT_BIN" ]; then
+  if [ "$RC" = 125 ] && [ ! -e "$err" ]; then
+    ISOLATE_FAILED=1
+  elif [ -n "$TIMEOUT_BIN" ]; then
     case "$RC" in 124|137) TIMED_OUT=1 ;; esac
   elif [ -e "$W/.timedout" ]; then
     TIMED_OUT=1
   fi
 }
+
+SCRATCH_MSG="grok-review.sh could not enter its scratch dir (it vanished or no longer resolves to itself), so grok was not run and the code was not reviewed."
 
 # compute_budget: per_reviewer_timeout_seconds - 10, clamped in the
 # foreground (no --envelope-out) to the host shell cap - 15.
@@ -399,12 +454,14 @@ compute_budget() {
 
 # auth_probe: 0 session (or opted-in key), 10 missing, 11 not
 # authenticated / unrecognised, 12 key only without opt-in, 13 no
-# recognisable answer before the bound (PROBE_LIMIT seconds).
+# recognisable answer before the bound (PROBE_LIMIT seconds), 14 the
+# scratch dir could not be entered (grok was not run).
 PROBE_LIMIT=$PROBE_CAP
 auth_probe() {
   command -v grok >/dev/null 2>&1 || return 10
   local line=""
   guarded "$PROBE_LIMIT" "$W/models.out" "$W/models.err" models
+  if [ "$ISOLATE_FAILED" = 1 ]; then return 14; fi
   line="$(head -n 1 "$W/models.out" 2>/dev/null || true)"
   case "$line" in
     "You are logged in"*) return 0 ;;
@@ -443,6 +500,7 @@ if [ "$MODE" = "auth" ]; then
   case "$rc" in
     0) printf 'grok: authenticated\n' ;;
     13) note "grok models did not answer within ${PROBE_LIMIT}s; treating as not authenticated"; rc=11 ;;
+    14) note "$SCRATCH_MSG"; rc=11 ;;
     12) note "only XAI_API_KEY is available; it bills per token. Run grok login, or opt in with multi_model_review.per_reviewer.grok-review-prompter.allow_api_key_billing: true" ;;
     *) note "not authenticated; run grok login" ;;
   esac
@@ -510,6 +568,7 @@ auth_probe || arc=$?
 case "$arc" in
   0) ;;
   13) fail timeout "grok models (the auth probe) did not answer within ${PROBE_LIMIT}s of the ${BUDGET}s wall-clock budget; no review was run." ;;
+  14) fail unknown_error "$SCRATCH_MSG" ;;
   12) fail cli_auth_failed "grok: only XAI_API_KEY is available, which bills per token. Run grok login, or opt in with per_reviewer.grok-review-prompter.allow_api_key_billing: true." ;;
   *) fail cli_auth_failed "grok: not authenticated. Run grok login." ;;
 esac
@@ -564,6 +623,9 @@ run_grok() {
   if [ -n "$MODEL" ]; then args+=(-m "$MODEL"); fi
   if [ -n "$JUDGE" ]; then args+=(--rules "$JUDGE"); fi
   guarded "$left" "$RAW_ABS.tmp" "$W/stderr.$ATTEMPT" "${args[@]}"
+  if [ "$ISOLATE_FAILED" = 1 ]; then
+    fail unknown_error "$SCRATCH_MSG"
+  fi
   if ! mv -f -- "$RAW_ABS.tmp" "$RAW_ABS" 2>/dev/null; then
     BAD_RAW="$RAW"
     RAW=""
@@ -621,24 +683,28 @@ while :; do
     fail cli_failed "grok exited $RC without a JSON result: ${ERR:-no stderr}"
   fi
 
-  # D36 incomplete-run guard (Risk 15): allowlist {end_turn}, before parsing.
+  # D36 incomplete-run guard (Risk 15): allowlist {end_turn}, before
+  # parsing. w.done is node's/jq's exact verdict, never a shell compare.
   STOP="$(cat "$W/w.stop")"
-  if [ "$STOP" != "end_turn" ] || case "$ERR" in *"max turns reached"*) true ;; *) false ;; esac; then
+  DONE="$(cat "$W/w.done" 2>/dev/null || true)"
+  if [ "$DONE" != "yes" ] || case "$ERR" in *"max turns reached"*) true ;; *) false ;; esac; then
+    if [ "$DONE" != "yes" ] && [ "$RC" != 0 ] && printf '%s\n' "$ERR" | grep -Eiq "$AUTH_RE"; then
+      fail cli_auth_failed "grok: not authenticated (exit $RC, stopReason: ${STOP:-<absent>}); run grok login. stderr: $ERR"
+    fi
     fail cli_failed "grok run incomplete (stopReason: ${STOP:-<absent>}, exit $RC): the code was not reviewed, so this run's output was discarded."
   fi
   if [ "$RC" != 0 ]; then
     fail cli_failed "grok exited $RC (stopReason: end_turn): ${ERR:-no stderr}"
   fi
 
-  # 5. Output parsing: structuredOutput first, else .text (D33).
+  # 5. Output parsing: structuredOutput first, else .text (D33). usage.model
+  # is the modelUsage key when the wrapper has one; validate-findings falls
+  # back to --model (the configured model), else null.
   USAGE="$(cat "$W/w.usage")"
-  if [ -n "$USAGE" ]; then
-    ENV_OUT="$(bash "$VALIDATE" --reviewer-id "$REVIEWER_ID" --family "$FAMILY" --raw-output-path "$RAW" --input "$W/w.payload" --usage-json "$USAGE")"
-  elif [ -n "$MODEL" ]; then
-    ENV_OUT="$(bash "$VALIDATE" --reviewer-id "$REVIEWER_ID" --family "$FAMILY" --raw-output-path "$RAW" --input "$W/w.payload" --model "$MODEL")"
-  else
-    ENV_OUT="$(bash "$VALIDATE" --reviewer-id "$REVIEWER_ID" --family "$FAMILY" --raw-output-path "$RAW" --input "$W/w.payload")"
-  fi
+  VF_ARGS=(--reviewer-id "$REVIEWER_ID" --family "$FAMILY" --raw-output-path "$RAW" --input "$W/w.payload")
+  if [ -n "$USAGE" ]; then VF_ARGS+=(--usage-json "$USAGE"); fi
+  if [ -n "$MODEL" ]; then VF_ARGS+=(--model "$MODEL"); fi
+  ENV_OUT="$(bash "$VALIDATE" "${VF_ARGS[@]}")"
 
   # 6. Retry once on parse_failed (the fallback argv, if any, is kept).
   if [ "$PARSE_RETRIED" = 0 ] && printf '%s' "$ENV_OUT" | grep -Eq '"error_code"[[:space:]]*:[[:space:]]*"parse_failed"'; then

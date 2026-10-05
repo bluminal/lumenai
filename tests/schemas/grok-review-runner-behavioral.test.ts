@@ -19,7 +19,7 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -28,7 +28,9 @@ import {
   readdirSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
   chmodSync,
 } from 'node:fs';
@@ -74,10 +76,16 @@ const TIMEOUT_TOOL = which('timeout') ?? which('gtimeout');
 let ROOT_TMP = '';
 let seq = 0;
 
-type BinOpts = { node?: boolean; jq?: boolean; timeout?: boolean; grok?: boolean };
+/**
+ * scratchHook replaces `mkdir` with a wrapper that, right after the runner
+ * creates <scratch>/home (the last step of make_scratch, before the auth
+ * probe), removes the scratch dir ('gone') or swaps it for a symlink to the
+ * runner's cwd, the project ('swap').
+ */
+type BinOpts = { node?: boolean; jq?: boolean; timeout?: boolean; grok?: boolean; scratchHook?: 'gone' | 'swap' };
 
 function makeBin(opts: BinOpts = {}): string {
-  const { node = true, jq = false, timeout = false, grok = true } = opts;
+  const { node = true, jq = false, timeout = false, grok = true, scratchHook } = opts;
   const bin = join(ROOT_TMP, `bin-${seq++}`);
   mkdirSync(bin, { recursive: true });
   const link = (tool: string, as = tool) => {
@@ -91,6 +99,25 @@ function makeBin(opts: BinOpts = {}): string {
   if (grok) {
     writeFileSync(join(bin, 'grok'), stubSource(join(bin, 'bash')));
     chmodSync(join(bin, 'grok'), 0o755);
+  }
+  if (scratchHook) {
+    unlinkSync(join(bin, 'mkdir'));
+    writeFileSync(
+      join(bin, 'mkdir'),
+      `#!${join(bin, 'bash')}
+${which('mkdir')} "$@" || exit $?
+for a in "$@"; do
+  case "$a" in
+    */synthex-grok.*/home)
+      d="\${a%/home}"
+      ${which('rm')} -rf "$d"
+      ${scratchHook === 'swap' ? `${which('ln')} -s "$PWD" "$d"` : ':'} ;;
+  esac
+done
+exit 0
+`,
+    );
+    chmodSync(join(bin, 'mkdir'), 0o755);
   }
   return bin;
 }
@@ -106,9 +133,12 @@ const RECORDED_ENV = [
 
 /**
  * Stub grok. `grok models` prints $STUB_SCENARIO/models.stdout (default: the
- * logged-in line), then sleeps models.sleep seconds when that file exists. Any other call is a review invocation N: it records
- * argv/env/pwd/prompt, then prints N.stdout (else default.stdout), sleeps
- * N.sleep, prints N.stderr and exits N.exit (else the default.* files).
+ * logged-in line); when models.swap exists it then moves its own cwd (the
+ * scratch dir) to <scratch>.moved and leaves a symlink to it in its place;
+ * then it sleeps models.sleep seconds when that file exists. Any other call
+ * is a review invocation N: it records argv/env/pwd/prompt/pid, then prints
+ * N.stdout (else default.stdout), sleeps N.sleep, prints N.stderr and exits
+ * N.exit (else the default.* files).
  */
 function stubSource(bash: string): string {
   return `#!${bash}
@@ -118,11 +148,12 @@ if [ "\${1:-}" = "models" ]; then
   n=$(cat "$L/models.count" 2>/dev/null || printf 0); n=$((n + 1)); printf '%s' "$n" > "$L/models.count"
   printf '%s\\0' "$@" > "$L/models-$n.argv"; pwd -P > "$L/models-$n.pwd"; dump_env > "$L/models-$n.env"
   if [ -e "$D/models.stdout" ]; then cat "$D/models.stdout"; else printf 'You are logged in with grok.com.\\nDefault model: grok-4.7\\n'; fi
+  if [ -e "$D/models.swap" ]; then d=$(pwd -P); mv "$d" "$d.moved"; ${which('ln')} -s "$d.moved" "$d"; fi
   if [ -e "$D/models.sleep" ]; then sleep "$(cat "$D/models.sleep")"; fi
   exit 0
 fi
 n=$(cat "$L/count" 2>/dev/null || printf 0); n=$((n + 1)); printf '%s' "$n" > "$L/count"
-printf '%s\\0' "$@" > "$L/inv-$n.argv"; pwd -P > "$L/inv-$n.pwd"; dump_env > "$L/inv-$n.env"
+printf '%s\\0' "$@" > "$L/inv-$n.argv"; pwd -P > "$L/inv-$n.pwd"; dump_env > "$L/inv-$n.env"; printf '%s' "$$" > "$L/inv-$n.pid"
 prev=""; for a in "$@"; do if [ "$prev" = "--prompt-file" ]; then cat "$a" > "$L/inv-$n.prompt"; fi; prev="$a"; done
 pick() { if [ -e "$D/$n.$1" ]; then printf '%s' "$D/$n.$1"; elif [ -e "$D/default.$1" ]; then printf '%s' "$D/default.$1"; fi; }
 f=$(pick stdout); if [ -n "$f" ]; then cat "$f"; fi
@@ -220,6 +251,8 @@ type RunOpts = {
   steps?: Record<string, Step>;
   models?: string;
   modelsSleep?: number;
+  /** `grok models` swaps its scratch dir for a symlink to <scratch>.moved. */
+  modelsSwap?: boolean;
   config?: string;
   envelopeConfig?: Record<string, unknown>;
   env?: Record<string, string>;
@@ -261,7 +294,20 @@ function count(dir: string, file: string): number {
   return existsSync(join(dir, file)) ? Number.parseInt(readFileSync(join(dir, file), 'utf8'), 10) : 0;
 }
 
-function run(opts: RunOpts = {}): RunResult {
+type Case = {
+  proj: string;
+  log: string;
+  vfLog: string;
+  bin: string;
+  args: string[];
+  env: Record<string, string>;
+  realGrokHome: string;
+};
+
+const INPUT_REL = '.synthex/tmp/grok-review-prompter-0f1e2d3c.input.json';
+
+/** Writes one case's scenario, config and input envelope; spawns nothing. */
+function setupCase(opts: RunOpts = {}): Case {
   const caseDir = mkdtempSync(join(ROOT_TMP, 'case-'));
   const proj = join(caseDir, 'proj');
   const log = join(caseDir, 'log');
@@ -281,6 +327,7 @@ function run(opts: RunOpts = {}): RunResult {
   }
   if (opts.models !== undefined) writeFileSync(join(scen, 'models.stdout'), opts.models);
   if (opts.modelsSleep !== undefined) writeFileSync(join(scen, 'models.sleep'), String(opts.modelsSleep));
+  if (opts.modelsSwap) writeFileSync(join(scen, 'models.swap'), '');
   if (opts.config !== undefined) {
     mkdirSync(join(proj, '.synthex'), { recursive: true });
     writeFileSync(join(proj, '.synthex', 'config.yaml'), opts.config);
@@ -290,15 +337,16 @@ function run(opts: RunOpts = {}): RunResult {
     ...ENVELOPE,
     config: { ...ENVELOPE.config, ...(opts.envelopeConfig ?? {}) },
   };
-  const inputRel = '.synthex/tmp/grok-review-prompter-0f1e2d3c.input.json';
   mkdirSync(join(proj, '.synthex', 'tmp'), { recursive: true });
-  writeFileSync(join(proj, inputRel), JSON.stringify(envelope));
+  writeFileSync(join(proj, INPUT_REL), JSON.stringify(envelope));
 
   const bin = makeBin(opts.bin);
-  const args = opts.auth ? ['--auth-check'] : (opts.args ?? ['--input', inputRel]);
-  const started = Date.now();
-  const r = spawnSync(join(bin, 'bash'), [SPY_RUNNER, ...args], {
-    cwd: proj,
+  return {
+    proj,
+    log,
+    vfLog,
+    bin,
+    args: opts.auth ? ['--auth-check'] : (opts.args ?? ['--input', INPUT_REL]),
     env: {
       PATH: bin,
       STUB_LOG: log,
@@ -308,11 +356,31 @@ function run(opts: RunOpts = {}): RunResult {
       HOME: join(caseDir, 'user-home'),
       ...(opts.env ?? {}),
     },
+    realGrokHome: realpathSync(grokHomeReal),
+  };
+}
+
+function run(opts: RunOpts = {}): RunResult {
+  const c = setupCase(opts);
+  const started = Date.now();
+  const r = spawnSync(join(c.bin, 'bash'), [SPY_RUNNER, ...c.args], {
+    cwd: c.proj,
+    env: c.env,
     encoding: 'utf8',
     timeout: 60_000,
   });
   const durationMs = Date.now() - started;
+  return readCase(c, { status: r.status ?? -1, stdout: r.stdout ?? '', stderr: r.stderr ?? '' }, !!opts.auth, durationMs);
+}
 
+/** Reads back what the stub and the validate-findings spy recorded. */
+function readCase(
+  c: Case,
+  r: { status: number; stdout: string; stderr: string },
+  auth: boolean,
+  durationMs: number,
+): RunResult {
+  const { log, vfLog, proj } = c;
   const invocations: Inv[] = [];
   for (let n = 1; n <= count(log, 'count'); n++) {
     invocations.push({
@@ -339,7 +407,7 @@ function run(opts: RunOpts = {}): RunResult {
     });
   }
   let parsed: Record<string, any> | null = null;
-  if (!opts.auth) {
+  if (!auth) {
     try {
       parsed = JSON.parse(r.stdout);
     } catch {
@@ -347,16 +415,16 @@ function run(opts: RunOpts = {}): RunResult {
     }
   }
   return {
-    status: r.status ?? -1,
-    stdout: r.stdout ?? '',
-    stderr: r.stderr ?? '',
+    status: r.status,
+    stdout: r.stdout,
+    stderr: r.stderr,
     envelope: parsed,
     invocations,
     models,
     vf,
     proj,
     rawPath: join(proj, ENVELOPE.config.raw_output_path as string),
-    realGrokHome: realpathSync(grokHomeReal),
+    realGrokHome: c.realGrokHome,
     durationMs,
   };
 }
@@ -452,7 +520,8 @@ describe('argv, isolation env and cwd (stub grok records them)', () => {
     expect(argv[argv.indexOf('--prompt-file') + 1]).toBe(`${r.invocations[0].pwd}/prompt.txt`);
     expect(argValue(argv, '--output-format')).toBe('json');
     expect(argValue(argv, '--disallowed-tools')).toBe(
-      'read_file,grep,list_dir,run_terminal_cmd,search_replace,write_file,web_search,web_fetch,todo_write,task,Agent',
+      'read_file,grep,list_dir,run_terminal_cmd,run_terminal_command,search_replace,write_file,web_search,web_fetch,' +
+        'todo_write,task,spawn_subagent,memory_search,search_tool,use_tool,Agent',
     );
     expect(argvValues(argv, '--deny')).toEqual(['*', 'mcp__*']);
     expect(argValue(argv, '--permission-mode')).toBe('dontAsk');
@@ -461,6 +530,21 @@ describe('argv, isolation env and cwd (stub grok records them)', () => {
     expect(argv).toContain('--disable-web-search');
     expect(argValue(argv, '--max-turns')).toBe('3');
     expect(argv).toContain('--json-schema');
+  });
+
+  it('--disallowed-tools names every built-in in grok\'s own docs, keeps the spike\'s names, and ends with Agent (D25)', () => {
+    const tools = (argValue(r.invocations[0].argv, '--disallowed-tools') as string).split(',');
+    // ~/.grok/docs/user-guide: 01-getting-started.md "Tools" table, and
+    // 07-mcp-servers.md "Tool Discovery" (the MCP meta-tools).
+    const documented = [
+      'read_file', 'search_replace', 'grep', 'list_dir', 'run_terminal_command', 'web_search', 'web_fetch',
+      'todo_write', 'spawn_subagent', 'memory_search', 'search_tool', 'use_tool',
+    ];
+    for (const t of documented) expect(tools, t).toContain(t);
+    // The names the 1.0.46 spike ran with (U1) stay: unknown names are accepted silently.
+    for (const t of ['run_terminal_cmd', 'write_file', 'task']) expect(tools, t).toContain(t);
+    expect(tools[tools.length - 1]).toBe('Agent');
+    expect(new Set(tools).size).toBe(tools.length);
   });
 
   it('argv never carries an approval bypass or -p', () => {
@@ -823,6 +907,16 @@ describe('fixture mapping on the Task 67 recordings', () => {
     expect(r.envelope?.usage).toEqual({ input_tokens: 11093, output_tokens: 1758, model: 'grok-4.7-build' });
   }, T);
 
+  it('a wrapper with usage but no modelUsage: usage.model is config.model (the -m value), else null', () => {
+    const noModelUsage = wrapper({ modelUsage: undefined });
+    const a = run({ steps: { default: { stdout: noModelUsage, exit: 0 } }, envelopeConfig: { model: 'grok-4.7' } });
+    expect(a.envelope?.status).toBe('success');
+    expect(a.envelope?.usage).toEqual({ input_tokens: 11093, output_tokens: 1758, model: 'grok-4.7' });
+    const b = run({ steps: { default: { stdout: noModelUsage, exit: 0 } } });
+    expect(b.envelope?.status).toBe('success');
+    expect(b.envelope?.usage).toEqual({ input_tokens: 11093, output_tokens: 1758, model: null });
+  }, T);
+
   it('g8-denied-tool-then-answer passes the guard; its prose-preamble .text gives parse_failed after exactly 2 invocations', () => {
     const r = run({ steps: { default: rec('g8-denied-tool-then-answer') } });
     expect(r.invocations).toHaveLength(2);
@@ -994,6 +1088,32 @@ describe('incomplete-run guard (Risk 15, D36): allowlist {end_turn}, before pars
     const r = run({ steps: { default: { stdout: '{"type":"error","message":"Session expired; run grok login"}', exit: 1 } } });
     expect(r.envelope?.error_code).toBe('cli_auth_failed');
   }, T);
+
+  it.each([
+    ['a trailing newline', 'end_turn\n', '"end_turn\\n"'],
+    ['a leading space', ' end_turn', '" end_turn"'],
+  ])('stopReason end_turn with %s is not exactly end_turn: cli_failed, no validate-findings call', (_label, stop, shown) => {
+    const r = run({ steps: { default: { stdout: wrapper({ stopReason: stop, text: '{"findings": []}' }), exit: 0 } } });
+    expect(r.envelope?.error_code).toBe('cli_failed');
+    expect(r.envelope?.error_message).toContain(`stopReason: ${shown}`);
+    expect(normalizeCalls(r)).toHaveLength(0);
+  }, T);
+
+  it('a non-end_turn wrapper, a non-zero exit and a login error on stderr give cli_auth_failed, before validate-findings', () => {
+    const r = run({
+      steps: { default: { stdout: '{"error":"Not signed in"}', stderr: 'Error: Not signed in. Run grok login', exit: 1 } },
+    });
+    expect(r.envelope?.error_code).toBe('cli_auth_failed');
+    expect(r.envelope?.error_message).toContain('grok login');
+    expect(r.invocations).toHaveLength(1);
+    expect(normalizeCalls(r)).toHaveLength(0);
+    // The same output with exit 0 is not a login failure: cli_failed.
+    const zero = run({
+      steps: { default: { stdout: '{"error":"Not signed in"}', stderr: 'Error: Not signed in. Run grok login', exit: 0 } },
+    });
+    expect(zero.envelope?.error_code).toBe('cli_failed');
+    expect(normalizeCalls(zero)).toHaveLength(0);
+  }, T);
 });
 
 // ---------------------------------------------------------------------------
@@ -1123,6 +1243,126 @@ describe('raw_output_path that cannot be written', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Scratch dir that cannot be entered (isolate: cd || exit 125, pwd -P check)
+// ---------------------------------------------------------------------------
+
+describe('a scratch dir that cannot be entered, or no longer resolves to itself, fails closed', () => {
+  it('isolate() checks cd and pwd -P itself (errexit is ignored under `auth_probe || rc=$?`)', () => {
+    const m = /\nisolate\(\) \{\n([\s\S]*?)\n\}/.exec(RUNNER_SRC);
+    expect(m).not.toBeNull();
+    const body = (m as RegExpExecArray)[1];
+    expect(body).toContain('cd -- "$W" 2>/dev/null || exit 125');
+    expect(body).toContain('[ "$(pwd -P)" = "$W" ] || exit 125');
+    expect(body.indexOf('|| exit 125')).toBeLessThan(body.indexOf('export HOME'));
+  });
+
+  describe.each(BRANCHES)('%s', (_label, bin) => {
+    it('--auth-check: scratch swapped for a symlink to the project before the probe: exit 11, grok never runs', () => {
+      const r = run({ auth: true, bin: { ...bin, scratchHook: 'swap' } });
+      expect(r.models).toHaveLength(0);
+      expect(r.status).toBe(11);
+      expect(r.stderr).toMatch(/could not enter its scratch dir/);
+      expect(existsSync(join(r.proj, 'models.out'))).toBe(false);
+    }, T);
+
+    it('--auth-check: scratch removed before the probe: exit 11 naming the scratch dir, not a login problem', () => {
+      const r = run({ auth: true, bin: { ...bin, scratchHook: 'gone' } });
+      expect(r.models).toHaveLength(0);
+      expect(r.status).toBe(11);
+      expect(r.stderr).toMatch(/could not enter its scratch dir/);
+      expect(r.stderr).not.toMatch(/run grok login/);
+    }, T);
+
+    it('--input: scratch swapped or removed before the probe: unknown_error (not cli_auth_failed), no grok call', () => {
+      for (const scratchHook of ['swap', 'gone'] as const) {
+        const r = run({ bin: { ...bin, scratchHook } });
+        expect(r.envelope?.error_code, scratchHook).toBe('unknown_error');
+        expect(r.envelope?.error_message, scratchHook).toContain('scratch dir');
+        expect(r.models, scratchHook).toHaveLength(0);
+        expect(r.invocations, scratchHook).toHaveLength(0);
+      }
+    }, T);
+
+    it('--input: scratch swapped for a symlink after the probe: the review never runs outside it (unknown_error)', () => {
+      const r = run({ bin, modelsSwap: true });
+      try {
+        expect(r.models).toHaveLength(1);
+        expect(r.invocations).toHaveLength(0);
+        expect(r.envelope?.error_code).toBe('unknown_error');
+        expect(r.envelope?.error_message).toContain('scratch dir');
+        expect(existsSync(`${r.rawPath}.tmp`)).toBe(false);
+      } finally {
+        if (r.models[0]) rmSync(`${r.models[0].pwd}.moved`, { recursive: true, force: true });
+      }
+    }, T);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The runner itself interrupted (SIGINT / SIGTERM)
+// ---------------------------------------------------------------------------
+
+async function waitFor(pred: () => boolean, ms: number, what: string): Promise<void> {
+  const end = Date.now() + ms;
+  while (!pred()) {
+    if (Date.now() > end) throw new Error(`timed out waiting for ${what}`);
+    await new Promise((res) => setTimeout(res, 50));
+  }
+}
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+describe.each(BRANCHES)('the runner interrupted while grok runs (%s)', (_label, bin) => {
+  it.each([
+    ['SIGTERM', 143],
+    ['SIGINT', 130],
+  ] as const)('%s: grok is stopped, a cli_failed envelope goes to stdout and --envelope-out, exit %i', async (sig, code) => {
+    const c = setupCase({
+      bin,
+      steps: { default: { stdout: PARTIAL, sleep: 30 } },
+      args: ['--input', INPUT_REL, '--envelope-out', 'env.json'],
+    });
+    const rawPath = join(c.proj, ENVELOPE.config.raw_output_path as string);
+    const child = spawn(join(c.bin, 'bash'), [SPY_RUNNER, ...c.args], { cwd: c.proj, env: c.env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.resume();
+    const closed = new Promise<number | null>((res) => child.on('close', (status) => res(status)));
+    await waitFor(
+      () => existsSync(join(c.log, 'inv-1.pid')) && existsSync(`${rawPath}.tmp`) && statSync(`${rawPath}.tmp`).size > 0,
+      15_000,
+      'the stub review to start',
+    );
+    const stubPid = Number.parseInt(readFileSync(join(c.log, 'inv-1.pid'), 'utf8'), 10);
+    const sent = Date.now();
+    child.kill(sig);
+    const status = await closed;
+    expect(Date.now() - sent).toBeLessThan(5_000);
+    expect(status).toBe(code);
+    const envFile = join(c.proj, 'env.json');
+    expect(existsSync(envFile)).toBe(true);
+    const envelope = JSON.parse(readFileSync(envFile, 'utf8'));
+    expect(envelope.status).toBe('failed');
+    expect(envelope.error_code).toBe('cli_failed');
+    expect(envelope.error_message).toBe('grok-review.sh was interrupted; the code was not reviewed.');
+    expect(envelope.raw_output_path).toBe(ENVELOPE.config.raw_output_path);
+    expect(JSON.parse(stdout)).toEqual(envelope);
+    // The partial raw output is kept (atomic rename), and grok was stopped.
+    expect(readFileSync(rawPath, 'utf8')).toBe(PARTIAL);
+    expect(existsSync(`${rawPath}.tmp`)).toBe(false);
+    await waitFor(() => !alive(stubPid), 5_000, 'the stub grok to exit');
+    expect(readCase(c, { status: status ?? -1, stdout, stderr: '' }, false, 0).vf.filter((v) => !v.argv.includes('--error'))).toHaveLength(0);
+  }, T);
+});
+
+// ---------------------------------------------------------------------------
 // node / jq fallbacks
 // ---------------------------------------------------------------------------
 
@@ -1144,6 +1384,27 @@ describe('JSON tooling fallbacks (harness-modernization D19)', () => {
     expect(g2.envelope?.usage?.model).toBe('grok-4.7-build');
     expect(run({ bin: { node: false, jq: true }, steps: { default: rec('g9-unknown-model-error') } }).envelope?.error_code).toBe('cli_failed');
   }, T);
+
+  it.skipIf(!HAS_JQ)('jq-only: the exact end_turn compare, the stderr auth mapping and the usage.model fallback behave the same', () => {
+    const jqBin = { node: false, jq: true };
+    for (const [stop, shown] of [['end_turn\n', '"end_turn\\n"'], [' end_turn', '" end_turn"']]) {
+      const r = run({ bin: jqBin, steps: { default: { stdout: wrapper({ stopReason: stop, text: '{"findings": []}' }), exit: 0 } } });
+      expect(r.envelope?.error_code, shown).toBe('cli_failed');
+      expect(r.envelope?.error_message, shown).toContain(`stopReason: ${shown}`);
+      expect(normalizeCalls(r), shown).toHaveLength(0);
+    }
+    const auth = run({
+      bin: jqBin,
+      steps: { default: { stdout: '{"error":"Not signed in"}', stderr: 'Error: Not signed in. Run grok login', exit: 1 } },
+    });
+    expect(auth.envelope?.error_code).toBe('cli_auth_failed');
+    expect(normalizeCalls(auth)).toHaveLength(0);
+    const noModelUsage = wrapper({ modelUsage: undefined });
+    const a = run({ bin: jqBin, steps: { default: { stdout: noModelUsage, exit: 0 } }, envelopeConfig: { model: 'grok-4.7' } });
+    expect(a.envelope?.usage).toEqual({ input_tokens: 11093, output_tokens: 1758, model: 'grok-4.7' });
+    const b = run({ bin: jqBin, steps: { default: { stdout: noModelUsage, exit: 0 } } });
+    expect(b.envelope?.usage).toEqual({ input_tokens: 11093, output_tokens: 1758, model: null });
+  }, 2 * T);
 
   it('neither node nor jq: an unknown_error envelope and no invocation', () => {
     const r = run({ bin: { node: false, jq: false } });
