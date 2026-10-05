@@ -284,7 +284,9 @@ export function validateArgs(raw) {
   const args = {
     runId: typeof src.runId === 'string' ? src.runId : null,
     loopId: typeof src.loopId === 'string' ? src.loopId : null,
-    command: typeof src.command === 'string' ? src.command : null,
+    // Tolerate a leading '/' or 'synthex:' (e.g. '/synthex:next-priority');
+    // the live Task 59 run showed models pass the namespaced form.
+    command: typeof src.command === 'string' ? src.command.trim().replace(/^\/?(?:synthex:)?/, '') : null,
     planPath: null,
     requirementsPath: null,
     concurrentTasks: null,

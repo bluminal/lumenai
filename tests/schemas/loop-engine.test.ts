@@ -106,8 +106,9 @@ describe('loop-engine lib (FR-HM19, Task 59)', () => {
       { ...NP, loopId: '-np' },
       { ...NP, loopId: 'np_loop' },
       { ...NP, command: undefined },
-      { ...NP, command: '/synthex:next-priority' },
       { ...NP, command: 'team-implement' },
+      { ...NP, command: 'synthex:team-implement' },
+      { ...NP, command: '/synthex:' },
     ];
     for (const raw of bad) {
       const v = validateArgs(raw);
@@ -121,6 +122,23 @@ describe('loop-engine lib (FR-HM19, Task 59)', () => {
     expect(echoed.args.command).toBe('nope');
     expect(validateArgs({ ...NP, runId: 7 }).args.runId).toBeNull();
     expect(validateArgs(NP).ok).toBe(true);
+  });
+
+  it('validateArgs normalizes a leading "/" or "synthex:" on command (live Task 59 run, 2026-10-05)', () => {
+    // The live [H] run passed command "synthex:next-priority" first and got a
+    // bad-args fallback; the engine now accepts the namespaced forms.
+    for (const command of ['next-priority', 'synthex:next-priority', '/synthex:next-priority', '/next-priority', '  next-priority  ']) {
+      const v = validateArgs({ ...NP, command });
+      expect(v.ok, command).toBe(true);
+      expect(v.args.command).toBe('next-priority');
+    }
+    // Other loop commands need extra args (summary/report/requirementsPath),
+    // so check only that the command itself normalizes and is not the reason.
+    for (const [command, bare] of [['synthex:loop', 'loop'], ['/synthex:review-code', 'review-code'], ['synthex:refine-requirements', 'refine-requirements'], ['synthex:write-implementation-plan', 'write-implementation-plan']]) {
+      const v = validateArgs({ ...NP, command });
+      expect(v.args.command, command).toBe(bare);
+      expect(v.notes.join(' ')).not.toMatch(/not a loop command/);
+    }
   });
 
   it('validateArgs rejects a runId that does not start with loopId + "-i"', () => {
