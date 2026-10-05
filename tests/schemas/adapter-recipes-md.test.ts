@@ -395,8 +395,9 @@ describe('multi-model-review Task 69: adapter-recipes.md ## 9. Cursor', () => {
     expect(cursor).toContain('aggregator.command');
   });
 
-  it('notes the U13 auth-check gap (synthetic logged-in fixture)', () => {
-    expect(cursor).toMatch(/Gap \(U13\)/);
-    expect(cursor).toMatch(/synthetic fixture/);
+  it('records the U13 logged-in capture and the plan-tier gap', () => {
+    expect(cursor).toMatch(/U13 \(resolved for the login check\)/);
+    expect(cursor).toContain('tests/fixtures/multi-model-review/adapters/cursor/status/');
+    expect(cursor).toMatch(/cannot see the plan tier \(D43\)/);
   });
 });

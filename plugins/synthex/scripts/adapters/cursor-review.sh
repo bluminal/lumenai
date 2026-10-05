@@ -361,7 +361,8 @@ end' 2>/dev/null || true)"
 # form, "out" for an explicit logged-out form, else "unknown". JSON forms:
 # isAuthenticated/authenticated/isLoggedIn/loggedIn true, or status
 # authenticated/logged_in/logged-in/loggedin; the observed text form
-# "Logged in as ..." (C1) also counts. Any explicit false wins.
+# "Logged in as ..." (C1), optionally after the CLI's "✓ " mark (the
+# captured status text), also counts. Any explicit false wins.
 status_verdict() {
   if [ "$JSON_TOOL" = "node" ]; then
     node -e '
@@ -378,7 +379,7 @@ if (isObj(j)) {
   const st = typeof j.status === "string" ? j.status.toLowerCase() : "";
   if (vals.some((x) => x === false) || OUT.includes(st)) v = "out";
   else if (vals.some((x) => x === true) || IN.includes(st)) v = "in";
-} else if (j === undefined && /^Logged in as \S/.test(t.split("\n")[0])) v = "in";
+} else if (j === undefined && /^(?:\u2713 )?Logged in as \S/.test(t.split("\n")[0])) v = "in";
 process.stdout.write(v);
 ' "$1" 2>/dev/null || printf 'unknown'
   else
@@ -394,7 +395,7 @@ else "unknown" end' "$1" 2>/dev/null || true)"
     if [ -z "$v" ]; then
       # Not JSON at all: the observed text form.
       case "$(head -n 1 "$1" 2>/dev/null || true)" in
-        "Logged in as "?*) v="in" ;;
+        "Logged in as "?* | "✓ Logged in as "?*) v="in" ;;
         *) v="unknown" ;;
       esac
     fi

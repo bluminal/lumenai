@@ -410,12 +410,12 @@ The adapter's auth check is the runner's `--auth-check`. It runs the D26 model a
 
 | Exit | Meaning |
 |---|---|
-| 0 | A logged-in form was positively matched (JSON `isAuthenticated`/`authenticated`/`isLoggedIn`/`loggedIn: true` or `status: "authenticated"`, or the text form `Logged in as …`) and `status` exited 0 |
+| 0 | A logged-in form was positively matched (JSON `isAuthenticated`/`authenticated`/`isLoggedIn`/`loggedIn: true` or `status: "authenticated"`, or the text form `Logged in as …`, optionally after a `✓ `) and `status` exited 0 |
 | 10 | `cursor-agent` is not on PATH |
 | 11 | Anything else: an explicit logged-out form, an unrecognised answer, no answer within the bound, a deny file that could not be written, or a scratch dir that could not be entered (fails closed) |
 | 12 | No explicit non-Auto model or no family is configured (D26), or only `CURSOR_API_KEY` is available and per-request billing is not opted into |
 
-**Gap (U13).** No logged-in `status --format json` output has been captured yet, so the logged-in JSON forms above are a synthetic fixture. If a real CLI prints a shape the runner does not recognise, `--auth-check` exits 11 and preflight never counts Cursor as available; capture the output as a free check and pin it in `cursor-review-runner-behavioral.test.ts`. The check also cannot see the plan tier (D43): a Free-plan account passes it and fails on its first review (below).
+**U13 (resolved for the login check).** The logged-in output of Cursor Agent CLI `2026.10.01-e373342` was captured as a free check on 2026-10-05: `status --format json` prints `{"status":"authenticated","isAuthenticated":true,…}`, and plain `status` prints `✓ Logged in as <email>`. Both are pinned under `tests/fixtures/multi-model-review/adapters/cursor/status/` and replayed by `cursor-review-runner-behavioral.test.ts`; a live `--auth-check` returned 0 and left `~/.cursor` unchanged. If a later CLI prints a shape the runner does not recognise, `--auth-check` exits 11 and preflight stops counting Cursor (fails closed); re-capture and re-pin. The check still cannot see the plan tier (D43): a Free-plan account passes it and fails on its first review (below).
 
 **Billing (D26, Q10).** The runner unsets `CURSOR_API_KEY` for every cursor-agent call unless the project config sets `multi_model_review.per_reviewer.cursor-review-prompter.allow_api_key_billing: true` (an `allow_api_key_billing` in the input envelope is ignored, so an LLM-written envelope cannot opt in), so the login session is used and a usage-billed key never silently replaces it (U21 is gated: whether the key draws on the same pools is unverified). Every run uses the account's plan pools and can spill into on-demand usage; Teams surcharges apply. Cursor is a **second hop**: the review goes to Cursor, which forwards the bundle to the vendor behind the slug, so both companies' retention terms apply. The runner logs `init.apiKeySource` for every attempt.
 

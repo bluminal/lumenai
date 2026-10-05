@@ -51,6 +51,9 @@ const SHARED_SCHEMA = JSON.parse(readFileSync(join(PLUGIN, 'agents', '_shared', 
 const CURSOR_DIR = join(ROOT, 'tests', 'fixtures', 'multi-model-review', 'adapters', 'cursor');
 const REC_DIR = join(CURSOR_DIR, 'recordings');
 const HELP_DIR = join(CURSOR_DIR, 'cli-help');
+// Captured from the real CLI while logged in (a free check, sanitized): pins the --auth-check match (U13).
+const STATUS_LOGGED_IN_JSON = readFileSync(join(CURSOR_DIR, 'status', 'logged-in.json'), 'utf8');
+const STATUS_LOGGED_IN_TEXT = readFileSync(join(CURSOR_DIR, 'status', 'logged-in.txt'), 'utf8');
 const CURSOR_VERSION = readFileSync(join(HELP_DIR, 'version.txt'), 'utf8').trim();
 const DENY_RECORDED = join(REC_DIR, 'deny-all.cli.json');
 
@@ -1639,6 +1642,11 @@ describe.each(BRANCHES)('--auth-check (`cursor-agent status --format json` under
     expect((await run({ auth: true, bin, config: AUTH_CONFIG, statusExit: 1 })).status).toBe(11);
   }, 2 * T);
 
+  it('exits 0 for the captured logged-in status, JSON and text forms (fixtures cursor/status, U13)', async () => {
+    expect((await run({ auth: true, bin, config: AUTH_CONFIG, status: STATUS_LOGGED_IN_JSON })).status).toBe(0);
+    expect((await run({ auth: true, bin, config: AUTH_CONFIG, status: STATUS_LOGGED_IN_TEXT })).status).toBe(0);
+  }, T);
+
   it('accepts the observed text form "Logged in as <email>" (C1)', async () => {
     expect((await run({ auth: true, bin, config: AUTH_CONFIG, status: 'Logged in as <email>\n' })).status).toBe(0);
   }, T);
@@ -1833,6 +1841,8 @@ describe.concurrent('JSON tooling fallbacks (harness-modernization D19)', () => 
 
   it.skipIf(!HAS_JQ)('jq-only: --auth-check matches the same logged-in forms and fails closed the same', async () => {
     expect((await run({ auth: true, bin: jqBin, config: AUTH_CONFIG })).status).toBe(0);
+    expect((await run({ auth: true, bin: jqBin, config: AUTH_CONFIG, status: STATUS_LOGGED_IN_JSON })).status).toBe(0);
+    expect((await run({ auth: true, bin: jqBin, config: AUTH_CONFIG, status: STATUS_LOGGED_IN_TEXT })).status).toBe(0);
     expect((await run({ auth: true, bin: jqBin, config: AUTH_CONFIG, status: 'Logged in as <email>\n' })).status).toBe(0);
     expect((await run({ auth: true, bin: jqBin, config: AUTH_CONFIG, status: '{"isAuthenticated":false}' })).status).toBe(11);
     expect((await run({ auth: true, bin: jqBin, config: AUTH_CONFIG, status: 'garbage\n' })).status).toBe(11);
