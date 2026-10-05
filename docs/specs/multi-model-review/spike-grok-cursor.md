@@ -1,6 +1,6 @@
 # Phase 9 CLI Spike: Grok and Cursor (Task 67)
 
-> Live verification of the Grok and Cursor CLIs before any runner code is written. It resolves or gates U1–U26 from the "Phase 9 Spike Checklist (Task 67)" in `docs/plans/multi-model-review.md`. **Both halves are complete.** The Grok outcomes were approved as D33–D36. The Cursor outcomes are listed under [Decisions to confirm](#decisions-to-confirm) and await the user's approval.
+> Live verification of the Grok and Cursor CLIs before any runner code is written. It resolves or gates U1–U26 from the "Phase 9 Spike Checklist (Task 67)" in `docs/plans/multi-model-review.md`. **Both halves are complete and approved.** The Grok outcomes were approved as D33–D36. A.J. Brown approved the Cursor outcomes on 2026-10-05, two of them in changed form; see [Decisions](#decisions).
 
 | | |
 |---|---|
@@ -87,17 +87,18 @@ Across every run, the canary marker was never created, `$W` never gained a file 
 ```sh
 W=$(mktemp -d /tmp/synthex-cursor.XXXXXX); W=$(cd "$W" && pwd -P)   # /private/tmp/...
 cd "$W"
-# C5 and C7 only: the project-level deny file
+# C5, C7 and C8 only: the project-level deny file
 mkdir -p "$W/.cursor" && cp deny-all.cli.json "$W/.cursor/cli.json"
 timeout 300 cursor-agent -p --mode ask --sandbox enabled --trust \
   --output-format stream-json --model <slug> "<prompt>" </dev/null
+# C8 only: no "<prompt>" argument; stdin is the prompt instead of /dev/null
 ```
 
 - **Config and login.** There was no HOME isolation, and `CURSOR_CONFIG_DIR` was unset. The real `~/.cursor` was used, because its `cli-config.json` holds the login (an `authInfo` key).
-- **Prompt delivery.** The prompt was always passed inline as the last positional argument. The harness also has a file mode (`review-input.txt` plus a pointer prompt), which was never used.
-- **Scratch dir.** It started empty, except for `.cursor/cli.json` in C5 and C7.
+- **Prompt delivery.** The prompt was passed inline as the last positional argument, except in C8, which fed it on stdin with no prompt argument. The harness also has a file mode (`review-input.txt` plus a pointer prompt), which was never used.
+- **Scratch dir.** It started empty, except for `.cursor/cli.json` in C5, C7 and C8.
 
-**The deny file** (`recordings/deny-all.cli.json`), copied to `$W/.cursor/cli.json` for C5 and C7:
+**The deny file** (`recordings/deny-all.cli.json`), copied to `$W/.cursor/cli.json` for C5, C7 and C8:
 
 ```json
 { "permissions": { "allow": [], "deny": ["Read(**)", "Read(/**)", "Read(~/**)", "Write(**)", "Write(/**)", "Shell(*)", "Mcp(*:*)"] } }
@@ -113,15 +114,15 @@ Both sit outside the scratch dir. After each run, the harness listed `$W` and ch
 - **Free checks (no prompt sent):**
   - C1 `cursor-agent status`;
   - C2 `cursor-agent models`;
-  - after the runs, a read-only inspection of `~/.cursor` and `~/.local/bin`: file names, symlink targets, config key names, and a search for the canary token. No values were recorded.
-- **Live invocations (7), against the budget of 8 per CLI:**
-  - 5 reached a model and returned a `result` event: C3b, C4, C4b, C5 and C7.
+  - after C3–C7, a read-only inspection of `~/.cursor` and `~/.local/bin`: file names, symlink targets, config key names, and a search for the canary token. No values were recorded.
+- **Live invocations (8), the full budget of 8 per CLI:**
+  - 6 reached a model and returned a `result` event: C3b, C4, C4b, C5, C7 and C8. C8 came last, to settle U18.
   - C3 failed the plan check after the stream had echoed the prompt.
   - C6 failed before a session started.
 
 **Evidence provenance.** C1 was reported by the operator and not saved: `cursor-agent status` printed `Logged in as <email>` and exited 0. The `~/.cursor` and `~/.local/bin` observations (U14–U17) come from the read-only inspection. Everything else comes from saved files:
 - the per-run argv, stdout and stderr;
-- the per-run meta file (exit code, wall-clock seconds, the files in `$W`, and the marker check);
+- the per-run meta file (exit code, wall-clock seconds, the files in `$W`, and the marker check; C8's lacks the last two);
 - `C2-models.txt`.
 
 ### Runs (Cursor)
@@ -135,8 +136,9 @@ Both sit outside the scratch dir. After each run, the harness listed `$W` and ch
 | C5 | review plus filler, 158,339 B inline | `auto` | yes | 0 | 31 | none | 3 findings; 51,996 input tokens |
 | C6 | review | `not-a-real-model` | no | 1 | 2 | — | `Cannot use this model: not-a-real-model. Available models: …` and empty stdout |
 | C7 | neutral file read | `auto` | yes | 0 | 31 | 2 reads denied, 1 shell call denied, 1 glob with 0 files | No leak. The model reported that it could not read the file. |
+| C8 | C5's prompt, 158,339 B on stdin, no prompt argument | `auto` | yes | 0 | 17 | none | 3 findings; 49,308 input tokens |
 
-Across every run, the canary marker was never created, and `$W` never gained a file beyond C5's and C7's planted `.cursor/cli.json`. The canary token appears in C4's and C4b's stdout and in no other stdout or stderr. The recordings replace it with `<canary-token>`.
+Across C3–C7, the canary marker was never created, and `$W` never gained a file beyond C5's and C7's planted `.cursor/cli.json`. C8's meta recorded neither check, and C8 made no tool calls. The canary token appears in C4's and C4b's stdout and in no other stdout or stderr, C8's included. The recordings replace it with `<canary-token>`.
 
 ## Results (U1–U26)
 
@@ -158,20 +160,20 @@ Status values: `resolved` (with evidence) or `gated` (needs a condition not met 
 | U12 | Cursor: `-p --mode ask` without `--force` refuses writes and shell; the tool_call payload types | resolved | **Ask mode is not a read boundary.** <ul><li>**Writes and shell:** in C4 the model declined both ("Ask mode blocks file creation and shell writes") and emitted no write or shell tool call. The CLI's own enforcement of that refusal was therefore not exercised.</li><li>**Reads are not confined.** With `--mode ask --sandbox enabled` and no deny file, `readToolCall` read files outside the scratch dir in C4 (the canary) and C4b (the review target). Their contents reached the provider.</li><li>**`--sandbox enabled` covers shell commands only.** C7's shell call shows the policy it requests: `TYPE_WORKSPACE_READWRITE`, `networkAccess: false` and `readBoundary: "READ_BOUNDARY_MODE_UNSPECIFIED"`, which confines writes but sets no read boundary. Cursor also classed that `cat`/`ls`/`find` command as `isReadonly: true`, so ask mode alone may run read-only shell commands (not tested).</li><li>**Payload types observed:** `readToolCall`, `getMcpToolsToolCall`, `shellToolCall` and `globToolCall`, as `tool_call` events with subtype `started` or `completed`. Results take three shapes: `success`, `error {errorMessage}` and `permissionDenied {command, workingDirectory, error, isReadonly}`.</li><li>**Discoverable but not observed:** C4's tool catalog also lists `AwaitShell`, `CreateGoal`, `Delete`, `EditNotebook`, `FetchMcpResource`, `GenerateImage`, `ReadLints`, `Task`, `TodoWrite`, `UpdateGoal`, `WebFetch` and `WebSearch`, plus two MCP servers' tools.</li></ul> Because type names are open-ended, the allowlist is frozen as a rule on result shapes; see [Tool-call allowlist (Cursor)](#tool-call-allowlist-cursor). |
 | U13 | Cursor: `status --format json` exit codes and fields, latency, auto-update | gated | Partly observed. In C1 (operator report, not saved), `cursor-agent status` printed `Logged in as <email>` and exited 0. The help fixture confirms `--format text\|json` and the usage line `agent status\|whoami`. <ul><li>**Not captured:** the `--format json` fields, the logged-out exit code and text, and the latency.</li><li>**Auto-update:** not observed. The binary is a versioned install, and the help lists an explicit `update` subcommand.</li><li>**Plan tier:** `status` does not reveal it. C3's Free-plan rejection surfaces only once a prompt is sent.</li></ul> To resolve it, capture `cursor-agent status --format json` while logged in (a free check). Until then, `--auth-check` positively matches the logged-in form and fails closed (exit 11) on anything else, as Grok's does. The logged-out case uses a synthetic fixture. |
 | U14 | Cursor: whether the installer ships the `cursor-agent` alias, and where | resolved | Yes, on this machine. `~/.local/bin/cursor-agent` is a symlink to `~/.local/share/cursor-agent/versions/2026.10.01-e373342/cursor-agent`, and the harness ran that path. <ul><li>`~/.local/bin/agent` still points to Grok's `~/.grok/bin/agent`, dated 21 Sep, before this Cursor install on 5 Oct. This install did not clobber it.</li><li>Every help usage line names the program `agent`, so the adapter hardcodes `cursor-agent` and never calls `agent` (Risk 11).</li></ul> Other installer versions may behave differently. |
-| U15 | Cursor: whether `--trust` persists into `~/.cursor` | resolved | Yes, and more than trust. <ul><li>**Trust markers.** Every run, including C6, which never started a session, created `~/.cursor/projects/private-tmp-synthex-cursor-<suffix>/` holding a `.workspace-trusted` marker.</li><li>**Transcripts.** The six runs that started a session also left `worker.log`, in four cases `repo.json`, and the agent transcript `agent-transcripts/<session_id>/<session_id>.jsonl`.</li><li>**Conversations.** These are stored in `~/.cursor/chats/<hash>/<session_id>/store.db`.</li><li>**The canary.** The token from C4 and C4b is in C4's transcript and in both runs' `store.db`.</li></ul> So every review adds a directory to `~/.cursor/projects`, and Cursor keeps a local copy of the bundle after the runner deletes `$W`. See decision (h). |
+| U15 | Cursor: whether `--trust` persists into `~/.cursor` | resolved | Yes, and more than trust. <ul><li>**Trust markers.** Every run through C7, including C6, which never started a session, created `~/.cursor/projects/private-tmp-synthex-cursor-<suffix>/` holding a `.workspace-trusted` marker.</li><li>**Transcripts.** The six runs that started a session also left `worker.log`, in four cases `repo.json`, and the agent transcript `agent-transcripts/<session_id>/<session_id>.jsonl`.</li><li>**Conversations.** These are stored in `~/.cursor/chats/<hash>/<session_id>/store.db`.</li><li>**The canary.** The token from C4 and C4b is in C4's transcript and in both runs' `store.db`.</li></ul> So every review adds a directory to `~/.cursor/projects`, and Cursor keeps a local copy of the bundle after the runner deletes `$W`. Decision (h) has the runner delete its own run's entries. |
 | U16 | Cursor: whether `~/.cursor/hooks.json` or Claude-compat hooks fire in `-p` | resolved | **User hooks fire.** No `~/.cursor/hooks.json` exists on this machine. Yet in C7 the shell call started as `cat /tmp/…` and was denied as `rtk read /tmp/…`: the user's RTK command-rewrite hook ran inside the review subprocess, before the permission check. <ul><li>**Likely source:** the only RTK hook on the machine is the Claude Code `PreToolUse` hook in `~/.claude/settings.json`, which points to Cursor's Claude-compat hook loading.</li><li>**Hook plumbing:** every tool_call event also carries a `hookAdditionalContexts` array.</li><li>**Project hooks:** not tested. Unlike Grok's scratch dir, `$W` is trusted (`--trust`), but the runner writes nothing there except the deny file.</li></ul> See decision (d). |
 | U17 | Cursor: whether `CURSOR_CONFIG_DIR` or `HOME=<scratch>` isolates config while keeping the login | resolved | **Not adopted. A project-level deny file replaces it** (decision a; Q8). <ul><li>**Relocation not tried live.** Neither `CURSOR_CONFIG_DIR` nor `HOME=<scratch>` was tried. The login is in `~/.cursor/cli-config.json` (an `authInfo` key), so relocating that directory would lose it (inferred, not tried), unless the credentials were copied into `/tmp`, which the runner must not do.</li><li>**The deny file works.** `$W/.cursor/cli.json` with deny rules (C7) blocked reads through both `/tmp` and `/private/tmp` paths and blocked shell. It needs no relocation, so the login is untouched.</li><li>**Not isolated: hooks.** User hooks still run (U16).</li><li>**Not isolated: MCP servers.** C4's catalog lists two MCP servers from the user's installed plugins, reachable from a `-p --mode ask` run. No `~/.cursor/mcp.json` exists; the servers match Claude Code plugins installed for this user.</li></ul> **Gated residuals:** <ul><li>`Mcp(*:*)`, `Write(**)` and `Write(/**)` were never exercised, because no run attempted an MCP or write call under the deny file.</li><li>The tested file has no `WebFetch(*)` rule, although the catalog offers `WebFetch` and `WebSearch`.</li><li>A command on the user's global allow-list (`Shell(ls)` here) run alone under `Shell(*)` was not tested. C7's denied compound command did contain `ls`.</li></ul> |
-| U18 | Cursor: whether the prompt can come from stdin | gated | Not tested: every run used stdin `/dev/null` and an inline prompt. It is not needed on macOS (C5). It matters only as a possible way past Linux's 131,072-byte limit on a single argument (decision b). |
-| U19 | Cursor: file-route read of a 150 KB `review-input.txt` | resolved | **Moot.** The file route was not run. C5 passed a 158,339-byte prompt inline and got a normal review: exit 0, 3 findings and 51,996 input tokens. The file route would also need reads, which the deny file forbids. Decision (b) drops `review-input.txt`. This is verified on macOS only; Linux needs the guard in decision (b). |
+| U18 | Cursor: whether the prompt can come from stdin | resolved | **Yes (C8).** With no prompt argument, `cursor-agent -p` read C5's 158,339-byte prompt from stdin: exit 0 in 17 s, empty stderr, the `user` event echoed the whole prompt, and the last `assistant` message gave 3 findings (49,308 input tokens). Stdin has no per-argument cap, so Linux's 131,072-byte `MAX_ARG_STRLEN` does not apply, and the prompt stays out of the process table. Recorded on macOS. Decision (b) adopts stdin. |
+| U19 | Cursor: file-route read of a 150 KB `review-input.txt` | resolved | **Moot.** The file route was not run. C5 passed a 158,339-byte prompt inline and got a normal review: exit 0, 3 findings and 51,996 input tokens. C8 did the same on stdin (U18). The file route would also need reads, which the deny file forbids. Decision (b) drops `review-input.txt` and sends the prompt on stdin. |
 | U20 | Cursor: `system/init.model` format, usage shape, Max and fast slugs | resolved | <ul><li>**`system/init.model`** is a display name, not the slug. It is `Auto` for `--model auto`. For `gemini-3.7-flash-high` it is `Gemini 3.7 Flash High`, while `cursor-agent models` lists that slug as `Gemini 3.7 Flash`. With Auto, no event names the routed model. The runner therefore reports the configured slug as `usage.model`.</li><li>**Usage** appears only on the `result` event, as camelCase `inputTokens`, `outputTokens`, `cacheReadTokens` and `cacheWriteTokens`. There are no per-turn usage events and no cost fields. `inputTokens` excludes cache reads (C7: 26,839 input against 39,296 cache-read).</li><li>**Per-call overhead:** a 1,094-byte prompt used 16,490 input tokens (C3b), so Cursor adds about 15–16k tokens of its own context to every call, retries included.</li><li>**Slugs** (C2: 246 entries including `auto`): <ul><li>effort suffixes `-none`, `-minimal`, `-low`, `-medium`, `-high`, `-xhigh`, `-extra-high` and `-max`;</li><li>a `-fast` suffix (79 slugs) and `-thinking` variants;</li><li>bracket overrides in the help, such as `'claude-opus-4-8[context=1m,effort=high,fast=false]'`.</li></ul></li><li>**Max:** 30 slugs contain `-max`, but that is an effort tier. Max Mode is a separate `maxMode` key in `~/.cursor/cli-config.json` (false here), and no CLI flag sets it, so a slug alone cannot prove a run is not in Max Mode.</li><li>**Retention:** 20 display names carry `(NO ZDR)` (no zero data retention). That belongs in the FR-MR27 copy.</li></ul> |
 | U21 | Cursor: `CURSOR_API_KEY` pools and on-demand spillover | gated | Not checked: the docs and the account page were outside the spike. What the CLI shows: <ul><li>every `system:init` reports `apiKeySource: "login"`, so the runner can log which credential a run used;</li><li>no event carries cost or billing fields, so on-demand spillover is not visible from the stream;</li><li>the plan tier surfaces only as an error when a prompt is sent (C3).</li></ul> |
-| U22 | Whether depth-1 hosts can background-and-poll the runner, and the clamped budget | resolved | From `plugins/synthex/docs/hosts.md` and `config/hosts.env`, with the default `per_reviewer_timeout_seconds` of 180 (a 170 s budget): <ul><li>**Full 170 s in the foreground:** Claude (600 s shell cap), Hermes (600 s) and Gemini (300 s).</li><li>**Background and poll:** Grok (120 s) documents `background: true` plus polling, so it can use `--envelope-out`.</li><li>**Clamped:** Codex and OpenCode (120 s, "in-turn wait only") get 120 − 15 = **105 s**. OpenCode has no documented backgrounding, so Risk 8 stands for it.</li></ul> Observed Grok latency on a small diff was 14–35 s on the text path and 65 s with `--json-schema`. Cursor took 19–31 s wall clock (12.6–23.1 s `duration_ms`, Auto model), including the 158 KB prompt (C5). All are under 105 s, but a realistic bundle will be slower. Cursor has no turn or timeout flag, so the runner's wall-clock guard is its only bound. |
+| U22 | Whether depth-1 hosts can background-and-poll the runner, and the clamped budget | resolved | From `plugins/synthex/docs/hosts.md` and `config/hosts.env`, with the default `per_reviewer_timeout_seconds` of 180 (a 170 s budget): <ul><li>**Full 170 s in the foreground:** Claude (600 s shell cap), Hermes (600 s) and Gemini (300 s).</li><li>**Background and poll:** Grok (120 s) documents `background: true` plus polling, so it can use `--envelope-out`.</li><li>**Clamped:** Codex and OpenCode (120 s, "in-turn wait only") get 120 − 15 = **105 s**. OpenCode has no documented backgrounding, so Risk 8 stands for it.</li></ul> Observed Grok latency on a small diff was 14–35 s on the text path and 65 s with `--json-schema`. Cursor took 17–31 s wall clock (11.7–23.1 s `duration_ms`, Auto model), including the 158 KB prompt (C5 inline, C8 on stdin). All are under 105 s, but a realistic bundle will be slower. Cursor has no turn or timeout flag, so the runner's wall-clock guard is its only bound. |
 | U23 | Whether any validator constrains `per_reviewer` keys | resolved | None does. In `tests/` and `plugins/`, `per_reviewer` appears only as commented `defaults.yaml` examples (`model`, `family`) and in prose. Tests pin only `per_reviewer_timeout_seconds`. `allow_api_key_billing` needs no validator change. |
 | U24 | Whether the orchestrator has a byte or line budget test | resolved | None exists. `multi-model-review-orchestrator.md` is 36,061 B. <ul><li>`adapter-size.test.ts` budgets only the `*-review-prompter.md` adapters (6,144 B).</li><li>`agent-boilerplate.test.ts` pins the orchestrator's H1, a single-paragraph Source Authority and three locked strings.</li><li>`catalog-budget.test.ts` covers frontmatter descriptions only.</li></ul> The D28 sentence must leave those pinned strings intact. |
 | U25 | Grok's complete `stopReason` vocabulary | resolved | Observed values: <ul><li>`end_turn` for every normal completion, including after a denied tool attempt (G8) and for prose refusals (G4, G6);</li><li>`cancelled` when `--max-turns` runs out (G7, exit 1);</li><li>no `stopReason` at all for an error (G9's `{"type":"error"}`).</li></ul> The docs list `end_turn, max_tokens, max_turn_requests, refusal, cancelled`. On 1.0.46, running out of turns reports `cancelled`, not `max_turn_requests`. `max_tokens` and `refusal` were not observed. **Task 68 allowlist: `{end_turn}`.** See [Stop-reason vocabulary](#stop-reason-vocabulary-u25). |
 | U26 | Whether a denied tool attempt consumes a turn; the minimum `--max-turns` | resolved | Yes, it consumes a turn. In G7 (`--max-turns 1`), the model attempted a tool, the attempt was denied, and the run ended `cancelled` with exit 1. In G8 (`--max-turns 3`), the same prompt answered on turn 2. **`--max-turns 1` is unsafe; use 3.** See [Turn budget](#turn-budget-u26). |
 
-**Counts:** 20 resolved (U1–U3, U7–U12, U14–U17, U19, U20, U22–U26) and 6 gated (U4–U6, U13, U18, U21), for 26 rows. U2, U3, U9, U12 and U17 are resolved with named residuals in their rows. Two sub-questions are gated: U3's GROK_HOME-versus-HOME question, and U17's untested `Mcp(*:*)`, `Write` and `WebFetch` rules.
+**Counts:** 21 resolved (U1–U3, U7–U12, U14–U20, U22–U26) and 5 gated (U4–U6, U13, U21), for 26 rows. U2, U3, U9, U12 and U17 are resolved with named residuals in their rows. Two sub-questions are gated: U3's GROK_HOME-versus-HOME question, and U17's untested `Mcp(*:*)`, `Write` and `WebFetch` rules.
 
 ## CLI-surface check (Grok)
 
@@ -382,7 +384,7 @@ The token did not leak, and the model reported that it could not read the file. 
 | Event (`type:subtype`) | Fields | Notes |
 |------------------------|--------|-------|
 | `system:init` | `apiKeySource`, `cwd`, `session_id`, `model`, `permissionMode` | The first event of every session. `model` is a display name, and `permissionMode` was always `default`. |
-| `user` | `message.content[].text`, `session_id` | Echoes the full prompt, so the raw output contains the whole bundle (C5: 158 KB). |
+| `user` | `message.content[].text`, `session_id` | Echoes the full prompt, inline or from stdin, so the raw output contains the whole bundle (C5 and C8: 158 KB). |
 | `thinking:delta`, `thinking:completed` | `text`, `session_id`, `timestamp_ms` | The reasoning stream. The runner ignores it. |
 | `assistant` | `message.content[].text` and `session_id`; sometimes `model_call_id` and `timestamp_ms` | One complete message per event, because `--stream-partial-output` is not passed. |
 | `tool_call:started`, `tool_call:completed` | `call_id`, `model_call_id`, `session_id`, and `tool_call` | `tool_call` holds `<kind>ToolCall.{args, result}`, `toolCallId`, `hookAdditionalContexts`, `startedAtMs` and `completedAtMs`. `result` is `success {...}`, `error {errorMessage}` or `permissionDenied {...}`. A completed read can omit `args` (C7). |
@@ -402,7 +404,7 @@ Treat the file at `raw_output_path` like the prompt file: never commit it, and n
 
 ## Tool-call allowlist (Cursor)
 
-This is the rule proposed for Task 69 (decision c). It assumes the deny file is in place, so every tool call is expected to fail. It works on result shapes rather than tool type names, because the type names are open-ended (U12).
+This is the approved rule for Task 69 (decision c). It assumes the deny file is in place, so every tool call is expected to fail. It works on result shapes rather than tool type names, because the type names are open-ended (U12).
 
 1. **Scan every `tool_call` event.** Each carries exactly one `<kind>ToolCall` payload. An event with none, or with several, is a violation.
 2. **Tolerated shapes.** A `completed` event is tolerated only when its `result` is exactly one of:
@@ -418,7 +420,7 @@ This is the rule proposed for Task 69 (decision c). It assumes the deny file is 
 4. **Precedence.** The scan runs on whatever stream exists, before the exit code or the `result` event is mapped. A violation therefore wins over `success`, `cli_failed` and `timeout`. It yields `sandbox_violation`, and the raw output is kept.
 
 Against the recordings, the rule finds:
-- 0 violations for C3b, C5 and C7;
+- 0 violations for C3b, C5, C7 and C8;
 - 1 for C4b (the successful read);
 - 2 for C4 (the read and the MCP catalog call).
 
@@ -426,7 +428,7 @@ Against the recordings, the rule finds:
 
 Two consequences for Task 69:
 - **Its criterion "a read inside `$W` is not a violation" no longer holds.** Under `Read(**)`, a successful read anywhere means the deny layer failed.
-- **A benign run can be flagged.** If the model lists the tool catalog, the run is reported as a violation. Prompts that say "you have no tools" drew no tool calls in C3b and C5. The `[O]` metric for `sandbox_violation` on benign runs watches this.
+- **A benign run can be flagged.** If the model lists the tool catalog, the run is reported as a violation. Prompts that say "you have no tools" drew no tool calls in C3b, C5 and C8. The `[O]` metric for `sandbox_violation` on benign runs watches this.
 
 ## User hooks and local state (Cursor)
 
@@ -436,18 +438,17 @@ Two consequences for Task 69:
 - `~/.cursor/projects/private-tmp-synthex-cursor-<suffix>/`, holding a `.workspace-trusted` marker, `worker.log` and the agent transcript;
 - `~/.cursor/chats/<hash>/<session_id>/store.db`, the conversation.
 
-After C4 and C4b, the canary token was in those stores. The runner deletes `$W`, but Cursor keeps its own copy of the bundle and the answer, and `~/.cursor/projects` grows by one directory per review.
+After C4 and C4b, the canary token was in those stores. The runner deletes `$W`, but Cursor keeps its own copy of the bundle and the answer, and `~/.cursor/projects` grows by one directory per review. Decision (h) has the runner delete its own run's project dir and `chats/*/<session_id>` entry, and nothing else.
 
 ## Output parsing (Cursor)
 
-What `cursor-review.sh` must do, in order. This follows the brief and Task 69, except where a decision below changes it.
+What `cursor-review.sh` must do, in order. This follows the brief and Task 69, except where an approved decision below changes it.
 
 1. **Guards before spawning,** each with 0 invocations:
    - the model and family guard (D26) gives `cli_failed`;
    - `parent-mediated` mode gives `cli_unsupported_mode`;
-   - the prompt-size guard (decision b) gives `cli_failed`;
    - the runner writes `$W/.cursor/cli.json` with the tested deny list and reads it back; any failure gives `cli_failed` (decision a).
-2. **Keep the raw output first.** Stream stdout to `<raw>.tmp` and stderr to `<raw>.stderr.log`, and rename them atomically on every exit path.
+2. **Spawn and keep the raw output first.** Feed the prompt on stdin, with no prompt argument (decision b). Stream stdout to `<raw>.tmp` and stderr to `<raw>.stderr.log`, and rename them atomically on every exit path.
 3. **Parse** every non-empty stdout line as JSON. An unparseable line gives `cli_failed`.
 4. **Run the allowlist scan** (decision c). A violation gives `sandbox_violation`, whatever the exit code or `result` says.
 5. **Map a non-zero exit, or a missing `result` event:**
@@ -466,6 +467,7 @@ What `cursor-review.sh` must do, in order. This follows the brief and Task 69, e
    This replaces the brief's "usage is null in v1".
 9. **Retry once on `parse_failed`.** The retry is a second billed call, carrying about 16k tokens of Cursor overhead.
 10. **Log for audit.** Record `init.model`, `init.permissionMode` and `init.apiKeySource` in the stderr log. Never gate on `permissionMode` (decision f).
+11. **Clean up Cursor's local state** (decision h). Delete exactly `~/.cursor/projects/<slug of $W>` and `~/.cursor/chats/*/<session_id>`, using the run's own `session_id`, and nothing else. A run that never starts a session (C6) still leaves the projects entry.
 
 ## Error mapping (Cursor)
 
@@ -473,6 +475,7 @@ What `cursor-review.sh` must do, in order. This follows the brief and Task 69, e
 |------|-----------|------|--------|--------|----------------|
 | Normal review | `c3b-auto-review-success` | 0 | `init` … `result:success`, bare JSON | empty | `success` (3 findings) |
 | Large inline prompt, deny file | `c5-large-inline-prompt-deny-all` | 0 | As C3b | empty | `success` (3 findings) |
+| Large prompt on stdin, deny file | `c8-large-stdin-prompt-deny-all` | 0 | As C3b | empty | `success` (3 findings) |
 | Neutral read, deny file | `c7-neutral-read-deny-all` | 0 | 2 denied reads, 1 denied shell call, 1 empty glob; `.result` is preambles plus JSON | empty | `success` (1 finding) with the last-assistant unwrap; `.result` would give `parse_failed` |
 | Adversarial, no deny file | `c4-adversarial-no-deny-file` | 0 | A successful read (the canary) and a successful MCP catalog call | empty | `sandbox_violation` (raw kept) |
 | Neutral read, no deny file | `c4b-neutral-read-no-deny-file` | 0 | A successful read | empty | `sandbox_violation` (raw kept) |
@@ -480,16 +483,16 @@ What `cursor-review.sh` must do, in order. This follows the brief and Task 69, e
 | Unknown model | `c6-unknown-model` | 1 | empty | `Cannot use this model: not-a-real-model. Available models: …` | `cli_failed` |
 | Model or family guard | not applicable | — | — | — | `cli_failed` (0 invocations) |
 | Deny file not written | not applicable | — | — | — | `cli_failed` (0 invocations) |
-| Prompt over 131,072 B on Linux | not applicable | — | — | — | `cli_failed` (0 invocations; proposed in decision b) |
+| Prompt over 131,072 B on Linux | not applicable | — | — | — | No longer a case: the prompt goes on stdin, which has no per-argument cap (decision b, C8) |
 | Not authenticated | not recorded (U13) | expected non-zero | — | auth text | `cli_auth_failed` (synthetic fixture) |
 | `is_error: true`, or no `result` with exit 0 | not recorded | — | — | — | `cli_failed` |
 | Wall-clock guard fired | not recorded | 124, 142, or 143 with the watchdog flag | partial | — | `timeout` (partial raw kept; the allowlist scan still runs) |
 | Interrupted | not recorded | 130 | — | — | `cli_failed` |
 | `parent-mediated` mode | not applicable | — | — | — | `cli_unsupported_mode` (no spawn) |
 
-## Decisions to confirm
+## Decisions
 
-The orchestrator routes these to the product-manager subagent as D-rows. Each one needs the user's approval (Task 67 `[H]`).
+Both sets were approved under Task 67 `[H]`. The orchestrator routes them to the product-manager subagent as D-rows.
 
 ### Grok (approved)
 
@@ -512,52 +515,55 @@ These follow-ups for Task 68 need no D-row:
 - **Field-case fixture.** Add a synthetic copy of `g7-max-turns-cancelled` whose `.text` is `{"findings": []}`, the field-incident variant.
 - **Untested brief settings.** `--cwd "$W"` and `GROK_MEMORY=0` (both in the brief's runner) were not part of the spike argv. `--cwd` is in the help; `GROK_MEMORY` is unverified.
 
-### Cursor
+### Cursor (approved)
 
-Each item below names the plan rows it changes. Items (g) and (h) are new: the recordings raised them.
+A.J. Brown approved items (a)–(h) on 2026-10-05, with (c) and (f) approved as part of (a). Items (b) and (h) changed from the original recommendation, as marked.
 
-- **(a) Q8 resolved: a mandatory deny-all project file.** This amends D25's Cursor isolation and replaces the conditional `CURSOR_CONFIG_DIR` layer.
-  - **Change:** before spawning, the runner writes `$W/.cursor/cli.json` containing exactly the tested rules (`recordings/deny-all.cli.json`): allow `[]`, and deny `Read(**)`, `Read(/**)`, `Read(~/**)`, `Write(**)`, `Write(/**)`, `Shell(*)` and `Mcp(*:*)`.
+- **(a) Q8 resolved: a mandatory deny-all project file, plus the violation scan.** This amends D25's Cursor isolation and replaces the conditional `CURSOR_CONFIG_DIR` layer.
+  - **Change:** before spawning, the runner writes `$W/.cursor/cli.json` containing exactly the tested rules (`recordings/deny-all.cli.json`): allow `[]`, and deny `Read(**)`, `Read(/**)`, `Read(~/**)`, `Write(**)`, `Write(/**)`, `Shell(*)` and `Mcp(*:*)`. The tool_call scan in (c) runs on every stream.
   - **Fails closed:** if the directory or the file cannot be written, or the read-back does not match, the result is `cli_failed` and the CLI is never spawned.
-  - **Login untouched:** `CURSOR_CONFIG_DIR` is never set, so the login in `~/.cursor/cli-config.json` is unaffected. The runner never writes to `~/.cursor`.
+  - **Login untouched:** `CURSOR_CONFIG_DIR` is never set, so the login in `~/.cursor/cli-config.json` is unaffected. The runner writes no config under `~/.cursor`; its only change there is the cleanup in (h).
+  - **`WebFetch(*)`:** added to the file only after one live run shows the file still loads with it.
   - **Evidence:** without the file, C4 and C4b read outside `$W`. With it, C7 denied both reads and the shell call.
   - **Plan impact:**
     - Task 69's "no `.cursor/` … file is ever written to `$W`" becomes "the only file the runner writes to `$W` is `.cursor/cli.json`".
     - "`CURSOR_CONFIG_DIR` is absent" becomes unconditional.
     - Risk 4 is restated: read-only rests on the deny file, not on `--mode ask`.
-  - **Residuals (U17):** the `Write` and `Mcp` rules are untested, and the file has no `WebFetch(*)` rule. Verify a `WebFetch(*)` variant with one live run before adding it.
-- **(b) Always inline; drop the `review-input.txt` file route.**
-  - **Evidence:** C5's 158,339-byte inline prompt worked. The file route would need reads, which (a) forbids.
-  - **Linux caveat:** Linux limits a single argument to 131,072 bytes (`MAX_ARG_STRLEN`), and `multi_model_review.context.max_bundle_bytes` defaults to 204,800.
-  - **Proposed guard:** on Linux, a prompt over 131,072 bytes gives `cli_failed` before spawning. The message says to lower `max_bundle_bytes` or to leave Cursor out of large reviews. macOS needs no guard at the default bundle cap, because its `ARG_MAX` is 1 MiB, shared with the environment. If the guard bites in practice, a stdin route (U18) is the follow-up.
-  - **Note:** an inline prompt is visible in the process table (`ps`) while the review runs.
-  - **Plan impact:** Task 69's 96 KiB criterion becomes three checks: every prompt goes inline, `review-input.txt` never exists, and a stub test covers the Linux guard.
-- **(c) Freeze the tool_call allowlist** as the shape rule in [Tool-call allowlist (Cursor)](#tool-call-allowlist-cursor).
-  - **Change:** with the deny file in place, any completed tool call that returned content is `sandbox_violation`. Only `error`, `permissionDenied` and an empty `globToolCall` are tolerated, and anything unrecognised fails closed. A violation outranks every other result, and the raw output is kept.
-  - **Plan impact:** Task 69's "a read inside `$W` is not a violation" is dropped. Its fixture mapping uses C4 (2 violations), C4b (1) and C7 (0).
+  - **Residuals (U17):** the `Write` and `Mcp` rules are untested.
+- **(b) The prompt goes on stdin; drop the `review-input.txt` file route.** *Changed:* the recommendation was an inline prompt plus a Linux size guard.
+  - **Change:** the runner passes no prompt argument and writes the prompt to the CLI's stdin. `review-input.txt` never exists, and there is no prompt-size guard.
+  - **Why it changed:** C8 proved stdin works (U18). It fed C5's 158,339-byte prompt on stdin and got the same outcome as C5 inline: exit 0, 3 findings. Stdin has no per-argument cap, so Linux's 131,072-byte `MAX_ARG_STRLEN` no longer matters, and the prompt stays out of the process table (`ps`).
+  - **Why not the file route:** it would need reads, which (a) forbids.
+  - **Plan impact:** Task 69's 96 KiB criterion becomes two checks: the argv carries no prompt argument and the prompt arrives on stdin, and `review-input.txt` never exists.
+- **(c) The tool_call allowlist, approved with (a),** as the shape rule in [Tool-call allowlist (Cursor)](#tool-call-allowlist-cursor).
+  - **Change:** any tool call that completes with content, other than a denied read or shell call or an empty glob, is `sandbox_violation`. Anything unrecognised fails closed. A violation overrides every other result, and the raw output is kept.
+  - **Plan impact:** Task 69's "a read inside `$W` is not a violation" is dropped. Its fixture mapping uses C4 (2 violations), C4b (1), C7 (0) and C8 (0).
 - **(d) User hooks accepted as a known risk,** as Grok's are under D35.
   - **What runs:** hooks that the user's Cursor loads run once per review. That appears to include Claude Code hooks: in C7, the user's RTK hook rewrote `cat` to `rtk read`, and no `~/.cursor/hooks.json` exists (U16).
   - **Why it stays:** no per-run switch exists, and relocating the config dir would lose the login.
   - **Change:** the runner never edits `~/.cursor/hooks.json`, `~/.claude/settings.json` or any other hook configuration.
   - **Where it is documented:** a Known Gotcha in `cursor-review-prompter.md`, recipes §9 and the FR-MR27 note.
-- **(e) Free plan: "Named models unavailable" is `cli_failed`,** with an actionable message. For example: "Cursor's Free plan allows only Auto. cursor-review-prompter needs a paid Cursor plan to use a named model; otherwise remove it from reviewers."
+- **(e) Free plan: "Named models unavailable" is `cli_failed`,** with an actionable message: Cursor's Free plan allows only Auto, and a named model needs a paid plan, so upgrade or remove `cursor-review-prompter` from `multi_model_review.reviewers`.
   - **D26 is kept:** the runner never falls back to Auto.
+  - **Wizard:** the `init` / `configure-multi-model` wizard lists Cursor under "opt in manually".
   - **Preflight gap:** `--auth-check` cannot see the plan (U13), so a Free-plan user passes preflight and hits this error on the first review.
   - **Free follow-up:** check whether `cursor-agent about` shows the plan. If it does, `--auth-check` can exit 12 instead.
-- **(f) `permissionMode` is not a guarantee.** `system:init` reported `permissionMode: "default"` on every run despite `--mode ask`.
-  - **Change:** the runner keeps `--mode ask`, logs the value and never gates on it. The deny file is the guarantee.
+- **(f) `permissionMode` is not a guarantee, approved with (a).** `system:init` reported `permissionMode: "default"` on every run despite `--mode ask`. The runner keeps `--mode ask`, logs the value and never gates on it. The deny file is the guarantee.
 - **(g) Unwrap the last `assistant` message, not `.result`.** This changes Task 69's "unwraps the last `result` event".
-  - **The problem:** `.result` concatenates every assistant message with no separator. When the model narrates before a tool call (C4b, C7), `.result` is a preamble glued to the JSON. `validate-findings` then returns `parse_failed`, which costs a billed retry.
-  - **Evidence for the fix:** the last `assistant` message parses cleanly in every recording, through `validate-findings`, in the test: C3b gives 3 findings, C4b 1, C5 3 and C7 1.
-  - **Why a fence does not help:** asking for a fenced block does not fix `.result`. The fence would be glued to the end of the preamble, and `validate-findings` needs a fence at the start of a line (checked with a synthetic string).
-  - **What `.result` is still for:** the terminal checks (`is_error` and the subtype).
-- **(h) Local state in `~/.cursor`: accept it and document it.** Each review leaves a trust marker, a transcript and a chat store that holds the bundle (U15).
-  - **Recommendation:** document it as a Known Gotcha and in the FR-MR27 note, and do not clean it up. This is consistent with (d): the runner never touches `~/.cursor`.
-  - **Alternative:** after the run, delete exactly `~/.cursor/projects/<slug of $W>` and `~/.cursor/chats/*/<session_id>`. Both paths are derivable, but the deletion writes inside the user's Cursor config.
+  - **Change:** findings come from the last `assistant` message, falling back to `.result` only when there is no `assistant` event. `.result` still drives the terminal checks (`is_error` and the subtype).
+  - **Why:** `.result` concatenates every assistant message with no separator. When the model narrates before a tool call (C4b, C7), `.result` is a preamble glued to the JSON, and `validate-findings` returns `parse_failed`, which costs a billed retry.
+  - **Evidence:** the last `assistant` message parses cleanly in every recording, through `validate-findings`, in the test: C3b gives 3 findings, C4b 1, C5 3, C7 1 and C8 3.
+  - **Why a fence does not help:** the fence would be glued to the end of the preamble, and `validate-findings` needs a fence at the start of a line (checked with a synthetic string).
+- **(h) The runner deletes its own Cursor state after each run.** *Changed:* the recommendation was to document the state and leave it.
+  - **Change:** after each run, the runner deletes exactly `~/.cursor/projects/<slug of $W>` and that run's chat entries, `~/.cursor/chats/*/<session_id>`, and nothing else. The `session_id` comes from the run's own stream. Task 69 must prove by test that only those two paths are touched.
+  - **Why it changed:** the user preferred not to keep reviewed code in `~/.cursor`. Each review leaves a trust marker, a transcript and a chat store that holds the bundle; the canary from C4 and C4b ended up in C4's transcript and in both runs' chat stores (U15).
+  - **Where it is documented:** the FR-MR27 note still describes the local state and the cleanup.
 
 These follow-ups for Task 69 need no D-row:
 - **Banned flags.** Add `--auto-review`, `--api-key` and `--stream-partial-output` to the argv test's never-list, next to `--force`, `--yolo` and `--approve-mcps`.
 - **Auth-check fixture.** Capture `cursor-agent status --format json` while logged in (a free check) and pin it as a fixture (U13).
+- **Cleanup test (h).** Seed a scratch HOME with sibling `projects` and `chats` entries, run the cleanup, and assert that only the run's two derived paths are gone. Cover a run with no `session_id` (C6), where only the projects entry exists.
+- **Raw output.** `raw_output_path` needs the same no-leak care as the prompt. Stdin keeps the prompt out of argv, but the `user` echo still puts the whole bundle in the raw output (C5, C8), and tool-call results can carry file contents (see [Stream-json shape (Cursor)](#stream-json-shape-cursor)).
 - **Recipes §9 and the FR-MR27 copy.** Cover these points (U20):
   - the roughly 16k-token Cursor overhead on every call, retries included;
   - the `(NO ZDR)` models;

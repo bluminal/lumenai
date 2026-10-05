@@ -11,11 +11,13 @@
  * - every recording is well-formed (every NDJSON line parses, and the exit
  *   code is an integer);
  * - the terminal-event and error evidence Task 69's error mapping depends on
- *   (C3 Free plan, C6 unknown model, C3b/C5/C7 `result:success`);
+ *   (C3 Free plan, C6 unknown model, C3b/C5/C7/C8 `result:success`);
+ * - C8's stdin prompt delivery (U18, decision b): argv carries no prompt
+ *   argument, and the run matches C5's inline run;
  * - the read-boundary evidence behind the mandatory deny file (Q8): without
  *   it, C4 and C4b read a file outside the scratch dir; with it, C7's reads
  *   and shell call are denied;
- * - the proposed tool_call allowlist rule (spike decision c) and the
+ * - the approved tool_call allowlist rule (spike decision c) and the
  *   last-assistant-message unwrap (spike decision g), replayed through
  *   `validate-findings`;
  * - sanitization: no canary token, email, credential-shaped string, raw
@@ -45,6 +47,7 @@ const RECORDINGS = [
   'c5-large-inline-prompt-deny-all',
   'c6-unknown-model',
   'c7-neutral-read-deny-all',
+  'c8-large-stdin-prompt-deny-all',
 ] as const;
 type Recording = (typeof RECORDINGS)[number];
 
@@ -55,6 +58,7 @@ const RESULT_RUNS = [
   'c4b-neutral-read-no-deny-file',
   'c5-large-inline-prompt-deny-all',
   'c7-neutral-read-deny-all',
+  'c8-large-stdin-prompt-deny-all',
 ] as const satisfies readonly Recording[];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -82,8 +86,9 @@ function exitCodeOf(name: Recording): number {
 /**
  * argv.txt is the harness's `printf %q` line. The prompt is never recorded:
  * the last argument is a placeholder (`\<prompt\>`, or C5's
- * `<158339-byte prompt>`). No option token contains a space, so a whitespace
- * split is exact for options.
+ * `<158339-byte prompt>`). C8 has no prompt argument; its line ends with the
+ * stdin redirect `< <158339-byte prompt on stdin>`. No option token contains a
+ * space, so a whitespace split is exact for options.
  */
 function argvTokens(name: Recording): string[] {
   return readRec(name, 'argv.txt').trim().split(/\s+/);
@@ -135,7 +140,7 @@ function carriesToolCall(v: unknown): boolean {
 }
 
 /**
- * The tool_call allowlist rule PROPOSED by the spike (decision c), as a
+ * The tool_call allowlist rule APPROVED from the spike (decision c), as a
  * reference for Task 69. It runs with the mandatory deny file in place, so
  * every tool call is expected to fail. A completed call is tolerated only in
  * one of the three shapes observed in C7:
@@ -283,7 +288,12 @@ describe(`Task 67: Cursor spike recordings (${CURSOR_VERSION})`, () => {
   });
 
   describe('terminal events and error evidence', () => {
-    it.each(['c3b-auto-review-success', 'c5-large-inline-prompt-deny-all', 'c7-neutral-read-deny-all'] as const)(
+    it.each([
+      'c3b-auto-review-success',
+      'c5-large-inline-prompt-deny-all',
+      'c7-neutral-read-deny-all',
+      'c8-large-stdin-prompt-deny-all',
+    ] as const)(
       '%s exits 0 and ends in result:success with is_error false',
       (name) => {
         const evs = eventsOf(name);
@@ -350,6 +360,39 @@ describe(`Task 67: Cursor spike recordings (${CURSOR_VERSION})`, () => {
       expect((resultEvent(evs) as Ev).usage.inputTokens).toBeGreaterThan(40_000);
       expect(readRec(name, 'stdout.ndjson').length).toBeLessThan(20_000);
     });
+
+    it('C8: the same prompt on stdin succeeded; argv carries no prompt argument', () => {
+      const name = 'c8-large-stdin-prompt-deny-all';
+      const line = readRec(name, 'argv.txt').trim();
+      const parts = line.split(' < ');
+      expect(parts).toHaveLength(2);
+      expect(parts[1]).toBe('<158339-byte prompt on stdin>');
+      const command = parts[0].split(/\s+/);
+      expect(command).toEqual([
+        'cursor-agent',
+        '-p',
+        '--mode',
+        'ask',
+        '--sandbox',
+        'enabled',
+        '--trust',
+        '--output-format',
+        'stream-json',
+        '--model',
+        'auto',
+      ]);
+      // C5 is the same argv plus the inline prompt placeholder.
+      expect(argvTokens('c5-large-inline-prompt-deny-all')).toEqual([...command, '<158339-byte', 'prompt>']);
+      const evs = eventsOf(name);
+      expect(evs[1]).toEqual({
+        type: 'user',
+        message: { role: 'user', content: [{ type: 'text', text: '<158339-byte prompt>' }] },
+        session_id: '<redacted-id>',
+      });
+      expect(evs.some((e) => e.type === 'tool_call')).toBe(false);
+      expect((resultEvent(evs) as Ev).usage.inputTokens).toBeGreaterThan(40_000);
+      expect(readRec(name, 'stdout.ndjson').length).toBeLessThan(20_000);
+    });
   });
 
   describe('read boundary (Q8): ask mode does not confine reads; the deny file does', () => {
@@ -407,7 +450,7 @@ describe(`Task 67: Cursor spike recordings (${CURSOR_VERSION})`, () => {
       expect(policy.readBoundary).toBe('READ_BOUNDARY_MODE_UNSPECIFIED');
     });
 
-    it('the deny file used in C5 and C7 is the tested deny-all list', () => {
+    it('the deny file used in C5, C7 and C8 is the tested deny-all list', () => {
       const cfg = JSON.parse(readFileSync(join(REC_DIR, 'deny-all.cli.json'), 'utf8')) as Ev;
       expect(cfg.permissions.allow).toEqual([]);
       expect(cfg.permissions.deny).toEqual([
@@ -419,17 +462,18 @@ describe(`Task 67: Cursor spike recordings (${CURSOR_VERSION})`, () => {
         'Shell(*)',
         'Mcp(*:*)',
       ]);
-      for (const name of ['c5-large-inline-prompt-deny-all', 'c7-neutral-read-deny-all'] as const) {
+      for (const name of ['c5-large-inline-prompt-deny-all', 'c7-neutral-read-deny-all', 'c8-large-stdin-prompt-deny-all'] as const) {
         expect(readRec(name, 'README.md')).toContain('deny-all.cli.json');
       }
     });
   });
 
-  describe('proposed tool_call allowlist rule (decision c)', () => {
+  describe('approved tool_call allowlist rule (decision c)', () => {
     it.each([
       ['c3b-auto-review-success', 0],
       ['c5-large-inline-prompt-deny-all', 0],
       ['c7-neutral-read-deny-all', 0],
+      ['c8-large-stdin-prompt-deny-all', 0],
       ['c4b-neutral-read-no-deny-file', 1],
       ['c4-adversarial-no-deny-file', 2],
     ] as const)('%s has %i violation(s)', (name, count) => {
@@ -462,6 +506,7 @@ describe(`Task 67: Cursor spike recordings (${CURSOR_VERSION})`, () => {
       ['c3b-auto-review-success', 3, 'success'],
       ['c5-large-inline-prompt-deny-all', 3, 'success'],
       ['c7-neutral-read-deny-all', 1, 'parse_failed'],
+      ['c8-large-stdin-prompt-deny-all', 3, 'success'],
       ['c4b-neutral-read-no-deny-file', 1, 'parse_failed'],
     ] as const)('%s: last assistant message gives %i finding(s); .result gives %s', (name, count, resultOutcome) => {
       const evs = eventsOf(name);
