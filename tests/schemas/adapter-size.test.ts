@@ -27,6 +27,7 @@ const ADAPTERS = [
   'bedrock-review-prompter.md',
   'claude-review-prompter.md',
   'codex-review-prompter.md',
+  'cursor-review-prompter.md', // multi-model-review Task 69
   'gemini-review-prompter.md',
   'grok-review-prompter.md', // multi-model-review Task 68
   'llm-review-prompter.md',

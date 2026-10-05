@@ -55,9 +55,9 @@ function frontmatterBlock(contents: string): string {
 }
 
 describe('wrapper catalog diet (Task 19, FR-HM9/FR-HM10)', () => {
-  it('has a COMMAND_DESCRIPTIONS entry for all 22 commands and an AGENT_DESCRIPTIONS entry for all 27 agents (multi-model-review Task 68 added grok-review-prompter)', () => {
+  it('has a COMMAND_DESCRIPTIONS entry for all 22 commands and an AGENT_DESCRIPTIONS entry for all 28 agents (multi-model-review Tasks 68 and 69 added grok-review-prompter and cursor-review-prompter)', () => {
     expect(Object.keys(COMMAND_DESCRIPTIONS)).toHaveLength(22);
-    expect(Object.keys(AGENT_DESCRIPTIONS)).toHaveLength(27);
+    expect(Object.keys(AGENT_DESCRIPTIONS)).toHaveLength(28);
   });
 
   it('keeps every command wrapper description at or under 120 characters and equal to its COMMAND_DESCRIPTIONS entry', () => {

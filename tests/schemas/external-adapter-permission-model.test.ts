@@ -51,6 +51,13 @@ const ADAPTERS: Adapter[] = [
     cliKey: 'grok',
     readOnlyMarker: "--deny '*'",
   },
+  {
+    // multi-model-review Task 69 (D37): text-only; read-only rests on the deny-all project file.
+    name: 'cursor',
+    file: 'cursor-review-prompter.md',
+    cliKey: 'cursor',
+    readOnlyMarker: '.cursor/cli.json',
+  },
 ];
 
 describe('Task 81: external adapter permission model (ADR-003 / FR-MMT21)', () => {
