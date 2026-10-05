@@ -97,7 +97,7 @@ function makeBin(opts: BinOpts = {}): string {
 
 const RECORDED_ENV = [
   'HOME', 'GROK_HOME', 'GROK_SANDBOX', 'GROK_FOLDER_TRUST', 'GROK_CONFIG', 'GROK_CONFIG_PATH',
-  'XAI_API_KEY', 'GROK_DISABLE_AUTOUPDATER',
+  'XAI_API_KEY', 'GROK_CODE_XAI_API_KEY', 'GROK_DISABLE_AUTOUPDATER', 'GROK_MEMORY',
   ...['AGENTS', 'HOOKS', 'MCPS', 'RULES', 'SKILLS'].flatMap((v) => [
     `GROK_CLAUDE_${v}_ENABLED`,
     `GROK_CURSOR_${v}_ENABLED`,
@@ -106,7 +106,7 @@ const RECORDED_ENV = [
 
 /**
  * Stub grok. `grok models` prints $STUB_SCENARIO/models.stdout (default: the
- * logged-in line). Any other call is a review invocation N: it records
+ * logged-in line), then sleeps models.sleep seconds when that file exists. Any other call is a review invocation N: it records
  * argv/env/pwd/prompt, then prints N.stdout (else default.stdout), sleeps
  * N.sleep, prints N.stderr and exits N.exit (else the default.* files).
  */
@@ -118,6 +118,7 @@ if [ "\${1:-}" = "models" ]; then
   n=$(cat "$L/models.count" 2>/dev/null || printf 0); n=$((n + 1)); printf '%s' "$n" > "$L/models.count"
   printf '%s\\0' "$@" > "$L/models-$n.argv"; pwd -P > "$L/models-$n.pwd"; dump_env > "$L/models-$n.env"
   if [ -e "$D/models.stdout" ]; then cat "$D/models.stdout"; else printf 'You are logged in with grok.com.\\nDefault model: grok-4.7\\n'; fi
+  if [ -e "$D/models.sleep" ]; then sleep "$(cat "$D/models.sleep")"; fi
   exit 0
 fi
 n=$(cat "$L/count" 2>/dev/null || printf 0); n=$((n + 1)); printf '%s' "$n" > "$L/count"
@@ -218,6 +219,7 @@ type VfCall = { argv: string[]; input: string | null };
 type RunOpts = {
   steps?: Record<string, Step>;
   models?: string;
+  modelsSleep?: number;
   config?: string;
   envelopeConfig?: Record<string, unknown>;
   env?: Record<string, string>;
@@ -278,6 +280,7 @@ function run(opts: RunOpts = {}): RunResult {
     if (step.sleep !== undefined) writeFileSync(join(scen, `${key}.sleep`), String(step.sleep));
   }
   if (opts.models !== undefined) writeFileSync(join(scen, 'models.stdout'), opts.models);
+  if (opts.modelsSleep !== undefined) writeFileSync(join(scen, 'models.sleep'), String(opts.modelsSleep));
   if (opts.config !== undefined) {
     mkdirSync(join(proj, '.synthex'), { recursive: true });
     writeFileSync(join(proj, '.synthex', 'config.yaml'), opts.config);
@@ -431,6 +434,8 @@ describe('argv, isolation env and cwd (stub grok records them)', () => {
           GROK_CONFIG: '/nonexistent/config.toml',
           GROK_CONFIG_PATH: '/nonexistent',
           XAI_API_KEY: 'dummy-test-value',
+          GROK_CODE_XAI_API_KEY: 'dummy-alias-value',
+          GROK_MEMORY: '1',
         },
       }),
       'input',
@@ -499,9 +504,16 @@ describe('argv, isolation env and cwd (stub grok records them)', () => {
     expect(env.GROK_DISABLE_AUTOUPDATER).toBe('1');
   });
 
-  it('XAI_API_KEY is absent without the allow_api_key_billing opt-in (D26)', () => {
-    expect(r.invocations[0].env).not.toHaveProperty('XAI_API_KEY');
-    expect(r.models[0].env).not.toHaveProperty('XAI_API_KEY');
+  it('XAI_API_KEY and its GROK_CODE_XAI_API_KEY alias are absent without the allow_api_key_billing opt-in (D26)', () => {
+    for (const k of ['XAI_API_KEY', 'GROK_CODE_XAI_API_KEY']) {
+      expect(r.invocations[0].env, k).not.toHaveProperty(k);
+      expect(r.models[0].env, k).not.toHaveProperty(k);
+    }
+  });
+
+  it('GROK_MEMORY is forced to 0 in the probe and the review although the parent set 1', () => {
+    expect(r.invocations[0].env.GROK_MEMORY).toBe('0');
+    expect(r.models[0].env.GROK_MEMORY).toBe('0');
   });
 
   it('the prompt inlines the bundle (artifact, conventions, touched files, specs) and the schema', () => {
@@ -520,12 +532,13 @@ describe('XAI_API_KEY opt-in, model and judge_mode_prompt', () => {
   it('keeps XAI_API_KEY when per_reviewer.grok-review-prompter.allow_api_key_billing is true', () => {
     const r = collect(
       run({
-        env: { XAI_API_KEY: 'dummy-test-value' },
+        env: { XAI_API_KEY: 'dummy-test-value', GROK_CODE_XAI_API_KEY: 'dummy-alias-value' },
         config: 'multi_model_review:\n  per_reviewer:\n    grok-review-prompter:\n      allow_api_key_billing: true\n',
       }),
       'input',
     );
     expect(r.invocations[0].env.XAI_API_KEY).toBe('dummy-test-value');
+    expect(r.invocations[0].env.GROK_CODE_XAI_API_KEY).toBe('dummy-alias-value');
     expect(r.envelope?.status).toBe('success');
   }, T);
 
@@ -607,7 +620,13 @@ describe(`CLI-surface cross-check against the grok --help fixtures (${GROK_VERSI
     // run that sets -m and --rules.
     collect(run({ auth: true }), 'auth');
     collect(run({ envelopeConfig: { model: 'grok-4.7', judge_mode_prompt: 'Judge.' } }), 'input');
-  }, T);
+    // The same two runs on the timeout/gtimeout branch (the production path
+    // on Linux and on Macs with coreutils).
+    if (TIMEOUT_TOOL !== null) {
+      collect(run({ auth: true, bin: { timeout: true } }), 'auth');
+      collect(run({ bin: { timeout: true }, envelopeConfig: { model: 'grok-4.7', judge_mode_prompt: 'Judge.' } }), 'input');
+    }
+  }, 2 * T);
 
   it('the help parser finds models as a subcommand and the D25 flags at top level', () => {
     expect(TOP_CMDS.has('models')).toBe(true);
@@ -981,9 +1000,18 @@ describe('incomplete-run guard (Risk 15, D36): allowlist {end_turn}, before pars
 // --auth-check
 // ---------------------------------------------------------------------------
 
-describe('--auth-check (runs `grok models` under the review isolation)', () => {
+/** Both probe branches: the bash watchdog, and timeout/gtimeout when installed. */
+const BRANCHES: Array<[string, BinOpts]> = [
+  ['bash watchdog', { timeout: false }],
+  ...(TIMEOUT_TOOL !== null ? ([['timeout binary', { timeout: true }]] as Array<[string, BinOpts]>) : []),
+];
+
+describe.each(BRANCHES)('--auth-check (runs `grok models` under the review isolation; %s)', (_label, bin) => {
   it('exits 0 for a grok.com session login, with HOME isolation and the autoupdater off', () => {
-    const r = collect(run({ auth: true, env: { GROK_SANDBOX: 'strict', XAI_API_KEY: 'dummy-test-value' } }), 'auth');
+    const r = collect(
+      run({ auth: true, bin, env: { GROK_SANDBOX: 'strict', XAI_API_KEY: 'dummy-test-value', GROK_MEMORY: '1' } }),
+      'auth',
+    );
     expect(r.status).toBe(0);
     expect(r.models).toHaveLength(1);
     expect(r.invocations).toHaveLength(0);
@@ -993,6 +1021,7 @@ describe('--auth-check (runs `grok models` under the review isolation)', () => {
     expect(env.HOME).toBe(`${pwd}/home`);
     expect(env.GROK_HOME).toBe(r.realGrokHome);
     expect(env.GROK_DISABLE_AUTOUPDATER).toBe('1');
+    expect(env.GROK_MEMORY).toBe('0');
     expect(env.GROK_CLAUDE_HOOKS_ENABLED).toBe('0');
     expect(env).not.toHaveProperty('GROK_SANDBOX');
     expect(env).not.toHaveProperty('XAI_API_KEY');
@@ -1000,17 +1029,22 @@ describe('--auth-check (runs `grok models` under the review isolation)', () => {
   }, T);
 
   it('exits 11 when not authenticated, and fails closed on an unrecognised or empty line', () => {
-    expect(run({ auth: true, models: 'You are not authenticated.\n' }).status).toBe(11);
-    expect(run({ auth: true, models: 'Something new in grok 2.0\n' }).status).toBe(11);
-    expect(run({ auth: true, models: '' }).status).toBe(11);
+    expect(run({ auth: true, bin, models: 'You are not authenticated.\n' }).status).toBe(11);
+    expect(run({ auth: true, bin, models: 'Something new in grok 2.0\n' }).status).toBe(11);
+    expect(run({ auth: true, bin, models: '' }).status).toBe(11);
   }, T);
 
   it('exits 12 when only a key is present without opt-in, and 0 with the opt-in', () => {
-    expect(run({ auth: true, models: 'You are using XAI_API_KEY.\n' }).status).toBe(12);
+    expect(run({ auth: true, bin, models: 'You are using XAI_API_KEY.\n' }).status).toBe(12);
     // The key is unset for the probe, so grok sees no session; the parent's key makes it 12, not 11.
-    expect(run({ auth: true, models: 'You are not authenticated.\n', env: { XAI_API_KEY: 'dummy-test-value' } }).status).toBe(12);
+    expect(run({ auth: true, bin, models: 'You are not authenticated.\n', env: { XAI_API_KEY: 'dummy-test-value' } }).status).toBe(12);
+    // The same for grok's backward-compatible alias, which is unset too.
+    const alias = run({ auth: true, bin, models: 'You are not authenticated.\n', env: { GROK_CODE_XAI_API_KEY: 'dummy-alias-value' } });
+    expect(alias.status).toBe(12);
+    expect(alias.models[0].env).not.toHaveProperty('GROK_CODE_XAI_API_KEY');
     const optIn = run({
       auth: true,
+      bin,
       models: 'You are using XAI_API_KEY.\n',
       env: { XAI_API_KEY: 'dummy-test-value' },
       config: 'multi_model_review:\n  per_reviewer:\n    grok-review-prompter:\n      allow_api_key_billing: true\n',
@@ -1020,14 +1054,71 @@ describe('--auth-check (runs `grok models` under the review isolation)', () => {
   }, T);
 
   it('exits 10 when the binary is missing', () => {
-    expect(run({ auth: true, bin: { grok: false } }).status).toBe(10);
+    expect(run({ auth: true, bin: { ...bin, grok: false } }).status).toBe(10);
   }, T);
 
   it('--input mode fails cli_auth_failed before any review invocation when not authenticated', () => {
-    const r = run({ models: 'You are not authenticated.\n' });
+    const r = run({ bin, models: 'You are not authenticated.\n' });
     expect(r.envelope?.error_code).toBe('cli_auth_failed');
     expect(r.envelope?.error_message).toContain('grok login');
     expect(r.invocations).toHaveLength(0);
+  }, T);
+
+  it('a hanging `grok models` that prints nothing: --auth-check exits 11 within its bound', () => {
+    const r = run({ auth: true, bin, models: '', modelsSleep: 40, config: SHORT_BUDGET });
+    expect(r.status).toBe(11);
+    expect(r.stderr).toMatch(/did not answer within 2s/);
+    expect(r.durationMs).toBeLessThan(10_000);
+  }, T);
+
+  it('a hanging `grok models` after the logged-in line: --auth-check exits 0 within its bound', () => {
+    const r = run({ auth: true, bin, modelsSleep: 40, config: SHORT_BUDGET });
+    expect(r.status).toBe(0);
+    expect(r.durationMs).toBeLessThan(10_000);
+  }, T);
+
+  it('a hanging `grok models` in --input mode spends the review budget: timeout, no review invocation', () => {
+    const silent = run({ bin, models: '', modelsSleep: 40, config: SHORT_BUDGET });
+    expect(silent.envelope?.error_code).toBe('timeout');
+    expect(silent.invocations).toHaveLength(0);
+    expect(silent.durationMs).toBeLessThan(10_000);
+    const loggedIn = run({ bin, modelsSleep: 40, config: SHORT_BUDGET });
+    expect(loggedIn.envelope?.error_code).toBe('timeout');
+    expect(loggedIn.invocations).toHaveLength(0);
+    expect(loggedIn.durationMs).toBeLessThan(10_000);
+  }, T);
+
+  it('a slow probe and a slow review share one budget (the clock starts before the probe)', () => {
+    // Budget 8 s; the probe answers then lingers 4 s, the review sleeps 20 s.
+    // One shared clock ends the run near 8 s; a clock started after the
+    // probe would end it near 12 s.
+    const r = run({
+      bin,
+      modelsSleep: 4,
+      config: 'multi_model_review:\n  per_reviewer_timeout_seconds: 18\n',
+      steps: { default: { stdout: PARTIAL, sleep: 20 } },
+    });
+    expect(r.envelope?.error_code).toBe('timeout');
+    expect(r.envelope?.error_message).toContain('8s');
+    expect(r.invocations).toHaveLength(1);
+    expect(r.durationMs).toBeLessThan(10_500);
+  }, T);
+});
+
+describe('raw_output_path that cannot be written', () => {
+  it('gives an unknown_error envelope (exit 0, --envelope-out written) before any grok call', () => {
+    const r = run({
+      envelopeConfig: { raw_output_path: '/nonexistent-grok-runner-test/raw/g.json' },
+      args: ['--input', '.synthex/tmp/grok-review-prompter-0f1e2d3c.input.json', '--envelope-out', 'env.json'],
+    });
+    expect(r.status).toBe(0);
+    expect(r.envelope?.status).toBe('failed');
+    expect(r.envelope?.error_code).toBe('unknown_error');
+    expect(r.envelope?.error_message).toContain('raw_output_path');
+    expect(r.envelope?.raw_output_path).toBeNull();
+    expect(r.invocations).toHaveLength(0);
+    expect(r.models).toHaveLength(0);
+    expect(JSON.parse(readFileSync(join(r.proj, 'env.json'), 'utf8'))).toEqual(r.envelope);
   }, T);
 });
 

@@ -15,7 +15,7 @@ You are a **Grok Review Prompter**, a Haiku-backed adapter (D3) wrapping the xAI
 
 ## Permission Model (ADR-003 / D27, FR-MMT21)
 
-Resolved per `multi_model_review.external_permission_mode.grok`. **Pattern 1 (read-only)** is the default for grok, enforced by tool removal, not a sandbox: `--disallowed-tools` (every built-in), `--deny '*'`, `--deny 'mcp__*'`, `--permission-mode dontAsk`, `--no-subagents`, `--disable-web-search`, `--max-turns 3`, an untrusted `/tmp` scratch cwd and HOME isolation (multi-model-review D25). `--sandbox read-only` is defence in depth (D34). `sandbox-yolo` is a no-op alias of `read-only`. `parent-mediated` is **not supported**: the runner returns `cli_unsupported_mode` without spawning grok (D29). Never `--yolo`, `--always-approve`, `bypassPermissions` or `--trust`.
+Resolved per `multi_model_review.external_permission_mode.grok`. **Pattern 1 (read-only)** is the default for grok, enforced by tool removal, not a sandbox: `--disallowed-tools` (every built-in), `--deny '*'`, `--deny 'mcp__*'`, `--permission-mode dontAsk`, `--no-subagents`, `--disable-web-search`, `--max-turns 3`, an untrusted `/tmp` scratch cwd, HOME isolation and `GROK_MEMORY=0` (multi-model-review D25). `--sandbox read-only` is defence in depth (D34). `sandbox-yolo` is a no-op alias of `read-only`. `parent-mediated` is **not supported**: the runner returns `cli_unsupported_mode` without spawning grok (D29). Never `--yolo`, `--always-approve`, `bypassPermissions` or `--trust`.
 
 ## Behavior (FR-MR8 Responsibilities 1–8)
 
@@ -27,7 +27,7 @@ The runner checks `command -v grok`. Missing → `cli_missing` with the install 
 
 ### 2. Auth Check
 
-`"${CLAUDE_PLUGIN_ROOT}/scripts/adapters/grok-review.sh" --auth-check` runs `grok models` under the same isolation (no prompt is sent). Exit 0 = grok.com session, 10 = binary missing, 11 = not authenticated, 12 = only `XAI_API_KEY` without opt-in. The runner unsets `XAI_API_KEY` (pay-per-token) unless `per_reviewer.grok-review-prompter.allow_api_key_billing` is true (D26). Remediation: run `grok login`. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
+`"${CLAUDE_PLUGIN_ROOT}/scripts/adapters/grok-review.sh" --auth-check` runs `grok models` under the same isolation (no prompt is sent). Exit 0 = grok.com session, 10 = binary missing, 11 = not authenticated, 12 = only `XAI_API_KEY` without opt-in. The runner unsets `XAI_API_KEY` and its alias `GROK_CODE_XAI_API_KEY` (pay-per-token) unless `per_reviewer.grok-review-prompter.allow_api_key_billing` is true (D26). Remediation: run `grok login`. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
 ### 3. Prompt Construction
 

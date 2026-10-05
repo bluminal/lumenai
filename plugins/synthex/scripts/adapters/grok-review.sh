@@ -17,16 +17,20 @@
 #     depth-1 host can background this script and poll for the file.
 #   grok-review.sh --auth-check
 #     Runs `grok models` under the same isolation and reads its first line.
+#     The probe is bounded by min(30 s, the review budget below) in both
+#     modes; in --input mode it spends that budget, which starts before it.
 #
 # Text-only isolation (D25), applied to every grok call:
 #   - cwd is a fresh `mktemp -d /tmp/synthex-grok.XXXXXX` dir (canonicalised,
 #     guarded, removed by an EXIT trap): untrusted, so project hooks, MCP,
 #     rules and skills never load;
 #   - HOME=<scratch>/home; GROK_HOME stays the real (canonical) grok home,
-#     which holds the grok.com session; GROK_DISABLE_AUTOUPDATER=1; every
+#     which holds the grok.com session; GROK_DISABLE_AUTOUPDATER=1;
+#     GROK_MEMORY=0 (the process-wide force-disable: no memory index is
+#     injected and nothing is written to the user's memory store); every
 #     GROK_CLAUDE_*_ENABLED and GROK_CURSOR_*_ENABLED is 0; GROK_CONFIG,
 #     GROK_CONFIG_PATH, GROK_FOLDER_TRUST and GROK_SANDBOX are unset;
-#   - XAI_API_KEY is unset unless
+#   - XAI_API_KEY and its alias GROK_CODE_XAI_API_KEY are unset unless
 #     multi_model_review.per_reviewer.grok-review-prompter.allow_api_key_billing
 #     (or the envelope's config.allow_api_key_billing) is true (D26);
 #   - argv: --prompt-file, --output-format json, --json-schema <strict
@@ -56,9 +60,11 @@
 #   2 - usage error (unknown argument, or --input missing/unreadable).
 #   10 - --auth-check: the grok binary is not on PATH.
 #   11 - --auth-check: not authenticated (or the probe output was not
-#        recognised; this fails closed).
-#   12 - --auth-check: only XAI_API_KEY is available and per-token billing
-#        is not opted into (allow_api_key_billing is not true).
+#        recognised, or `grok models` did not answer in time; this fails
+#        closed).
+#   12 - --auth-check: only XAI_API_KEY (or GROK_CODE_XAI_API_KEY) is
+#        available and per-token billing is not opted into
+#        (allow_api_key_billing is not true).
 
 set -eu
 
@@ -78,6 +84,7 @@ SCHEMA_FILE="$PLUGIN_ROOT/agents/_shared/codex-findings.schema.json"
 REVIEWER_ID="grok-review-prompter"
 DISALLOWED_TOOLS="read_file,grep,list_dir,run_terminal_cmd,search_replace,write_file,web_search,web_fetch,todo_write,task,Agent"
 MAX_TURNS=3
+PROBE_CAP=30
 REFUSAL_A="could not resolve runtime-socket deny path"
 REFUSAL_B="endpoint is a symlink"
 REFUSAL_C="Refusing to start with its protections missing"
@@ -283,7 +290,7 @@ if [ -d "$REAL_GROK_HOME" ]; then
   REAL_GROK_HOME="$(cd -P -- "$REAL_GROK_HOME" && pwd -P)"
 fi
 PARENT_HAS_KEY="false"
-if [ -n "${XAI_API_KEY:-}" ]; then PARENT_HAS_KEY="true"; fi
+if [ -n "${XAI_API_KEY:-}" ] || [ -n "${GROK_CODE_XAI_API_KEY:-}" ]; then PARENT_HAS_KEY="true"; fi
 
 TIMEOUT_BIN=""
 if command -v timeout >/dev/null 2>&1; then
@@ -318,32 +325,103 @@ isolate() {
   export HOME="$W/home"
   export GROK_HOME="$REAL_GROK_HOME"
   export GROK_DISABLE_AUTOUPDATER=1
+  export GROK_MEMORY=0
   local v
   for v in AGENTS HOOKS MCPS RULES SKILLS; do
     export "GROK_CLAUDE_${v}_ENABLED=0" "GROK_CURSOR_${v}_ENABLED=0"
   done
   unset GROK_CONFIG GROK_CONFIG_PATH GROK_FOLDER_TRUST GROK_SANDBOX
-  if [ "$ALLOW_KEY" != "true" ]; then unset XAI_API_KEY; fi
+  if [ "$ALLOW_KEY" != "true" ]; then unset XAI_API_KEY GROK_CODE_XAI_API_KEY; fi
+}
+
+# guarded <limit> <stdout-file> <stderr-file> <grok args...>: one isolated
+# grok call, backgrounded and waited on (so an INT/TERM trap runs promptly
+# and cleanup can stop the child), killed after <limit> seconds by
+# timeout/gtimeout or else by a bash watchdog. Sets RC and TIMED_OUT. Both
+# the auth probe and the review go through here, so the two timeout
+# branches always run the same argv.
+RC=0
+TIMED_OUT=0
+guarded() {
+  local limit="$1" out="$2" err="$3"
+  shift 3
+  if [ "$limit" -lt 1 ]; then limit=1; fi
+  RC=0
+  TIMED_OUT=0
+  rm -f -- "$W/.timedout"
+  if [ -n "$TIMEOUT_BIN" ]; then
+    (isolate; exec "$TIMEOUT_BIN" -k 5 "$limit" grok "$@") > "$out" 2> "$err" < /dev/null &
+    GROK_PID=$!
+  else
+    (isolate; exec grok "$@") > "$out" 2> "$err" < /dev/null &
+    GROK_PID=$!
+    local pid=$GROK_PID
+    (sleep "$limit"; : > "$W/.timedout"; kill -TERM "$pid" 2>/dev/null; sleep 5; kill -KILL "$pid" 2>/dev/null) \
+      < /dev/null > /dev/null 2>&1 &
+    WATCHDOG_PID=$!
+  fi
+  wait "$GROK_PID" || RC=$?
+  GROK_PID=""
+  if [ -n "$WATCHDOG_PID" ]; then
+    kill "$WATCHDOG_PID" 2>/dev/null || true
+    WATCHDOG_PID=""
+  fi
+  if [ -n "$TIMEOUT_BIN" ]; then
+    case "$RC" in 124|137) TIMED_OUT=1 ;; esac
+  elif [ -e "$W/.timedout" ]; then
+    TIMED_OUT=1
+  fi
+}
+
+# compute_budget: per_reviewer_timeout_seconds - 10, clamped in the
+# foreground (no --envelope-out) to the host shell cap - 15.
+compute_budget() {
+  local prt cap host_id cap_var
+  prt="$(cfg multi_model_review.per_reviewer_timeout_seconds 180)"
+  case "$prt" in ''|*[!0-9]*) prt=180 ;; esac
+  BUDGET=$((prt - 10))
+  if [ -z "$ENVELOPE_OUT" ]; then
+    host_id="$(printf '%s' "${SYNTHEX_HOST:-claude}" | tr 'a-z' 'A-Z')"
+    case "$host_id" in ''|*[!A-Z0-9_]*) host_id="CLAUDE" ;; esac
+    cap=""
+    if [ -r "$HOSTS_ENV" ]; then
+      # shellcheck disable=SC1090
+      . "$HOSTS_ENV"
+      cap_var="SYNTHEX_HOST_${host_id}_SHELL_CAP"
+      cap="${!cap_var:-}"
+    fi
+    case "$cap" in ''|*[!0-9]*) ;; *)
+      if [ $((cap - 15)) -lt "$BUDGET" ]; then BUDGET=$((cap - 15)); fi ;;
+    esac
+  fi
+  if [ "$BUDGET" -lt 1 ]; then BUDGET=1; fi
 }
 
 # auth_probe: 0 session (or opted-in key), 10 missing, 11 not
-# authenticated / unrecognised, 12 key only without opt-in.
+# authenticated / unrecognised, 12 key only without opt-in, 13 no
+# recognisable answer before the bound (PROBE_LIMIT seconds).
+PROBE_LIMIT=$PROBE_CAP
 auth_probe() {
   command -v grok >/dev/null 2>&1 || return 10
-  local line rc=0
-  if [ -n "$TIMEOUT_BIN" ]; then
-    line="$( (isolate; exec "$TIMEOUT_BIN" -k 5 30 grok models) </dev/null 2>/dev/null | head -n 1)" || rc=$?
-  else
-    line="$( (isolate; exec grok models) </dev/null 2>/dev/null | head -n 1)" || rc=$?
-  fi
+  local line=""
+  guarded "$PROBE_LIMIT" "$W/models.out" "$W/models.err" models
+  line="$(head -n 1 "$W/models.out" 2>/dev/null || true)"
   case "$line" in
     "You are logged in"*) return 0 ;;
     "You are using XAI_API_KEY"*)
       if [ "$ALLOW_KEY" = "true" ]; then return 0; fi
       return 12 ;;
   esac
+  if [ "$TIMED_OUT" = 1 ]; then return 13; fi
   if [ "$PARENT_HAS_KEY" = "true" ] && [ "$ALLOW_KEY" != "true" ]; then return 12; fi
   return 11
+}
+
+# probe_limit: min(PROBE_CAP, what is left of BUDGET).
+probe_limit() {
+  PROBE_LIMIT=$((BUDGET - SECONDS))
+  if [ "$PROBE_LIMIT" -gt "$PROBE_CAP" ]; then PROBE_LIMIT=$PROBE_CAP; fi
+  if [ "$PROBE_LIMIT" -lt 1 ]; then PROBE_LIMIT=1; fi
 }
 
 # --- --auth-check --------------------------------------------------------
@@ -357,10 +435,14 @@ if [ "$MODE" = "auth" ]; then
     note "could not create a safe scratch dir under /tmp"
     exit 11
   fi
+  compute_budget
+  SECONDS=0
+  probe_limit
   rc=0
   auth_probe || rc=$?
   case "$rc" in
     0) printf 'grok: authenticated\n' ;;
+    13) note "grok models did not answer within ${PROBE_LIMIT}s; treating as not authenticated"; rc=11 ;;
     12) note "only XAI_API_KEY is available; it bills per token. Run grok login, or opt in with multi_model_review.per_reviewer.grok-review-prompter.allow_api_key_billing: true" ;;
     *) note "not authenticated; run grok login" ;;
   esac
@@ -383,6 +465,13 @@ case "$RAW" in
 esac
 mkdir -p -- "${RAW_ABS%/*}" 2>/dev/null || true
 STDERR_LOG="$RAW_ABS.stderr.log"
+# The raw output must land before parsing; if it cannot, say so in an
+# envelope instead of letting set -e end the run without one.
+if ! { : > "$STDERR_LOG"; } 2>/dev/null; then
+  BAD_RAW="$RAW"
+  RAW=""
+  fail unknown_error "grok-review.sh cannot write raw_output_path $BAD_RAW (or its .stderr.log); no grok call was made."
+fi
 
 case "$(env_get allow_api_key_billing)" in
   true) ALLOW_KEY="true" ;;
@@ -408,11 +497,19 @@ if ! make_scratch; then
   fail unknown_error "grok-review.sh could not create a safe scratch dir under /tmp."
 fi
 
+# 4. Wall-clock guard: per_reviewer_timeout_seconds - 10, clamped in the
+# foreground (no --envelope-out) to the host shell cap - 15. The clock
+# starts here, so the auth probe spends the same budget as the review.
+compute_budget
+SECONDS=0
+
 # 2. Auth (D26).
+probe_limit
 arc=0
 auth_probe || arc=$?
 case "$arc" in
   0) ;;
+  13) fail timeout "grok models (the auth probe) did not answer within ${PROBE_LIMIT}s of the ${BUDGET}s wall-clock budget; no review was run." ;;
   12) fail cli_auth_failed "grok: only XAI_API_KEY is available, which bills per token. Run grok login, or opt in with per_reviewer.grok-review-prompter.allow_api_key_billing: true." ;;
   *) fail cli_auth_failed "grok: not authenticated. Run grok login." ;;
 esac
@@ -445,42 +542,19 @@ if ! bundle_sections >> "$PROMPT" 2>/dev/null; then
   fail unknown_error "grok-review.sh could not read context_bundle from the input envelope."
 fi
 
-# 4. Wall-clock guard: per_reviewer_timeout_seconds - 10, clamped in the
-# foreground (no --envelope-out) to the host shell cap - 15.
-PRT="$(cfg multi_model_review.per_reviewer_timeout_seconds 180)"
-case "$PRT" in ''|*[!0-9]*) PRT=180 ;; esac
-BUDGET=$((PRT - 10))
-if [ -z "$ENVELOPE_OUT" ]; then
-  HOST_ID="$(printf '%s' "${SYNTHEX_HOST:-claude}" | tr 'a-z' 'A-Z')"
-  case "$HOST_ID" in ''|*[!A-Z0-9_]*) HOST_ID="CLAUDE" ;; esac
-  CAP=""
-  if [ -r "$HOSTS_ENV" ]; then
-    # shellcheck disable=SC1090
-    . "$HOSTS_ENV"
-    CAP_VAR="SYNTHEX_HOST_${HOST_ID}_SHELL_CAP"
-    CAP="${!CAP_VAR:-}"
-  fi
-  case "$CAP" in ''|*[!0-9]*) ;; *)
-    if [ $((CAP - 15)) -lt "$BUDGET" ]; then BUDGET=$((CAP - 15)); fi ;;
-  esac
-fi
-if [ "$BUDGET" -lt 1 ]; then BUDGET=1; fi
-SECONDS=0
-
-: > "$STDERR_LOG"
 USE_SANDBOX=1
 SANDBOX_RETRIED=0
 PARSE_RETRIED=0
 ATTEMPT=0
-RC=0
-TIMED_OUT=0
 
 # run_grok: one isolated invocation. Raw stdout lands in $RAW_ABS (atomic
 # rename on every path, timeout included) before anything parses it.
 run_grok() {
   ATTEMPT=$((ATTEMPT + 1))
   local left=$((BUDGET - SECONDS))
-  if [ "$left" -lt 1 ]; then left=1; fi
+  if [ "$left" -lt 1 ]; then
+    fail timeout "grok exceeded the ${BUDGET}s wall-clock budget (per_reviewer_timeout_seconds - 10, host-clamped) before review attempt $ATTEMPT could start."
+  fi
   local -a args
   args=(--prompt-file "$PROMPT" --output-format json --json-schema "$SCHEMA_JSON"
     --disallowed-tools "$DISALLOWED_TOOLS" --deny '*' --deny 'mcp__*'
@@ -489,39 +563,16 @@ run_grok() {
   args+=(--no-subagents --disable-web-search --max-turns "$MAX_TURNS")
   if [ -n "$MODEL" ]; then args+=(-m "$MODEL"); fi
   if [ -n "$JUDGE" ]; then args+=(--rules "$JUDGE"); fi
-  RC=0
-  TIMED_OUT=0
-  rm -f -- "$W/.timedout"
-  # Backgrounded and waited on, so an INT/TERM trap runs promptly and
-  # cleanup can stop the child.
-  if [ -n "$TIMEOUT_BIN" ]; then
-    (isolate; exec "$TIMEOUT_BIN" -k 5 "$left" grok "${args[@]}") \
-      > "$RAW_ABS.tmp" 2> "$W/stderr.$ATTEMPT" < /dev/null &
-    GROK_PID=$!
-  else
-    (isolate; exec grok "${args[@]}") > "$RAW_ABS.tmp" 2> "$W/stderr.$ATTEMPT" < /dev/null &
-    GROK_PID=$!
-    local pid=$GROK_PID
-    (sleep "$left"; : > "$W/.timedout"; kill -TERM "$pid" 2>/dev/null; sleep 5; kill -KILL "$pid" 2>/dev/null) \
-      < /dev/null > /dev/null 2>&1 &
-    WATCHDOG_PID=$!
+  guarded "$left" "$RAW_ABS.tmp" "$W/stderr.$ATTEMPT" "${args[@]}"
+  if ! mv -f -- "$RAW_ABS.tmp" "$RAW_ABS" 2>/dev/null; then
+    BAD_RAW="$RAW"
+    RAW=""
+    fail unknown_error "grok-review.sh could not write grok's output to raw_output_path $BAD_RAW (attempt $ATTEMPT exit $RC)."
   fi
-  wait "$GROK_PID" || RC=$?
-  GROK_PID=""
-  if [ -n "$WATCHDOG_PID" ]; then
-    kill "$WATCHDOG_PID" 2>/dev/null || true
-    WATCHDOG_PID=""
-  fi
-  if [ -n "$TIMEOUT_BIN" ]; then
-    case "$RC" in 124|137) TIMED_OUT=1 ;; esac
-  elif [ -e "$W/.timedout" ]; then
-    TIMED_OUT=1
-  fi
-  mv -f -- "$RAW_ABS.tmp" "$RAW_ABS"
   {
     printf '[grok-review.sh] attempt %s exit %s\n' "$ATTEMPT" "$RC"
     cat -- "$W/stderr.$ATTEMPT"
-  } >> "$STDERR_LOG"
+  } >> "$STDERR_LOG" 2>/dev/null || true
 }
 
 attempt_stderr() {
