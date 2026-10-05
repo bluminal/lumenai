@@ -5,6 +5,28 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 2.1.0] - 2026-10-05
+
+### Added
+
+- (synthex) implement FR-HM17 engine refute pass (Task 58)
+- (synthex) implement FR-HM16 review-code workflow engine (Task 57)
+- (synthex) fill FR-HM21 ladder level 2 with the FR-HM16 workflow engine gate
+
+### Fixed
+
+- (synthex) prevent workflow/command name collisions (Task 57, root cause)
+- (synthex) fix 5 defects in review-code workflow engine from live run (Task 57)
+- (synthex) review-code workflow meta is a pure literal at the top of the script (Task 57)
+
+### Changed
+
+- (plans) give Milestone 7.1 a proper Observational Outcomes line (fixes lint-plan zero-findings test)
+- (plans) record Task 58 done; Milestone 7.1 and Phase 7 complete
+- (plans) record Task 57 done; Task 58 in progress
+- (plans) record Task 56 done; Task 57 in progress
+- (plans) mark Task 56 in progress
+
 ## [synthex 2.0.1] - 2026-09-30
 
 ### Changed
