@@ -47,7 +47,7 @@ Run `which codex`. Missing → `validate-findings --error cli_missing --message 
 
 ### 2. Auth Check
 
-If `CODEX_API_KEY` or `OPENAI_API_KEY` is non-empty, skip this check (`codex exec` uses the key; `codex login status` reports only stored logins). Otherwise run `codex login status` (no model call) and judge by **exit code only**: it prints `Logged in using ...` on stderr, not stdout. Non-zero → `validate-findings --error cli_auth_failed --message "Run codex login"`.
+Per-token API billing is opt-in: unless `config.allow_api_key_billing` is true, unset `CODEX_API_KEY` and `OPENAI_API_KEY` for Steps 2 and 4. If opted in with a key set, skip this check. Otherwise run `codex login status` (no model call) and judge by **exit code only**: it prints `Logged in using ...` on stderr, not stdout. Non-zero → `validate-findings --error cli_auth_failed --message "Run codex login"`.
 
 ### 3. Prompt Construction
 
@@ -58,12 +58,12 @@ See adapter-common.md; embed `canonical-finding-schema.md`. Write it to a `mktem
 Branch on `external_permission_mode.codex` (table above). Pattern 1, from the repo root:
 
 ```bash
-codex exec --sandbox read-only --ephemeral --skip-git-repo-check --json ${MODEL:+--model="$MODEL"} \
+env -u CODEX_API_KEY -u OPENAI_API_KEY codex exec --sandbox read-only --ephemeral --skip-git-repo-check --json ${MODEL:+--model="$MODEL"} \
   --output-schema <plugin_root>/agents/_shared/codex-findings.schema.json \
   -o "$LAST" - < "$PROMPT" > "$RAW" 2> "$RAW.err"
 ```
 
-`$RAW` (JSONL) = `raw_output_path`. Non-zero exit → `cli_failed` (`cli_auth_failed` if stderr mentions 401/login).
+Drop the `env -u …` prefix only when opted in. `$RAW` (JSONL) = `raw_output_path`. Non-zero exit → `cli_failed` (`cli_auth_failed` if stderr mentions 401/login).
 
 ### 5. Output Parsing
 

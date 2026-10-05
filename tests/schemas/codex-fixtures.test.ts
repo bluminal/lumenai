@@ -316,7 +316,7 @@ describe('(d) cli-missing — which codex returns nothing → cli_missing', () =
 
 // ── (e) Auth via environment variable ─────────────────────────────────────────
 
-describe('(e) auth-via-env — CODEX_API_KEY set, no stored login → auth check skipped', () => {
+describe('(e) auth-via-env — CODEX_API_KEY set and allow_api_key_billing opted in → auth check skipped', () => {
   const fixture = loadFixture('auth-via-env');
   const adapter = readFileSync(CODEX_AGENT_MD, 'utf-8');
   const step2 = adapter.split('### 2. Auth Check')[1]?.split(/\n### /)[0] ?? '';
@@ -326,6 +326,18 @@ describe('(e) auth-via-env — CODEX_API_KEY set, no stored login → auth check
     expect(ls.command).toBe('codex login status');
     expect(ls.exit_status).toBe(1);
     expect(ls.stderr).toBe('Not logged in');
+  });
+
+  it('per-token API billing is opt-in: without allow_api_key_billing the keys are unset and login status fails closed', () => {
+    // No surprise usage billing (matches Grok D26 in docs/plans/multi-model-review.md).
+    expect(fixture.config).toEqual({ allow_api_key_billing: true });
+    const w = fixture.without_opt_in as Record<string, unknown>;
+    expect(w.keys_unset).toEqual(['CODEX_API_KEY', 'OPENAI_API_KEY']);
+    expect(w.auth_check_runs).toBe(true);
+    expect(w.expected_error_code).toBe('cli_auth_failed');
+    expect(step2).toContain('allow_api_key_billing');
+    expect(step2).toMatch(/unset `CODEX_API_KEY` and `OPENAI_API_KEY`/);
+    expect(adapter).toContain('env -u CODEX_API_KEY -u OPENAI_API_KEY codex exec --sandbox read-only');
   });
 
   it('fixture: auth check is skipped and the adapter proceeds to codex exec', () => {
