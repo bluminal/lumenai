@@ -393,7 +393,7 @@ implementation_plan:
 
 ## Native Looping
 
-This command supports the native Synthex looping primitive (introduced by `docs/plans/native-looping.md`). Pass `--loop` to iterate until the completion promise is emitted or `--max-iterations` is reached. The mechanical iteration framework — state file schema, loop-id rules, shared-context vs. fresh-subagent iteration, auto-compaction guarantees, promise emission, iteration markers — lives once in [`plugins/synthex/docs/native-looping.md`](../docs/native-looping.md). Only the command-specific bits are inlined below.
+**Loop engine (FR-HM19, D34):** when `--loop` is set, before the first iteration run `bash <plugin-root>/scripts/lib/config-get.sh native_looping.engine prose`; if it prints exactly `workflow`, `--loop-isolated` is not set, and a `Workflow` tool is in your tool list, Read `${CLAUDE_PLUGIN_ROOT}/docs/engines/loop-workflow.md` and follow it (this instruction is the `Workflow` opt-in, D31); otherwise follow this command's Stage 1 loop prose unchanged, never a host feature named Workflow. `<plugin-root>` is the installed plugin root (other hosts: `plugin_root` in `.synthex/state.json`).
 
 ### Emission Point
 
