@@ -1,6 +1,6 @@
 # Adapter Recipes — v1 Adapter Set
 
-> Per-adapter install, auth, sandbox, recommended-model, and gotcha guides for the v1 adapters (Codex, Gemini, Ollama), the fast-follow adapters (llm, Bedrock, Claude) and the Phase 9 adapters (Grok, §8). Plus a "writing a new adapter" guide per NFR-MR5 (§7).
+> Per-adapter install, auth, sandbox, recommended-model, and gotcha guides for the v1 adapters (Codex, Gemini, Ollama), the fast-follow adapters (llm, Bedrock, Claude) and the Phase 9 adapters (Grok, §8; Cursor, §9). Plus a "writing a new adapter" guide per NFR-MR5 (§7).
 
 ## Status: Final
 
@@ -387,3 +387,70 @@ grok --prompt-file <W>/prompt.txt --output-format json \
 5. **Latency.** `--json-schema` took 65 s against 21 s on the text path in the spike (one sample each). A host that cannot background the runner gets a 105 s clamp (U22) and may see `timeout`.
 6. **CLI drift.** The runner sets `GROK_DISABLE_AUTOUPDATER=1`. After a version bump, re-capture the help fixtures under `tests/fixtures/multi-model-review/adapters/grok/cli-help/`; `grok-review-runner-behavioral.test.ts` fails on a flag the help no longer lists.
 7. **Headless docs use `--yolo`.** The runner never does; never copy a docs example into a reviewer config.
+
+## 9. Cursor (Cursor Agent CLI)
+
+`cursor-review-prompter` is a thin agent: every CLI step lives in the runner `plugins/synthex/scripts/adapters/cursor-review.sh` (multi-model-review D28), which the orchestrator's depth-1 path runs too. It is a `text-only` proposer (D25): every Cursor tool is denied, and the bundle inlined in the prompt is the model's only context. It has **no default family**: `per_reviewer.cursor-review-prompter.model` (an explicit slug, never `auto`) and `.family` are both required (D26). Evidence for everything below is the Cursor half of the Task 67 spike, `docs/specs/multi-model-review/spike-grok-cursor.md` (Cursor Agent CLI 2026.10.01-e373342).
+
+### Install one-liner
+
+```bash
+curl https://cursor.com/install -fsS | bash
+```
+
+The installer puts two names on PATH, `cursor-agent` and `agent`, and every help usage line names the program `agent`. The adapter hardcodes `cursor-agent` and never calls `agent`, which can be another CLI's binary (Grok ships an `agent` symlink too; Risk 11, U14).
+
+### Auth setup
+
+```bash
+cursor-agent login
+```
+
+The adapter's auth check is the runner's `--auth-check`. It runs the D26 model and family guard first, then `cursor-agent status --format json` (it sends no prompt) from the same scratch workspace, with the same deny file and environment as a review:
+
+| Exit | Meaning |
+|---|---|
+| 0 | A logged-in form was positively matched (JSON `isAuthenticated`/`authenticated`/`isLoggedIn`/`loggedIn: true` or `status: "authenticated"`, or the text form `Logged in as …`) and `status` exited 0 |
+| 10 | `cursor-agent` is not on PATH |
+| 11 | Anything else: an explicit logged-out form, an unrecognised answer, no answer within the bound, a deny file that could not be written, or a scratch dir that could not be entered (fails closed) |
+| 12 | No explicit non-Auto model or no family is configured (D26), or only `CURSOR_API_KEY` is available and per-request billing is not opted into |
+
+**Gap (U13).** No logged-in `status --format json` output has been captured yet, so the logged-in JSON forms above are a synthetic fixture. If a real CLI prints a shape the runner does not recognise, `--auth-check` exits 11 and preflight never counts Cursor as available; capture the output as a free check and pin it in `cursor-review-runner-behavioral.test.ts`. The check also cannot see the plan tier (D43): a Free-plan account passes it and fails on its first review (below).
+
+**Billing (D26, Q10).** The runner unsets `CURSOR_API_KEY` for every cursor-agent call unless `multi_model_review.per_reviewer.cursor-review-prompter.allow_api_key_billing: true`, so the login session is used and a usage-billed key never silently replaces it (U21 is gated: whether the key draws on the same pools is unverified). Every run uses the account's plan pools and can spill into on-demand usage; Teams surcharges apply. Cursor is a **second hop**: the review goes to Cursor, which forwards the bundle to the vendor behind the slug, so both companies' retention terms apply. The runner logs `init.apiKeySource` for every attempt.
+
+### Recommended flagship model
+
+Pick an explicit slug from `cursor-agent models` and set the matching family; the runner never uses `auto` (Auto hides the routed model, which breaks family accounting). `system:init.model` is a display name (`Gemini 3.7 Flash High`), so `usage.model` is always the configured slug, with `inputTokens` and `outputTokens` from the `result` event (NFR-MR4). Advisory families: `claude-*` → `anthropic`, `gpt-*` → `openai`, `gemini-*` → `google`, `cursor-grok-*` → `xai`, and `composer-*` → `unknown` until its lineage is confirmed. Twenty display names carry `(NO ZDR)` (no zero data retention); avoid them for code that must not be retained. **Max Mode** is a `maxMode` setting in `~/.cursor/cli-config.json`, not a slug suffix (the `-max` slugs are an effort tier), so no slug can rule it out; check the account setting. **Aggregator pinning (D31):** Cursor is not in the D17 tier table, but a flagship slug can make it the strongest configured proposer; pin `multi_model_review.aggregator.command` when that is not wanted. When it is the aggregator, `judge_mode_prompt` goes first in the prompt under `--- ROLE ---`.
+
+### Sandbox flags (FR-MR26)
+
+The runner's argv, run from the scratch workspace `<W>` with the prompt on stdin:
+
+```bash
+cursor-agent -p --mode ask --sandbox enabled --trust --output-format stream-json --model <slug> < <prompt on stdin>
+```
+
+- **The read boundary is the deny file (D37), not `--mode ask`.** Before any cursor-agent call the runner writes `<W>/.cursor/cli.json`, byte-for-byte from `plugins/synthex/scripts/adapters/cursor-deny-all.cli.json` (the exact file C7 tested), and reads it back:
+
+  ```json
+  { "permissions": { "allow": [], "deny": ["Read(**)", "Read(/**)", "Read(~/**)", "Write(**)", "Write(/**)", "Shell(*)", "Mcp(*:*)"] } }
+  ```
+
+  If it cannot be written, or reads back differently, the result is `cli_failed` and cursor-agent is never spawned. Without it, ask mode and `--sandbox enabled` did not confine reads: C4 read a canary outside the workspace and leaked it, and C4b read the review target. With it, C7's reads (through `/tmp` and `/private/tmp`) and its shell call were denied and nothing leaked. The file layers over the global config, so `CURSOR_CONFIG_DIR` is never set and the login stays intact. `system:init.permissionMode` reports `default` on every run; the runner logs it and never gates on it.
+- **Untested rules (Q9).** `Write(**)`, `Write(/**)` and `Mcp(*:*)` were never exercised, and there is no `WebFetch(*)` rule yet: adding one waits on a live run that shows the file still loads with it. Until then the tool-call scan reports a successful web, write or MCP call as `sandbox_violation`, but only after the content was sent.
+- **Re-run C7 after every Cursor version bump** (Risk 9), alongside the help fixtures under `tests/fixtures/multi-model-review/adapters/cursor/cli-help/`: a CLI that stopped reading `.cursor/cli.json` would drop the deny layer silently. `cursor-review-runner-behavioral.test.ts` fails offline on a flag the help no longer lists, but only a live C7 proves the file still loads.
+- **Tool-call scan (D38).** Every stream is scanned in node or jq before the exit code or the `result` event is mapped. Only an `error` result, a `permissionDenied` result and an empty `globToolCall` success are tolerated; any other completed call, an unknown shape or subtype, a call that never completes, or a `*ToolCall` payload outside a `tool_call` event is `sandbox_violation`, which outranks `success`, `cli_failed` and `timeout`. The raw output is kept.
+- **Prompt on stdin (D39).** No prompt argument, no `review-input.txt`, no bundle file anywhere: the prompt is piped from the runner's memory, so it is not in the process table and Linux's 131,072-byte argument cap does not apply (C8 sent 158,339 bytes this way). The only file the runner writes to `<W>` is `.cursor/cli.json`.
+- Never `-f`/`--force`, `--yolo`, `--approve-mcps`, `--auto-review` (a server classifier that auto-runs tool calls), `--api-key` (a credential in argv), `--add-dir`, `--plugin-dir` or `--stream-partial-output` (it would split the assistant messages the unwrap reads).
+
+**Output mapping.** Raw stdout goes to `config.raw_output_path` atomically before parsing; it holds the `user` echo (the whole bundle) and any tool results, so treat it like the prompt: never commit it or copy it into logs. After the scan: the wall-clock guard gives `timeout` (partial raw kept); CLI exit 130 is `cli_failed`; a non-zero exit or a missing `result` event maps `Named models unavailable` to D43's Free-plan message, `Cannot use this model:` to a `cli_failed` that names the slug and `cursor-agent models`, a login error to `cli_auth_failed`, and anything else to `cli_failed`. Then the `result` event's subtype must be exactly `success` and `is_error` exactly `false` (decided in node or jq). Findings come from the **last `assistant` message** (D40), falling back to `.result` only when there is none, because `.result` glues every narrated preamble to the JSON. `parse_failed` is retried once. The guard is `per_reviewer_timeout_seconds` minus 10, clamped to the host shell cap minus 15 when there is no `--envelope-out`, and it covers the auth probe too. A `raw_output_path` that cannot be written gives `unknown_error` before any call; `parent-mediated` is `cli_unsupported_mode` without spawning (D29). On SIGINT or SIGTERM the runner stops cursor-agent, keeps any partial raw output, prints a `cli_failed` envelope and writes it to `--envelope-out`, then exits 130 or 143.
+
+### Known gotchas
+
+1. **User hooks run (D41).** Hooks the user's Cursor loads fire once per review, and that apparently includes Claude Code hooks: in C7 the user's RTK hook rewrote `cat` to `rtk read` inside the review, with no `~/.cursor/hooks.json` present (U16). No per-run switch exists, and relocating the config dir would lose the login. The runner never edits `~/.cursor/hooks.json`, `~/.claude/settings.json` or any other hook config. MCP servers from the user's plugins also load: C4's catalog call listed two of them, which is one reason `Mcp(*:*)` is in the deny file.
+2. **Local state and cleanup (D42).** Each review leaves `~/.cursor/projects/<slug of the workspace>/` (a trust marker, `worker.log` and the transcript) and `~/.cursor/chats/<hash>/<session_id>/store.db`, both holding the bundle (U15). After every run, including failures, timeouts and interrupts, the runner deletes exactly those two paths: the slug is derived from its own canonical workspace (`private-tmp-synthex-cursor-<suffix>`) and the `session_id` from its own stream's `system:init`. An id or slug that does not match a strict pattern, and any symlinked path, deletes nothing (state is kept rather than risked); a run with no session (C6) removes only its projects entry. If Cursor changes its slug scheme, the derived path does not exist and nothing is deleted (Risk 16): re-check U15 after version bumps.
+3. **Free plan (D43).** Cursor's Free plan allows only Auto, so a named model fails with `ActionRequiredError: Named models unavailable` (C3). The runner returns `cli_failed` with an actionable message (upgrade the plan, or remove `cursor-review-prompter` from `multi_model_review.reviewers`) and never retries with Auto. `--auth-check` cannot see the plan, so a Free-plan account passes preflight and fails on its first review; the wizard therefore lists Cursor for manual opt-in only (Task 70).
+4. **Per-call overhead.** Cursor adds about 16k tokens of its own context to every call, retries included (a 1,094-byte prompt used 16,490 input tokens in C3b), so a `parse_failed` retry costs a full second call.
+5. **No bounding flags.** There is no turn, timeout or tool-removal flag; the deny file and the runner's wall-clock guard are the only bounds.
+6. **Benign runs can be flagged.** A model that lists its tool catalog trips the D38 scan even though nothing was read; the prompt says the model has no tools, which drew no tool calls in C3b, C5 and C8.

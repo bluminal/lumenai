@@ -190,3 +190,19 @@ describe('Task 68: grok-review-prompter registration and agents order', () => {
     expect(parsed.agents).toEqual([...parsed.agents].sort());
   });
 });
+
+describe('Task 69: cursor-review-prompter registration', () => {
+  let parsed: any;
+  beforeAll(() => {
+    parsed = JSON.parse(readFileSync(PLUGIN_JSON, 'utf8'));
+  });
+
+  it('agents array contains ./agents/cursor-review-prompter.md, in alphabetical order', () => {
+    expect(parsed.agents).toContain('./agents/cursor-review-prompter.md');
+    expect(parsed.agents).toEqual([...parsed.agents].sort());
+  });
+
+  it('cursor-review-prompter.md exists on disk', () => {
+    expect(existsSync(join(AGENTS_DIR, 'cursor-review-prompter.md'))).toBe(true);
+  });
+});

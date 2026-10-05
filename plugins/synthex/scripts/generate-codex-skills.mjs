@@ -181,6 +181,8 @@ export const AGENT_DESCRIPTIONS = {
     'Reviews code for craftsmanship, correctness, convention adherence, and reuse opportunities.',
   'codex-review-prompter':
     'Adapter that invokes the OpenAI Codex CLI as an external proposer in multi-model review.',
+  'cursor-review-prompter':
+    'Adapter that invokes the Cursor Agent CLI as an external code-review proposer in multi-model review.',
   'design-system-agent':
     'Owns the design token registry and component library; audits frontend design-system compliance.',
   'findings-consolidator':

@@ -48,6 +48,8 @@ const ADAPTERS = [
   { agent: 'ollama-review-prompter.md', cliBinary: 'ollama' },
   // multi-model-review Task 68: the binary is hardcoded in the runner script.
   { agent: 'grok-review-prompter.md', cliBinary: 'grok' },
+  // multi-model-review Task 69: hardcoded in the runner; never the `agent` alias.
+  { agent: 'cursor-review-prompter.md', cliBinary: 'cursor-agent' },
 ];
 
 describe('Task 88 [T] (1): Layer 1 enum-key validation for external_permission_mode', () => {

@@ -295,15 +295,15 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
       '(FR-HM28) adds 6 more gates — one per *-review-prompter.md adapter — all pointing ' +
       'at docs/adapter-common.md; Task 45 (FR-HM26) adds 1 more gate in ' +
       'write-implementation-plan.md\'s Step 5.5 no-node prose fallback, pointing at ' +
-      'docs/plan-lint-rubric.md; multi-model-review Task 68 adds 1 more in grok-review-prompter.md, ' +
-      'pointing at docs/adapter-common.md',
+      'docs/plan-lint-rubric.md; multi-model-review Task 68 adds 1 more in grok-review-prompter.md and ' +
+      'Task 69 1 more in cursor-review-prompter.md, both pointing at docs/adapter-common.md',
     () => {
       const nativeLoopingMentions = files.reduce((count, relFile) => {
         const text = readFileSync(join(ROOT, relFile), 'utf8');
         return count + (text.match(/docs\/native-looping\.md/g) ?? []).length;
       }, 0);
       expect(nativeLoopingMentions).toBeGreaterThanOrEqual(32);
-      expect(allIncludes).toHaveLength(17);
+      expect(allIncludes).toHaveLength(18);
       expect(new Set(allIncludes.map((i) => i.file))).toEqual(
         new Set([
           'plugins/synthex/commands/review-code.md',
@@ -312,6 +312,7 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
           'plugins/synthex/agents/bedrock-review-prompter.md',
           'plugins/synthex/agents/claude-review-prompter.md',
           'plugins/synthex/agents/codex-review-prompter.md',
+          'plugins/synthex/agents/cursor-review-prompter.md',
           'plugins/synthex/agents/gemini-review-prompter.md',
           'plugins/synthex/agents/grok-review-prompter.md',
           'plugins/synthex/agents/llm-review-prompter.md',
