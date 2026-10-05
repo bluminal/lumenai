@@ -491,6 +491,12 @@ The first headless attempt launched five `claude -p` runs concurrently; all fail
 ### Artifacts
 `$SCRATCH/spikes/task9/logs/` (A1–A3, B, C stdout and transcripts, docs dumps, `keychain-repair.txt`, `failed-auth-attempt1/`); workflow journal `wf_388da267-38b`.
 
+### Addendum (Task 57 live run, 2026-09-30, Claude Code 2.1.285)
+
+> Addendum (Task 57 live run, 2026-09-30, Claude Code 2.1.285): a plugin workflow's `meta.name` is registered as a slash command `<plugin>:<name>` and shadows a same-named plugin command; typing the command expands to "Run the … workflow". Workflow names must never match a command name.
+
+This resolves the first "Unknowns" bullet above in the stricter, more damaging direction: it is not merely a project-local-vs-plugin collision question — a plugin workflow collides with a plugin **command** of the same name, and the command loses outright (no error, no merge, just silent replacement). The Task 57 `[H]` live run hit this directly: a workflow at `plugins/synthex/workflows/review-code.js` with `meta.name: 'review-code'` made every `/synthex:review-code` invocation expand to "Run the 'synthex:review-code' workflow … Invoke: `Workflow({ name: "synthex:review-code" })`" instead of loading `commands/review-code.md` — skipping config resolution, the capability ladder, and the review loop regardless of `code_review.engine`. Fix: the script and its `meta.name` were renamed to `review-code-engine` (`plugins/synthex/workflows/review-code-engine.js`, invoked as `Workflow {"name": "synthex:review-code-engine"}`); `tests/schemas/workflow-names.test.ts` now statically asserts no `workflows/*.js` `meta.name` can collide with any command or agent name. See `plugins/synthex/docs/engines/review-code-workflow.md`'s "Live-run fixes" section for the full writeup.
+
 ## Task 10 — OQ-8: can a workflow-spawned `tech-lead` spawn Agent subagents? (FR-HM19 b)
 
 **Verdict:** refuted. **Fallback fired:** yes — the command orchestrates the fan-out.

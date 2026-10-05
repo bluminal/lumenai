@@ -157,3 +157,28 @@ describe('Task 29 (FR-HM17, D18): code_review.verification via the helper', () =
     expect(window, 'Expected the comment to reference FR-HM17').toMatch(/FR-HM17/);
   });
 });
+
+describe('Task 58 (FR-HM17): code_review.refute_pass via the helper', () => {
+  it('loadDefaultsYaml() exposes code_review.refute_pass: "off" (default, opt-in, separate from verification)', async () => {
+    const cfg = await loadDefaultsYaml();
+    expect(cfg.code_review.refute_pass).toBe('off');
+    // Both keys exist independently — refute_pass (engine) never replaces
+    // or aliases verification (prose path); see
+    // docs/engines/review-code-workflow.md "Adversarial Refute Pass
+    // (FR-HM17, Task 58)".
+    expect('refute_pass' in cfg.code_review).toBe(true);
+    expect('verification' in cfg.code_review).toBe(true);
+  });
+
+  it('loadDefaultsYamlText() contains refute_pass: off with a comment above it referencing FR-HM17 and Task 58', () => {
+    const text = loadDefaultsYamlText();
+    const lines = text.split('\n');
+    const idx = lines.findIndex((l) => /^\s*refute_pass:\s*off\s*$/.test(l));
+    expect(idx, 'Expected to find "refute_pass: off" in defaults.yaml').toBeGreaterThan(0);
+    const window = lines.slice(Math.max(0, idx - 16), idx + 1).join('\n');
+    expect(window, 'Expected a comment above refute_pass: off').toMatch(/#/);
+    expect(window, 'Expected the comment to reference FR-HM17').toMatch(/FR-HM17/);
+    expect(window, 'Expected the comment to reference Task 58').toMatch(/Task 58/);
+    expect(window, 'Expected the comment to call out it is a SEPARATE key from verification').toMatch(/SEPARATE/);
+  });
+});
