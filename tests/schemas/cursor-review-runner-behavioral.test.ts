@@ -173,6 +173,8 @@ exit $rc
 }
 
 const RECORDED_ENV = ['HOME', 'CURSOR_CONFIG_DIR', 'CURSOR_API_KEY', 'CURSOR_API_ENDPOINT'];
+const PS = which('ps');
+const CHMOD = which('chmod');
 
 /**
  * Stub cursor-agent. `status` records itself and prints
@@ -182,8 +184,11 @@ const RECORDED_ENV = ['HOME', 'CURSOR_CONFIG_DIR', 'CURSOR_API_KEY', 'CURSOR_API
  * status.exit. Any other call is a review invocation N: it records argv,
  * stdin, env, pwd, the workspace listing, the deny file and (with
  * STUB_GREP) which files under the workspace and state dirs contain that
- * string; simulates Cursor's local state; then prints N.stdout (else
- * default.stdout), sleeps N.sleep, prints N.stderr and exits N.exit.
+ * string; simulates Cursor's local state; runs N.hook (else default.hook)
+ * with bash in the workspace (STUB_SLUG is its Cursor slug, STUB_PROJ the
+ * project); then prints N.stdout (else default.stdout), sleeps N.sleep,
+ * prints N.stderr and exits N.exit. status.hook runs the same way, before
+ * the status answer.
  */
 function stubBody(): string {
   return `L="$STUB_LOG"; D="$STUB_SCENARIO"
@@ -193,6 +198,7 @@ if [ "\${1:-}" = "status" ]; then
   n=$(cat "$L/status.count" 2>/dev/null || printf 0); n=$((n + 1)); printf '%s' "$n" > "$L/status.count"
   printf '%s\\0' "$@" > "$L/status-$n.argv"; pwd -P > "$L/status-$n.pwd"; dump_env > "$L/status-$n.env"
   listing . > "$L/status-$n.ls"
+  if [ -e "$D/status.hook" ]; then bash "$D/status.hook" < /dev/null > /dev/null 2>&1; fi
   if [ -e "$D/status.stdout" ]; then cat "$D/status.stdout"; else printf '{"isAuthenticated":true,"email":"<email>"}\\n'; fi
   if [ -e "$D/status.swap" ]; then d=$(pwd -P); mv "$d" "$d.moved"; ln -s "$d.moved" "$d"; fi
   if [ -e "$D/status.sleep" ]; then sleep "$(cat "$D/status.sleep")"; fi
@@ -216,6 +222,7 @@ if [ -e "$D/session" ]; then
   mkdir -p "$HOME/.cursor/chats/$h/$s" && : > "$HOME/.cursor/chats/$h/$s/store.db"
 fi
 pick() { if [ -e "$D/$n.$1" ]; then printf '%s' "$D/$n.$1"; elif [ -e "$D/default.$1" ]; then printf '%s' "$D/default.$1"; fi; }
+f=$(pick hook); if [ -n "$f" ]; then STUB_SLUG="$slug" bash "$f" < /dev/null > /dev/null 2>&1; fi
 f=$(pick stdout); if [ -n "$f" ]; then cat "$f"; fi
 f=$(pick sleep); if [ -n "$f" ]; then sleep "$(cat "$f")"; fi
 f=$(pick stderr); if [ -n "$f" ]; then cat "$f" >&2; fi
@@ -258,7 +265,8 @@ exec bash "${join(PLUGIN, 'scripts', 'validate-findings')}" "$@"
 // Recordings, scenarios and the run helper
 // ---------------------------------------------------------------------------
 
-type Step = { stdout?: string; stderr?: string; exit?: number; sleep?: number };
+/** hook: a bash script the stub runs in the workspace before printing stdout. */
+type Step = { stdout?: string; stderr?: string; exit?: number; sleep?: number; hook?: string };
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Ev = Record<string, any>;
 
@@ -368,6 +376,8 @@ type RunOpts = {
   statusSleep?: number;
   statusExit?: number;
   statusSwap?: boolean;
+  /** A bash script the stub runs in the workspace during `status`. */
+  statusHook?: string;
   /** The stub creates ~/.cursor/chats/<hash>/<session> for every review call. */
   session?: string;
   hash?: string;
@@ -438,7 +448,9 @@ function setupCase(opts: RunOpts = {}): Case {
     if (step.stderr !== undefined) writeFileSync(join(scen, `${key}.stderr`), step.stderr);
     if (step.exit !== undefined) writeFileSync(join(scen, `${key}.exit`), String(step.exit));
     if (step.sleep !== undefined) writeFileSync(join(scen, `${key}.sleep`), String(step.sleep));
+    if (step.hook !== undefined) writeFileSync(join(scen, `${key}.hook`), step.hook);
   }
+  if (opts.statusHook !== undefined) writeFileSync(join(scen, 'status.hook'), opts.statusHook);
   if (opts.status !== undefined) writeFileSync(join(scen, 'status.stdout'), opts.status);
   if (opts.statusSleep !== undefined) writeFileSync(join(scen, 'status.sleep'), String(opts.statusSleep));
   if (opts.statusExit !== undefined) writeFileSync(join(scen, 'status.exit'), String(opts.statusExit));
@@ -471,6 +483,7 @@ function setupCase(opts: RunOpts = {}): Case {
       STUB_LOG: log,
       STUB_SCENARIO: scen,
       VF_LOG: vfLog,
+      STUB_PROJ: proj,
       HOME: home,
       ...(opts.grep ? { STUB_GREP: opts.grep } : {}),
       ...(opts.env ?? {}),
@@ -570,6 +583,22 @@ const SCRATCH_RE = /^(\/private)?\/tmp\/synthex-cursor\.[A-Za-z0-9]{6}$/;
 const EXACT_ARGV = ['-p', '--mode', 'ask', '--sandbox', 'enabled', '--trust', '--output-format', 'stream-json', '--model', SLUG];
 const NEVER_FLAGS = ['-f', '--force', '--yolo', '--approve-mcps', '--auto-review', '--api-key', '--add-dir', '--plugin-dir', '--stream-partial-output'];
 
+/**
+ * Both JSON-tool paths: node, and the jq fallback hosts without node take
+ * (skipped, not dropped, on a host without jq).
+ */
+const TOOL_PATHS: Array<[string, BinOpts, boolean]> = [
+  ['node', { node: true }, false],
+  ['jq only', { node: false, jq: true }, !HAS_JQ],
+];
+
+/** Live processes whose command line contains <tag> (forked runner subshells keep the runner's argv). */
+function procsMatching(tag: string): string[] {
+  if (!PS) return [];
+  const r = spawnSync(PS, ['-axo', 'pid=,command='], { encoding: 'utf8' });
+  return (r.stdout ?? '').split('\n').filter((l) => l.includes(tag) && !l.includes(' ps -axo'));
+}
+
 /** Both timeout branches: the bash watchdog, and timeout/gtimeout when installed. */
 const BRANCHES: Array<[string, BinOpts]> = [
   ['bash watchdog', { timeout: false }],
@@ -636,7 +665,7 @@ describe('argv, stdin, isolation env and cwd (stub cursor-agent records them)', 
     r = collect(
       await run({
         envelopeConfig: { judge_mode_prompt: judge },
-        env: { CURSOR_CONFIG_DIR: '/nonexistent/cursor-config', CURSOR_API_KEY: 'dummy-test-value' },
+        env: { CURSOR_CONFIG_DIR: '/nonexistent/cursor-config', CURSOR_API_KEY: 'dummy-test-value', CURSOR_API_ENDPOINT: 'https://endpoint.invalid' },
         grep: 'Use bound parameters.',
       }),
       'input',
@@ -698,6 +727,11 @@ describe('argv, stdin, isolation env and cwd (stub cursor-agent records them)', 
     }
   });
 
+  it('CURSOR_API_ENDPOINT is absent from the probe and the review although the parent set it (the bundle and login go only to Cursor)', () => {
+    expect(r.invocations[0].env).not.toHaveProperty('CURSOR_API_ENDPOINT');
+    expect(r.statusCalls[0].env).not.toHaveProperty('CURSOR_API_ENDPOINT');
+  });
+
   it('CURSOR_API_KEY is absent without the allow_api_key_billing opt-in (D26, Q10)', () => {
     expect(r.invocations[0].env).not.toHaveProperty('CURSOR_API_KEY');
     expect(r.statusCalls[0].env).not.toHaveProperty('CURSOR_API_KEY');
@@ -730,15 +764,25 @@ describe.concurrent('prompt delivery and key opt-in', () => {
     expect(r.invocations[0].stdin).not.toContain('--- ROLE ---');
   }, T);
 
-  it('keeps CURSOR_API_KEY with the per-reviewer opt-in (config) or the envelope opt-in', async () => {
+  it('keeps CURSOR_API_KEY with the per-reviewer project-config opt-in', async () => {
     const a = await run({
       env: { CURSOR_API_KEY: 'dummy-test-value' },
       config: 'multi_model_review:\n  per_reviewer:\n    cursor-review-prompter:\n      allow_api_key_billing: true\n',
     });
     expect(a.invocations[0].env.CURSOR_API_KEY).toBe('dummy-test-value');
     expect(a.statusCalls[0].env.CURSOR_API_KEY).toBe('dummy-test-value');
+  }, T);
+
+  it('the input envelope alone cannot opt in: config.allow_api_key_billing true without the project-config opt-in leaves CURSOR_API_KEY unset (D26, Q10)', async () => {
     const b = await run({ env: { CURSOR_API_KEY: 'dummy-test-value' }, envelopeConfig: { allow_api_key_billing: true } });
-    expect(b.invocations[0].env.CURSOR_API_KEY).toBe('dummy-test-value');
+    expect(b.invocations).toHaveLength(1);
+    expect(b.invocations[0].env).not.toHaveProperty('CURSOR_API_KEY');
+    expect(b.statusCalls[0].env).not.toHaveProperty('CURSOR_API_KEY');
+    // Logged out with only the key: the envelope flag does not turn it into an opt-in.
+    const c = await run({ env: { CURSOR_API_KEY: 'dummy-test-value' }, envelopeConfig: { allow_api_key_billing: true }, status: '{"isAuthenticated":false}' });
+    expect(c.envelope?.error_code).toBe('cli_auth_failed');
+    expect(c.envelope?.error_message).toContain('only CURSOR_API_KEY');
+    expect(c.invocations).toHaveLength(0);
   }, T);
 });
 
@@ -783,6 +827,44 @@ describe.concurrent('deny file (D37)', () => {
     expect(a.status).toBe(11);
     expect(a.statusCalls).toHaveLength(0);
     expect(a.stderr).toContain('deny file');
+  }, T);
+});
+
+describe.concurrent.each(TOOL_PATHS)('deny file read back right before every cursor-agent spawn (D37; %s)', (_tool, tool, skip) => {
+  const itT = skip ? it.skip : it;
+  const PERMISSIVE = `printf '%s' '{"permissions":{"allow":["Read(**)"],"deny":[]}}' > .cursor/cli.json`;
+  const REMOVE = 'rm -f .cursor/cli.json';
+
+  itT('the read-back differs (cli.json is a symlink to /dev/null): cli_failed with 0 calls; --auth-check exits 11', async () => {
+    const r = await run({ bin: { ...tool, mkdirHook: 'devnull' } });
+    expect(r.envelope?.error_code).toBe('cli_failed');
+    expect(r.envelope?.error_message).toContain('deny file');
+    expect(r.invocations).toHaveLength(0);
+    expect(r.statusCalls).toHaveLength(0);
+    const a = await run({ auth: true, config: AUTH_CONFIG, bin: { ...tool, mkdirHook: 'devnull' } });
+    expect(a.status).toBe(11);
+    expect(a.statusCalls).toHaveLength(0);
+  }, T);
+
+  itT.each([
+    ['rewritten with permissive rules', PERMISSIVE],
+    ['removed', REMOVE],
+  ])('the auth probe left it %s: cli_failed, and the review is never spawned', async (_label, statusHook) => {
+    const r = await run({ bin: tool, statusHook });
+    expect(r.statusCalls).toHaveLength(1);
+    expect(r.invocations).toHaveLength(0);
+    expect(r.envelope?.error_code).toBe('cli_failed');
+    expect(r.envelope?.error_message).toContain('Before review attempt 1, the D37 deny file');
+  }, T);
+
+  itT.each([
+    ['rewritten with permissive rules', PERMISSIVE],
+    ['removed', REMOVE],
+  ])('review attempt 1 left it %s before a parse_failed retry: cli_failed, and the retry is never spawned', async (_label, hook) => {
+    const r = await run({ bin: tool, steps: { '1': { stdout: stream([], { answer: 'prose' }), exit: 0, hook }, default: { stdout: stream(), exit: 0 } } });
+    expect(r.invocations).toHaveLength(1);
+    expect(r.envelope?.error_code).toBe('cli_failed');
+    expect(r.envelope?.error_message).toContain('Before review attempt 2, the D37 deny file');
   }, T);
 });
 
@@ -834,13 +916,14 @@ const READ_OK = (id: string, path = '/tmp/x.txt', content = 'file body') => [
   toolCall('completed', id, { readToolCall: { args: { path }, result: { success: { path, content } } } }),
 ];
 
-describe.concurrent('tool-call scan (D38): the frozen result-shape allowlist, run before any other mapping', () => {
-  it.each([
+describe.concurrent.each(TOOL_PATHS)('tool-call scan (D38): the frozen result-shape allowlist, run before any other mapping (%s)', (_tool, tool, skip) => {
+  const itT = skip ? it.skip : it;
+  itT.each([
     ['c4-adversarial-no-deny-file', 2],
     ['c4b-neutral-read-no-deny-file', 1],
   ] as const)('%s gives sandbox_violation with %i violation(s), and the raw output is kept', async (name, n) => {
     const step = rec(name);
-    const r = await run({ steps: { default: step } });
+    const r = await run({ bin: tool, steps: { default: step } });
     expect(r.envelope?.status).toBe('failed');
     expect(r.envelope?.error_code).toBe('sandbox_violation');
     expect(violationCount(r)).toBe(n);
@@ -853,7 +936,7 @@ describe.concurrent('tool-call scan (D38): the frozen result-shape allowlist, ru
   const PAYLOAD_OUTSIDE = assistant(ANSWER);
   (PAYLOAD_OUTSIDE.message as Ev).readToolCall = { result: { success: { content: 'x' } } };
 
-  it.each([
+  itT.each([
     ['an unknown result shape', [toolCall('started', 'a', { readToolCall: { args: {} } }), toolCall('completed', 'a', { readToolCall: { result: { rejected: {} } } })]],
     ['a started call that never completes', [toolCall('started', 'a', { readToolCall: { args: { path: 'a' } } })]],
     ['an unknown tool_call subtype', [toolCall('updated', 'a', { readToolCall: { args: {} } })]],
@@ -863,26 +946,87 @@ describe.concurrent('tool-call scan (D38): the frozen result-shape allowlist, ru
     ['a tool_call event with two payloads', [toolCall('completed', 'b', { readToolCall: { result: { error: { errorMessage: 'x' } } }, shellToolCall: { result: { error: { errorMessage: 'x' } } } })]],
     ['a glob that found files', [toolCall('completed', 'g', { globToolCall: { result: { success: { files: ['a'], totalFiles: 1 } } } })]],
     ['an error result with an extra key', [toolCall('completed', 'e', { readToolCall: { result: { error: { errorMessage: 'x', content: 'y' } } } })]],
+    ['a permissionDenied result with an extra key (stdout)', [toolCall('completed', 'p', { shellToolCall: { result: { permissionDenied: { command: 'cat x', stdout: 'LEAKED-CONTENT' } } } })]],
+    ['a permissionDenied result with a non-string command', [toolCall('completed', 'p', { shellToolCall: { result: { permissionDenied: { command: { text: 'LEAKED-CONTENT' } } } } })]],
+    ['an empty-files success on a readToolCall (only a glob may have one)', [toolCall('completed', 'r', { readToolCall: { result: { success: { files: [], totalFiles: 0 } } } })]],
+    ['an empty glob success with an extra key', [toolCall('completed', 'g', { globToolCall: { result: { success: { files: [], totalFiles: 0, matches: ['/etc/hosts: LEAKED-CONTENT'] } } } })]],
+    ['an empty glob success with a mistyped key', [toolCall('completed', 'g', { globToolCall: { result: { success: { files: [], totalFiles: 0, pattern: 5 } } } })]],
+    ['a tool_call event with no *ToolCall payload', [{ type: 'tool_call', subtype: 'completed', call_id: 'n', tool_call: { other: {} } }]],
+    ['a tolerated error result whose event has no call_id', [{ type: 'tool_call', subtype: 'completed', tool_call: { readToolCall: { result: { error: { errorMessage: 'x' } } } } }]],
   ] as Array<[string, Ev[]]>)('synthetic: %s is a violation, even with a clean answer and exit 0', async (_label, middle) => {
-    const r = await run({ steps: { default: { stdout: stream(middle), exit: 0 } } });
+    const r = await run({ bin: tool, steps: { default: { stdout: stream(middle), exit: 0 } } });
     expect(r.envelope?.error_code).toBe('sandbox_violation');
     expect(violationCount(r)).toBe(1);
     expect(normalizeCalls(r)).toHaveLength(0);
   }, T);
 
-  it('a violation in a line with reordered keys and extra whitespace is still found (parsed, not string-matched)', async () => {
+  // Raw lines: only text can carry an id a double cannot hold.
+  const tcLine = (subtype: string, id: string | null, result?: string) =>
+    `{"type":"tool_call","subtype":"${subtype}"${id === null ? '' : `,"call_id":${id}`},"tool_call":{"readToolCall":{"args":{}${result ? `,"result":${result}` : ''}}}}`;
+  const ERR = '{"error":{"errorMessage":"denied"}}';
+  itT.each([
+    ['numeric ids that differ but round to the same double', [tcLine('started', '12345678901234567890'), tcLine('completed', '12345678901234567891', ERR)]],
+    ['no id when started, a null id when completed', [tcLine('started', null), tcLine('completed', 'null', ERR)]],
+    ['equal numeric ids', [tcLine('started', '7'), tcLine('completed', '7', ERR)]],
+    ['equal empty-string ids', [tcLine('started', '""'), tcLine('completed', '""', ERR)]],
+  ])('a call_id that is not a non-empty string (%s) is a violation on both tool paths, so node and jq cannot pair calls differently', async (_label, lines) => {
+    const r = await run({ bin: tool, steps: { default: { stdout: nd([INIT]) + lines.join('\n') + '\n' + nd([assistant(ANSWER), result()]), exit: 0 } } });
+    expect(r.envelope?.error_code).toBe('sandbox_violation');
+    expect(r.envelope?.error_message).toContain('without a string call_id');
+  }, T);
+
+  itT('the tolerated shapes pass: a C7-shaped empty glob success, an error result and a permissionDenied result; C7 itself is a success', async () => {
+    const middle = [
+      toolCall('started', 'g', { globToolCall: { args: { globPattern: '**/*' } } }),
+      toolCall('completed', 'g', { globToolCall: { result: { success: { pattern: '**/*', path: '/tmp', files: [], totalFiles: 0, clientTruncated: false, ripgrepTruncated: false } } } }),
+      toolCall('started', 'e', { readToolCall: { args: { path: '/tmp/x' } } }),
+      toolCall('completed', 'e', { readToolCall: { result: { error: { errorMessage: 'denied' } } } }),
+      toolCall('started', 's', { shellToolCall: { args: { command: 'ls' } } }),
+      toolCall('completed', 's', { shellToolCall: { result: { permissionDenied: { command: 'ls', workingDirectory: '/tmp', error: 'blocked', isReadonly: true } } } }),
+    ];
+    const [a, c7] = await Promise.all([
+      run({ bin: tool, steps: { default: { stdout: stream(middle), exit: 0 } } }),
+      run({ bin: tool, steps: { default: rec('c7-neutral-read-deny-all') } }),
+    ]);
+    expect(a.envelope?.status).toBe('success');
+    expect(a.envelope?.findings).toHaveLength(1);
+    expect(c7.envelope?.status).toBe('success');
+    expect(c7.envelope?.findings).toHaveLength(1);
+  }, T);
+
+  itT('the message claims returned content only for a completed call with an untolerated result; descriptions use "an" before a vowel', async () => {
+    const [a, b, c] = await Promise.all([
+      run({ bin: tool, steps: { default: { stdout: stream(READ_OK('r')), exit: 0 } } }),
+      run({ bin: tool, steps: { default: { stdout: stream([toolCall('started', 'a', { readToolCall: { args: {} } })]), exit: 0 } } }),
+      run({ bin: tool, steps: { default: { stdout: stream([PAYLOAD_OUTSIDE, toolCall('completed', 'e', { readToolCall: { result: { error: { errorMessage: 'x', content: 'y' } } } })]), exit: 0 } } }),
+    ]);
+    const ma = String(a.envelope?.error_message);
+    expect(ma).toContain('readToolCall completed with a success result');
+    expect(ma).toContain('completed with a result the allowlist does not tolerate');
+    const mb = String(b.envelope?.error_message);
+    expect(b.envelope?.error_code).toBe('sandbox_violation');
+    expect(mb).toContain('readToolCall started and never completed');
+    expect(mb).toContain('no tool call is known to have returned content');
+    expect(mb).not.toContain('completed with a result the allowlist does not tolerate');
+    const mc = String(c.envelope?.error_message);
+    expect(mc).toContain('an assistant event carrying a *ToolCall payload');
+    expect(mc).toContain('readToolCall completed with an error result');
+    expect(mc).not.toMatch(/\ba [aeiou]/);
+  }, T);
+
+  itT('a violation in a line with reordered keys and extra whitespace is still found (parsed, not string-matched)', async () => {
     const line = '{ "tool_call" : { "readToolCall" : { "result" : { "success" : { "content" : "x" } } } } , "call_id" : "z" , "subtype" : "completed" , "type" : "tool_call" }';
-    const r = await run({ steps: { default: { stdout: nd([INIT]) + line + '\n' + nd([assistant(ANSWER), result()]), exit: 0 } } });
+    const r = await run({ bin: tool, steps: { default: { stdout: nd([INIT]) + line + '\n' + nd([assistant(ANSWER), result()]), exit: 0 } } });
     expect(r.envelope?.error_code).toBe('sandbox_violation');
     expect(violationCount(r)).toBe(1);
   }, T);
 
-  it('an unparseable line that names a *ToolCall payload fails closed as a violation', async () => {
-    const r = await run({ steps: { default: { stdout: nd([INIT]) + '{"type":"tool_call","tool_call":{"readToolCall":{"result":{"success"\n' + nd([assistant(ANSWER), result()]), exit: 0 } } });
+  itT('an unparseable line that names a *ToolCall payload fails closed as a violation', async () => {
+    const r = await run({ bin: tool, steps: { default: { stdout: nd([INIT]) + '{"type":"tool_call","tool_call":{"readToolCall":{"result":{"success"\n' + nd([assistant(ANSWER), result()]), exit: 0 } } });
     expect(r.envelope?.error_code).toBe('sandbox_violation');
   }, T);
 
-  it('a violation outranks a non-zero exit, exit 130, is_error and a missing result event', async () => {
+  itT('a violation outranks a non-zero exit, exit 130, is_error and a missing result event', async () => {
     const v = READ_OK('r');
     const cases: Step[] = [
       { stdout: stream(v), stderr: 'Error: boom', exit: 1 },
@@ -891,7 +1035,7 @@ describe.concurrent('tool-call scan (D38): the frozen result-shape allowlist, ru
       { stdout: stream(v, { result: null }), exit: 0 },
       { stdout: nd([INIT, ...v]), stderr: 'ActionRequiredError: Named models unavailable', exit: 1 },
     ];
-    const results = await Promise.all(cases.map((step) => run({ steps: { default: step } })));
+    const results = await Promise.all(cases.map((step) => run({ bin: tool, steps: { default: step } })));
     results.forEach((r, i) => {
       expect(r.envelope?.error_code, JSON.stringify(cases[i]).slice(0, 80)).toBe('sandbox_violation');
       expect(readFileSync(r.rawPath, 'utf8')).toBe(cases[i].stdout);
@@ -980,38 +1124,6 @@ describe.concurrent('fixture mapping on the Task 67 recordings', () => {
     expect(r.envelope?.error_message).toContain('cursor-agent login');
   }, T);
 
-  it.each([
-    ['is_error: true', stream([], { result: result({ is_error: true }) })],
-    ['subtype error_during_execution', stream([], { result: result({ subtype: 'error_during_execution' }) })],
-    ['subtype "success\\n" (exact compare)', stream([], { result: result({ subtype: 'success\n' }) })],
-    ['subtype " success" (exact compare)', stream([], { result: result({ subtype: ' success' }) })],
-    ['is_error "false" (a string, not false)', stream([], { result: result({ is_error: 'false' }) })],
-    ['is_error absent', stream([], { result: (() => { const x = result(); delete x.is_error; return x; })() })],
-    ['a missing result event with exit 0', stream([], { result: null })],
-  ])('synthetic %s gives cli_failed and no validate-findings normalization', async (_label, stdout) => {
-    const r = await run({ steps: { default: { stdout, exit: 0 } } });
-    expect(r.envelope?.error_code).toBe('cli_failed');
-    expect(normalizeCalls(r)).toHaveLength(0);
-  }, T);
-
-  it('a stream with no assistant event falls back to .result (D40)', async () => {
-    const evs = recEvents('c3b-auto-review-success').filter((e) => e.type !== 'assistant');
-    const r = await run({ steps: { default: { stdout: nd(evs), exit: 0 } } });
-    expect(r.envelope?.status).toBe('success');
-    expect(r.envelope?.findings).toHaveLength(3);
-    expect(normalizeCalls(r)[0].input).toBe((evs.filter((e) => e.type === 'result').pop() as Ev).result);
-  }, T);
-
-  it('a synthetic parse_failed gives exactly 2 invocations; the retry prompt carries the clarification', async () => {
-    const r = await run({ steps: { default: { stdout: stream([], { answer: 'Here is my review: it looks fine.' }), exit: 0 } } });
-    expect(r.invocations).toHaveLength(2);
-    expect(normalizeCalls(r)).toHaveLength(2);
-    expect(r.envelope?.error_code).toBe('parse_failed');
-    expect(r.invocations[0].stdin).not.toContain(RETRY_TEXT);
-    expect(r.invocations[1].stdin.endsWith(`\n${RETRY_TEXT}\n`)).toBe(true);
-    expect(r.invocations[1].argv).toEqual(EXACT_ARGV);
-  }, T);
-
   it('a parse_failed then a clean answer gives success after 2 invocations', async () => {
     const r = await run({ steps: { '1': { stdout: stream([], { answer: 'prose' }), exit: 0 }, default: { stdout: stream(), exit: 0 } } });
     expect(r.invocations).toHaveLength(2);
@@ -1080,6 +1192,58 @@ describe.concurrent('fixture mapping on the Task 67 recordings', () => {
 });
 
 // ---------------------------------------------------------------------------
+// D40 terminal checks and output parsing, on both JSON-tool paths
+// ---------------------------------------------------------------------------
+
+describe.concurrent.each(TOOL_PATHS)('D40 terminal checks and output parsing (%s)', (_tool, tool, skip) => {
+  const itT = skip ? it.skip : it;
+  itT.each([
+    ['is_error: true', stream([], { result: result({ is_error: true }) })],
+    ['subtype error_during_execution', stream([], { result: result({ subtype: 'error_during_execution' }) })],
+    ['subtype "success\\n" (exact compare)', stream([], { result: result({ subtype: 'success\n' }) })],
+    ['subtype " success" (exact compare)', stream([], { result: result({ subtype: ' success' }) })],
+    ['is_error "false" (a string, not false)', stream([], { result: result({ is_error: 'false' }) })],
+    ['is_error absent', stream([], { result: (() => { const x = result(); delete x.is_error; return x; })() })],
+    ['a missing result event with exit 0', stream([], { result: null })],
+  ])('synthetic %s gives cli_failed and no validate-findings normalization', async (_label, stdout) => {
+    const r = await run({ bin: tool, steps: { default: { stdout, exit: 0 } } });
+    expect(r.envelope?.error_code).toBe('cli_failed');
+    expect(normalizeCalls(r)).toHaveLength(0);
+  }, T);
+
+  itT('a stream with no assistant event falls back to .result (D40)', async () => {
+    const evs = recEvents('c3b-auto-review-success').filter((e) => e.type !== 'assistant');
+    const r = await run({ bin: tool, steps: { default: { stdout: nd(evs), exit: 0 } } });
+    expect(r.envelope?.status).toBe('success');
+    expect(r.envelope?.findings).toHaveLength(3);
+    expect(normalizeCalls(r)[0].input).toBe((evs.filter((e) => e.type === 'result').pop() as Ev).result);
+  }, T);
+
+  itT('a synthetic parse_failed gives exactly 2 invocations; the retry prompt carries the clarification', async () => {
+    const r = await run({ bin: tool, steps: { default: { stdout: stream([], { answer: 'Here is my review: it looks fine.' }), exit: 0 } } });
+    expect(r.invocations).toHaveLength(2);
+    expect(normalizeCalls(r)).toHaveLength(2);
+    expect(r.envelope?.error_code).toBe('parse_failed');
+    expect(r.invocations[0].stdin).not.toContain(RETRY_TEXT);
+    expect(r.invocations[1].stdin.endsWith(`\n${RETRY_TEXT}\n`)).toBe(true);
+    expect(r.invocations[1].argv).toEqual(EXACT_ARGV);
+  }, T);
+
+  // Lines node and jq could read differently fail closed the same way on both paths.
+  itT.each([
+    ['a non-JSON stdout line', nd([INIT]) + 'Thinking...\n' + nd([assistant(ANSWER), result()])],
+    ['a non-object line', nd([INIT]) + '[1,2]\n' + nd([assistant(ANSWER), result()])],
+    ['a BOM before the first line', '\ufeff' + stream()],
+    ['NaN in the result usage', nd([INIT, assistant(ANSWER)]) + JSON.stringify(result()).replace('"inputTokens":100', '"inputTokens":NaN') + '\n'],
+    ['a number too large for a double', nd([INIT]) + '{"type":"thinking","n":1e1000}\n' + nd([assistant(ANSWER), result()])],
+  ])('synthetic %s gives cli_failed (not success) and no normalization', async (_label, stdout) => {
+    const r = await run({ bin: tool, steps: { default: { stdout, exit: 0 } } });
+    expect(r.envelope?.error_code).toBe('cli_failed');
+    expect(normalizeCalls(r)).toHaveLength(0);
+  }, T);
+});
+
+// ---------------------------------------------------------------------------
 // Local-state cleanup (D42)
 // ---------------------------------------------------------------------------
 
@@ -1130,14 +1294,17 @@ function seedHome(home: string): void {
   w('.claude/settings.json', '{"hooks":{}}');
 }
 
-describe.concurrent('local-state cleanup (D42): only the run\'s own two paths are deleted', () => {
-  it.each([
-    ['success (C7)', () => rec('c7-neutral-read-deny-all', SID_A), {}],
-    ['failure (C3, Free plan)', () => rec('c3-free-plan-named-model', SID_A), {}],
-    ['sandbox_violation (C4)', () => rec('c4-adversarial-no-deny-file', SID_A), {}],
-  ] as Array<[string, () => Step, Partial<RunOpts>]>)('after a %s run, the projects entry and the chat entry are gone; nothing else changed', async (_label, step, extra) => {
+describe.concurrent.each(TOOL_PATHS)('local-state cleanup (D42) on both JSON-tool paths (%s)', (_tool, tool, skip) => {
+  const itT = skip ? it.skip : it;
+
+  itT.each([
+    ['success (C7)', () => rec('c7-neutral-read-deny-all', SID_A)],
+    ['failure (C3, Free plan)', () => rec('c3-free-plan-named-model', SID_A)],
+    ['sandbox_violation (C4)', () => rec('c4-adversarial-no-deny-file', SID_A)],
+  ] as Array<[string, () => Step]>)('after a %s run, the projects entry and the chat entry (session_id from system:init) are gone; nothing else changed', async (_label, step) => {
     const before: string[] = [];
     const r = await run({
+      bin: tool,
       steps: { default: step() },
       session: SID_A,
       hash: HASH,
@@ -1145,20 +1312,18 @@ describe.concurrent('local-state cleanup (D42): only the run\'s own two paths ar
         seedHome(home);
         before.push(...tree(home));
       },
-      ...extra,
     });
     expect(r.invocations).toHaveLength(1);
-    const slug = r.invocations[0].slug;
-    expect(slug).toMatch(/^(private-)?tmp-synthex-cursor-[A-Za-z0-9]{6}$/);
-    expect(existsSync(join(r.home, '.cursor', 'projects', slug))).toBe(false);
+    expect(r.invocations[0].slug).toMatch(/^(private-)?tmp-synthex-cursor-[A-Za-z0-9]{6}$/);
+    expect(existsSync(join(r.home, '.cursor', 'projects', r.invocations[0].slug))).toBe(false);
     expect(existsSync(join(r.home, '.cursor', 'chats', HASH, SID_A))).toBe(false);
-    // Everything seeded is still there, byte for byte, and nothing else remains.
     expect(tree(r.home)).toEqual(before);
   }, T);
 
-  it('a run with no session_id (C6) removes only its projects entry', async () => {
+  itT('a run with no session_id (C6) removes only its projects entry', async () => {
     const before: string[] = [];
     const r = await run({
+      bin: tool,
       steps: { default: rec('c6-unknown-model') },
       envelopeConfig: { model: 'not-a-real-model' },
       seedHome: (home) => {
@@ -1171,6 +1336,34 @@ describe.concurrent('local-state cleanup (D42): only the run\'s own two paths ar
     expect(tree(r.home)).toEqual(before);
   }, T);
 
+  itT.each([
+    ['C7 (unknown_error)', 'c7-neutral-read-deny-all', 'unknown_error'],
+    ['C4 (a violation still outranks the write failure)', 'c4-adversarial-no-deny-file', 'sandbox_violation'],
+  ] as const)('the raw output cannot be moved into raw_output_path after %s: the session read from the .tmp stream is still removed', async (_label, name, code) => {
+    const before: string[] = [];
+    const r = await run({
+      bin: tool,
+      steps: { default: { ...rec(name, SID_A), hook: `${CHMOD} 500 "$STUB_PROJ/docs/reviews/raw"` } },
+      session: SID_A,
+      hash: HASH,
+      seedHome: (home) => {
+        seedHome(home);
+        before.push(...tree(home));
+      },
+    });
+    try {
+      expect(r.envelope?.error_code).toBe(code);
+      expect(r.envelope?.error_message).toContain('raw_output_path');
+      expect(r.invocations).toHaveLength(1);
+      expect(existsSync(join(r.home, '.cursor', 'chats', HASH, SID_A))).toBe(false);
+      expect(tree(r.home)).toEqual(before);
+    } finally {
+      chmodSync(join(r.proj, 'docs', 'reviews', 'raw'), 0o755);
+    }
+  }, T);
+});
+
+describe.concurrent('local-state cleanup (D42): only the run\'s own two paths are deleted', () => {
   it.each([
     ['empty', ''],
     ['containing /', 'abcdefgh/ijkl'],
@@ -1555,18 +1748,23 @@ function alive(pid: number): boolean {
 
 describe.each(BRANCHES)('the runner interrupted while cursor-agent runs (%s)', (_label, bin) => {
   it.each([
-    ['SIGTERM', 143],
-    ['SIGINT', 130],
-  ] as const)('%s: cursor-agent is stopped, a cli_failed envelope goes to stdout and --envelope-out, exit %i, and D42 cleanup still runs', async (sig, code) => {
+    ['SIGTERM', 143, 'cli_failed', false],
+    ['SIGINT', 130, 'cli_failed', false],
+    ['SIGTERM after a read returned content', 143, 'sandbox_violation', true],
+    ['SIGINT after a read returned content', 130, 'sandbox_violation', true],
+  ] as const)('%s: exit %i with a %s envelope on stdout and --envelope-out; cursor-agent is stopped, D42 cleanup still runs, and no runner process outlives it', async (label, code, errorCode, leaked) => {
+    const sig = label.startsWith('SIGTERM') ? 'SIGTERM' : 'SIGINT';
     const sid = randomUUID();
-    const partial = nd([{ ...INIT, session_id: sid }]);
+    const partial = nd([{ ...INIT, session_id: sid }, ...(leaked ? READ_OK('r1') : [])]);
     const before: string[] = [];
+    // A unique --envelope-out: forked runner subshells keep the runner's command line, so this tags them.
+    const envOut = `env-${randomUUID()}.json`;
     const c = setupCase({
       bin,
       steps: { default: { stdout: partial, sleep: 30 } },
       session: sid,
       hash: HASH,
-      args: ['--input', INPUT_REL, '--envelope-out', 'env.json'],
+      args: ['--input', INPUT_REL, '--envelope-out', envOut],
       seedHome: (home) => {
         seedHome(home);
         before.push(...tree(home));
@@ -1589,10 +1787,13 @@ describe.each(BRANCHES)('the runner interrupted while cursor-agent runs (%s)', (
     const status = await closed;
     expect(Date.now() - sent).toBeLessThan(5_000);
     expect(status).toBe(code);
-    const envelope = JSON.parse(readFileSync(join(c.proj, 'env.json'), 'utf8'));
+    // The KILL backstop and the watchdog are cancelled, not left to fire at a stale pid later.
+    if (PS) await waitFor(() => procsMatching(envOut).length === 0, 1_000, `no runner process left (${procsMatching(envOut).join(' | ')})`);
+    const envelope = JSON.parse(readFileSync(join(c.proj, envOut), 'utf8'));
     expect(envelope.status).toBe('failed');
-    expect(envelope.error_code).toBe('cli_failed');
-    expect(envelope.error_message).toBe('cursor-review.sh was interrupted; the code was not reviewed.');
+    expect(envelope.error_code).toBe(errorCode);
+    if (leaked) expect(envelope.error_message).toContain('readToolCall completed with a success result');
+    else expect(envelope.error_message).toBe('cursor-review.sh was interrupted; the code was not reviewed.');
     expect(envelope.raw_output_path).toBe(RAW_REL);
     expect(JSON.parse(stdout)).toEqual(envelope);
     expect(readFileSync(rawPath, 'utf8')).toBe(partial);
@@ -1621,20 +1822,14 @@ describe.concurrent('JSON tooling fallbacks (harness-modernization D19)', () => 
     expect(a.invocations[0].clijson).toBe(readFileSync(DENY_RECORDED, 'utf8'));
   }, T);
 
-  it.skipIf(!HAS_JQ)('jq-only: the scan, the Free-plan mapping and the exact result checks behave the same', async () => {
-    const c4 = await run({ bin: jqBin, steps: { default: rec('c4-adversarial-no-deny-file') } });
-    expect(c4.envelope?.error_code).toBe('sandbox_violation');
-    expect(violationCount(c4)).toBe(2);
-    expect(violationCount(await run({ bin: jqBin, steps: { default: rec('c4b-neutral-read-no-deny-file') } }))).toBe(1);
-    expect((await run({ bin: jqBin, steps: { default: { stdout: stream([toolCall('started', 'a', { readToolCall: { args: {} } })]), exit: 0 } } })).envelope?.error_code).toBe('sandbox_violation');
+  // The scan, the D40 terminal checks, the deny read-back and the D42 session
+  // extraction run on both paths in their own describe.each(TOOL_PATHS) blocks.
+  it.skipIf(!HAS_JQ)('jq-only: the Free-plan mapping is the same', async () => {
     const c3 = await run({ bin: jqBin, steps: { default: rec('c3-free-plan-named-model') } });
+    expect(c3.envelope?.error_code).toBe('cli_failed');
     expect(c3.envelope?.error_message).toContain('Free plan allows only Auto');
-    for (const res of [result({ subtype: 'success\n' }), result({ is_error: 'false' })]) {
-      expect((await run({ bin: jqBin, steps: { default: { stdout: stream([], { result: res }), exit: 0 } } })).envelope?.error_code).toBe('cli_failed');
-    }
-    const noAsst = recEvents('c3b-auto-review-success').filter((e) => e.type !== 'assistant');
-    expect((await run({ bin: jqBin, steps: { default: { stdout: nd(noAsst), exit: 0 } } })).envelope?.findings).toHaveLength(3);
-  }, 2 * T);
+    expect(c3.invocations).toHaveLength(1);
+  }, T);
 
   it.skipIf(!HAS_JQ)('jq-only: --auth-check matches the same logged-in forms and fails closed the same', async () => {
     expect((await run({ auth: true, bin: jqBin, config: AUTH_CONFIG })).status).toBe(0);
@@ -1683,6 +1878,27 @@ describe('wall-clock guard: per_reviewer_timeout_seconds - 10, host-clamped in t
     expect(r.envelope?.error_code).toBe('sandbox_violation');
     expect(readFileSync(r.rawPath, 'utf8')).toBe(partial);
     expect(r.durationMs).toBeLessThan(9_000);
+  }, T);
+
+  it.each(BRANCHES)('after a timeout the whole cursor-agent process group is stopped before the D42 cleanup, so a TERM-ignoring helper cannot recreate state (%s)', async (_label, bin) => {
+    const before: string[] = [];
+    // The helper ignores TERM and writes into the run's projects entry 8 s in (budget 4 s).
+    const hook = `( trap '' TERM; sleep 8; mkdir -p "$HOME/.cursor/projects/$STUB_SLUG/late" ) > /dev/null 2>&1 &`;
+    const started = Date.now();
+    const r = await run({
+      bin,
+      config: BUDGET_4S,
+      steps: { default: { stdout: nd([INIT]), sleep: 30, hook } },
+      seedHome: (home) => {
+        seedHome(home);
+        before.push(...tree(home));
+      },
+    });
+    expect(r.envelope?.error_code).toBe('timeout');
+    const late = join(r.home, '.cursor', 'projects', r.invocations[0].slug, 'late');
+    await new Promise((res) => setTimeout(res, Math.max(0, started + 10_500 - Date.now())));
+    expect(existsSync(late)).toBe(false);
+    expect(tree(r.home)).toEqual(before);
   }, T);
 
   it('D42 cleanup runs after a timeout: the projects entry and the chat entry are gone; nothing else changed', async () => {

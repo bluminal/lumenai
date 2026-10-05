@@ -191,14 +191,18 @@ function isTolerated(kind: string, r: unknown): boolean {
     const err = r.error;
     return isPlainObject(err) && Object.keys(err).every((k) => k === 'errorMessage') && typeof err.errorMessage === 'string';
   }
+  // Every key of a tolerated shape is typed, so none can carry an extra payload
+  // (kept in step with cursor-review.sh's tolerated(), Task 69 review).
   if (keys[0] === 'permissionDenied') {
     const pd = r.permissionDenied;
-    const allowed = ['command', 'workingDirectory', 'error', 'isReadonly'];
-    return isPlainObject(pd) && Object.keys(pd).every((k) => allowed.includes(k));
+    const types: Record<string, string> = { command: 'string', workingDirectory: 'string', error: 'string', isReadonly: 'boolean' };
+    return isPlainObject(pd) && Object.keys(pd).every((k) => Object.prototype.hasOwnProperty.call(types, k) && typeof pd[k] === types[k]);
   }
   if (keys[0] === 'success' && kind === 'globToolCall') {
     const s = r.success;
-    return isPlainObject(s) && Array.isArray(s.files) && s.files.length === 0 && s.totalFiles === 0;
+    const types: Record<string, string> = { pattern: 'string', path: 'string', files: 'array', totalFiles: 'number', clientTruncated: 'boolean', ripgrepTruncated: 'boolean' };
+    const typed = isPlainObject(s) && Object.keys(s).every((k) => Object.prototype.hasOwnProperty.call(types, k) && (types[k] === 'array' ? Array.isArray(s[k]) : typeof s[k] === types[k]));
+    return typed && Array.isArray(s.files) && s.files.length === 0 && s.totalFiles === 0;
   }
   return false;
 }

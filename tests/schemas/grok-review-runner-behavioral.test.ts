@@ -626,6 +626,21 @@ describe('XAI_API_KEY opt-in, model and judge_mode_prompt', () => {
     expect(r.envelope?.status).toBe('success');
   }, T);
 
+  it('the input envelope alone cannot opt in: config.allow_api_key_billing true without the project-config opt-in leaves XAI_API_KEY unset (D26)', () => {
+    const r = collect(
+      run({
+        env: { XAI_API_KEY: 'dummy-test-value', GROK_CODE_XAI_API_KEY: 'dummy-alias-value' },
+        envelopeConfig: { allow_api_key_billing: true },
+      }),
+      'input',
+    );
+    expect(r.invocations).toHaveLength(1);
+    for (const k of ['XAI_API_KEY', 'GROK_CODE_XAI_API_KEY']) {
+      expect(r.invocations[0].env, k).not.toHaveProperty(k);
+      expect(r.models[0].env, k).not.toHaveProperty(k);
+    }
+  }, T);
+
   it('passes -m <model> when config.model is set and judge_mode_prompt as the --rules value (D31)', () => {
     const judge = 'You are the aggregator. Judge the findings below.';
     const r = collect(run({ envelopeConfig: { model: 'grok-4.7', judge_mode_prompt: judge } }), 'input');

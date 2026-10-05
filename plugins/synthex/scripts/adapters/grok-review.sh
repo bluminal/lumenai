@@ -12,7 +12,7 @@
 #   grok-review.sh --input <envelope.json> [--envelope-out <path>]
 #     <envelope.json> is the FR-MR9 input envelope: {command,
 #     context_bundle, config: {model, family, raw_output_path,
-#     judge_mode_prompt?, allow_api_key_billing?}}. Prints the envelope on
+#     judge_mode_prompt?}}. Prints the envelope on
 #     stdout and, with --envelope-out, also writes it there atomically so a
 #     depth-1 host can background this script and poll for the file.
 #   grok-review.sh --auth-check
@@ -31,8 +31,9 @@
 #     GROK_CLAUDE_*_ENABLED and GROK_CURSOR_*_ENABLED is 0; GROK_CONFIG,
 #     GROK_CONFIG_PATH, GROK_FOLDER_TRUST and GROK_SANDBOX are unset;
 #   - XAI_API_KEY and its alias GROK_CODE_XAI_API_KEY are unset unless
+#     the project config's
 #     multi_model_review.per_reviewer.grok-review-prompter.allow_api_key_billing
-#     (or the envelope's config.allow_api_key_billing) is true (D26);
+#     is true (D26). The input envelope cannot opt in;
 #   - cwd is checked inside the subshell that execs grok (cd || exit 125,
 #     then pwd -P must equal the scratch dir); errexit alone is not enough
 #     there, because the auth probe runs as `auth_probe || rc=$?`. A failed
@@ -531,9 +532,6 @@ if ! { : > "$STDERR_LOG"; } 2>/dev/null; then
   fail unknown_error "grok-review.sh cannot write raw_output_path $BAD_RAW (or its .stderr.log); no grok call was made."
 fi
 
-case "$(env_get allow_api_key_billing)" in
-  true) ALLOW_KEY="true" ;;
-esac
 
 # D29: parent-mediated is unsupported; sandbox-yolo is a no-op alias of
 # read-only. The CLI is never spawned for an unsupported mode.
