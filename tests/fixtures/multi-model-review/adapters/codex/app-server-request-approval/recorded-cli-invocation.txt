@@ -1,1 +1,1 @@
-codex app-server --json <prompt-with-canonical-finding-schema-embedded>
+codex app-server

@@ -164,8 +164,18 @@ describe('Task 50: adapter-recipes.md', () => {
       expect(content).toContain('--sandbox read-only');
     });
 
-    it('documents --approval-mode never flag', () => {
-      expect(content).toContain('--approval-mode never');
+    // Was: documents --approval-mode never flag. Codex CLI 0.160.0 evidence (tests/fixtures/cli-help/codex/): `codex exec` has no --approval-mode flag and rejects -a/--ask-for-approval; it never prompts.
+    it('does not document the nonexistent --approval-mode never flag', () => {
+      expect(content).not.toContain('--approval-mode never');
+    });
+
+    it('documents --ephemeral and the strict codex-findings schema', () => {
+      expect(content).toContain('--ephemeral');
+      expect(content).toContain('codex-findings.schema.json');
+    });
+
+    it('documents codex login status as the auth check (codex auth status does not exist)', () => {
+      expect(content).toContain('codex login status');
     });
 
     it('documents codex login auth command', () => {

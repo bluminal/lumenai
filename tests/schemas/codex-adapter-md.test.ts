@@ -33,7 +33,11 @@ describe('Task 9: codex-review-prompter.md', () => {
 
   describe('Sandbox flags per FR-MR26 (acceptance criterion 3)', () => {
     it('contains --sandbox read-only', () => expect(content).toContain('--sandbox read-only'));
-    it('contains --approval-mode never', () => expect(content).toContain('--approval-mode never'));
+    // Was: contains --approval-mode never. Codex CLI 0.160.0 evidence (tests/fixtures/cli-help/codex/): `codex exec` has no --approval-mode flag and rejects -a/--ask-for-approval; it never prompts.
+    // The read-only guarantee is --sandbox read-only; --ephemeral leaves no persisted session.
+    it('does not pass the nonexistent --approval-mode never to codex exec', () => expect(content).not.toContain('--approval-mode never'));
+    it('contains --ephemeral', () => expect(content).toContain('--ephemeral'));
+    it('passes the strict codex-findings schema via --output-schema', () => expect(content).toMatch(/--output-schema\s+\S*codex-findings\.schema\.json/));
     it('contains --json', () => expect(content).toContain('--json'));
     it('references FR-MR26', () => expect(content).toContain('FR-MR26'));
   });
@@ -60,6 +64,13 @@ describe('Task 9: codex-review-prompter.md', () => {
 
   it('auth setup pointer present (codex login)', () => {
     expect(content).toContain('codex login');
+  });
+
+  // `codex auth status` does not exist ("unrecognized subcommand 'status'"); the real check is
+  // `codex login status` (exit 0 + "Logged in using ...", no model call) — Codex CLI 0.160.0.
+  it('auth check uses codex login status, never the nonexistent codex auth status', () => {
+    expect(content).toContain('codex login status');
+    expect(content).not.toContain('codex auth status');
   });
 
   it('known gotchas section present', () => {
@@ -103,7 +114,8 @@ describe('Task 9: codex-review-prompter.md', () => {
     it('preserves Pattern 1 (FR-MR26) sandbox flags as fallback path', () => {
       // Pattern 1 must remain documented (it's the fallback)
       expect(content).toContain('--sandbox read-only');
-      expect(content).toContain('--approval-mode never');
+      // Was: toContain('--approval-mode never'). Codex CLI 0.160.0 evidence (tests/fixtures/cli-help/codex/): `codex exec` has no --approval-mode flag and rejects -a/--ask-for-approval; it never prompts.
+      expect(content).not.toContain('--approval-mode never');
     });
   });
 });

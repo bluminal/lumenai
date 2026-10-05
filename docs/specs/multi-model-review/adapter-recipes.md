@@ -26,7 +26,13 @@ npm install -g @openai/codex
 codex login
 ```
 
-Authenticates via OpenAI account. Token stored in `~/.config/codex/auth.json`. Token expiry handled by treating 401 from `codex exec` as `cli_auth_failed`.
+Authenticates via OpenAI account (ChatGPT login or API key). Credentials live under `$CODEX_HOME` (default `~/.codex`). The adapter's auth check is:
+
+```bash
+codex login status
+```
+
+It exits 0 and prints `Logged in using ...` when authenticated, and makes no model call. There is no `auth` subcommand: an `auth status` check fails with "unrecognized subcommand". Token expiry is handled by treating a 401 from `codex exec` as `cli_auth_failed`.
 
 ### Recommended flagship model
 
@@ -34,16 +40,27 @@ Authenticates via OpenAI account. Token stored in `~/.config/codex/auth.json`. T
 
 ### Sandbox flags (FR-MR26)
 
-- `--sandbox read-only` — file system access is read-only
-- `--approval-mode never` — no interactive approvals; fail-fast instead
+```bash
+codex exec --sandbox read-only --ephemeral --skip-git-repo-check --json [-m <model>] \
+  --output-schema <plugin_root>/agents/_shared/codex-findings.schema.json \
+  -o <last-message-file> - < <prompt-file>
+```
 
-These flags are MANDATORY. The Layer 2 fixture (Task 12) asserts the documented flag set is a substring of the recorded invocation string.
+- `--sandbox read-only` — model-generated commands can read the repo but never write
+- `--ephemeral` — no Codex session is persisted to disk
+- `--json` — JSONL event stream on stdout (the last `turn.completed` event carries token usage)
+- `--output-schema` — Codex enforces the strict findings schema on its final message; `-o` writes that message to a file
+- `-` — prompt read from stdin (context bundles can reach 200 KB)
+
+`codex exec` is non-interactive and never asks for approval, so there is no approval flag: `codex exec` has no `--approval-mode`, and it rejects `-a`/`--ask-for-approval` (that is a top-level `codex` flag only). `--sandbox read-only` is MANDATORY. The Layer 2 fixture (Task 12) asserts the documented flag set is a substring of the recorded invocation string, and `tests/schemas/codex-cli-flags.test.ts` checks every documented `codex` subcommand and flag against captured `codex --help` output (`tests/fixtures/cli-help/codex/`).
+
+**Strict output schema.** Codex structured output requires a strict JSON Schema: every property listed in `required` (optional ones made nullable) and `additionalProperties: false` at every object level. The canonical finding schema does not satisfy that, so the adapter passes `plugins/synthex/agents/_shared/codex-findings.schema.json` (the model-authored canonical fields only — no `source`, which `validate-findings` injects). `tests/schemas/codex-findings-schema.test.ts` keeps it in parity with `canonical-finding.schema.json`; `validate-findings` still enforces the full canonical rules afterwards.
 
 ### Known gotchas
 
-1. **Sandbox flag order:** `--sandbox` must precede the prompt; older CLI versions don't reorder.
-2. **`--approval-mode never` is required:** Without it the CLI may block on file-write approval prompts.
-3. **JSON envelope variations:** Codex may wrap findings in `response.message.content[0].text` rather than at the top level; the adapter handles both.
+1. **Flag order:** all flags precede the `-` prompt argument.
+2. **No approval flag exists for `codex exec`:** earlier revisions of this recipe passed an `--approval-mode` flag, which current Codex CLI (verified on 0.160.0) does not accept on `exec` (and `-a never` is rejected there too). `codex exec` never blocks on approval prompts.
+3. **Output location:** the schema-shaped answer is in the `-o` last-message file; if it is empty, fall back to the last `item.completed` event's `item.text` in the JSONL stream.
 4. **Auth token expiry:** Tokens can expire silently; treat 401 from `codex exec` as `cli_auth_failed`.
 
 ---
@@ -255,14 +272,14 @@ Any Anthropic model DIFFERENT from the host session model (e.g., if host is `cla
 - `--permission-mode acceptEdits` — restricts autonomous operations to file edits only (no shell execution)
 - `--tools ""` — disables all built-in tools (Bash, file read/write), forcing text-only response
 
-This is the Claude CLI's equivalent of Codex's `--sandbox read-only --approval-mode never`. Semantic intent is identical; flag names differ.
+This is the Claude CLI's equivalent of Codex's `codex exec --sandbox read-only` (which never prompts for approval). Semantic intent is identical; flag names differ.
 
 ### Known gotchas
 
 1. **Self-preference risk:** When the host session is also Anthropic, this adapter adds to the Anthropic count without adding family diversity. The orchestrator's preflight emits a self-preference warning (FR-MR15) when applicable.
 2. **Model must differ from host:** If the same model is configured for both host and adapter, the adapter runs but provides no diversity benefit — it is a misconfiguration. The orchestrator's preflight diversity check is the enforcement point.
 3. **Auth shared with host:** `claude` uses the same credential store as the Claude Code session. A non-zero `claude auth status` exit is only a genuine auth failure when running outside an established session context.
-4. **Sandbox flag variance from Codex:** Claude CLI does not expose `--sandbox read-only` or `--approval-mode never`. The equivalent is `--permission-mode acceptEdits --tools ""`. Verify against `claude --help` when upgrading the Claude CLI.
+4. **Sandbox flag variance from Codex:** Claude CLI does not expose Codex's `--sandbox read-only`. The equivalent is `--permission-mode acceptEdits --tools ""`. Verify against `claude --help` when upgrading the Claude CLI.
 
 ---
 

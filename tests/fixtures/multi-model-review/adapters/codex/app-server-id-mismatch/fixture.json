@@ -2,7 +2,7 @@
   "scenario": "app-server-id-mismatch",
   "description": "Codex requestApproval id=req-001; orchestrator (mistakenly) sends decision with id=req-002; adapter MUST drop the mismatched response and continue waiting for the correctly-correlated id=req-001 response.",
   "permission_mode": "parent-mediated",
-  "recorded_cli_invocation": "codex app-server --json <prompt>",
+  "recorded_cli_invocation": "codex app-server",
   "stdout_messages": [
     {
       "kind": "request-approval",

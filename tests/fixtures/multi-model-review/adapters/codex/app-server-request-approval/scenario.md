@@ -2,12 +2,12 @@
 
 **Adapter:** `codex-review-prompter`
 **Permission mode:** `parent-mediated` (Pattern 3 / ADR-003 / D27 / FR-MMT21)
-**CLI invocation:** `codex app-server --json <prompt>`
+**CLI invocation:** `codex app-server` (stdio JSON-RPC transport, the default; `app-server` takes no prompt argument and has no `--json` flag per `codex app-server --help` 0.160.0 — the prompt is sent over the JSON-RPC channel)
 
 ## Flow under test
 
 1. Adapter resolves `multi_model_review.external_permission_mode.codex` → `parent-mediated` (the default per Task 82's defaults.yaml).
-2. Adapter probes `codex app-server --help` (exit 0) and invokes `codex app-server --json <prompt>`.
+2. Adapter probes `codex app-server --help` (exit 0) and invokes `codex app-server`, sending the prompt over its stdio JSON-RPC channel.
 3. Codex emits a JSON-RPC `requestApproval` message on stdout (proposing to read `src/secrets/keys.ts`).
 4. Adapter intercepts the message and surfaces it as a fenced `codex-approval-request` block to the parent Claude session.
 5. Parent decides `approve` (with no argument modification) and SendMessages the decision to the adapter.

@@ -98,7 +98,10 @@ describe('Task 84 [T] (2): Layer 2 fixture — Codex app-server requestApproval 
 
   it('recorded CLI invocation uses `app-server` subcommand (raw-string check)', () => {
     expect(invocation).toContain('codex app-server');
-    expect(invocation).toContain('--json');
+    // Was: toContain('--json'). `codex app-server --help` (Codex CLI 0.160.0,
+    // tests/fixtures/cli-help/codex/codex-0.160.0-app-server.txt) lists no --json
+    // flag and no prompt argument: it speaks JSON-RPC over stdio by default.
+    expect(invocation).not.toContain('--json');
   });
 
   it('stdout messages include a JSON-RPC requestApproval message with required envelope fields', () => {

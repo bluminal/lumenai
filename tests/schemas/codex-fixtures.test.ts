@@ -4,7 +4,7 @@
  * Validates 4 fixture scenarios for the codex-review-prompter adapter:
  *   (a) successful      — happy path, 2 findings, usage, sandbox flags FR-MR26
  *   (b) malformed-output-retry — first and retry calls both fail to parse → parse_failed
- *   (c) auth-failure    — codex auth status exits non-zero → cli_auth_failed
+ *   (c) auth-failure    — codex login status exits non-zero → cli_auth_failed
  *   (d) cli-missing     — which codex returns nothing → cli_missing
  *
  * Each scenario:
@@ -125,8 +125,14 @@ describe('(a) successful — happy path, 2 findings', () => {
       expect(invocation).toContain('--sandbox read-only');
     });
 
-    it('recorded-cli-invocation.txt contains --approval-mode never', () => {
-      expect(invocation).toContain('--approval-mode never');
+    // Was: contains --approval-mode never. Codex CLI 0.160.0 evidence (tests/fixtures/cli-help/codex/): `codex exec` has no --approval-mode flag and rejects -a/--ask-for-approval; it never prompts.
+    it('recorded-cli-invocation.txt does not contain --approval-mode or -a', () => {
+      expect(invocation).not.toContain('--approval-mode');
+      expect(invocation).not.toMatch(/\s(-a|--ask-for-approval)\s/);
+    });
+
+    it('recorded-cli-invocation.txt contains --ephemeral', () => {
+      expect(invocation).toContain('--ephemeral');
     });
 
     it('recorded-cli-invocation.txt contains --json', () => {
@@ -137,8 +143,9 @@ describe('(a) successful — happy path, 2 findings', () => {
       expect(agentMd).toContain('--sandbox read-only');
     });
 
-    it('codex-review-prompter.md documents --approval-mode never (source authority)', () => {
-      expect(agentMd).toContain('--approval-mode never');
+    // Was: documents --approval-mode never. Codex CLI 0.160.0 evidence (tests/fixtures/cli-help/codex/): `codex exec` has no --approval-mode flag and rejects -a/--ask-for-approval; it never prompts.
+    it('codex-review-prompter.md documents --ephemeral (source authority)', () => {
+      expect(agentMd).toContain('--ephemeral');
     });
 
     it('codex-review-prompter.md documents --json (source authority)', () => {
@@ -186,7 +193,7 @@ describe('(b) malformed-output-retry — retry-then-fail → parse_failed', () =
 
 // ── (c) Auth Failure ──────────────────────────────────────────────────────────
 
-describe('(c) auth-failure — codex auth status non-zero → cli_auth_failed', () => {
+describe('(c) auth-failure — codex login status non-zero → cli_auth_failed', () => {
   const envelope = loadExpectedEnvelope('auth-failure');
   const fixture = loadFixture('auth-failure');
 
@@ -219,6 +226,11 @@ describe('(c) auth-failure — codex auth status non-zero → cli_auth_failed', 
 
   it('error_message references "codex login" as remediation', () => {
     expect(envelope.error_message as string).toContain('codex login');
+  });
+
+  it('fixture records the real auth check command (codex login status; `codex auth status` does not exist)', () => {
+    const authCheck = fixture.auth_check as Record<string, unknown>;
+    expect(authCheck.command).toBe('codex login status');
   });
 
   it('fixture records auth check exit_status as non-zero', () => {

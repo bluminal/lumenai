@@ -2,7 +2,7 @@
   "scenario": "app-server-request-approval",
   "description": "Codex invoked via app-server (Pattern 3); emits a requestApproval JSON-RPC message; adapter proxies it to the parent Claude session; parent approves; Codex completes the review.",
   "permission_mode": "parent-mediated",
-  "recorded_cli_invocation": "codex app-server --json <prompt>",
+  "recorded_cli_invocation": "codex app-server",
   "stdout_messages": [
     {
       "kind": "request-approval",
