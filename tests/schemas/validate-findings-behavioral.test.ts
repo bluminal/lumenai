@@ -30,7 +30,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -467,11 +467,40 @@ const CURSOR_STREAM_JSON = [
   .map((o) => JSON.stringify(o))
   .join('\n');
 
+/** Models usually fence their JSON, so the wrapper's text is fenced too. */
+const fencedFindings = '```json\n' + JSON.stringify({ findings: [D32_FINDING] }) + '\n```';
+
+/** Raw Grok wrapper whose .text is fenced JSON (the usual model output). */
+const GROK_RAW_WRAPPER_FENCED = JSON.stringify({
+  text: fencedFindings,
+  stopReason: 'end_turn',
+  usage: { input_tokens: 100, output_tokens: 20 },
+});
+
+/** Raw Grok wrapper whose .text holds an inline fence with no newline after the opener. */
+const GROK_RAW_WRAPPER_INLINE_FENCE = JSON.stringify({
+  text: 'Done. ```json []```',
+  stopReason: 'end_turn',
+  usage: { input_tokens: 100, output_tokens: 20 },
+});
+
+/** Un-unwrapped Cursor stream-json whose assistant and result text is fenced. */
+const CURSOR_STREAM_JSON_FENCED = [
+  { type: 'system', subtype: 'init', model: 'example-model', cwd: '/tmp/synthex-cursor.example' },
+  { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: fencedFindings }] } },
+  { type: 'result', subtype: 'success', is_error: false, result: fencedFindings },
+]
+  .map((o) => JSON.stringify(o))
+  .join('\n');
+
 const PARSE_FAILED_CASES: Array<[string, string]> = [
   ['a raw Grok {text, stopReason, usage} wrapper', GROK_RAW_WRAPPER],
+  ['a raw Grok wrapper whose .text is fenced JSON', GROK_RAW_WRAPPER_FENCED],
+  ['a raw Grok wrapper whose .text holds an inline fence', GROK_RAW_WRAPPER_INLINE_FENCE],
   ['a Grok {type:"error", message} object', GROK_ERROR_OBJECT],
   ['a {response: …} object (un-unwrapped Gemini wrapper)', GEMINI_RESPONSE_WRAPPER],
   ['Cursor stream-json NDJSON with no finding lines', CURSOR_STREAM_JSON],
+  ['Cursor stream-json NDJSON whose assistant/result text is fenced', CURSOR_STREAM_JSON_FENCED],
   ['a top-level JSON scalar', JSON.stringify('looks fine to me')],
 ];
 
@@ -482,7 +511,9 @@ const STILL_PASSES_CASES: Array<[string, string, number]> = [
     JSON.stringify(D32_FINDING) + '\n' + JSON.stringify({ ...D32_FINDING, finding_id: 'style.b.two' }) + '\n',
     2,
   ],
+  ['one-line bare-finding NDJSON (a single top-level finding object)', JSON.stringify(D32_FINDING) + '\n', 1],
   ['an explicit "findings": null (normalized to [])', JSON.stringify({ findings: null }), 0],
+  ['a fenced findings object with prose around it', 'Here is my review:\n' + fencedFindings + '\nThanks!', 1],
 ];
 
 type PathMode = 'node' | 'jq';
@@ -511,13 +542,23 @@ describe.each<PathMode>(['node', 'jq'])('D32 (Task 66): parse_failed instead of 
     expect(envelope.raw_output_path).toBe('r.json');
   });
 
-  it('names the missing "findings" key and the wrapper keys in error_message', () => {
+  it.each([
+    ['unfenced', GROK_RAW_WRAPPER],
+    ['fenced .text', GROK_RAW_WRAPPER_FENCED],
+  ])('names the missing "findings" key and the wrapper keys in error_message (%s)', (_label, stdin) => {
     const result = withPath(mode, (pathDir) =>
-      run(['--reviewer-id', 'grok-review-prompter', '--family', 'xai'], { stdin: GROK_RAW_WRAPPER, pathDir }),
+      run(['--reviewer-id', 'grok-review-prompter', '--family', 'xai'], { stdin, pathDir }),
     );
     const envelope = parseEnvelope(result.stdout);
     expect(envelope.error_message).toContain('no "findings" key');
     expect(envelope.error_message).toContain('text, stopReason');
+  });
+
+  it('a fenced Cursor event log names the stream-json reason, not the generic one', () => {
+    const result = withPath(mode, (pathDir) =>
+      run(['--reviewer-id', 'cursor-review-prompter', '--family', 'cursor'], { stdin: CURSOR_STREAM_JSON_FENCED, pathDir }),
+    );
+    expect(parseEnvelope(result.stdout).error_message).toContain('stream-json event log');
   });
 
   it.each(STILL_PASSES_CASES)('%s still passes', (_label, stdin, count) => {
@@ -566,12 +607,58 @@ describe.each<PathMode>(['node', 'jq'])('D32 (Task 66): --usage-json — %s path
     expect(parseEnvelope(withoutModel.stdout).usage).toEqual({ input_tokens: 1, output_tokens: 2, model: null });
   });
 
-  it('the model output\'s own usage wins over --usage-json', () => {
+  it('--usage-json (the CLI\'s measured usage) wins over a usage key in the model output', () => {
     const own = JSON.stringify({ findings: [D32_FINDING], usage: { input_tokens: 9, output_tokens: 8, model: 'own' } });
     const result = withPath(mode, (pathDir) =>
       run([...args, '--usage-json', '{"input_tokens":1,"output_tokens":2,"model":"m"}'], { stdin: own, pathDir }),
     );
+    expect(parseEnvelope(result.stdout).usage).toEqual({ input_tokens: 1, output_tokens: 2, model: 'm' });
+  });
+
+  it('a well-formed usage in the model output is used when --usage-json is absent', () => {
+    const own = JSON.stringify({ findings: [D32_FINDING], usage: { input_tokens: 9, output_tokens: 8, model: 'own' } });
+    const result = withPath(mode, (pathDir) => run(args, { stdin: own, pathDir }));
     expect(parseEnvelope(result.stdout).usage).toEqual({ input_tokens: 9, output_tokens: 8, model: 'own' });
+  });
+
+  it('usage from the model output always carries model: --model, else null', () => {
+    const own = JSON.stringify({ findings: [D32_FINDING], usage: { input_tokens: 9, output_tokens: 8 } });
+    const withModel = withPath(mode, (pathDir) => run([...args, '--model', 'grok-x'], { stdin: own, pathDir }));
+    expect(parseEnvelope(withModel.stdout).usage).toEqual({ input_tokens: 9, output_tokens: 8, model: 'grok-x' });
+    const withoutModel = withPath(mode, (pathDir) => run(args, { stdin: own, pathDir }));
+    expect(parseEnvelope(withoutModel.stdout).usage).toEqual({ input_tokens: 9, output_tokens: 8, model: null });
+  });
+
+  it.each([
+    ['an empty object', {}],
+    ['a string', 'n/a'],
+    ['an array', [1]],
+    ['false', false],
+    ['0', 0],
+    ['non-numeric token counts', { input_tokens: '9', output_tokens: 8 }],
+  ])('a malformed usage in the model output (%s) counts as absent', (_label, badUsage) => {
+    const stdinBad = JSON.stringify({ findings: [D32_FINDING], usage: badUsage });
+    const without = withPath(mode, (pathDir) => run(args, { stdin: stdinBad, pathDir }));
+    expect(without.code).toBe(0);
+    const envWithout = parseEnvelope(without.stdout);
+    expect(envWithout.status).toBe('success');
+    expect(envWithout.findings).toHaveLength(1);
+    expect(envWithout.usage).toBeNull();
+    const withFlag = withPath(mode, (pathDir) =>
+      run([...args, '--model', 'mm', '--usage-json', '{"input_tokens":1,"output_tokens":2}'], { stdin: stdinBad, pathDir }),
+    );
+    expect(parseEnvelope(withFlag.stdout).usage).toEqual({ input_tokens: 1, output_tokens: 2, model: 'mm' });
+  });
+
+  it('a malformed usage on one NDJSON line does not break the merge', () => {
+    const ndjson =
+      JSON.stringify({ findings: [D32_FINDING], usage: 'n/a' }) +
+      '\n' +
+      JSON.stringify({ findings: [], usage: { input_tokens: 3, output_tokens: 4 } });
+    const result = withPath(mode, (pathDir) => run(args, { stdin: ndjson, pathDir }));
+    const envelope = parseEnvelope(result.stdout);
+    expect(envelope.status).toBe('success');
+    expect(envelope.usage).toEqual({ input_tokens: 3, output_tokens: 4, model: null });
   });
 
   it.each([
@@ -648,5 +735,44 @@ describe('D32 (Task 66): script header documents the eight-code enum and the new
   it('documents --usage-json and the D32 parse_failed rules', () => {
     expect(header).toContain('--usage-json');
     expect(header).toContain('D32');
+  });
+});
+
+// ── Interpreter failure: exit 0 always means an envelope was printed ─────
+
+describe('validate-findings: an interpreter that fails prints an unknown_error envelope', () => {
+  const stdin = JSON.stringify({ findings: [D32_FINDING] });
+  const args = ['--reviewer-id', 'x', '--family', 'y', '--raw-output-path', 'r.json'];
+
+  function withStub(tool: 'node' | 'jq', script: string, extra: string[]): { code: number; stdout: string } {
+    const tmp = mkdtempSync(join(tmpdir(), 'validate-findings-stub-'));
+    try {
+      const bin = restrictedPath(tmp, [...POSIX_TOOLS, ...extra]);
+      writeFileSync(join(bin, tool), script, { mode: 0o755 });
+      return run(args, { stdin, pathDir: bin });
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+
+  it('node path: a crashing node gives unknown_error, not empty stdout', () => {
+    const result = withStub('node', '#!/bin/bash\ncat >/dev/null\nexit 3\n', []);
+    expect(result.code).toBe(0);
+    const envelope = parseEnvelope(result.stdout);
+    expect(envelope.status).toBe('failed');
+    expect(envelope.error_code).toBe('unknown_error');
+    expect(envelope.usage).toBeNull();
+    expect(envelope.raw_output_path).toBe('r.json');
+  });
+
+  it('jq path: a jq that fails while building the envelope gives unknown_error, not empty stdout', () => {
+    const realJq = execFileSync('bash', ['-c', 'command -v jq'], { encoding: 'utf-8' }).trim();
+    const stub = `#!/bin/bash\ncase "$*" in *--slurpfile*) exit 5 ;; esac\nexec "${realJq}" "$@"\n`;
+    const result = withStub('jq', stub, []);
+    expect(result.code).toBe(0);
+    const envelope = parseEnvelope(result.stdout);
+    expect(envelope.status).toBe('failed');
+    expect(envelope.error_code).toBe('unknown_error');
+    expect(envelope.raw_output_path).toBe('r.json');
   });
 });

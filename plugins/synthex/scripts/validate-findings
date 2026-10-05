@@ -13,11 +13,12 @@
 #                      [--raw-output-path <path>] [--model <id>]
 #                      [--usage-json <json>] [--input <path>]
 #     Reads raw CLI stdout (fenced or bare JSON, or NDJSON) from --input, or
-#     from stdin when --input is omitted. Normalizes it: strips a wrapping
-#     markdown code fence (tolerating prelude/postlude prose around it),
-#     tries a direct JSON parse, falls back to joining newline-delimited
-#     JSON (merging findings[] arrays and usage token counts across lines),
-#     then falls back to stripping trailing commas and retrying both.
+#     from stdin when --input is omitted. Normalizes it: tries the raw text
+#     as one JSON value, then as newline-delimited JSON (merging findings[]
+#     arrays and usage token counts across lines); only when neither parses
+#     does it strip a wrapping markdown code fence (both fence lines at the
+#     start of a line, tolerating prelude/postlude prose around it) and try
+#     both again; then it strips trailing commas and retries.
 #     Validates each finding against canonical-finding.schema.json (after
 #     injecting `source`, overwriting anything the CLI itself emitted there),
 #     drops any finding that still fails validation (never aborts the run;
@@ -32,14 +33,16 @@
 #     carries `findings` and no object is finding-shaped (has finding_id,
 #     severity or title — e.g. an un-unwrapped stream-json event log) all
 #     give `parse_failed`. A bare
-#     array, bare-finding NDJSON, and an explicit `"findings": null`
-#     (normalized to []) still pass.
-#     --usage-json sets the envelope's `usage` when the model output carries
-#     none (runners pass the CLI wrapper's own usage this way, NFR-MR4). It
-#     must be a JSON object with numeric input_tokens and output_tokens; a
-#     missing `model` is filled from --model, else null. Anything else is
-#     malformed: it is ignored (usage stays null) with a stderr note, never
-#     an error.
+#     array, bare-finding NDJSON (one line or many), a single top-level
+#     finding object, and an explicit `"findings": null` (normalized to [])
+#     still pass.
+#     --usage-json passes the CLI wrapper's own measured usage (NFR-MR4). It
+#     must be a JSON object with numeric input_tokens and output_tokens;
+#     anything else is malformed: it is ignored with a stderr note, never an
+#     error. Usage precedence: a well-formed --usage-json, else a well-formed
+#     `usage` in the parsed output, else null (a malformed usage from either
+#     source counts as absent). Any non-null usage always carries `model`:
+#     its own non-empty string, else --model, else null.
 #
 #   validate-findings --error <error_code> [--message <text>]
 #                      [--raw-output-path <path>]
@@ -54,7 +57,8 @@
 #
 # Prefers node (guarded by `command -v node`); falls back to jq when node is
 # absent; falls back to a dependency-free `unknown_error` envelope when
-# neither is present. No `python`, anywhere (D19).
+# neither is present, or when the interpreter itself fails. No `python`,
+# anywhere (D19).
 #
 # Exit codes:
 #   0 - an envelope was printed to stdout. Check the JSON body's "status"
@@ -162,12 +166,22 @@ else
   cat > "$RESOLVED_INPUT"
   CLEANUP_TMP="$RESOLVED_INPUT"
 fi
-cleanup() { [ -n "$CLEANUP_TMP" ] && rm -f "$CLEANUP_TMP" 2>/dev/null; }
+CLEANUP_OUT=""
+cleanup() {
+  [ -n "$CLEANUP_TMP" ] && rm -f "$CLEANUP_TMP" 2>/dev/null
+  [ -n "$CLEANUP_OUT" ] && rm -f "$CLEANUP_OUT" 2>/dev/null
+  return 0
+}
 trap cleanup EXIT
 
 # --- Preferred path: node ------------------------------------------------
 if command -v node >/dev/null 2>&1; then
-  node - "$SOURCE_TYPE" "$REVIEWER_ID" "$FAMILY" "$RAW_OUTPUT_PATH" "$MODEL" "$RESOLVED_INPUT" "$SCHEMA_PATH" "$USAGE_JSON" <<'NODE_SCRIPT'
+  # stdout goes to a file first: a node crash prints an unknown_error
+  # envelope instead of nothing, so exit 0 always means an envelope was
+  # printed (see the header).
+  NODE_OUT="$(mktemp 2>/dev/null || printf "/tmp/validate-findings-out-%s" "$$")"
+  CLEANUP_OUT="$NODE_OUT"
+  node - "$SOURCE_TYPE" "$REVIEWER_ID" "$FAMILY" "$RAW_OUTPUT_PATH" "$MODEL" "$RESOLVED_INPUT" "$SCHEMA_PATH" "$USAGE_JSON" > "$NODE_OUT" <<'NODE_SCRIPT'
 const fs = require('fs');
 const [, , sourceType, reviewerId, family, rawOutputPathArg, model, inputFile, schemaPath, usageJsonArg] = process.argv;
 const rawOutputPath = rawOutputPathArg.length > 0 ? rawOutputPathArg : null;
@@ -200,18 +214,29 @@ function validateFinding(f) {
   return errors;
 }
 
-// Extracts the interior of the FIRST fenced code block found anywhere in
-// the text, tolerating prelude/postlude prose the CLI printed around it
-// (a banner line, "Here is my review:", trailing "Thanks!", etc.). When no
-// fence is present, the trimmed text is used unchanged.
-const FENCE_RE = /```(?:json)?\r?\n?([\s\S]*?)```/;
+// Extracts the interior of the FIRST closed fenced code block, tolerating
+// prelude/postlude prose the CLI printed around it (a banner line, "Here is
+// my review:", trailing "Thanks!", etc.). Both fence lines must start at the
+// beginning of a line, exactly as the jq path's awk does, so a ``` inside a
+// JSON string never counts as a fence. Returns null when there is no closed
+// fence.
+const FENCE_RE = /^```[^\n]*\n([\s\S]*?)^```/m;
 function stripFence(text) {
   const m = FENCE_RE.exec(text);
-  return m ? m[1].trim() : text.trim();
+  return m ? m[1].trim() : null;
 }
 
 function stripTrailingCommas(text) {
   return text.replace(/,(\s*[}\]])/g, '$1');
+}
+
+function isPlainObject(v) { return typeof v === 'object' && v !== null && !Array.isArray(v); }
+function hasOwn(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+
+// A usage object is well-formed only when it is a plain object with numeric
+// input_tokens and output_tokens. Anything else is treated as absent.
+function isValidUsage(v) {
+  return isPlainObject(v) && typeof v.input_tokens === 'number' && typeof v.output_tokens === 'number';
 }
 
 function tryParse(text) {
@@ -219,7 +244,7 @@ function tryParse(text) {
 }
 
 function mergeUsage(a, b) {
-  if (!b || typeof b !== 'object') return a;
+  if (!isPlainObject(b)) return a;
   if (!a) return { ...b };
   const sum = (x, y) => (typeof x === 'number' ? x : 0) + (typeof y === 'number' ? y : 0);
   return {
@@ -228,9 +253,6 @@ function mergeUsage(a, b) {
     model: b.model ?? a.model ?? null,
   };
 }
-
-function isPlainObject(v) { return typeof v === 'object' && v !== null && !Array.isArray(v); }
-function hasOwn(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 
 // A finding-shaped object carries at least one of these keys (D32). Used to
 // tell bare-finding NDJSON (passes) from an event log with no findings in
@@ -284,9 +306,14 @@ function tryNdjsonJoin(text) {
 
 // A top-level object MUST carry a `findings` key (D32): a CLI wrapper the
 // adapter forgot to unwrap, or a CLI error object, is never a clean review.
+// The one exception is a single finding-shaped object (one-line bare-finding
+// NDJSON), which is treated as [obj], the same rule tryNdjsonJoin uses.
 function extractFindingsAndUsage(parsedValue) {
   if (Array.isArray(parsedValue)) return { ok: true, findings: parsedValue, usage: null };
   if (isPlainObject(parsedValue)) {
+    if (!hasOwn(parsedValue, 'findings') && isFindingShaped(parsedValue)) {
+      return { ok: true, findings: [parsedValue], usage: null };
+    }
     if (!hasOwn(parsedValue, 'findings')) {
       const keys = Object.keys(parsedValue).slice(0, 8).join(', ');
       return {
@@ -301,14 +328,28 @@ function extractFindingsAndUsage(parsedValue) {
   return { ok: false, reason: `top-level JSON value is a ${kind}, not a findings object or array` };
 }
 
+// Order matters (D32): the raw text is tried as JSON and as NDJSON BEFORE
+// any fence-strip, so a CLI wrapper whose .text/.result holds fenced JSON is
+// judged as the wrapper it is (parse_failed), never as the fragment inside.
 function normalize(rawText) {
-  const text = stripFence(rawText);
+  const trimmed = rawText.trim();
 
-  let parsed = tryParse(text);
+  let parsed = tryParse(trimmed);
   if (parsed.ok) return extractFindingsAndUsage(parsed.value);
 
-  const ndjson = tryNdjsonJoin(text);
-  if (ndjson) return ndjson;
+  const rawNdjson = tryNdjsonJoin(trimmed);
+  if (rawNdjson) return rawNdjson;
+
+  const fenced = stripFence(rawText);
+  const text = fenced === null ? trimmed : fenced;
+
+  if (fenced !== null) {
+    parsed = tryParse(text);
+    if (parsed.ok) return extractFindingsAndUsage(parsed.value);
+
+    const ndjson = tryNdjsonJoin(text);
+    if (ndjson) return ndjson;
+  }
 
   const destrailed = stripTrailingCommas(text);
   parsed = tryParse(destrailed);
@@ -325,10 +366,7 @@ function normalize(rawText) {
 function parseUsageFlag(text) {
   if (!text) return null;
   const p = tryParse(text);
-  if (p.ok && isPlainObject(p.value)
-    && typeof p.value.input_tokens === 'number' && typeof p.value.output_tokens === 'number') {
-    return p.value;
-  }
+  if (p.ok && isValidUsage(p.value)) return p.value;
   process.stderr.write('validate-findings: ignoring malformed --usage-json (want a JSON object with numeric input_tokens and output_tokens)\n');
   return null;
 }
@@ -374,14 +412,14 @@ for (const f of result.findings) {
   }
 }
 
-let usage = result.usage ?? null;
-let usageFromFlag = false;
-if (!usage) {
-  usage = parseUsageFlag(usageJsonArg);
-  usageFromFlag = usage !== null;
-}
-if (usage && typeof usage === 'object' && !usage.model && model) usage = { ...usage, model };
-if (usageFromFlag && !hasOwn(usage, 'model')) usage = { ...usage, model: null };
+// Usage precedence (NFR-MR4): a well-formed --usage-json (the CLI's own
+// measured usage, passed by the runner) wins; else a well-formed usage
+// carried in the parsed output; else null. A malformed usage from either
+// source is treated as absent. Any non-null usage always carries `model`:
+// its own non-empty string, else --model, else null.
+const flagUsage = parseUsageFlag(usageJsonArg);
+let usage = flagUsage ?? (isValidUsage(result.usage) ? result.usage : null);
+if (usage !== null && !isNonEmptyString(usage.model)) usage = { ...usage, model: model.length > 0 ? model : null };
 
 printEnvelope({
   status: 'success',
@@ -393,30 +431,60 @@ printEnvelope({
 });
 process.exit(0);
 NODE_SCRIPT
-  exit $?
+  if [ $? -eq 0 ] && [ -s "$NODE_OUT" ]; then
+    cat "$NODE_OUT"
+  else
+    printf '{"status":"failed","error_code":"unknown_error","error_message":"validate-findings: node failed while building the envelope.","findings":[],"usage":null,"raw_output_path":%s}\n' \
+      "$(json_raw_output_path)"
+  fi
+  exit 0
 fi
 
 # --- Fallback path: jq (no node on PATH) ---------------------------------
 if command -v jq >/dev/null 2>&1; then
-  # 1. Fence-strip: extract the interior of the FIRST fenced code block
-  #    found anywhere in the blob (tolerating prelude/postlude prose); when
-  #    no fence is present, pass the blob through unchanged.
+  # A jq failure while building the envelope prints an unknown_error
+  # envelope instead of nothing, so exit 0 always means an envelope was
+  # printed (see the header).
+  jq_failed() {
+    printf '{"status":"failed","error_code":"unknown_error","error_message":"validate-findings: jq failed while building the envelope.","findings":[],"usage":null,"raw_output_path":%s}\n' \
+      "$(json_raw_output_path)"
+    exit 0
+  }
+
+  if [ -z "$(tr -d '[:space:]' < "$RESOLVED_INPUT")" ]; then
+    printf '{"status":"failed","error_code":"parse_failed","error_message":"validate-findings received empty input; nothing to parse.","findings":[],"usage":null,"raw_output_path":%s}\n' \
+      "$(json_raw_output_path)"
+    exit 0
+  fi
+
+  # 1. Fence-strip: the interior of the FIRST closed fenced code block, both
+  #    fence lines at the start of a line (mirrors the node path's FENCE_RE),
+  #    tolerating prelude/postlude prose around it. awk exits 0 when it found
+  #    one; otherwise it exits 1 and copies the blob through unchanged.
   FENCE_STRIPPED="$(mktemp 2>/dev/null || printf '/tmp/validate-findings-fence-%s' "$$")"
-  awk '
-    BEGIN { infence = 0; found = 0 }
-    /^```/ {
-      if (infence) { infence = 0; found = 1; next }
-      else { infence = 1; next }
-    }
-    { if (infence) print; else if (!found) other[NR] = $0 }
+  FENCE_FOUND=0
+  if awk '
+    BEGIN { state = 0; n = 0 }
+    { line[NR] = $0 }
+    state == 0 && /^```/ { state = 1; next }
+    state == 1 && /^```/ { state = 2; next }
+    state == 1 { inner[++n] = $0 }
     END {
-      if (!found) { for (i = 1; i <= NR; i++) if (i in other) print other[i] }
+      if (state == 2) { for (i = 1; i <= n; i++) print inner[i]; exit 0 }
+      for (i = 1; i <= NR; i++) print line[i]
+      exit 1
     }
-  ' "$RESOLVED_INPUT" > "$FENCE_STRIPPED"
+  ' "$RESOLVED_INPUT" > "$FENCE_STRIPPED"; then
+    FENCE_FOUND=1
+  fi
 
   JQ_PROGRAM='
+    # Well-formed usage: an object with numeric input_tokens and output_tokens.
+    def valid_usage:
+      if type == "object" then ((.input_tokens | type) == "number") and ((.output_tokens | type) == "number") else false end;
+
     def merge_usage(a; b):
-      if (b == null) then a
+      if ((b | type) != "object") then a
       elif (a == null) then b
       else {
         input_tokens: ((a.input_tokens // 0) + (b.input_tokens // 0)),
@@ -424,22 +492,25 @@ if command -v jq >/dev/null 2>&1; then
         model: (b.model // a.model // null)
       } end;
 
+    def finding_shaped:
+      (type == "object") and (has("finding_id") or has("severity") or has("title"));
+
     # Mirrors the node path (D32): a top-level object with no `findings`
     # key, or a top-level scalar, yields {parse_error: <reason>} instead of
-    # a silent zero-finding success.
+    # a silent zero-finding success. A single finding-shaped object
+    # (one-line bare-finding NDJSON) is treated as [obj].
     def extract:
       if (type == "array") then {findings: ., usage: null}
       elif (type == "object") then
         if has("findings") then
           {findings: (if (.findings | type) == "array" then .findings else [] end), usage: (.usage // null)}
+        elif finding_shaped then
+          {findings: [.], usage: null}
         else
           {parse_error: ("top-level JSON object has no \"findings\" key (keys: " + (keys_unsorted[:8] | join(", ")) + "); likely an un-unwrapped CLI wrapper or a CLI error object")}
         end
       else {parse_error: ("top-level JSON value is a " + type + ", not a findings object or array")}
       end;
-
-    def finding_shaped:
-      (type == "object") and (has("finding_id") or has("severity") or has("title"));
 
     # Returns null when the text is not NDJSON at all (fewer than 2 lines,
     # or a line that does not parse), else {findings, usage} or
@@ -472,25 +543,30 @@ if command -v jq >/dev/null 2>&1; then
       else (ndjson_join($raw)) end
   '
 
-  RAW_FOR_JQ="$(cat "$FENCE_STRIPPED")"
+  run_jq_program() { jq -c -n --arg raw "$1" "$JQ_PROGRAM" 2>/dev/null; }
+  no_result() { [ -z "$RESULT" ] || [ "$RESULT" = "null" ]; }
 
-  if [ -z "$(tr -d '[:space:]' < "$FENCE_STRIPPED")" ]; then
-    RESULT=""
-  else
-    RESULT="$(jq -c -n --arg raw "$RAW_FOR_JQ" "$JQ_PROGRAM" 2>/dev/null)"
+  # 2. The raw blob first, as JSON then NDJSON (D32: a CLI wrapper whose
+  #    .text/.result holds fenced JSON is judged as the wrapper it is, never
+  #    as the fragment inside), mirroring the node path's normalize().
+  RESULT="$(run_jq_program "$(cat "$RESOLVED_INPUT")")"
+
+  # 3. Then the fenced interior, when a closed fence was found.
+  if no_result && [ "$FENCE_FOUND" = 1 ] && [ -n "$(tr -d '[:space:]' < "$FENCE_STRIPPED")" ]; then
+    RESULT="$(run_jq_program "$(cat "$FENCE_STRIPPED")")"
   fi
 
-  if [ -z "$RESULT" ] || [ "$RESULT" = "null" ]; then
-    # Retry once after a whole-blob trailing-comma strip (newlines
-    # collapsed first so the bracket-lookahead works across line breaks).
+  # 4. Retry once after a whole-blob trailing-comma strip (newlines
+  #    collapsed first so the bracket-lookahead works across line breaks).
+  if no_result; then
     DESTRAILED="$(tr -d '\n' < "$FENCE_STRIPPED" | sed -E 's/,([[:space:]]*[]}])/\1/g')"
     if [ -n "$DESTRAILED" ]; then
-      RESULT="$(jq -c -n --arg raw "$DESTRAILED" "$JQ_PROGRAM" 2>/dev/null)"
+      RESULT="$(run_jq_program "$DESTRAILED")"
     fi
   fi
   rm -f "$FENCE_STRIPPED" 2>/dev/null
 
-  if [ -z "$RESULT" ] || [ "$RESULT" = "null" ]; then
+  if no_result; then
     printf '{"status":"failed","error_code":"parse_failed","error_message":"validate-findings could not parse the CLI output into the canonical envelope (fence-strip, NDJSON-join, and trailing-comma-strip all failed). Raw output preserved at raw_output_path.","findings":[],"usage":null,"raw_output_path":%s}\n' \
       "$(json_raw_output_path)"
     exit 0
@@ -499,27 +575,29 @@ if command -v jq >/dev/null 2>&1; then
   # D32: the jq program flagged a wrapper/error object, a scalar, or a
   # finding-less NDJSON log — a visible parse_failed, never a silent pass.
   if printf '%s' "$RESULT" | jq -e 'has("parse_error")' >/dev/null 2>&1; then
-    jq -c -n --argjson result "$RESULT" --arg raw_output_path "$RAW_OUTPUT_PATH" '{
+    ENVELOPE="$(jq -c -n --argjson result "$RESULT" --arg raw_output_path "$RAW_OUTPUT_PATH" '{
       status: "failed",
       error_code: "parse_failed",
       error_message: ("validate-findings: " + $result.parse_error + ". Raw output preserved at raw_output_path."),
       findings: [],
       usage: null,
       raw_output_path: (if ($raw_output_path | length) > 0 then $raw_output_path else null end)
-    }'
+    }')" || jq_failed
+    [ -n "$ENVELOPE" ] || jq_failed
+    printf '%s\n' "$ENVELOPE"
     exit 0
   fi
 
   # --usage-json: well-formed only as a JSON object with numeric
   # input_tokens and output_tokens; anything else is ignored (usage null).
   if [ -n "$USAGE_JSON" ] && ! jq -e -n --arg u "$USAGE_JSON" \
-      '($u | try fromjson catch null) | (type == "object") and ((.input_tokens | type) == "number") and ((.output_tokens | type) == "number")' \
+      '($u | try fromjson catch null) | if type == "object" then ((.input_tokens | type) == "number") and ((.output_tokens | type) == "number") else false end' \
       >/dev/null 2>&1; then
     printf 'validate-findings: ignoring malformed --usage-json (want a JSON object with numeric input_tokens and output_tokens)\n' >&2
     USAGE_JSON=""
   fi
 
-  jq -c -n \
+  ENVELOPE="$(jq -c -n \
     --argjson result "$RESULT" \
     --arg reviewer_id "$REVIEWER_ID" \
     --arg family "$FAMILY" \
@@ -529,6 +607,8 @@ if command -v jq >/dev/null 2>&1; then
     --arg usage_json "$USAGE_JSON" \
     --slurpfile schema_arr "$SCHEMA_PATH" \
     '
+      def valid_usage:
+        if type == "object" then ((.input_tokens | type) == "number") and ((.output_tokens | type) == "number") else false end;
       ($schema_arr[0]) as $schema
       | ($schema.properties.severity.enum) as $severities
       | ($schema.properties.source.properties.source_type.enum) as $source_types
@@ -552,14 +632,17 @@ if command -v jq >/dev/null 2>&1; then
                end)
           )
         ) as $out
+      # Usage precedence (NFR-MR4), mirroring the node path: a well-formed
+      # --usage-json wins, else a well-formed usage from the parsed output,
+      # else null. Any non-null usage always carries `model`: its own
+      # non-empty string, else --model, else null.
       | (if ($usage_json | length) > 0 then ($usage_json | fromjson) else null end) as $flag_usage
-      | ($result.usage // $flag_usage) as $base_usage
-      | (if ($base_usage != null and ($base_usage.model // "") == "" and $model != "") then
-           ($base_usage + {model: $model})
-         else $base_usage end) as $usage0
-      | (if ($result.usage == null and $usage0 != null and ($usage0 | has("model") | not)) then
-           ($usage0 + {model: null})
-         else $usage0 end) as $usage
+      | ($result.usage | if valid_usage then . else null end) as $own_usage
+      | (if $flag_usage != null then $flag_usage else $own_usage end) as $base_usage
+      | (if $base_usage == null then null
+         elif (($base_usage.model | type) == "string" and ($base_usage.model | length) > 0) then $base_usage
+         else ($base_usage + {model: (if $model != "" then $model else null end)})
+         end) as $usage
       | {
           status: "success",
           error_code: null,
@@ -568,7 +651,9 @@ if command -v jq >/dev/null 2>&1; then
           usage: $usage,
           raw_output_path: (if ($raw_output_path | length) > 0 then $raw_output_path else null end)
         }
-    '
+    ')" || jq_failed
+  [ -n "$ENVELOPE" ] || jq_failed
+  printf '%s\n' "$ENVELOPE"
   exit 0
 fi
 

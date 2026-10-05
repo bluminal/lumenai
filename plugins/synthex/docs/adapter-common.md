@@ -60,8 +60,8 @@ are never user-facing.
    `.response`): a top-level object with no `findings` key, a CLI error
    object, or NDJSON with no finding lines is `parse_failed`, never a clean
    zero-finding review (multi-model-review D32). When the wrapper reports
-   usage, pass it as `--usage-json '<json>'`; the script uses it only if the
-   model's own output carries none.
+   usage, pass it as `--usage-json '<json>'`: it wins over any `usage` key in
+   the model's own output (NFR-MR4: the CLI's measured usage, verbatim).
 6. **Retry-Once on Parse Failure** — on `error_code: parse_failed`, append a
    clarification ("Your previous response could not be parsed as JSON.
    Respond with ONLY valid JSON, no markdown fences, no prose.") to the

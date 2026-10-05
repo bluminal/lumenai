@@ -9,7 +9,18 @@
  * expected envelopes once the adapter applies its documented unwrap (and,
  * where the wrapper carries usage, passes it via --usage-json), on both the
  * node path and the jq-fallback path. It also pins the Risk 6 side effect:
- * the raw codex and ollama wrappers, piped un-unwrapped, are parse_failed.
+ * the raw codex, ollama and claude wrappers, piped un-unwrapped, are
+ * parse_failed.
+ *
+ * codex/successful has two recorded shapes. Before the Codex quick-fix PR
+ * (fix/codex-adapter-cli) it holds one `recorded_cli_stdout` wrapper; after
+ * it, `recorded_last_message` (the -o file) plus `recorded_cli_stdout_jsonl`
+ * (the --json event log). codexReplay() reads whichever shape is present and
+ * asserts the keys it reads exist, so a renamed fixture key fails loudly
+ * instead of passing for the wrong reason (e.g. empty stdin).
+ *
+ * The Claude adapter has no fixture suite, so its case uses an inline
+ * `claude --output-format json` wrapper built from the codex findings.
  *
  * The fixture files themselves are unchanged; codex-fixtures, gemini-fixtures,
  * ollama-fixtures and fastfollow-adapter-envelopes keep running as-is.
@@ -64,30 +75,102 @@ function loadFixture(dir: string): { fixture: any; expected: any } {
 
 const ids = (findings: any[]) => findings.map((f) => f.finding_id);
 
+/**
+ * What the codex adapter pipes into validate-findings (its unwrapped stdin
+ * and extra args), and the raw, un-unwrapped CLI stdout, for whichever
+ * codex/successful fixture shape is checked out.
+ */
+function codexReplay(fixture: any): { stdin: string; args: string[]; rawStdout: string } {
+  if (fixture.recorded_last_message !== undefined) {
+    // Post quick-fix: Step 5 pipes {findings, usage} built from the -o file
+    // and the last turn.completed event, with --model.
+    expect(Array.isArray(fixture.recorded_last_message.findings)).toBe(true);
+    expect(Array.isArray(fixture.recorded_cli_stdout_jsonl)).toBe(true);
+    expect(fixture.resolved_model).toBeDefined();
+    const turn = [...fixture.recorded_cli_stdout_jsonl].reverse().find((e: any) => e.type === 'turn.completed');
+    expect(turn?.usage).toBeDefined();
+    return {
+      stdin: JSON.stringify({
+        findings: fixture.recorded_last_message.findings,
+        usage: { input_tokens: turn.usage.input_tokens, output_tokens: turn.usage.output_tokens },
+      }),
+      args: ['--model', fixture.resolved_model],
+      rawStdout: fixture.recorded_cli_stdout_jsonl.map((e: any) => JSON.stringify(e)).join('\n'),
+    };
+  }
+  // Pre quick-fix: one wrapper; the adapter unwraps the content text and
+  // passes the wrapper's usage via --usage-json.
+  const wrapper = fixture.recorded_cli_stdout;
+  expect(wrapper).toBeDefined();
+  const text = wrapper.response?.message?.content?.[0]?.text;
+  expect(typeof text).toBe('string');
+  return {
+    stdin: text,
+    args: ['--usage-json', JSON.stringify({ ...wrapper.usage, model: wrapper.model })],
+    rawStdout: JSON.stringify(wrapper),
+  };
+}
+
+/** Inline `claude --output-format json` wrapper: the findings live inside .result. */
+function claudeWrapper(findings: any[]): Record<string, any> {
+  return {
+    type: 'result',
+    subtype: 'success',
+    is_error: false,
+    result: JSON.stringify({ findings }),
+    usage: { input_tokens: 1200, output_tokens: 90, cache_read_input_tokens: 0 },
+  };
+}
+
 describe.each<PathMode>(['node', 'jq'])('Task 66 Risk 6: existing adapter fixtures replayed through validate-findings — %s path', (mode) => {
-  it('codex/successful: the unwrapped content text plus --usage-json reproduces the expected envelope', () => {
+  it("codex/successful: the adapter's unwrapped stdin reproduces the expected envelope", () => {
     const { fixture, expected } = loadFixture('codex/successful');
-    const wrapper = fixture.recorded_cli_stdout;
-    const text = wrapper.response.message.content[0].text;
-    const usageJson = JSON.stringify({ ...wrapper.usage, model: wrapper.model });
+    expect(expected).not.toBeNull();
+    const { stdin, args } = codexReplay(fixture);
+    expect(stdin.trim().length).toBeGreaterThan(0);
     const env = run(
       mode,
-      ['--reviewer-id', 'codex-review-prompter', '--family', 'openai', '--raw-output-path', expected.raw_output_path, '--usage-json', usageJson],
-      text,
+      ['--reviewer-id', 'codex-review-prompter', '--family', 'openai', '--raw-output-path', expected.raw_output_path, ...args],
+      stdin,
     );
-    expect(env.status).toBe(expected.status);
-    expect(env.error_code).toBeNull();
-    expect(ids(env.findings)).toEqual(ids(expected.findings));
-    expect(env.findings).toEqual(expected.findings);
-    expect(env.usage).toEqual(expected.usage);
-    expect(env.raw_output_path).toBe(expected.raw_output_path);
+    expect(env).toEqual(expected);
   });
 
-  it('codex/successful: the raw, un-unwrapped wrapper is now parse_failed (D32), not a silent pass', () => {
+  it('codex/successful: the raw, un-unwrapped CLI stdout is now parse_failed (D32), not a silent pass', () => {
     const { fixture } = loadFixture('codex/successful');
-    const env = run(mode, ['--reviewer-id', 'codex-review-prompter', '--family', 'openai'], JSON.stringify(fixture.recorded_cli_stdout));
+    const { rawStdout } = codexReplay(fixture);
+    expect(rawStdout.trim().length).toBeGreaterThan(0);
+    const env = run(mode, ['--reviewer-id', 'codex-review-prompter', '--family', 'openai'], rawStdout);
     expect(env.status).toBe('failed');
     expect(env.error_code).toBe('parse_failed');
+    expect(env.error_message).not.toContain('empty input');
+  });
+
+  it('claude: the unwrapped .result plus the wrapper usage via --usage-json passes (Step 5)', () => {
+    const { expected } = loadFixture('codex/successful');
+    const findings = expected.findings.map(({ source, ...f }: any) => f);
+    const wrapper = claudeWrapper(findings);
+    const usageJson = JSON.stringify({ input_tokens: wrapper.usage.input_tokens, output_tokens: wrapper.usage.output_tokens });
+    const env = run(
+      mode,
+      ['--reviewer-id', 'claude-review-prompter', '--family', 'anthropic', '--model', 'claude-opus', '--raw-output-path', 'r.json', '--usage-json', usageJson],
+      wrapper.result,
+    );
+    expect(env.status).toBe('success');
+    expect(ids(env.findings)).toEqual(ids(expected.findings));
+    expect(env.findings.every((f: any) => f.source.reviewer_id === 'claude-review-prompter')).toBe(true);
+    expect(env.usage).toEqual({ input_tokens: 1200, output_tokens: 90, model: 'claude-opus' });
+  });
+
+  it('claude: the raw {type:"result"} wrapper, piped un-unwrapped, is now parse_failed (D32)', () => {
+    const { expected } = loadFixture('codex/successful');
+    const env = run(
+      mode,
+      ['--reviewer-id', 'claude-review-prompter', '--family', 'anthropic'],
+      JSON.stringify(claudeWrapper(expected.findings)),
+    );
+    expect(env.error_code).toBe('parse_failed');
+    expect(env.error_message).toContain('no "findings" key');
   });
 
   it('codex/malformed-output-retry: both the first call and the retry stay parse_failed (terminal)', () => {
