@@ -1,0 +1,27 @@
+{
+  "text": "I'll open the review target and quote its first line in the required JSON.",
+  "stopReason": "cancelled",
+  "sessionId": "<redacted-id>",
+  "requestId": "<redacted-id>",
+  "usage": {
+    "input_tokens": 9891,
+    "cache_read_input_tokens": 2176,
+    "cache_creation_input_tokens": 0,
+    "output_tokens": 94,
+    "reasoning_tokens": 66,
+    "total_tokens": 12161
+  },
+  "num_turns": 1,
+  "total_cost_usd": 0.00728756,
+  "total_cost_usd_ticks": 72875600,
+  "modelUsage": {
+    "grok-4.7-build": {
+      "inputTokens": 9891,
+      "outputTokens": 94,
+      "cacheReadInputTokens": 2176,
+      "cacheCreationInputTokens": 0,
+      "modelCalls": 1,
+      "costUSD": 0.00728756
+    }
+  }
+}
