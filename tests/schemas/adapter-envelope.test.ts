@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import { validateFullAdapterEnvelope, STATUS_VALUES, ERROR_CODE_VALUES } from './adapter-envelope';
+
+const VALIDATE_FINDINGS = join(__dirname, '..', '..', 'plugins', 'synthex', 'scripts', 'validate-findings');
 
 const validFinding = {
   finding_id: 'security.handleLogin.missing-csrf-check',
@@ -305,5 +309,31 @@ describe('Task 11: validateFullAdapterEnvelope', () => {
     expect(ERROR_CODE_VALUES).toContain('cli_missing');
     expect(ERROR_CODE_VALUES).toContain('parse_failed');
     expect(ERROR_CODE_VALUES).toContain('timeout');
+    expect(ERROR_CODE_VALUES).toContain('cli_unsupported_mode');
+  });
+
+  // multi-model-review Task 66 (D32): FR-MR16 grows to eight codes.
+  it('passes for a failed envelope with error_code cli_unsupported_mode', () => {
+    const result = validateFullAdapterEnvelope({
+      status: 'failed',
+      error_code: 'cli_unsupported_mode',
+      error_message: 'parent-mediated is not supported by gemini; use read-only',
+      findings: [],
+      usage: null,
+      raw_output_path: 'docs/reviews/raw/gemini-abc.json',
+    });
+    expect(result.valid, result.errors.join('; ')).toBe(true);
+  });
+
+  it('the envelope validate-findings prints for --error cli_unsupported_mode passes the full validator', () => {
+    const stdout = execFileSync(
+      'bash',
+      [VALIDATE_FINDINGS, '--error', 'cli_unsupported_mode', '--message', 'x', '--raw-output-path', 'docs/reviews/raw/r.json'],
+      { encoding: 'utf-8' },
+    );
+    const envelope = JSON.parse(stdout);
+    expect(envelope.error_code).toBe('cli_unsupported_mode');
+    const result = validateFullAdapterEnvelope(envelope);
+    expect(result.valid, result.errors.join('; ')).toBe(true);
   });
 });

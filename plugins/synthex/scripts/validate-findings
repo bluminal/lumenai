@@ -11,7 +11,7 @@
 #   validate-findings --reviewer-id <id> --family <family>
 #                      [--source-type native-team|external|native-recovery]
 #                      [--raw-output-path <path>] [--model <id>]
-#                      [--input <path>]
+#                      [--usage-json <json>] [--input <path>]
 #     Reads raw CLI stdout (fenced or bare JSON, or NDJSON) from --input, or
 #     from stdin when --input is omitted. Normalizes it: strips a wrapping
 #     markdown code fence (tolerating prelude/postlude prose around it),
@@ -24,16 +24,33 @@
 #     the drop count is folded into error_message), and prints the resulting
 #     envelope to stdout. A blob that cannot be normalized by any of the
 #     above prints a `parse_failed` envelope instead.
+#     A silent zero-finding "pass" is never produced (multi-model-review
+#     D32): a top-level JSON object with no `findings` key (an un-unwrapped
+#     CLI wrapper such as Grok's `{text, stopReason, usage}` or Gemini's
+#     `{response}`, or a CLI error object such as `{type: "error",
+#     message}`), a top-level JSON scalar, and NDJSON in which no line
+#     carries `findings` and no object is finding-shaped (has finding_id,
+#     severity or title — e.g. an un-unwrapped stream-json event log) all
+#     give `parse_failed`. A bare
+#     array, bare-finding NDJSON, and an explicit `"findings": null`
+#     (normalized to []) still pass.
+#     --usage-json sets the envelope's `usage` when the model output carries
+#     none (runners pass the CLI wrapper's own usage this way, NFR-MR4). It
+#     must be a JSON object with numeric input_tokens and output_tokens; a
+#     missing `model` is filled from --model, else null. Anything else is
+#     malformed: it is ignored (usage stays null) with a stderr note, never
+#     an error.
 #
 #   validate-findings --error <error_code> [--message <text>]
 #                      [--raw-output-path <path>]
 #     Skips parsing entirely and prints a `{"status":"failed", ...}`
 #     envelope for a failure the caller already detected — this is how every
 #     adapter constructs its cli_missing/cli_auth_failed/cli_failed/timeout/
-#     sandbox_violation/unknown_error envelopes (one script, not six
-#     hand-rolled JSON blobs). `error_code` MUST be one of the seven values
-#     in the closed FR-MR16 enum; adapters MUST NOT invent new codes. This
-#     path is pure bash — it never needs node or jq.
+#     sandbox_violation/unknown_error/cli_unsupported_mode envelopes (one
+#     script, not eight hand-rolled JSON blobs). `error_code` MUST be one of
+#     the eight values in the closed FR-MR16 enum; adapters MUST NOT invent
+#     new codes. `usage` is always null here. This path is pure bash — it
+#     never needs node or jq.
 #
 # Prefers node (guarded by `command -v node`); falls back to jq when node is
 # absent; falls back to a dependency-free `unknown_error` envelope when
@@ -68,6 +85,7 @@ MODEL=""
 INPUT_FILE=""
 ERROR_CODE=""
 MESSAGE=""
+USAGE_JSON=""
 
 usage_error() {
   printf 'validate-findings: usage: %s\n' "$1" >&2
@@ -84,6 +102,7 @@ while [ $# -gt 0 ]; do
     --input) INPUT_FILE="${2:-}"; shift 2 ;;
     --error) ERROR_CODE="${2:-}"; shift 2 ;;
     --message) MESSAGE="${2:-}"; shift 2 ;;
+    --usage-json) USAGE_JSON="${2:-}"; shift 2 ;;
     *) usage_error "unknown argument \"$1\"" ;;
   esac
 done
@@ -112,9 +131,9 @@ json_raw_output_path() {
 # --- --error fast path (FR-MR16 closed enum; pure bash) ------------------
 if [ -n "$ERROR_CODE" ]; then
   case "$ERROR_CODE" in
-    cli_missing|cli_auth_failed|cli_failed|parse_failed|timeout|sandbox_violation|unknown_error) ;;
+    cli_missing|cli_auth_failed|cli_failed|parse_failed|timeout|sandbox_violation|unknown_error|cli_unsupported_mode) ;;
     *)
-      usage_error "\"$ERROR_CODE\" is not in the closed FR-MR16 enum (one of: cli_missing, cli_auth_failed, cli_failed, parse_failed, timeout, sandbox_violation, unknown_error)"
+      usage_error "\"$ERROR_CODE\" is not in the closed FR-MR16 enum (one of: cli_missing, cli_auth_failed, cli_failed, parse_failed, timeout, sandbox_violation, unknown_error, cli_unsupported_mode)"
       ;;
   esac
   MSG="${MESSAGE:-adapter reported $ERROR_CODE}"
@@ -148,9 +167,9 @@ trap cleanup EXIT
 
 # --- Preferred path: node ------------------------------------------------
 if command -v node >/dev/null 2>&1; then
-  node - "$SOURCE_TYPE" "$REVIEWER_ID" "$FAMILY" "$RAW_OUTPUT_PATH" "$MODEL" "$RESOLVED_INPUT" "$SCHEMA_PATH" <<'NODE_SCRIPT'
+  node - "$SOURCE_TYPE" "$REVIEWER_ID" "$FAMILY" "$RAW_OUTPUT_PATH" "$MODEL" "$RESOLVED_INPUT" "$SCHEMA_PATH" "$USAGE_JSON" <<'NODE_SCRIPT'
 const fs = require('fs');
-const [, , sourceType, reviewerId, family, rawOutputPathArg, model, inputFile, schemaPath] = process.argv;
+const [, , sourceType, reviewerId, family, rawOutputPathArg, model, inputFile, schemaPath, usageJsonArg] = process.argv;
 const rawOutputPath = rawOutputPathArg.length > 0 ? rawOutputPathArg : null;
 
 const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
@@ -210,61 +229,108 @@ function mergeUsage(a, b) {
   };
 }
 
+function isPlainObject(v) { return typeof v === 'object' && v !== null && !Array.isArray(v); }
+function hasOwn(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+
+// A finding-shaped object carries at least one of these keys (D32). Used to
+// tell bare-finding NDJSON (passes) from an event log with no findings in
+// it, such as un-unwrapped Cursor stream-json (parse_failed).
+const FINDING_SHAPED_KEYS = ['finding_id', 'severity', 'title'];
+function isFindingShaped(v) { return isPlainObject(v) && FINDING_SHAPED_KEYS.some((k) => hasOwn(v, k)); }
+
 // NDJSON join: each non-empty line parses independently as JSON. Lines
 // carrying a `findings` array are merged (concatenated) and their `usage`
 // objects combined (summed token counts, last non-null model wins). A line
 // that is itself a bare finding/object is pushed directly. Mirrors
 // gemini-review-prompter.md's "streaming envelope shape" Known Gotcha.
+// Returns null when the text is not NDJSON at all (fewer than 2 lines, or a
+// line that does not parse), so the caller can try the next strategy; else
+// a normalize() result: ok:true with findings/usage, or ok:false with a
+// reason when no line carries `findings` and no object is finding-shaped.
 function tryNdjsonJoin(text) {
   const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
-  if (lines.length < 2) return { ok: false };
+  if (lines.length < 2) return null;
   const parsedLines = [];
   for (const line of lines) {
     const p = tryParse(line);
-    if (!p.ok) return { ok: false };
+    if (!p.ok) return null;
     parsedLines.push(p.value);
   }
   const findings = [];
   let usage = null;
+  let carriesFindings = false;
+  let findingShaped = false;
   for (const v of parsedLines) {
-    if (v && typeof v === 'object' && !Array.isArray(v) && Array.isArray(v.findings)) {
+    if (isPlainObject(v) && hasOwn(v, 'findings')) carriesFindings = true;
+    if (isPlainObject(v) && Array.isArray(v.findings)) {
       findings.push(...v.findings);
     } else if (Array.isArray(v)) {
+      carriesFindings = true;
       findings.push(...v);
-    } else if (v && typeof v === 'object') {
+    } else if (isPlainObject(v)) {
+      if (isFindingShaped(v)) findingShaped = true;
       findings.push(v);
     }
-    if (v && typeof v === 'object' && v.usage) usage = mergeUsage(usage, v.usage);
+    if (isPlainObject(v) && v.usage) usage = mergeUsage(usage, v.usage);
   }
-  return { ok: true, value: { findings, usage } };
+  if (!carriesFindings && !findingShaped) {
+    return {
+      ok: false,
+      reason: 'NDJSON output has no line carrying "findings" and no finding-shaped object (finding_id/severity/title); likely an un-unwrapped stream-json event log',
+    };
+  }
+  return { ok: true, findings, usage };
 }
 
+// A top-level object MUST carry a `findings` key (D32): a CLI wrapper the
+// adapter forgot to unwrap, or a CLI error object, is never a clean review.
 function extractFindingsAndUsage(parsedValue) {
-  if (Array.isArray(parsedValue)) return { findings: parsedValue, usage: null };
-  if (parsedValue && typeof parsedValue === 'object') {
-    const findings = parsedValue.findings === null || parsedValue.findings === undefined ? [] : parsedValue.findings;
-    return { findings: Array.isArray(findings) ? findings : [], usage: parsedValue.usage ?? null };
+  if (Array.isArray(parsedValue)) return { ok: true, findings: parsedValue, usage: null };
+  if (isPlainObject(parsedValue)) {
+    if (!hasOwn(parsedValue, 'findings')) {
+      const keys = Object.keys(parsedValue).slice(0, 8).join(', ');
+      return {
+        ok: false,
+        reason: `top-level JSON object has no "findings" key (keys: ${keys}); likely an un-unwrapped CLI wrapper or a CLI error object`,
+      };
+    }
+    const findings = parsedValue.findings === null ? [] : parsedValue.findings;
+    return { ok: true, findings: Array.isArray(findings) ? findings : [], usage: parsedValue.usage ?? null };
   }
-  return { findings: [], usage: null };
+  const kind = parsedValue === null ? 'null' : typeof parsedValue;
+  return { ok: false, reason: `top-level JSON value is a ${kind}, not a findings object or array` };
 }
 
 function normalize(rawText) {
   const text = stripFence(rawText);
 
   let parsed = tryParse(text);
-  if (parsed.ok) return { ok: true, ...extractFindingsAndUsage(parsed.value) };
+  if (parsed.ok) return extractFindingsAndUsage(parsed.value);
 
   const ndjson = tryNdjsonJoin(text);
-  if (ndjson.ok) return { ok: true, findings: ndjson.value.findings, usage: ndjson.value.usage };
+  if (ndjson) return ndjson;
 
   const destrailed = stripTrailingCommas(text);
   parsed = tryParse(destrailed);
-  if (parsed.ok) return { ok: true, ...extractFindingsAndUsage(parsed.value) };
+  if (parsed.ok) return extractFindingsAndUsage(parsed.value);
 
   const ndjson2 = tryNdjsonJoin(destrailed);
-  if (ndjson2.ok) return { ok: true, findings: ndjson2.value.findings, usage: ndjson2.value.usage };
+  if (ndjson2) return ndjson2;
 
   return { ok: false };
+}
+
+// --usage-json: well-formed only when it is a JSON object with numeric
+// input_tokens and output_tokens. Malformed → null (never an error).
+function parseUsageFlag(text) {
+  if (!text) return null;
+  const p = tryParse(text);
+  if (p.ok && isPlainObject(p.value)
+    && typeof p.value.input_tokens === 'number' && typeof p.value.output_tokens === 'number') {
+    return p.value;
+  }
+  process.stderr.write('validate-findings: ignoring malformed --usage-json (want a JSON object with numeric input_tokens and output_tokens)\n');
+  return null;
 }
 
 function printEnvelope(env) { process.stdout.write(JSON.stringify(env) + '\n'); }
@@ -287,7 +353,9 @@ const result = normalize(rawText);
 if (!result.ok) {
   printEnvelope(failEnvelope(
     'parse_failed',
-    'validate-findings could not parse the CLI output into the canonical envelope (fence-strip, NDJSON-join, and trailing-comma-strip all failed). Raw output preserved at raw_output_path.',
+    result.reason
+      ? `validate-findings: ${result.reason}. Raw output preserved at raw_output_path.`
+      : 'validate-findings could not parse the CLI output into the canonical envelope (fence-strip, NDJSON-join, and trailing-comma-strip all failed). Raw output preserved at raw_output_path.',
   ));
   process.exit(0);
 }
@@ -306,8 +374,14 @@ for (const f of result.findings) {
   }
 }
 
-let usage = result.usage;
+let usage = result.usage ?? null;
+let usageFromFlag = false;
+if (!usage) {
+  usage = parseUsageFlag(usageJsonArg);
+  usageFromFlag = usage !== null;
+}
 if (usage && typeof usage === 'object' && !usage.model && model) usage = { ...usage, model };
+if (usageFromFlag && !hasOwn(usage, 'model')) usage = { ...usage, model: null };
 
 printEnvelope({
   status: 'success',
@@ -350,29 +424,51 @@ if command -v jq >/dev/null 2>&1; then
         model: (b.model // a.model // null)
       } end;
 
+    # Mirrors the node path (D32): a top-level object with no `findings`
+    # key, or a top-level scalar, yields {parse_error: <reason>} instead of
+    # a silent zero-finding success.
     def extract:
       if (type == "array") then {findings: ., usage: null}
-      else {findings: (if (.findings == null) then [] else .findings end), usage: (.usage // null)}
+      elif (type == "object") then
+        if has("findings") then
+          {findings: (if (.findings | type) == "array" then .findings else [] end), usage: (.usage // null)}
+        else
+          {parse_error: ("top-level JSON object has no \"findings\" key (keys: " + (keys_unsorted[:8] | join(", ")) + "); likely an un-unwrapped CLI wrapper or a CLI error object")}
+        end
+      else {parse_error: ("top-level JSON value is a " + type + ", not a findings object or array")}
       end;
 
+    def finding_shaped:
+      (type == "object") and (has("finding_id") or has("severity") or has("title"));
+
+    # Returns null when the text is not NDJSON at all (fewer than 2 lines,
+    # or a line that does not parse), else {findings, usage} or
+    # {parse_error} when no line carries `findings` and no object is
+    # finding-shaped.
     def ndjson_join($text):
-      ($text / "\n" | map(select(length > 0))) as $lines
+      ($text / "\n" | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))) as $lines
       | if ($lines | length) < 2 then null
         else
-          ($lines | map(try fromjson catch null)) as $parsed
+          ($lines | map(try (fromjson | {v: .}) catch null)) as $parsed
           | if ($parsed | any(. == null)) then null
             else
-              reduce $parsed[] as $v
-                ({findings: [], usage: null};
-                  (if ($v | type) == "array" then .findings += $v
-                   elif ($v.findings? != null) then .findings += $v.findings
-                   else .findings += [$v] end)
-                  | .usage = merge_usage(.usage; $v.usage?))
+              (reduce ($parsed[] | .v) as $v
+                ({findings: [], usage: null, carried: false, shaped: false};
+                  (if ($v | type) == "array" then (.findings += $v | .carried = true)
+                   elif ($v | type) == "object" then
+                     (if ($v | has("findings")) then .carried = true else . end)
+                     | (if ($v.findings | type) == "array" then .findings += $v.findings
+                        else (.findings += [$v] | (if ($v | finding_shaped) then .shaped = true else . end)) end)
+                   else . end)
+                  | .usage = merge_usage(.usage; (if ($v | type) == "object" then ($v.usage // null) else null end))))
+              | if (.carried or .shaped) then {findings: .findings, usage: .usage}
+                else {parse_error: "NDJSON output has no line carrying \"findings\" and no finding-shaped object (finding_id/severity/title); likely an un-unwrapped stream-json event log"}
+                end
             end
         end;
 
-    ($raw | try fromjson catch null) as $direct
-    | if $direct != null then ($direct | extract)
+    ($raw | try (fromjson | {v: .}) catch null) as $direct
+    | if $direct != null then ($direct.v | extract)
       else (ndjson_join($raw)) end
   '
 
@@ -400,6 +496,29 @@ if command -v jq >/dev/null 2>&1; then
     exit 0
   fi
 
+  # D32: the jq program flagged a wrapper/error object, a scalar, or a
+  # finding-less NDJSON log — a visible parse_failed, never a silent pass.
+  if printf '%s' "$RESULT" | jq -e 'has("parse_error")' >/dev/null 2>&1; then
+    jq -c -n --argjson result "$RESULT" --arg raw_output_path "$RAW_OUTPUT_PATH" '{
+      status: "failed",
+      error_code: "parse_failed",
+      error_message: ("validate-findings: " + $result.parse_error + ". Raw output preserved at raw_output_path."),
+      findings: [],
+      usage: null,
+      raw_output_path: (if ($raw_output_path | length) > 0 then $raw_output_path else null end)
+    }'
+    exit 0
+  fi
+
+  # --usage-json: well-formed only as a JSON object with numeric
+  # input_tokens and output_tokens; anything else is ignored (usage null).
+  if [ -n "$USAGE_JSON" ] && ! jq -e -n --arg u "$USAGE_JSON" \
+      '($u | try fromjson catch null) | (type == "object") and ((.input_tokens | type) == "number") and ((.output_tokens | type) == "number")' \
+      >/dev/null 2>&1; then
+    printf 'validate-findings: ignoring malformed --usage-json (want a JSON object with numeric input_tokens and output_tokens)\n' >&2
+    USAGE_JSON=""
+  fi
+
   jq -c -n \
     --argjson result "$RESULT" \
     --arg reviewer_id "$REVIEWER_ID" \
@@ -407,6 +526,7 @@ if command -v jq >/dev/null 2>&1; then
     --arg source_type "$SOURCE_TYPE" \
     --arg raw_output_path "$RAW_OUTPUT_PATH" \
     --arg model "$MODEL" \
+    --arg usage_json "$USAGE_JSON" \
     --slurpfile schema_arr "$SCHEMA_PATH" \
     '
       ($schema_arr[0]) as $schema
@@ -432,9 +552,14 @@ if command -v jq >/dev/null 2>&1; then
                end)
           )
         ) as $out
-      | (if ($result.usage != null and ($result.usage.model // "") == "" and $model != "") then
-           ($result.usage + {model: $model})
-         else $result.usage end) as $usage
+      | (if ($usage_json | length) > 0 then ($usage_json | fromjson) else null end) as $flag_usage
+      | ($result.usage // $flag_usage) as $base_usage
+      | (if ($base_usage != null and ($base_usage.model // "") == "" and $model != "") then
+           ($base_usage + {model: $model})
+         else $base_usage end) as $usage0
+      | (if ($result.usage == null and $usage0 != null and ($usage0 | has("model") | not)) then
+           ($usage0 + {model: null})
+         else $usage0 end) as $usage
       | {
           status: "success",
           error_code: null,

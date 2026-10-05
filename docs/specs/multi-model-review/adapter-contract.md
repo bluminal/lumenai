@@ -104,7 +104,7 @@ Every finding from an external adapter MUST set `source.source_type: "external"`
 
 ## 3. error_code Enum (FR-MR16)
 
-When `status: "failed"`, `error_code` MUST be one of:
+When `status: "failed"`, `error_code` MUST be one of these eight values:
 
 | Value | Meaning | Trigger |
 |-------|---------|---------|
@@ -115,6 +115,7 @@ When `status: "failed"`, `error_code` MUST be one of:
 | `timeout` | The adapter exceeded its per-reviewer timeout | Per-reviewer timeout fires |
 | `sandbox_violation` | The CLI attempted an operation forbidden by the sandbox flags | Sandbox enforcement |
 | `unknown_error` | Catch-all for unexpected failures | Last-resort fallback |
+| `cli_unsupported_mode` | The resolved `external_permission_mode` is one this CLI does not support (e.g. `parent-mediated` on a non-proxying CLI); the CLI is never spawned | Permission-mode resolution, before invocation |
 
 Adapters MUST NOT introduce new error_code values. Any new failure mode requires updating FR-MR16 and this contract.
 
@@ -122,7 +123,7 @@ Adapters MUST NOT introduce new error_code values. Any new failure mode requires
 
 `parse_failed` triggers a single retry with an appended clarification prompt (FR-MR8 step 3). If the retry also fails to parse, `error_code: parse_failed` is returned terminally.
 
-`cli_missing`, `cli_auth_failed`, and `sandbox_violation` are NOT retried — they are terminal.
+`cli_missing`, `cli_auth_failed`, `sandbox_violation`, and `cli_unsupported_mode` are NOT retried — they are terminal.
 
 `timeout`, `cli_failed`, and `unknown_error` are NOT automatically retried by the adapter; the orchestrator may surface them to FR-MR17 native-only continuation logic.
 

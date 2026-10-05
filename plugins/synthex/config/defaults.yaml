@@ -602,12 +602,13 @@ multi_model_review:
     default: read-only
     #
     # Allowed keys: `default`, plus the bare adapter names listed below
-    # (`codex`, `claude`, `gemini`, `bedrock`, `llm`, `ollama`). Any other
-    # key in this block is **silently ignored** by the adapters and is
-    # never propagated to a shell invocation. The adapter binary names
-    # (`which codex`, `which gemini`, `which aws`, etc.) are HARDCODED
-    # in each `*-review-prompter` agent's Step 1 (CLI Presence Check) —
-    # they are NOT derived from these config-key names. This prevents
+    # (`codex`, `claude`, `gemini`, `bedrock`, `llm`, `ollama`, `grok`,
+    # `cursor`). Any other key in this block is **silently ignored** by the
+    # adapters and is never propagated to a shell invocation. The adapter
+    # binary names (`which codex`, `which gemini`, `which aws`, etc.; the
+    # `grok` key's binary is `grok`, the `cursor` key's is `cursor-agent`)
+    # are HARDCODED in each `*-review-prompter` agent's Step 1 (CLI Presence
+    # Check) — they are NOT derived from these config-key names. This prevents
     # an adversarial project config from injecting a path-traversal or
     # shell-metacharacter binary name. The Layer 1 schema test
     # `tests/schemas/external-permission-mode-key-validation.test.ts`
@@ -617,10 +618,16 @@ multi_model_review:
     # `<cli>-review-prompter` agent file's prefix).
     codex: parent-mediated      # Pattern 3 via `codex app-server` JSON-RPC requestApproval
     claude: parent-mediated     # Pattern 3 via Claude Code `canUseTool` over --output-format stream-json
-    gemini: read-only           # Pattern 1 via `--readonly` flag
+    gemini: read-only           # Pattern 1 via headless `--approval-mode default` (no TTY, so every confirmation-needing tool is denied; Task 25)
     bedrock: read-only          # Pattern 1 — `aws bedrock-runtime invoke-model` has no tool-use surface
     llm: read-only              # Pattern 1 — `llm` CLI is a stateless provider-API wrapper
     ollama: read-only           # Pattern 1 — Ollama HTTP API has no tool-use surface
+    # grok and cursor are text-only (multi-model-review D25). For both,
+    # `sandbox-yolo` is a no-op alias of read-only and `parent-mediated` is
+    # unsupported: the adapter returns cli_unsupported_mode without
+    # spawning the CLI (multi-model-review D29).
+    grok: read-only             # Pattern 1 — every built-in tool removed + --deny '*' + untrusted /tmp cwd + HOME isolation
+    cursor: read-only           # Pattern 1 — `cursor-agent --mode ask` + --sandbox enabled + scratch workspace + tool_call allowlist; never --force
 
   # Pattern 2 (sandbox-yolo) trust-boundary configuration.
   # Defines the OS-sandbox wrappers used when a CLI is configured for

@@ -9,7 +9,7 @@
  * 2.  Document references FR-MR9
  * 3.  Document references FR-MR16
  * 4.  Document references NFR-MR4
- * 5.  Document contains all 7 error_code enum values
+ * 5.  Document contains all 8 error_code enum values
  * 6.  Example 1 (success with findings) passes validator
  * 7.  Example 2 (clean review, empty findings) passes validator
  * 8.  Example 3 (cli_missing) passes validator
@@ -20,7 +20,7 @@
  * 13. Rejects failed without error_code
  * 14. Rejects non-array findings
  * 15. Rejects missing raw_output_path
- * 16. All 7 error_code enum values accepted when status=failed
+ * 16. All 8 error_code enum values accepted when status=failed
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -64,10 +64,16 @@ describe('Task 4: adapter-contract.md and validator', () => {
     });
 
     // 5
-    it('lists all 7 error_code enum values', () => {
+    it('lists all 8 error_code enum values', () => {
       for (const v of ERROR_CODE_VALUES) {
         expect(content, `document should contain error_code value: ${v}`).toContain(v);
       }
+    });
+
+    // 5b — multi-model-review Task 66 (D32)
+    it('documents cli_unsupported_mode in the FR-MR16 table as a terminal (not retried) code', () => {
+      expect(content).toMatch(/\| `cli_unsupported_mode` \|/);
+      expect(content).toMatch(/`sandbox_violation`, and `cli_unsupported_mode` are NOT retried/);
     });
   });
 
@@ -213,7 +219,7 @@ describe('Task 4: adapter-contract.md and validator', () => {
     });
 
     // 16
-    it('all 7 error_code enum values accepted when status=failed', () => {
+    it('all 8 error_code enum values accepted when status=failed', () => {
       for (const code of ERROR_CODE_VALUES) {
         const r = validateAdapterEnvelope({
           status: 'failed',
@@ -225,6 +231,21 @@ describe('Task 4: adapter-contract.md and validator', () => {
         });
         expect(r.valid, `error_code="${code}" should be valid`).toBe(true);
       }
+    });
+
+    // 17 — multi-model-review Task 66 (D32): FR-MR16 grows to eight codes.
+    it('accepts error_code cli_unsupported_mode (D32) and the enum has exactly 8 values', () => {
+      expect(ERROR_CODE_VALUES).toContain('cli_unsupported_mode');
+      expect(ERROR_CODE_VALUES).toHaveLength(8);
+      const r = validateAdapterEnvelope({
+        status: 'failed',
+        error_code: 'cli_unsupported_mode',
+        error_message: 'parent-mediated is not supported by this CLI; use read-only',
+        findings: [],
+        usage: null,
+        raw_output_path: 'docs/reviews/raw/x.json',
+      });
+      expect(r.valid, r.errors.join('; ')).toBe(true);
     });
   });
 });
