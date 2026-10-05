@@ -14,6 +14,7 @@
     "./agents/design-system-agent.md",
     "./agents/findings-consolidator.md",
     "./agents/gemini-review-prompter.md",
+    "./agents/grok-review-prompter.md",
     "./agents/lead-frontend-engineer.md",
     "./agents/llm-review-prompter.md",
     "./agents/metrics-analyst.md",

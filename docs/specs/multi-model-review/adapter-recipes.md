@@ -1,6 +1,6 @@
 # Adapter Recipes — v1 Adapter Set
 
-> Per-adapter install, auth, sandbox, recommended-model, and gotcha guides for the v1 adapters (Codex, Gemini, Ollama). Plus a "writing a new adapter" guide per NFR-MR5.
+> Per-adapter install, auth, sandbox, recommended-model, and gotcha guides for the v1 adapters (Codex, Gemini, Ollama), the fast-follow adapters (llm, Bedrock, Claude) and the Phase 9 adapters (Grok, §8). Plus a "writing a new adapter" guide per NFR-MR5 (§7).
 
 ## Status: Final
 
@@ -317,3 +317,71 @@ The Codex adapter is the reference implementation — its structure should be th
 - **Do NOT** introduce new error_code values without updating FR-MR16 + adapter-contract.md.
 - **Do NOT** modify the orchestrator to special-case the new adapter. The adapter envelope is the contract; the orchestrator treats all adapters uniformly.
 - **Do NOT** store API keys in adapter agent prose. Adapters delegate auth to the underlying CLI's native auth flow.
+
+---
+
+## 8. Grok (xAI / Grok Build CLI)
+
+`grok-review-prompter` is a thin agent: every CLI step lives in the runner `plugins/synthex/scripts/adapters/grok-review.sh` (multi-model-review D28), which the orchestrator's depth-1 path runs too. It is a `text-only` proposer (D25): the model gets no file, shell, web or MCP tools, and the bundle inlined in the prompt is its only context. Default family `xai`; a configured model that does not start with `grok-` gives `unknown` unless `per_reviewer.grok-review-prompter.family` is set. Evidence for every flag below is the Task 67 spike, `docs/specs/multi-model-review/spike-grok-cursor.md` (Grok CLI 1.0.46).
+
+### Install one-liner
+
+```bash
+curl -fsSL https://x.ai/cli/install.sh | bash
+```
+
+Grok's bundled docs document only this installer (and a PowerShell one); there is no npm path (U11).
+
+### Auth setup
+
+```bash
+grok login
+```
+
+Sign in with a grok.com session. The adapter's auth check is the runner's `--auth-check`, which runs `grok models` (it sends no prompt) under the same isolation as a review and reads the first line:
+
+| Exit | Meaning |
+|---|---|
+| 0 | `You are logged in with grok.com.` (a session) |
+| 10 | `grok` is not on PATH |
+| 11 | Not authenticated, or an unrecognised first line (fails closed; `grok models` exit codes are not relied on, U9) |
+| 12 | Only `XAI_API_KEY` is available and per-token billing is not opted into |
+
+**Billing (D26).** `XAI_API_KEY` bills per token. The runner unsets it for every grok call unless `multi_model_review.per_reviewer.grok-review-prompter.allow_api_key_billing: true`, so no review is usage-billed by surprise, whichever credential grok prefers (U6).
+
+### Recommended flagship model
+
+The account default (`grok-4.7` at spike time). Leave `per_reviewer.grok-review-prompter.model` unset to use it; the runner passes `-m` only when a model is configured. The wrapper's `modelUsage` is keyed by the serving model (`grok-4.7-build`), and that key is what lands in `usage.model` (NFR-MR4). Grok is not in the D17 tier table, so `auto` never picks it as the aggregator; when it is configured as the aggregator, the runner passes `judge_mode_prompt` through `--rules` (D31).
+
+### Sandbox flags (FR-MR26)
+
+The runner's argv (scratch path shown as `<W>`):
+
+```bash
+grok --prompt-file <W>/prompt.txt --output-format json \
+  --json-schema '<agents/_shared/codex-findings.schema.json, minified>' \
+  --disallowed-tools read_file,grep,list_dir,run_terminal_cmd,search_replace,write_file,web_search,web_fetch,todo_write,task,Agent \
+  --deny '*' --deny 'mcp__*' --permission-mode dontAsk --sandbox read-only \
+  --no-subagents --disable-web-search --max-turns 3 [-m <model>] [--rules <judge_mode_prompt>]
+```
+
+- `--disallowed-tools` removes every built-in tool; `--deny '*'` denies any tool that is left, and `--deny 'mcp__*'` every MCP tool. This removal is the read-only guarantee (U1, U2).
+- `--permission-mode dontAsk`, `--no-subagents` and `--disable-web-search` are defence in depth.
+- `--json-schema` (D33) uses the same strict findings schema as the Codex adapter (every property required, optional ones nullable, `additionalProperties: false`, no `source`). The answer lands in `structuredOutput`; the runner reads that first and falls back to `.text` only when it is absent (U10).
+- `--max-turns 3` (D36): a denied tool attempt consumes a turn, so 1 is unsafe (U26).
+- `--sandbox read-only` (D34). On macOS it restricts only writes. **Fallback:** where `/var/run/docker.sock` is a symlink (OrbStack, Docker Desktop), grok 1.0.46 refuses to start with "could not resolve runtime-socket deny path … endpoint is a symlink … Refusing to start with its protections missing". On exactly that refusal the runner retries once without `--sandbox` and logs a warning on stderr and in `<raw>.stderr.log` (never in `error_message`). Any other refusal is `cli_failed`. The refusal comes before any prompt is sent, so the retry costs nothing.
+- Never `--yolo`, `--always-approve`, `--permission-mode bypassPermissions`, `--trust` or `-p`.
+
+**Isolation (Task 67 evidence).** Every grok call runs from a fresh `mktemp -d /tmp/synthex-grok.XXXXXX` dir, canonicalised and removed by a trap, with `HOME=<W>/home`, the real `GROK_HOME` (it holds the OAuth session), `GROK_DISABLE_AUTOUPDATER=1`, every `GROK_CLAUDE_*_ENABLED` and `GROK_CURSOR_*_ENABLED` set to `0`, and `GROK_CONFIG`, `GROK_FOLDER_TRUST` and `GROK_SANDBOX` unset. In the spike, under these settings: an adversarial prompt could not write a file, read a canary outside the scratch dir or call an MCP tool (G4); a planted project hook in the untrusted scratch dir did not fire (G6); `grok inspect` listed 0 MCP servers and 0 plugins, with every Claude and Cursor compat source disabled (U8).
+
+**Output mapping.** Raw stdout goes to `config.raw_output_path` atomically before parsing. A `{type:"error"}` object is `cli_failed` (`cli_auth_failed` when it names a login problem). Then the incomplete-run guard (D36, Risk 15): a `stopReason` other than exactly `end_turn` (absent included), or `max turns reached` on stderr, is `cli_failed` and the run's text is never parsed, because it can be `{"findings": []}` for code that was never reviewed. Otherwise the unwrapped answer goes to `validate-findings --usage-json` with the wrapper's `usage.input_tokens`, `usage.output_tokens` and `modelUsage` key. `parse_failed` is retried once. The wall-clock guard is `per_reviewer_timeout_seconds` minus 10, clamped to the host shell cap minus 15 when there is no `--envelope-out` (`timeout`, a partial raw is kept); exit 130 is `cli_failed`; `parent-mediated` is `cli_unsupported_mode` without spawning grok (D29).
+
+### Known gotchas
+
+1. **User hooks run (D35).** Hooks in `$GROK_HOME/hooks`, and in plugins installed there (possibly Synthex via `.grok-plugin`), fire once per review subprocess. No per-run switch exists, and isolating `GROK_HOME` would lose the login. They are the user's own trusted hooks and run as they would for a manual `grok` run. The runner never edits hook config, including `~/.grok/disabled-hooks`.
+2. **Sandbox refusal on Docker hosts (D34).** See the fallback above. The profile's child-network block is a no-op on macOS; tool removal is the real guarantee.
+3. **Billing.** Session reviews still report `total_cost_usd`; it stays in the raw output only. Each `parse_failed` retry and each extra turn is another call.
+4. **Self-review.** On a Grok host the native reviewers are xAI as well, so a grok proposer adds no real family diversity (Task 71 fixes the accounting).
+5. **Latency.** `--json-schema` took 65 s against 21 s on the text path in the spike (one sample each). A host that cannot background the runner gets a 105 s clamp (U22) and may see `timeout`.
+6. **CLI drift.** The runner sets `GROK_DISABLE_AUTOUPDATER=1`. After a version bump, re-capture the help fixtures under `tests/fixtures/multi-model-review/adapters/grok/cli-help/`; `grok-review-runner-behavioral.test.ts` fails on a flag the help no longer lists.
+7. **Headless docs use `--yolo`.** The runner never does; never copy a docs example into a reviewer config.

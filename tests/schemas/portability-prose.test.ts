@@ -246,7 +246,7 @@ const SCRIPT_CALL_FILES = [
 
 describe('Task 18: other-hosts guidance follows every ${CLAUDE_PLUGIN_ROOT}/scripts call (FR-HM13)', () => {
   describe('discovery: known script-call sites', () => {
-    it('finds exactly the 15 known sites (harness-modernization Task 34 added list-loops.md and cancel-loop.md; Task 38/FR-HM26 added dismiss-upgrade-nudge.md and star.md as state-flag.sh one-Bash-call sites; Task 39/FR-HM26 added init.md; Task 43/FR-HM28 added the 6 *-review-prompter.md adapters and multi-model-review-orchestrator.md as validate-findings call sites; Task 45/FR-HM26 added write-implementation-plan.md as the lint-plan.mjs call site)', () => {
+    it('finds exactly the 16 known sites (harness-modernization Task 34 added list-loops.md and cancel-loop.md; Task 38/FR-HM26 added dismiss-upgrade-nudge.md and star.md as state-flag.sh one-Bash-call sites; Task 39/FR-HM26 added init.md; Task 43/FR-HM28 added the 6 *-review-prompter.md adapters and multi-model-review-orchestrator.md as validate-findings call sites; Task 45/FR-HM26 added write-implementation-plan.md as the lint-plan.mjs call site; multi-model-review Task 68 added grok-review-prompter.md as the grok-review.sh runner call site)', () => {
       const sites = SCRIPT_CALL_FILES.filter(
         (f) => findScriptCallLines(readFileSync(f, 'utf8')).length > 0
       ).map((f) => f.replace(ROOT + '/', ''));
@@ -264,6 +264,7 @@ describe('Task 18: other-hosts guidance follows every ${CLAUDE_PLUGIN_ROOT}/scri
           'plugins/synthex/agents/claude-review-prompter.md',
           'plugins/synthex/agents/codex-review-prompter.md',
           'plugins/synthex/agents/gemini-review-prompter.md',
+          'plugins/synthex/agents/grok-review-prompter.md',
           'plugins/synthex/agents/llm-review-prompter.md',
           'plugins/synthex/agents/ollama-review-prompter.md',
           'plugins/synthex/agents/multi-model-review-orchestrator.md',

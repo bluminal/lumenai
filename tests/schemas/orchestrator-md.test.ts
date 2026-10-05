@@ -147,3 +147,35 @@ describe('Task 19: multi-model-review-orchestrator.md', () => {
     });
   });
 });
+
+describe('multi-model-review Task 68 (D28): Step 3 runner-script sentence', () => {
+  let content: string;
+  let step3: string;
+  beforeAll(() => {
+    content = readFileSync(ORCHESTRATOR, 'utf8');
+    const start = content.indexOf('### Step 3');
+    step3 = content.slice(start, content.indexOf('### Step 4', start));
+  });
+
+  it('Step 3 says to run a runner under scripts/adapters/ with --input and --envelope-out and use its envelope', () => {
+    expect(step3).toContain(
+      "if an adapter's CLI Invocation names a runner under `scripts/adapters/`, run it with `--input <file> --envelope-out <file>`",
+    );
+    expect(step3).toMatch(/backgrounded and polled when the host shell cap is below `per_reviewer_timeout_seconds`/);
+    expect(step3).toContain('use the envelope it writes');
+  });
+
+  it("preflight 0a runs the runner's --auth-check", () => {
+    expect(step3).toContain("preflight 0a runs the runner's `--auth-check`");
+  });
+
+  it('the sentence is generic: it names no specific adapter (NFR-MR5 one-time extension, Risk 12)', () => {
+    const para = step3.slice(step3.indexOf('**Runner scripts'), step3.indexOf('\n\n', step3.indexOf('**Runner scripts')));
+    expect(para).not.toMatch(/grok|cursor/i);
+  });
+
+  it('the D17 chain and the FR-MR12 single-batch wording are intact', () => {
+    expect(content).toContain('Claude Opus > GPT-5 > Claude Sonnet > Gemini 2.5 Pro > DeepSeek V3 > Qwen 32B');
+    expect(content).toContain('Native and external proposers run in a single parallel Task batch.');
+  });
+});
