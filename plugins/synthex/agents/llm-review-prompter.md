@@ -31,7 +31,7 @@ Sandbox flags are N/A (FR-MR26) — `llm` is stateless: it reads the prompt, cal
 
 Run `which llm`. Missing → `validate-findings --error cli_missing --message "pip install llm"`.
 
-**Safe-name assertion (Task 88):** The binary name `llm` is HARDCODED in the `which llm` invocation above. The adapter does NOT derive the binary name from any config key — prevents injecting a path-traversal/shell-metacharacter name into `which`. `tests/schemas/external-permission-mode-key-validation.test.ts` enforces only `{codex, claude, gemini, bedrock, llm, ollama, default}` as keys in `external_permission_mode`. CWE-20 defense-in-depth.
+**Safe-name assertion (Task 88):** The binary name `llm` is HARDCODED in the `which llm` invocation above. The adapter does NOT derive the binary name from any config key — prevents injecting a path-traversal/shell-metacharacter name into `which`. `tests/schemas/external-permission-mode-key-validation.test.ts` enforces only `{codex, claude, gemini, bedrock, llm, ollama, grok, cursor, default}` as keys in `external_permission_mode`. CWE-20 defense-in-depth.
 
 ### 2. Auth Check
 

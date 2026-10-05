@@ -36,7 +36,7 @@ Sandbox flags (`--sandbox read-only`-style) are N/A for the `aws` CLI — there 
 
 Run `which aws`. Missing → `validate-findings --error cli_missing --message "pip install awscli (or brew install awscli on macOS)"`.
 
-**Safe-name assertion (Task 88):** The binary name `aws` is HARDCODED in the `which aws` invocation above (the bedrock adapter wraps the AWS CLI's `bedrock-runtime` subcommand). The adapter does NOT derive the binary name from any config key — prevents injecting a path-traversal/shell-metacharacter name into `which`. `tests/schemas/external-permission-mode-key-validation.test.ts` enforces only `{codex, claude, gemini, bedrock, llm, ollama, default}` as keys in `external_permission_mode`. CWE-20 defense-in-depth.
+**Safe-name assertion (Task 88):** The binary name `aws` is HARDCODED in the `which aws` invocation above (the bedrock adapter wraps the AWS CLI's `bedrock-runtime` subcommand). The adapter does NOT derive the binary name from any config key — prevents injecting a path-traversal/shell-metacharacter name into `which`. `tests/schemas/external-permission-mode-key-validation.test.ts` enforces only `{codex, claude, gemini, bedrock, llm, ollama, grok, cursor, default}` as keys in `external_permission_mode`. CWE-20 defense-in-depth.
 
 ### 2. Auth Check
 

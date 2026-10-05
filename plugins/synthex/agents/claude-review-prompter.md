@@ -30,7 +30,7 @@ You are a **Claude Review Prompter** — a Haiku-backed adapter (D3) wrapping th
 
 Run `which claude`. Missing → `validate-findings --error cli_missing --message "npm install -g @anthropic-ai/claude-code"`.
 
-**Safe-name assertion (Task 88):** The binary name `claude` is HARDCODED in the `which claude` invocation above. The adapter does NOT derive the binary name from any config key — prevents injecting a path-traversal/shell-metacharacter name into `which`. `tests/schemas/external-permission-mode-key-validation.test.ts` enforces only `{codex, claude, gemini, bedrock, llm, ollama, default}` as keys in `external_permission_mode`. CWE-20 defense-in-depth.
+**Safe-name assertion (Task 88):** The binary name `claude` is HARDCODED in the `which claude` invocation above. The adapter does NOT derive the binary name from any config key — prevents injecting a path-traversal/shell-metacharacter name into `which`. `tests/schemas/external-permission-mode-key-validation.test.ts` enforces only `{codex, claude, gemini, bedrock, llm, ollama, grok, cursor, default}` as keys in `external_permission_mode`. CWE-20 defense-in-depth.
 
 ### 2. Auth Check
 
@@ -50,7 +50,13 @@ claude --model <config.model> --output-format json --permission-mode acceptEdits
 
 ### 5. Output Parsing
 
-Pipe raw stdout into `validate-findings --reviewer-id claude-review-prompter --family "${RESOLVED_FAMILY:-anthropic}" --raw-output-path <path>`.
+Raw stdout is a `{type: "result", is_error, result, usage, ...}` wrapper, not the findings payload; piped as-is it is `parse_failed` (multi-model-review D32). `is_error: true` → `validate-findings --error cli_failed`. Otherwise unwrap `.result` from `$RAW` (the `raw_output_path` file) and pass the wrapper's usage:
+
+```bash
+jq -r .result "$RAW" | validate-findings --reviewer-id claude-review-prompter --family "${RESOLVED_FAMILY:-anthropic}" --model <config.model> --raw-output-path "$RAW" --usage-json "$(jq -c ".usage|{input_tokens,output_tokens}" "$RAW")"
+```
+
+The retry (Step 6) unwraps the same way.
 
 ### 6. Retry-Once on Parse Failure
 

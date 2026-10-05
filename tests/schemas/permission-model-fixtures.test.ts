@@ -21,7 +21,9 @@ const REPO_ROOT = join(__dirname, '..', '..');
 const FIXTURES = join(REPO_ROOT, 'tests', 'fixtures');
 
 const VALID_MODES = new Set(['read-only', 'parent-mediated', 'sandbox-yolo']);
-const ALL_V1_CLIS = ['codex', 'claude', 'gemini', 'bedrock', 'llm', 'ollama'];
+// grok and cursor joined in multi-model-review Task 66; both are read-only and
+// never parent-mediated (D29), so PARENT_MEDIATED_CLIS is unchanged.
+const ALL_V1_CLIS = ['codex', 'claude', 'gemini', 'bedrock', 'llm', 'ollama', 'grok', 'cursor'];
 const PARENT_MEDIATED_CLIS = new Set(['codex', 'claude']);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,6 +63,14 @@ describe('Task 84 [T] (1): Layer 1 schema — external_permission_mode enum per 
         ).toBe(true);
       }
     }
+  });
+
+  // multi-model-review Task 66 (D29): grok and cursor never default to
+  // parent-mediated; the parent-mediated set stays exactly {codex, claude}.
+  it('PARENT_MEDIATED_CLIS stays exactly {codex, claude}; grok and cursor are read-only', () => {
+    expect([...PARENT_MEDIATED_CLIS].sort()).toEqual(['claude', 'codex']);
+    expect(block.grok).toBe('read-only');
+    expect(block.cursor).toBe('read-only');
   });
 
   it.each(ALL_V1_CLIS)('CLI "%s" has an enum-valid default', (cli) => {
@@ -222,7 +232,7 @@ describe('Task 84: Layer 2 fixture — sandbox-yolo config + confirmation prompt
     expect(fixture.resolved_permission_mode_per_cli.codex).toBe('parent-mediated');
     expect(fixture.resolved_permission_mode_per_cli.claude).toBe('parent-mediated');
     expect(fixture.resolved_permission_mode_per_cli.gemini).toBe('sandbox-yolo');
-    for (const cli of ['bedrock', 'llm', 'ollama']) {
+    for (const cli of ['bedrock', 'llm', 'ollama', 'grok', 'cursor']) {
       expect(fixture.resolved_permission_mode_per_cli[cli]).toBe('read-only');
     }
   });
