@@ -28,6 +28,7 @@ const ADAPTERS = [
   'claude-review-prompter.md',
   'codex-review-prompter.md',
   'gemini-review-prompter.md',
+  'grok-review-prompter.md', // multi-model-review Task 68
   'llm-review-prompter.md',
   'ollama-review-prompter.md',
 ] as const;

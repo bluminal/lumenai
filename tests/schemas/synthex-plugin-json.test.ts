@@ -171,3 +171,22 @@ describe('Task 20: orchestrator registration', () => {
     expect(parsed.agents).toContain('./agents/ollama-review-prompter.md');
   });
 });
+
+describe('Task 68: grok-review-prompter registration and agents order', () => {
+  let parsed: any;
+  beforeAll(() => {
+    parsed = JSON.parse(readFileSync(PLUGIN_JSON, 'utf8'));
+  });
+
+  it('agents array contains ./agents/grok-review-prompter.md', () => {
+    expect(parsed.agents).toContain('./agents/grok-review-prompter.md');
+  });
+
+  it('grok-review-prompter.md exists on disk', () => {
+    expect(existsSync(join(AGENTS_DIR, 'grok-review-prompter.md'))).toBe(true);
+  });
+
+  it('agents array is in alphabetical order', () => {
+    expect(parsed.agents).toEqual([...parsed.agents].sort());
+  });
+});

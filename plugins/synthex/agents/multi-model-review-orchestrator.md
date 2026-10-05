@@ -139,6 +139,8 @@ If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Buil
 
 On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
+**Runner scripts (multi-model-review D28):** if an adapter's CLI Invocation names a runner under `scripts/adapters/`, run it with `--input <file> --envelope-out <file>` (the FR-MR9 input envelope written to `.synthex/tmp/<adapter>-<uuid>.input.json`; backgrounded and polled when the host shell cap is below `per_reviewer_timeout_seconds`) instead of calling that CLI yourself, and use the envelope it writes; preflight 0a runs the runner's `--auth-check` as that adapter's auth check.
+
 Issue ONE parallel Task batch containing:
 
 - **Native sub-agents:** for each name in `native_reviewers`, issue a Task call with the sub-agent identity. Each native receives the assembled bundle PLUS its standard host-session context PLUS an explicit `output_schema` requirement so it emits canonical findings (per `canonical-finding-schema.md`). Native source attribution: `source.source_type = "native-team"`, `source.family = "anthropic"`, `source.reviewer_id = <native agent name>`.

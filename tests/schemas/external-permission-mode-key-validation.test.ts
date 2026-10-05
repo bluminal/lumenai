@@ -46,6 +46,8 @@ const ADAPTERS = [
   { agent: 'bedrock-review-prompter.md', cliBinary: 'aws' },
   { agent: 'llm-review-prompter.md', cliBinary: 'llm' },
   { agent: 'ollama-review-prompter.md', cliBinary: 'ollama' },
+  // multi-model-review Task 68: the binary is hardcoded in the runner script.
+  { agent: 'grok-review-prompter.md', cliBinary: 'grok' },
 ];
 
 describe('Task 88 [T] (1): Layer 1 enum-key validation for external_permission_mode', () => {

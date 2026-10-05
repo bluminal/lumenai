@@ -268,3 +268,56 @@ describe('Task 50: adapter-recipes.md', () => {
     });
   });
 });
+
+describe('multi-model-review Task 68: adapter-recipes.md ## 8. Grok', () => {
+  let content: string;
+  let grok: string;
+  beforeAll(() => {
+    content = readFileSync(RECIPES_PATH, 'utf8');
+    const start = content.indexOf('## 8. Grok');
+    const next = content.indexOf('\n## ', start + 1);
+    grok = content.slice(start, next === -1 ? undefined : next);
+  });
+
+  it('has ## 8. Grok after §7, which keeps its number', () => {
+    expect(content).toMatch(/^## 7\. Writing a New Adapter \(NFR-MR5\)$/m);
+    expect(content).toMatch(/^## 8\. Grok/m);
+    expect(content.indexOf('## 8. Grok')).toBeGreaterThan(content.indexOf('## 7. Writing a New Adapter'));
+  });
+
+  it('line 3 adapter list names Grok', () => {
+    const line3 = content.split('\n')[2];
+    expect(line3).toContain('Grok');
+    expect(line3).toContain('Codex, Gemini, Ollama');
+  });
+
+  it('covers install, auth, flagship model, sandbox flags and known gotchas', () => {
+    for (const h of ['### Install one-liner', '### Auth setup', '### Recommended flagship model', '### Sandbox flags (FR-MR26)', '### Known gotchas']) {
+      expect(grok, h).toContain(h);
+    }
+    expect(grok).toContain('curl -fsSL https://x.ai/cli/install.sh | bash');
+    expect(grok).toContain('grok login');
+  });
+
+  it('documents the FR-MR26 flags, including the D34 sandbox fallback', () => {
+    for (const f of ["--deny '*'", "--deny 'mcp__*'", '--disallowed-tools', '--permission-mode dontAsk', '--sandbox read-only', '--max-turns 3', '--json-schema', '--no-subagents', '--disable-web-search']) {
+      expect(grok, f).toContain(f);
+    }
+    expect(grok).toContain('D34');
+    expect(grok).toMatch(/retries once without `--sandbox`/);
+    expect(grok).toContain('Refusing to start with its protections missing');
+  });
+
+  it('Known gotchas include the D35 user hooks', () => {
+    const gotchas = grok.slice(grok.indexOf('### Known gotchas'));
+    expect(gotchas).toContain('D35');
+    expect(gotchas).toContain('$GROK_HOME/hooks');
+  });
+
+  it("carries Task 67's isolation evidence", () => {
+    expect(grok).toContain('spike-grok-cursor.md');
+    expect(grok).toMatch(/Isolation \(Task 67 evidence\)/);
+    expect(grok).toMatch(/G4/);
+    expect(grok).toMatch(/G6/);
+  });
+});
