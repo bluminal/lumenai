@@ -320,7 +320,7 @@ The `--auth-check` path runs `grok models` under the same isolation and reads it
 | Turns exhausted | `g7-max-turns-cancelled` | 1 | Wrapper, `cancelled`, preamble `.text` | `Error: max turns reached` | `cli_failed` (incomplete-run guard) |
 | Denied tool, then an answer | `g8-denied-tool-then-answer` | 0 | Wrapper, `end_turn`, preamble plus JSON | empty | Text path: `parse_failed` after one retry. With `--json-schema`: expected `success` (not recorded). |
 | Unknown model | `g9-unknown-model-error` | 1 | `{"type":"error","message":"Couldn't set model …"}` | `Error: Couldn't set model …` | `cli_failed` |
-| Sandbox refusal (docker.sock symlink) | `sandbox-read-only-refused` | 1 | not preserved | `warning: … runtime-socket deny path /var/run/docker.sock: endpoint is a symlink` / `error: … Refusing to start with its protections missing.` | One retry without `--sandbox`, plus a warning (proposed) |
+| Sandbox refusal (docker.sock symlink) | `sandbox-read-only-refused` | 1 | not preserved | `warning: … runtime-socket deny path /var/run/docker.sock: endpoint is a symlink` / `error: … Refusing to start with its protections missing.` | One retry without `--sandbox`, plus a warning (D34) |
 | Any other sandbox refusal | — | non-zero | — | `Refusing to start …` | `cli_failed` |
 | Not authenticated | not recorded (U5) | expected non-zero | expected `{"type":"error"}` | auth text | `cli_auth_failed` (synthetic fixture) |
 | Wall-clock guard fired | not recorded | 124, 142, or 143 with the watchdog flag | partial | — | `timeout` (partial raw kept) |
