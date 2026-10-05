@@ -1,0 +1,1 @@
+cursor-agent -p --mode ask --sandbox enabled --trust --output-format stream-json --model not-a-real-model \<prompt\>
