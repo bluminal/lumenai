@@ -1,0 +1,18 @@
+{
+  "scenario": "auth-via-env",
+  "description": "Codex is authenticated only through an API-key environment variable (common in CI). `codex login status` reports stored credentials only, so it prints 'Not logged in' and exits 1 even though `codex exec` would work. The adapter must skip `codex login status` when CODEX_API_KEY or OPENAI_API_KEY is non-empty and go on to `codex exec`; a 401 from `codex exec` remains the cli_auth_failed backstop.",
+  "env": {
+    "CODEX_API_KEY": "<non-empty>",
+    "CODEX_HOME": "<empty directory: no stored credentials>"
+  },
+  "auth_check_skipped": true,
+  "login_status_if_run": {
+    "command": "codex login status",
+    "exit_status": 1,
+    "stdout": "",
+    "stderr": "Not logged in"
+  },
+  "expected_next_step": "codex exec",
+  "must_not_return_error_code": "cli_auth_failed",
+  "backstop": "A 401 or login error on codex exec stderr maps to cli_auth_failed."
+}

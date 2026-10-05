@@ -9,7 +9,8 @@
   "auth_check": {
     "command": "codex login status",
     "exit_status": 1,
-    "stdout": "Not logged in"
+    "stdout": "",
+    "stderr": "Not logged in"
   },
   "raw_output_path": "docs/reviews/raw/codex-c3d4e5f6.json"
 }

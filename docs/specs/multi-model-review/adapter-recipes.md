@@ -32,7 +32,7 @@ Authenticates via OpenAI account (ChatGPT login or API key). Credentials live un
 codex login status
 ```
 
-It exits 0 and prints `Logged in using ...` when authenticated, and makes no model call. There is no `auth` subcommand: an `auth status` check fails with "unrecognized subcommand". Token expiry is handled by treating a 401 from `codex exec` as `cli_auth_failed`.
+It exits 0 when authenticated and 1 otherwise, and makes no model call. Judge it by exit code: the `Logged in using ...` / `Not logged in` line goes to **stderr**, and stdout is empty. It reports stored credentials only, so when `CODEX_API_KEY` or `OPENAI_API_KEY` is set (common in CI) it prints `Not logged in` although `codex exec` would work; the adapter skips the check in that case. There is no `auth` subcommand: an `auth status` check fails with "unrecognized subcommand". Token expiry is handled by treating a 401 from `codex exec` as `cli_auth_failed`.
 
 ### Recommended flagship model
 
@@ -60,8 +60,10 @@ codex exec --sandbox read-only --ephemeral --skip-git-repo-check --json [-m <mod
 
 1. **Flag order:** all flags precede the `-` prompt argument.
 2. **No approval flag exists for `codex exec`:** earlier revisions of this recipe passed an `--approval-mode` flag, which current Codex CLI (verified on 0.160.0) does not accept on `exec` (and `-a never` is rejected there too). `codex exec` never blocks on approval prompts.
-3. **Output location:** the schema-shaped answer is in the `-o` last-message file; if it is empty, fall back to the last `item.completed` event's `item.text` in the JSONL stream.
-4. **Auth token expiry:** Tokens can expire silently; treat 401 from `codex exec` as `cli_auth_failed`.
+3. **Output location:** the schema-shaped answer is in the `-o` last-message file; if it is empty, fall back to the last `agent_message` `item.completed` event's `item.text` in the JSONL stream. Codex writes an empty `-o` file when a turn ends without an agent message, so a missing answer must fail closed (`parse_failed`), never become a zero-findings success.
+4. **Optional model flag in shell:** write it as one word, `${MODEL:+--model="$MODEL"}`. The two-word `${MODEL:+-m "$MODEL"}` stays a single argument in zsh (the macOS default shell), which Codex reads as `--model " <model>"`.
+5. **Auth token expiry:** Tokens can expire silently; treat 401 from `codex exec` as `cli_auth_failed`.
+6. **Permission modes:** `parent-mediated` (the default) runs as read-only with one WARN line, because Pattern 3 is not yet built on the real `codex app-server` protocol (`initialize`, `thread/start`, `turn/start`, `item/*/requestApproval`). `sandbox-yolo` runs the same `codex exec` command inside `sandbox-exec`/`bwrap` with `--sandbox danger-full-access` (nested Seatbelt fails).
 
 ---
 

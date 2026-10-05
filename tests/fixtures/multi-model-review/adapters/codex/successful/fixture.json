@@ -4,7 +4,8 @@
   "auth_check": {
     "command": "codex login status",
     "exit_status": 0,
-    "stdout": "Logged in using ChatGPT"
+    "stdout": "",
+    "stderr": "Logged in using ChatGPT"
   },
   "recorded_last_message": {
     "findings": [

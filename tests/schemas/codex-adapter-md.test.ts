@@ -77,29 +77,44 @@ describe('Task 9: codex-review-prompter.md', () => {
     expect(content).toContain('Known Gotchas');
   });
 
-  describe('Task 80: ADR-003 Pattern 3 (parent-mediated) default', () => {
-    it('[T] uses app-server JSON-RPC mode (raw-string check for app-server invocation flag)', () => {
+  // Task 80 originally pinned a Pattern 3 flow built on a bare JSON-RPC `requestApproval`
+  // method, a terminal `result` message and a `codex app-server --help` exit-status fallback.
+  // None of that matches Codex CLI 0.160.0: the app-server protocol
+  // (`codex app-server generate-json-schema`) has initialize / thread/start / turn/start and
+  // item/*/requestApproval, and `codex app-server --help` exits 0, so the fallback never fired
+  // and the default config never reached `codex exec`. Until Pattern 3 is rebuilt on the real
+  // protocol, parent-mediated runs Pattern 1 with one WARN line.
+  describe('Task 80: ADR-003 parent-mediated default runs Pattern 1 until Pattern 3 is implemented', () => {
+    const permissionSection = () => content.split('## Permission Model')[1]?.split('\n## ')[0] ?? '';
+
+    it('[T] documents parent-mediated as the default mode', () => {
+      expect(permissionSection()).toMatch(/`parent-mediated` \(default\)/);
+    });
+
+    it('parent-mediated runs Pattern 1 and logs one WARN line', () => {
+      const row = permissionSection().split('\n').find((l) => l.startsWith('| `parent-mediated`')) ?? '';
+      expect(row).toContain('Pattern 1');
+      expect(row).toMatch(/WARN/);
+      expect(row).not.toMatch(/Pattern 3 —/);
+    });
+
+    it('states Pattern 3 is not implemented and names the real app-server protocol', () => {
+      expect(content).toMatch(/Pattern 3 is not implemented/);
       expect(content).toContain('codex app-server');
+      for (const method of ['initialize', 'thread/start', 'turn/start', 'item/*/requestApproval']) {
+        expect(content).toContain(method);
+      }
     });
 
-    it('[T] documents app-server as the Pattern 3 default', () => {
-      expect(content).toMatch(/Pattern 3.*parent-mediated/);
-      expect(content).toMatch(/app-server.*parent-mediated|parent-mediated.*app-server/s);
+    it('does not document the nonexistent bare requestApproval method or terminal result message', () => {
+      expect(content).not.toContain('"method":"requestApproval"');
+      expect(content).not.toMatch(/terminal `result` message/);
+      expect(content).not.toContain('codex-approval-request');
     });
 
-    it('[T] documents requestApproval JSON-RPC parsing (raw-string check)', () => {
-      expect(content).toContain('requestApproval');
-      expect(content).toContain('jsonrpc');
-    });
-
-    it('[T] documents the requestApproval proxy mechanism to parent session', () => {
-      expect(content).toContain('codex-approval-request');
-      expect(content).toMatch(/parent (Claude )?session/i);
-    });
-
-    it('[T] documents fallback to Pattern 1 when app-server unavailable (raw-string check)', () => {
-      expect(content).toMatch(/fall.?back.*Pattern 1|Pattern 1.*fall.?back/is);
-      expect(content).toContain('codex app-server --help');
+    it('does not choose the pattern from `codex app-server --help` exit status (it exits 0)', () => {
+      expect(content).not.toMatch(/if `codex app-server --help` exits non-zero/);
+      expect(content).not.toContain('Cache the `codex app-server --help` probe result');
     });
 
     it('[T] references ADR-003 and FR-MMT21', () => {
@@ -109,6 +124,12 @@ describe('Task 9: codex-review-prompter.md', () => {
 
     it('[T] references the external_permission_mode config key', () => {
       expect(content).toContain('multi_model_review.external_permission_mode');
+    });
+
+    it('Pattern 2 (sandbox-yolo) wraps the Step 4 codex exec command, not a bare `codex exec --json <prompt>`', () => {
+      expect(content).not.toContain('codex exec --json <prompt>');
+      expect(content).toMatch(/sandbox-exec [^\n]*codex exec --sandbox danger-full-access/);
+      expect(content).toMatch(/Patterns 1 and 2/);
     });
 
     it('preserves Pattern 1 (FR-MR26) sandbox flags as fallback path', () => {

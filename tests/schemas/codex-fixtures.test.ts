@@ -57,6 +57,13 @@ describe('(a) successful — happy path, 2 findings', () => {
   const envelope = loadExpectedEnvelope('successful');
   const fixture = loadFixture('successful');
 
+  it('auth check: codex login status exits 0 with "Logged in using ..." on stderr (stdout empty)', () => {
+    const authCheck = fixture.auth_check as Record<string, unknown>;
+    expect(authCheck.exit_status).toBe(0);
+    expect(authCheck.stdout).toBe('');
+    expect(String(authCheck.stderr)).toMatch(/^Logged in using /);
+  });
+
   it('expected_envelope passes validateFullAdapterEnvelope', () => {
     const result = validateFullAdapterEnvelope(envelope);
     expect(result.errors).toEqual([]);
@@ -238,6 +245,14 @@ describe('(c) auth-failure — codex login status non-zero → cli_auth_failed',
     expect(authCheck.exit_status).not.toBe(0);
   });
 
+  // `codex login status` writes its status line to stderr and nothing to stdout
+  // (Codex CLI 0.160.0), so a stdout-only `| grep 'Logged in'` always fails.
+  it('fixture records the auth status line on stderr, not stdout', () => {
+    const authCheck = fixture.auth_check as Record<string, unknown>;
+    expect(authCheck.stdout).toBe('');
+    expect(authCheck.stderr).toBe('Not logged in');
+  });
+
   it('raw_output_path is echoed from fixture input', () => {
     expect(envelope.raw_output_path).toBe(fixture.raw_output_path);
   });
@@ -296,5 +311,42 @@ describe('(d) cli-missing — which codex returns nothing → cli_missing', () =
 
   it('raw_output_path is echoed from fixture input', () => {
     expect(envelope.raw_output_path).toBe(fixture.raw_output_path);
+  });
+});
+
+// ── (e) Auth via environment variable ─────────────────────────────────────────
+
+describe('(e) auth-via-env — CODEX_API_KEY set, no stored login → auth check skipped', () => {
+  const fixture = loadFixture('auth-via-env');
+  const adapter = readFileSync(CODEX_AGENT_MD, 'utf-8');
+  const step2 = adapter.split('### 2. Auth Check')[1]?.split(/\n### /)[0] ?? '';
+
+  it('fixture: login status would exit 1 ("Not logged in" on stderr) with env-only auth', () => {
+    const ls = fixture.login_status_if_run as Record<string, unknown>;
+    expect(ls.command).toBe('codex login status');
+    expect(ls.exit_status).toBe(1);
+    expect(ls.stderr).toBe('Not logged in');
+  });
+
+  it('fixture: auth check is skipped and the adapter proceeds to codex exec', () => {
+    expect(fixture.auth_check_skipped).toBe(true);
+    expect(fixture.expected_next_step).toBe('codex exec');
+    expect(fixture.must_not_return_error_code).toBe('cli_auth_failed');
+  });
+
+  it('adapter Step 2 skips codex login status when CODEX_API_KEY or OPENAI_API_KEY is set', () => {
+    expect(step2).toContain('CODEX_API_KEY');
+    expect(step2).toContain('OPENAI_API_KEY');
+    expect(step2).toMatch(/skip/i);
+  });
+
+  it('adapter Step 2 judges codex login status by exit code, not by grepping stdout', () => {
+    expect(step2).toMatch(/exit code only/i);
+    expect(step2).toContain('stderr');
+    expect(step2).not.toMatch(/no `Logged in` in output/);
+  });
+
+  it('adapter keeps the 401 → cli_auth_failed backstop on codex exec', () => {
+    expect(adapter).toMatch(/401[\s\S]{0,40}cli_auth_failed|cli_auth_failed[\s\S]{0,40}401/);
   });
 });

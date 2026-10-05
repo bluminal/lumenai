@@ -582,8 +582,10 @@ multi_model_review:
   #                     default for every environment.
   #   - parent-mediated (Pattern 3): adapter invokes its CLI in a mode that
   #                     proxies tool-use approval requests back to the parent
-  #                     Claude session (Codex app-server requestApproval,
-  #                     Claude Code canUseTool over --output-format stream-json).
+  #                     Claude session (Claude Code canUseTool over
+  #                     --output-format stream-json). Codex's adapter does not
+  #                     implement Pattern 3 yet: it runs parent-mediated as
+  #                     read-only (Pattern 1) and logs one WARN line.
   #                     The parent session decides per request. Use this for
   #                     CLIs that natively support approval proxying.
   #   - sandbox-yolo    (Pattern 2): adapter invokes its CLI with full tool
@@ -592,7 +594,8 @@ multi_model_review:
   #                     Opt in only when you trust the CLI inside the sandbox.
   #
   # Defaults applied per CLI: Codex and Claude Code default to parent-mediated
-  # (Pattern 3) because their CLIs natively support approval proxying. All
+  # (Pattern 3) because their CLIs natively support approval proxying (Codex
+  # currently runs it as read-only; see the `codex` entry below). All
   # other CLIs default to read-only (Pattern 1) — the universal safe default.
   # Override any entry here per project to opt into sandbox-yolo (Pattern 2)
   # for a specific CLI; the spawning command will require explicit y/N
@@ -615,7 +618,7 @@ multi_model_review:
     #
     # Per-CLI defaults. CLI names are the bare adapter name (the
     # `<cli>-review-prompter` agent file's prefix).
-    codex: parent-mediated      # Pattern 3 via `codex app-server` JSON-RPC requestApproval
+    codex: parent-mediated      # Runs as Pattern 1 (`codex exec --sandbox read-only`) + one WARN until Pattern 3 is built on the app-server protocol
     claude: parent-mediated     # Pattern 3 via Claude Code `canUseTool` over --output-format stream-json
     gemini: read-only           # Pattern 1 via `--readonly` flag
     bedrock: read-only          # Pattern 1 — `aws bedrock-runtime invoke-model` has no tool-use surface

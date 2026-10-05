@@ -77,7 +77,7 @@ Cost: 5 judge invocations × ~500 tokens output × `claude-3-5-sonnet` rate. Ord
 
 ### Running the wall-clock parallelism test (live, expensive)
 
-Requires: codex CLI authenticated (`codex login status` exits 0 and prints `Logged in`), gemini CLI authenticated (`gcloud auth list` shows active credentials), `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`, and a project with `.synthex-plus/config.yaml` allowing multi-model team-review.
+Requires: codex CLI authenticated (`codex login status` exits 0; it prints `Logged in using ...` on stderr), gemini CLI authenticated (`gcloud auth list` shows active credentials), `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`, and a project with `.synthex-plus/config.yaml` allowing multi-model team-review.
 
 ```sh
 cd tests

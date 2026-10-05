@@ -1,0 +1,1 @@
+codex exec --sandbox read-only --ephemeral --skip-git-repo-check --json --output-schema plugins/synthex/agents/_shared/codex-findings.schema.json -o /tmp/codex-last-message.json - < /tmp/codex-prompt.txt

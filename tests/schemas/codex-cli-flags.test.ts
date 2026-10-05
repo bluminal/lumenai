@@ -29,6 +29,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..');
@@ -358,7 +359,8 @@ describe('checker self-test: known-bad commands are rejected, known-good accepte
     'codex login status',
     'codex login',
     'codex exec --sandbox workspace-write',
-    'codex exec --sandbox read-only --ephemeral --skip-git-repo-check --json ${MODEL:+-m "$MODEL"} --output-schema s.json -o "$LAST" - < "$PROMPT" > "$RAW"',
+    'codex exec --sandbox read-only --ephemeral --skip-git-repo-check --json ${MODEL:+--model="$MODEL"} --output-schema s.json -o "$LAST" - < "$PROMPT" > "$RAW"',
+    'codex exec --sandbox danger-full-access --ephemeral --json -o "$LAST" -',
     'codex -a never exec -',
     'codex app-server --help',
     'codex app-server',
@@ -400,6 +402,29 @@ describe('explicit regressions: nonexistent Codex commands/flags never reappear'
       return after !== null && /(^|\s)(-a|--ask-for-approval)(\s|=|$)/.test(after[1]);
     });
     expect(offenders.map((d) => `${d.file}:${d.line}`)).toEqual([]);
+  });
+
+  // `${MODEL:+-m "$MODEL"}` splits into two words in bash but stays ONE word
+  // ("-m gpt-5") in zsh, the macOS default shell; clap then reads --model with
+  // the value " gpt-5". The single-word `${MODEL:+--model="$MODEL"}` works in both.
+  it('no documented codex command uses a two-word ${VAR:+-flag "$VAR"} expansion', () => {
+    const twoWord = /\$\{\w+:\+-[\w-]+\s+"/;
+    expect(DOCUMENTED.filter((d) => twoWord.test(d.cmd)).map((d) => `${d.file}:${d.line}`)).toEqual([]);
+  });
+
+  it('the adapter\'s optional model flag expands to a single --model=<value> word in bash and zsh', () => {
+    const adapter = readFileSync(join(REPO_ROOT, 'plugins', 'synthex', 'agents', 'codex-review-prompter.md'), 'utf8');
+    const expansion = adapter.match(/\$\{MODEL:\+[^}]*\}/)?.[0];
+    expect(expansion).toBe('${MODEL:+--model="$MODEL"}');
+    for (const shell of ['bash', 'zsh']) {
+      let out: string;
+      try {
+        out = execFileSync(shell, ['-c', `MODEL=gpt-5; printf '[%s]\\n' ${expansion}`], { encoding: 'utf8' });
+      } catch {
+        continue; // shell not installed
+      }
+      expect(out, shell).toBe('[--model=gpt-5]\n');
+    }
   });
 
   it('no documented codex command uses --dangerously-bypass-approvals-and-sandbox', () => {
