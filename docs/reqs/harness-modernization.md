@@ -605,7 +605,7 @@ Marketplace and manifest (`.claude-plugin/marketplace.json:26-39`, `plugins/synt
 | `review-code` default-path prompt bytes | ≤ 15 KB (from 27.6 KB) | Layer 1 size assertion |
 | Claude Code sessions list zero `synthex:*` skills | 0 | Manual plus `/skill-doctor` |
 | Codex skill catalog under budget with no blanked descriptions | 100% of 46 non-blank | Compat activation capture |
-| OpenCode `<available_skills>` block size | ≤ 13,353 bytes (measured 12,717 after the description diet, plus 5%); description bytes ≤ 6,000. The original 60% target was withdrawn: 8,044 bytes are host-rendered markup and absolute paths (A17) | Compat activation `catalog` phase |
+| OpenCode `<available_skills>` block size | ≤ 290 bytes per installed skill (46 × 290 = 13,340, within A17's 13,353-byte ceiling of measured 12,717 + 5%); description bytes ≤ 6,000. A19 made the budget per skill because A17's fixed total failed on skill count alone at 50 skills (13,840 bytes, ~277 per skill). The original 60% target was withdrawn: 8,044 bytes are host-rendered markup and absolute paths (A17) | Compat activation `catalog` phase |
 | Loop bookkeeping tool calls per iteration | 1 (from 4 to 6) | Layer 2 transcript count |
 | Utility agents retired | 5 of 6 (commit-message-author, plan-scribe, plan-linter, context-bundle-assembler, audit-artifact-writer) | `plugin.json` diff |
 | Native-only review output byte-identical to FR-MR23 baseline | 100% | Snapshot |
