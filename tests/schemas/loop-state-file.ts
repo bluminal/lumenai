@@ -6,6 +6,8 @@
  *   - status enum membership
  *   - isolation enum membership
  *   - schema_version === 1
+ *   - optional runId lease (FR-HM19 Stage 2, Task 59): "<loop_id>-i<N>",
+ *     only on a running loop
  *
  * Used by Layer 1 schema tests + the iteration framework's runtime
  * recovery path (FR-NL25): when an agent re-derives state from disk
@@ -30,6 +32,8 @@ export interface LoopState {
   last_updated: string;
   exited_at: string | null;
   exit_reason: string | null;
+  /** FR-HM19 Stage 2 (Task 59): pending verdict-run lease, "<loop_id>-i<N>". Optional. */
+  runId?: string | null;
 }
 
 export type ValidationResult =
@@ -68,6 +72,8 @@ const ISOLATION_VALUES: ReadonlyArray<LoopState['isolation']> = [
 ];
 
 const LOOP_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+export const RUN_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}-i[0-9]{1,3}$/;
 
 const ISO_8601_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 
@@ -203,6 +209,27 @@ export function validateLoopStateFile(input: unknown): ValidationResult {
   // Cross-field: running status MUST have exited_at === null.
   if (obj.status === 'running' && obj.exited_at !== null) {
     errors.push('status "running" requires exited_at to be null');
+  }
+
+  // runId (FR-HM19 Stage 2, Task 59): optional lease; absent or null is fine.
+  if ('runId' in obj && obj.runId !== null) {
+    const runId = obj.runId;
+    if (typeof runId !== 'string') {
+      errors.push('runId must be a string or null');
+    } else {
+      if (!RUN_ID_PATTERN.test(runId)) {
+        errors.push(`runId "${runId}" violates pattern ^[a-z0-9][a-z0-9-]{0,63}-i[0-9]{1,3}$`);
+      }
+      // Exactly <loop_id>-i<N> (digits only after the prefix), matching the
+      // loop-engine's validateArgs, so `<loop_id>-ix-i5` is rejected too.
+      const prefix = typeof obj.loop_id === 'string' ? obj.loop_id + '-i' : null;
+      if (prefix !== null && (!runId.startsWith(prefix) || !/^[0-9]{1,3}$/.test(runId.slice(prefix.length)))) {
+        errors.push(`runId must be "${obj.loop_id}-i<N>"`);
+      }
+      if (obj.status !== 'running') {
+        errors.push('runId requires status "running"');
+      }
+    }
   }
 
   if (errors.length > 0) {

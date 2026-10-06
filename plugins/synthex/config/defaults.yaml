@@ -379,6 +379,22 @@ next_priority:
   concurrent_tasks: 3
 
 # -------------------------------------------------------------------
+# Native Looping Settings
+# Used by every --loop command (next-priority, loop, review-code,
+# refine-requirements, write-implementation-plan)
+# -------------------------------------------------------------------
+native_looping:
+
+  # FR-HM19 Stage 2 loop engine (Claude Code only, opt-in, D34). "workflow"
+  # only takes effect when a Workflow tool is also in the caller's tool list
+  # and --loop-isolated is not set (config enables, tool presence selects:
+  # FR-HM3, D31); every other host, and any host missing the tool, keeps the
+  # Stage 1 prose loop. Headless runs also need a
+  # Workflow(synthex:loop-engine) permission allow rule. See
+  # docs/engines/loop-workflow.md. Options: prose | workflow.
+  engine: prose
+
+# -------------------------------------------------------------------
 # Worktree Settings
 # Used by the `next-priority` command for parallel task execution
 # -------------------------------------------------------------------

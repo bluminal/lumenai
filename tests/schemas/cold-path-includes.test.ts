@@ -25,6 +25,7 @@
  * `docs/standing-pool-routing.md`, `docs/sandbox-yolo.md`, and
  * `docs/multi-model-decision.md`. No KNOWN_* allowlist is seeded: there is
  * no real, today-existing D17 violation to grandfather.
+ * Task 59 (FR-HM19, D34) adds the loop-engine selectors: next-priority.md (2 gates) and loop.md, review-code.md, refine-requirements.md and write-implementation-plan.md (1 each).
  *
  * Rules enforced against every detected Read gate:
  *   1. The target must be written as `${CLAUDE_PLUGIN_ROOT}/docs/<x>.md`
@@ -295,20 +296,27 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
       '(FR-HM28) adds 6 more gates — one per *-review-prompter.md adapter — all pointing ' +
       'at docs/adapter-common.md; Task 45 (FR-HM26) adds 1 more gate in ' +
       'write-implementation-plan.md\'s Step 5.5 no-node prose fallback, pointing at ' +
-      'docs/plan-lint-rubric.md; multi-model-review Task 68 adds 1 more in grok-review-prompter.md and ' +
-      'Task 69 1 more in cursor-review-prompter.md, both pointing at docs/adapter-common.md',
+      'docs/plan-lint-rubric.md; Task 59 (FR-HM19) adds 6 more gates — next-priority.md\'s ' +
+      'engine selector reads docs/engines/loop-workflow.md or docs/next-priority-loop.md, and ' +
+      'loop.md, review-code.md, refine-requirements.md and write-implementation-plan.md each ' +
+      'read docs/engines/loop-workflow.md; multi-model-review Task 68 adds 1 more in ' +
+      'grok-review-prompter.md and Task 69 1 more in cursor-review-prompter.md, both pointing at ' +
+      'docs/adapter-common.md',
     () => {
       const nativeLoopingMentions = files.reduce((count, relFile) => {
         const text = readFileSync(join(ROOT, relFile), 'utf8');
         return count + (text.match(/docs\/native-looping\.md/g) ?? []).length;
       }, 0);
       expect(nativeLoopingMentions).toBeGreaterThanOrEqual(32);
-      expect(allIncludes).toHaveLength(18);
+      expect(allIncludes).toHaveLength(24);
       expect(new Set(allIncludes.map((i) => i.file))).toEqual(
         new Set([
           'plugins/synthex/commands/review-code.md',
           'plugins/synthex/commands/performance-audit.md',
           'plugins/synthex/commands/write-implementation-plan.md',
+          'plugins/synthex/commands/next-priority.md',
+          'plugins/synthex/commands/loop.md',
+          'plugins/synthex/commands/refine-requirements.md',
           'plugins/synthex/agents/bedrock-review-prompter.md',
           'plugins/synthex/agents/claude-review-prompter.md',
           'plugins/synthex/agents/codex-review-prompter.md',
@@ -329,6 +337,8 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
           '${CLAUDE_PLUGIN_ROOT}/docs/model-resolution.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/adapter-common.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/plan-lint-rubric.md',
+          '${CLAUDE_PLUGIN_ROOT}/docs/engines/loop-workflow.md',
+          '${CLAUDE_PLUGIN_ROOT}/docs/next-priority-loop.md',
         ]),
       );
     },

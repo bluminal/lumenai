@@ -134,8 +134,9 @@ function readPluginVersion(pluginRoot) {
 }
 
 // ---------------------------------------------------------------------------
-// scripts/loop-step.sh — begin -> advance -> hold -> finish -> list -> cancel
-// -> check-writable (Task 37's documented sequence).
+// scripts/loop-step.sh — begin -> advance -> advance --run -> hold -> hold --run
+// -> hold -> finish -> list -> cancel -> check-writable (Task 37's documented
+// sequence, plus the Task 59 runId lease).
 // ---------------------------------------------------------------------------
 
 function loopStepLifecycle(ctx, includeNode) {
@@ -166,8 +167,38 @@ function loopStepLifecycle(ctx, includeNode) {
     `advance printed ${JSON.stringify(advance.stdout)}`,
   );
 
+  // FR-HM19 Stage 2 (Task 59): the runId lease. advance --run / hold --run
+  // set it; plain hold clears it.
+  const statePath = join(loopsDir, 'smoke-loop.json');
+  const advanceRun = runScript(ctx.scriptAbsPath, ['advance', 'smoke-loop', '--run'], opts);
+  assert(advanceRun.code === 0, `advance --run exited ${advanceRun.code}: ${advanceRun.stderr}`);
+  assert(
+    advanceRun.stdout === '[loop smoke-loop iteration 2/3]\nrun-id: smoke-loop-i2\n',
+    `advance --run printed ${JSON.stringify(advanceRun.stdout)}`,
+  );
+  assert(
+    readFileSync(statePath, 'utf8').includes('"runId": "smoke-loop-i2"'),
+    'advance --run did not write runId',
+  );
+
   const hold = runScript(ctx.scriptAbsPath, ['hold', 'smoke-loop'], opts);
   assert(hold.code === 0, `hold exited ${hold.code}: ${hold.stderr}`);
+  assert(!readFileSync(statePath, 'utf8').includes('"runId"'), 'hold did not clear runId');
+
+  const holdRun = runScript(ctx.scriptAbsPath, ['hold', 'smoke-loop', '--run'], opts);
+  assert(holdRun.code === 0, `hold --run exited ${holdRun.code}: ${holdRun.stderr}`);
+  assert(
+    holdRun.stdout === 'run-id: smoke-loop-i2\n',
+    `hold --run printed ${JSON.stringify(holdRun.stdout)}`,
+  );
+  assert(
+    readFileSync(statePath, 'utf8').includes('"runId": "smoke-loop-i2"'),
+    'hold --run did not write runId',
+  );
+
+  const holdClear = runScript(ctx.scriptAbsPath, ['hold', 'smoke-loop'], opts);
+  assert(holdClear.code === 0, `hold exited ${holdClear.code}: ${holdClear.stderr}`);
+  assert(!readFileSync(statePath, 'utf8').includes('"runId"'), 'second hold did not clear runId');
 
   const finish = runScript(ctx.scriptAbsPath, ['finish', 'smoke-loop', 'completed'], opts);
   assert(finish.code === 0, `finish exited ${finish.code}: ${finish.stderr}`);
@@ -176,7 +207,7 @@ function loopStepLifecycle(ctx, includeNode) {
   assert(list.code === 0, `list exited ${list.code}: ${list.stderr}`);
   assert(/^COMPLETED \(1\):$/m.test(list.stdout), `list did not report the completed loop: ${list.stdout}`);
   assert(
-    /smoke-loop\s+completed \(promise\)\s+iter 1\/3/.test(list.stdout),
+    /smoke-loop\s+completed \(promise\)\s+iter 2\/3/.test(list.stdout),
     `list did not include the loop's outcome: ${list.stdout}`,
   );
 
