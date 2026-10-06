@@ -3,8 +3,8 @@
 ## Overview
 
 During `/init`, the detection scan (step 4a) returns the same mixed results as scenario (a):
-codex and ollama are authenticated, gemini is unauthenticated, and llm/aws/claude are not
-detected.
+codex and ollama are authenticated, gemini is unauthenticated, grok and cursor-agent are listed for
+manual opt-in, and llm/aws/claude are not detected.
 
 The user selects **option 2: Enable later (show snippet)**.
 
@@ -21,15 +21,19 @@ Instead, a commented-out YAML snippet is printed to the terminal so the user can
 3. **Snippet is printed** with the following properties:
    - Begins with `multi_model_review:` as the top-level key (the entire block is commented out)
    - Is syntactically valid YAML when the `#` comment prefixes are stripped — validated by parsing
-   - Includes all three detected CLIs (codex, gemini, ollama) as commented-out reviewer entries
-     under `reviewers:`. This differs from option 1: ALL detected CLIs appear in the snippet
+   - Includes the detected CLIs (codex, gemini, ollama, grok, cursor-agent) as commented-out
+     reviewer entries under `reviewers:`, by adapter name. This differs from option 1: ALL detected CLIs appear in the snippet
      (including unauthenticated gemini), because the snippet is for the user to configure manually
      when ready — not a live config write.
+   - Has a commented `per_reviewer:` block: `grok-review-prompter.allow_api_key_billing: false`, and a
+     block-style `cursor-review-prompter` with `model` and `family` placeholders and
+     `allow_api_key_billing: false`.
    - The snippet is fully commented out so the user can uncomment selectively.
 
 ## Snippet Content
 
-The printed snippet matches `expected-snippet.yaml` in this fixture directory:
+The printed snippet matches `expected-snippet.yaml` in this fixture directory (byte-identical to the
+wizard's Option 2 block):
 
 ```yaml
 # multi_model_review:
@@ -38,6 +42,15 @@ The printed snippet matches `expected-snippet.yaml` in this fixture directory:
 #     # - codex-review-prompter      # OpenAI / Codex CLI  (codex login)
 #     # - gemini-review-prompter     # Google / gcloud     (gcloud auth login)
 #     # - ollama-review-prompter     # Local model         (ollama serve)
+#     # - grok-review-prompter       # xAI / Grok CLI      (grok login)
+#     # - cursor-review-prompter     # Cursor Agent CLI    (cursor-agent login; paid plan)
+#   per_reviewer:
+#     grok-review-prompter:
+#       allow_api_key_billing: false   # true bills XAI_API_KEY per token
+#     cursor-review-prompter:
+#       model: gpt-5.6-sol-high        # placeholder: a named slug from `cursor-agent models`, never auto
+#       family: openai                 # placeholder: the slug's vendor
+#       allow_api_key_billing: false   # true bills CURSOR_API_KEY per request
 #   aggregator:
 #     command: auto
 ```

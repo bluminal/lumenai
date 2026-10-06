@@ -246,7 +246,7 @@ const SCRIPT_CALL_FILES = [
 
 describe('Task 18: other-hosts guidance follows every ${CLAUDE_PLUGIN_ROOT}/scripts call (FR-HM13)', () => {
   describe('discovery: known script-call sites', () => {
-    it('finds exactly the 17 known sites (harness-modernization Task 34 added list-loops.md and cancel-loop.md; Task 38/FR-HM26 added dismiss-upgrade-nudge.md and star.md as state-flag.sh one-Bash-call sites; Task 39/FR-HM26 added init.md; Task 43/FR-HM28 added the 6 *-review-prompter.md adapters and multi-model-review-orchestrator.md as validate-findings call sites; Task 45/FR-HM26 added write-implementation-plan.md as the lint-plan.mjs call site; multi-model-review Task 68 added grok-review-prompter.md as the grok-review.sh runner call site; Task 69 added cursor-review-prompter.md as the cursor-review.sh runner call site)', () => {
+    it('finds exactly the 18 known sites (harness-modernization Task 34 added list-loops.md and cancel-loop.md; Task 38/FR-HM26 added dismiss-upgrade-nudge.md and star.md as state-flag.sh one-Bash-call sites; Task 39/FR-HM26 added init.md; Task 43/FR-HM28 added the 6 *-review-prompter.md adapters and multi-model-review-orchestrator.md as validate-findings call sites; Task 45/FR-HM26 added write-implementation-plan.md as the lint-plan.mjs call site; multi-model-review Task 68 added grok-review-prompter.md as the grok-review.sh runner call site; Task 69 added cursor-review-prompter.md as the cursor-review.sh runner call site; Task 70 added configure-multi-model.md as the grok-review.sh and cursor-review.sh --auth-check call site)', () => {
       const sites = SCRIPT_CALL_FILES.filter(
         (f) => findScriptCallLines(readFileSync(f, 'utf8')).length > 0
       ).map((f) => f.replace(ROOT + '/', ''));
@@ -259,6 +259,7 @@ describe('Task 18: other-hosts guidance follows every ${CLAUDE_PLUGIN_ROOT}/scri
           'plugins/synthex/commands/dismiss-upgrade-nudge.md',
           'plugins/synthex/commands/star.md',
           'plugins/synthex/commands/init.md',
+          'plugins/synthex/commands/configure-multi-model.md',
           'plugins/synthex/commands/write-implementation-plan.md',
           'plugins/synthex/agents/bedrock-review-prompter.md',
           'plugins/synthex/agents/claude-review-prompter.md',
