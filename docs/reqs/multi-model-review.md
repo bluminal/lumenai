@@ -96,7 +96,8 @@ The orchestrator enforces a minimum of **two distinct model families** across th
 
 **Family attribution:**
 - **Native reviewers** count as the `anthropic` family (they all run on the host Claude session).
-- **External reviewers** declare their family in their adapter metadata (`openai` for Codex, `google` for Gemini, `local-<model>` for Ollama, etc.).
+- **External reviewers** declare their family in their adapter metadata (`openai` for Codex, `google` for Gemini, `xai` for Grok, `local-<model>` for Ollama, etc.). Cursor has no default family: it uses the configured `per_reviewer.cursor-review-prompter.family`, which is required because a Cursor slug can route to any vendor.
+- **Self-review on a Grok host:** when Synthex itself runs on Grok (`SYNTHEX_HOST=grok`), the native reviewers are xAI models, so a `grok-review-prompter` proposer adds no real family diversity. The `init` wizard (FR-MR19) therefore lists grok for manual opt-in only on a Grok host. Host-aware accounting of the natives' family is separate follow-up work (plan Task 71); until it lands, the "natives count as `anthropic`" rule above still applies.
 - A default configuration of "native reviewers + Codex (GPT-5) + Gemini" already satisfies the 2-family minimum (Anthropic + OpenAI + Google = 3 families) without needing the optional `claude-review-prompter` adapter.
 
 **Acceptance Criteria:**
@@ -304,13 +305,17 @@ The initial adapter set ships with the plugin and covers the external providers 
 | `llm-review-prompter` | Optional (universal escape hatch) | `llm -m <model> --schema <file>` | Universal adapter — 50+ providers via `llm` plugins (OpenRouter, Groq, Mistral, Cohere, Bedrock) | Inferred from the `llm` model ID prefix | `text-only` |
 | `bedrock-review-prompter` | Optional (for users on AWS) | `aws bedrock-runtime invoke-model` | AWS Bedrock (Claude, Llama, Nova, Titan, Mistral) — for users with AWS creds but no per-vendor CLI | Inferred from Bedrock model ID | `text-only` |
 | `claude-review-prompter` | **No (specialty)** — see note below | `claude -p --output-format json` | Anthropic (Sonnet/Opus/Haiku), including Bedrock/Vertex routing via env vars | `anthropic` | `agentic` |
+| `grok-review-prompter` | No (opt-in) | Runner `scripts/adapters/grok-review.sh` → `grok --prompt-file <W>/prompt.txt --output-format json --json-schema <strict findings schema>` with every tool removed (full flag set in FR-MR26) | xAI Grok through a grok.com subscription session; `XAI_API_KEY` / `GROK_CODE_XAI_API_KEY` are used only with `per_reviewer.grok-review-prompter.allow_api_key_billing: true` | `xai` (a configured model not starting `grok-` gives `unknown` unless `per_reviewer.grok-review-prompter.family` is set) | `text-only` |
+| `cursor-review-prompter` | No (opt-in; named models need a paid Cursor plan) | Runner `scripts/adapters/cursor-review.sh` → `cursor-agent -p --mode ask --sandbox enabled --trust --output-format stream-json --model <slug>`, prompt on stdin | Models Cursor routes (Claude, GPT, Gemini, Grok, Composer), as a second hop through Cursor; `CURSOR_API_KEY` is used only with `per_reviewer.cursor-review-prompter.allow_api_key_billing: true` | None: an explicit non-Auto `per_reviewer.cursor-review-prompter.model` AND `.family` are both required | `text-only` |
 
 **On `claude-review-prompter`:** the native Synthex sub-agents already cover the Anthropic family by running in the host Claude session — they have role-specialized prompts, full Synthex context (CLAUDE.md, project specs, conventions), and direct Task-tool access. A generic `claude -p` subprocess does not have that specialization and would also pay for a fresh CLI invocation. Only configure `claude-review-prompter` if you want a *different* Anthropic model than the host session's model — e.g., the host is Sonnet and you want Opus as a second Anthropic voice for a high-stakes review. Otherwise, leave it out.
+
+**On `grok-review-prompter` and `cursor-review-prompter`:** both are opt-in and never auto-enrolled. Each is a thin agent whose CLI steps all live in an executable runner script (NFR-MR5), so hosts that call CLIs directly from the orchestrator get the same isolation. Both are `text-only` because neither CLI offers a fail-closed read scope today: every tool is removed or denied and the bundle inlined in the prompt is the model's only context. Cursor's Free plan allows only Auto, which hides the routed model and so breaks family accounting; a Free-plan account fails its first review with an actionable `cli_failed` and is never retried with Auto. The evidence for both (Task 67 spike) is in `docs/specs/multi-model-review/adapter-recipes.md` §8–§9.
 
 **Capability tier matters** because it controls how the orchestrator delivers context (FR-MR28). Agentic-tier external reviewers receive the context bundle AND read-only access to the sandboxed workspace (they can follow imports, check sibling files, read additional specs). Text-only-tier external reviewers receive the context bundle alone — no file access — so bundle completeness and summarization quality directly determine the upper bound of their review quality. Native reviewers do not have a tier classification because they always have full Synthex tool access in the host session.
 
 **Acceptance Criteria:**
-- Each adapter has its own `.md` definition in `plugins/synthex/agents/`
+- Each adapter has its own `.md` definition in `plugins/synthex/agents/`; `grok-review-prompter` and `cursor-review-prompter` delegate every CLI step to their runner under `plugins/synthex/scripts/adapters/`, which the `.md` names in its CLI Invocation
 - Each adapter is listed in `plugins/synthex/.claude-plugin/plugin.json`
 - Each adapter's file documents: the CLI invocation shape, auth expectations, output parsing logic, known gotchas, and install one-liner
 
@@ -559,7 +564,7 @@ The `init` command is updated to introduce multi-model review during project set
 
 1. After the existing concurrent-tasks prompt, add a new section: **"Multi-model review (optional)"**.
 2. Briefly describe the feature: "Synthex can run reviews across multiple LLM families (Claude, GPT, Gemini, local models) via CLIs you already have installed. Off by default."
-3. Detect locally-available CLIs via `which` for each first-class adapter (FR-MR10) and report which are installed.
+3. Detect locally-available CLIs via `which` for each first-class adapter (FR-MR10) and report which are installed. `grok` and `cursor-agent` are detected with `command -v` (never `which agent`, which can be another CLI's binary), and their auth check is the runner's `--auth-check` (exit 0 authenticated, 10 not installed, 11 not authenticated, 12 needs opt-in config). Cursor is never auto-enrolled, because the auth check cannot see a Free plan; it is listed under "detected — opt in manually", as is grok on auth exit 12 or on a Grok host (FR-MR4). The `reviewers` list holds adapter names (`grok-review-prompter`), not CLI names.
 4. Use `AskUserQuestion` to ask whether to enable multi-model review with the detected CLIs as defaults. Options:
    - "Enable with detected CLIs" — writes `multi_model_review.enabled: true` and reviewers matching detected CLIs
    - "Enable later (show config snippet)" — leaves `enabled: false` and prints a commented-out config snippet with setup instructions
@@ -714,16 +719,19 @@ Per FR-MR2, Synthex never handles provider credentials. This is both a security 
 
 Each adapter invocation MUST use the CLI's most restrictive non-interactive sandbox mode to prevent the external LLM from making unintended changes to the developer's machine:
 
-- `codex exec` — `--sandbox read-only --approval-mode never`
+- `codex exec` — `--sandbox read-only --ephemeral` (`codex exec` never prompts and has no approval flag)
 - `claude -p` — `--permission-mode plan` (plan-only) OR `--disallowed-tools Edit,Write,Bash` when a tool-shaped CLI is unavoidable
 - `gemini` — equivalent read-only flag set
 - `opencode run` — `--mode plan` or equivalent
 - Ollama / `llm` / direct SDK CLIs — no agentic tools, so sandboxing is a non-issue
+- `grok` — every built-in tool removed (`--disallowed-tools <every built-in>,Agent`, `--deny '*'`, `--deny 'mcp__*'`), `--permission-mode dontAsk`, `--no-subagents`, `--disable-web-search`, `--max-turns 3`, run from an untrusted `/tmp` scratch cwd with HOME isolated and `GROK_MEMORY=0`. `--sandbox read-only` is defence in depth: the runner retries once without it only on the exact docker.sock-symlink refusal, which comes before any prompt is sent. Never `--yolo`, `--always-approve`, `bypassPermissions` or `--trust`.
+- `cursor-agent` — the read boundary is a mandatory deny-all project file `<W>/.cursor/cli.json` (`allow: []`; deny `Read(**)`, `Read(/**)`, `Read(~/**)`, `Write(**)`, `Write(/**)`, `Shell(*)`, `Mcp(*:*)`), written and read back before every spawn; if it cannot be written or reads back differently, the result is `cli_failed` and the CLI is never spawned. `--mode ask` and `--sandbox enabled` are kept but confine nothing. Every `tool_call` event is checked against a result-shape allowlist, and any call that returned content is `sandbox_violation`. Never `--force`, `--yolo`, `--approve-mcps`, `--auto-review` or `--api-key`.
+- For `grok` and `cursor-agent`, `sandbox-yolo` is a no-op alias of read-only, and `parent-mediated` returns `cli_unsupported_mode` without spawning the CLI.
 
 Adapter definitions document their exact sandbox flag set. Review prompts instruct the reviewer LLM that it is operating in read-only mode and that its job is to emit findings, not to modify files.
 
 **Acceptance Criteria:**
-- No adapter can, through normal operation, cause the reviewer LLM to edit files, run destructive shell commands, or persist state outside `/tmp`
+- No adapter can, through normal operation, cause the reviewer LLM to edit files, run destructive shell commands, or persist state outside `/tmp`. Cursor writes its own session state under `~/.cursor` (a transcript and a chat copy of each review); the Cursor runner deletes exactly its run's entries after every run, failures included
 - Sandbox flags are verified in adapter integration tests against each supported CLI
 - If a CLI removes or changes a sandbox flag, the adapter fails fast with a clear error rather than invoking unsafely
 
@@ -731,7 +739,11 @@ Adapter definitions document their exact sandbox flag set. Review prompts instru
 
 Because artifacts (diffs, plans) are sent to external providers, the PRD surfaces — but does not solve — the concern that sensitive code or requirements may be transmitted. The solution is documentation, not enforcement:
 
-- The `init` discoverability prompt (FR-MR19) includes a warning: "Multi-model review sends your code/plans/PRD to the configured external providers. Confirm this matches your organization's data-handling policy."
+- The `init` discoverability prompt (FR-MR19) includes a warning: "Multi-model review sends your code/plans/PRD to the configured external providers. Confirm this matches your organization's data-handling policy." The warning names the providers content can reach (OpenAI, Google, xAI, Cursor, etc.) and always adds, whether or not those CLIs were detected:
+  - Grok user and plugin hooks in `$GROK_HOME` run once per Grok review, and hooks the user's Cursor loads (apparently including Claude Code hooks) run once per Cursor review. Synthex never edits hook configuration.
+  - Cursor is a second hop: Cursor's and the model vendor's terms both apply, and models marked `(NO ZDR)` have no zero data retention.
+  - Cursor reviews draw on the user's Cursor plan and can spill into on-demand usage; every call, retries included, adds about 16k tokens of Cursor's own context.
+  - Cursor stores a transcript and a chat copy of each review under `~/.cursor`, which the runner deletes after the run.
 - The audit artifact (FR-MR24) records which providers received the content.
 - The `reviewers` list in config supports an `enabled: false` pattern for quickly disabling a provider (e.g., if you want to exclude hosted providers from a sensitive review).
 
@@ -760,6 +772,8 @@ The audit artifact reports token usage per reviewer when the CLI provides it. Sy
 
 **NFR-MR5: Extensibility**
 Adding a new adapter requires only: creating `<adapter>-review-prompter.md` in `plugins/synthex/agents/`, registering it in `plugin.json`, and documenting its CLI. No changes to the orchestrator are required provided the adapter conforms to FR-MR9.
+
+An adapter may put its CLI logic in an executable runner under `plugins/synthex/scripts/adapters/` (bash, no python), as `grok-review-prompter` and `cursor-review-prompter` do. The orchestrator runs any runner named in an adapter's CLI Invocation with `--input <file> --envelope-out <file>` and uses the envelope it writes, and preflight runs the runner's `--auth-check`; this is one generic rule, so adding a runner-backed adapter still needs no orchestrator change. Entries in `multi_model_review.reviewers` are adapter names (e.g. `grok-review-prompter`), not CLI names.
 
 **NFR-MR6: Consistent output contract**
 The orchestrator's returned findings conform to the same canonical schema as native reviewer findings, so any downstream consumer (a command's consolidated report, `findings-consolidator`, the PM's plan-revision flow) works identically regardless of whether multi-model was used.
