@@ -5,7 +5,7 @@
 The adapter exercises the authentication-check failure path (FR-MR8 step 2):
 
 1. `which codex` returns a valid binary path (CLI Presence Check passes — FR-MR8 step 1).
-2. `codex auth status` exits with status code 1 (non-zero), indicating the user is
+2. `codex login status` exits with status code 1 (non-zero), indicating the user is
    not authenticated with the Codex CLI.
 3. Adapter returns `error_code: cli_auth_failed` immediately, without invoking
    `codex exec`. This is a terminal error — no retry is performed (per adapter-contract.md).
@@ -15,10 +15,10 @@ The adapter exercises the authentication-check failure path (FR-MR8 step 2):
 ## FR-MR / FR-MR8 Steps Exercised
 
 - FR-MR8 step 1 (CLI Presence Check — passes)
-- FR-MR8 step 2 (Auth Check — fails, non-zero exit from `codex auth status`)
+- FR-MR8 step 2 (Auth Check — fails, non-zero exit from `codex login status`)
 - FR-MR16 (`error_code: cli_auth_failed`)
 
 ## Fixture Files
 
-- `fixture.json` — simulated subprocess outputs for `which codex` and `codex auth status`
+- `fixture.json` — simulated subprocess outputs for `which codex` and `codex login status`
 - `expected_envelope.json` — failed envelope with `error_code: cli_auth_failed`

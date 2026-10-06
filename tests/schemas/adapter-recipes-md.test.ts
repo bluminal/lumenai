@@ -164,8 +164,18 @@ describe('Task 50: adapter-recipes.md', () => {
       expect(content).toContain('--sandbox read-only');
     });
 
-    it('documents --approval-mode never flag', () => {
-      expect(content).toContain('--approval-mode never');
+    // Was: documents --approval-mode never flag. Codex CLI 0.160.0 evidence (tests/fixtures/cli-help/codex/): `codex exec` has no --approval-mode flag and rejects -a/--ask-for-approval; it never prompts.
+    it('does not document the nonexistent --approval-mode never flag', () => {
+      expect(content).not.toContain('--approval-mode never');
+    });
+
+    it('documents --ephemeral and the strict codex-findings schema', () => {
+      expect(content).toContain('--ephemeral');
+      expect(content).toContain('codex-findings.schema.json');
+    });
+
+    it('documents codex login status as the auth check (codex auth status does not exist)', () => {
+      expect(content).toContain('codex login status');
     });
 
     it('documents codex login auth command', () => {
@@ -256,5 +266,138 @@ describe('Task 50: adapter-recipes.md', () => {
     it('anti-patterns: no API keys in adapter prose', () => {
       expect(newAdapterSection).toMatch(/API key/i);
     });
+  });
+});
+
+describe('multi-model-review Task 68: adapter-recipes.md ## 8. Grok', () => {
+  let content: string;
+  let grok: string;
+  beforeAll(() => {
+    content = readFileSync(RECIPES_PATH, 'utf8');
+    const start = content.indexOf('## 8. Grok');
+    const next = content.indexOf('\n## ', start + 1);
+    grok = content.slice(start, next === -1 ? undefined : next);
+  });
+
+  it('has ## 8. Grok after §7, which keeps its number', () => {
+    expect(content).toMatch(/^## 7\. Writing a New Adapter \(NFR-MR5\)$/m);
+    expect(content).toMatch(/^## 8\. Grok/m);
+    expect(content.indexOf('## 8. Grok')).toBeGreaterThan(content.indexOf('## 7. Writing a New Adapter'));
+  });
+
+  it('line 3 adapter list names Grok', () => {
+    const line3 = content.split('\n')[2];
+    expect(line3).toContain('Grok');
+    expect(line3).toContain('Codex, Gemini, Ollama');
+  });
+
+  it('covers install, auth, flagship model, sandbox flags and known gotchas', () => {
+    for (const h of ['### Install one-liner', '### Auth setup', '### Recommended flagship model', '### Sandbox flags (FR-MR26)', '### Known gotchas']) {
+      expect(grok, h).toContain(h);
+    }
+    expect(grok).toContain('curl -fsSL https://x.ai/cli/install.sh | bash');
+    expect(grok).toContain('grok login');
+  });
+
+  it('documents the FR-MR26 flags, including the D34 sandbox fallback', () => {
+    for (const f of ["--deny '*'", "--deny 'mcp__*'", '--disallowed-tools', '--permission-mode dontAsk', '--sandbox read-only', '--max-turns 3', '--json-schema', '--no-subagents', '--disable-web-search']) {
+      expect(grok, f).toContain(f);
+    }
+    expect(grok).toContain('D34');
+    expect(grok).toMatch(/retries once without `--sandbox`/);
+    expect(grok).toContain('Refusing to start with its protections missing');
+  });
+
+  it('Known gotchas include the D35 user hooks', () => {
+    const gotchas = grok.slice(grok.indexOf('### Known gotchas'));
+    expect(gotchas).toContain('D35');
+    expect(gotchas).toContain('$GROK_HOME/hooks');
+  });
+
+  it("carries Task 67's isolation evidence", () => {
+    expect(grok).toContain('spike-grok-cursor.md');
+    expect(grok).toMatch(/Isolation \(Task 67 evidence\)/);
+    expect(grok).toMatch(/G4/);
+    expect(grok).toMatch(/G6/);
+  });
+});
+
+describe('multi-model-review Task 69: adapter-recipes.md ## 9. Cursor', () => {
+  let content: string;
+  let cursor: string;
+  beforeAll(() => {
+    content = readFileSync(RECIPES_PATH, 'utf8');
+    const start = content.indexOf('## 9. Cursor');
+    const next = content.indexOf('\n## ', start + 1);
+    cursor = start === -1 ? '' : content.slice(start, next === -1 ? undefined : next);
+  });
+
+  it('has ## 9. Cursor after ## 8. Grok, and line 3 names Cursor', () => {
+    expect(content).toMatch(/^## 9\. Cursor/m);
+    expect(content.indexOf('## 9. Cursor')).toBeGreaterThan(content.indexOf('## 8. Grok'));
+    expect(content.split('\n')[2]).toContain('Cursor');
+  });
+
+  it('covers install, auth, flagship model, sandbox flags and known gotchas', () => {
+    for (const h of ['### Install one-liner', '### Auth setup', '### Recommended flagship model', '### Sandbox flags (FR-MR26)', '### Known gotchas']) {
+      expect(cursor, h).toContain(h);
+    }
+    expect(cursor).toContain('curl https://cursor.com/install -fsS | bash');
+    expect(cursor).toContain('cursor-agent login');
+    expect(cursor).toContain('cursor-agent status --format json');
+  });
+
+  it('covers the billing pools and the second hop', () => {
+    expect(cursor).toMatch(/plan pools/);
+    expect(cursor).toMatch(/on-demand/);
+    expect(cursor).toMatch(/second hop/);
+    expect(cursor).toContain('CURSOR_API_KEY');
+  });
+
+  it('covers the D37 deny file, its untested rules (Q9) and re-running C7 after each version bump', () => {
+    expect(cursor).toContain('.cursor/cli.json');
+    expect(cursor).toContain('cursor-deny-all.cli.json');
+    expect(cursor).toContain('D37');
+    expect(cursor).toContain('Q9');
+    expect(cursor).toMatch(/`Write\(\*\*\)`, `Write\(\/\*\*\)` and `Mcp\(\*:\*\)` were never exercised/);
+    expect(cursor).toContain('WebFetch(*)');
+    expect(cursor).toMatch(/Re-run C7 after every Cursor version bump/);
+  });
+
+  it('documents the exact argv and the never-list', () => {
+    expect(cursor).toContain('cursor-agent -p --mode ask --sandbox enabled --trust --output-format stream-json --model <slug>');
+    for (const f of ['--force', '--yolo', '--approve-mcps', '--auto-review', '--api-key', '--add-dir', '--plugin-dir', '--stream-partial-output']) {
+      expect(cursor, f).toContain(`\`${f}\``);
+    }
+  });
+
+  it('covers the D41 hooks and MCP findings, D42 cleanup and D43 Free plan with its preflight gap', () => {
+    const gotchas = cursor.slice(cursor.indexOf('### Known gotchas'));
+    expect(gotchas).toContain('D41');
+    expect(gotchas).toMatch(/apparently includes Claude Code hooks/);
+    expect(gotchas).toMatch(/MCP servers/);
+    expect(gotchas).toContain('D42');
+    expect(gotchas).toContain('~/.cursor/projects/');
+    expect(gotchas).toContain('D43');
+    expect(gotchas).toContain('Named models unavailable');
+    expect(gotchas).toMatch(/passes preflight and fails on its first review/);
+  });
+
+  it('covers the ~16k-token overhead, (NO ZDR) models, the agent program name, Max Mode and aggregator pinning', () => {
+    expect(cursor).toMatch(/16k tokens/);
+    expect(cursor).toMatch(/retries included/);
+    expect(cursor).toContain('(NO ZDR)');
+    expect(cursor).toMatch(/names the program `agent`/);
+    expect(cursor).toMatch(/never calls `agent`/);
+    expect(cursor).toMatch(/Max Mode/);
+    expect(cursor).toMatch(/no slug can rule it out/);
+    expect(cursor).toMatch(/Aggregator pinning/);
+    expect(cursor).toContain('aggregator.command');
+  });
+
+  it('records the U13 logged-in capture and the plan-tier gap', () => {
+    expect(cursor).toMatch(/U13 \(resolved for the login check\)/);
+    expect(cursor).toContain('tests/fixtures/multi-model-review/adapters/cursor/status/');
+    expect(cursor).toMatch(/cannot see the plan tier \(D43\)/);
   });
 });

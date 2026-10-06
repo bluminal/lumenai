@@ -39,6 +39,7 @@
 
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -72,7 +73,7 @@ let restrictedPathSeq = 0;
 
 /** Builds a bin/ dir of symlinks to only the POSIX tools these scripts need
  * (never jq), optionally including node. Returns the dir (usable as PATH). */
-function buildRestrictedPath(baseDir, includeNode) {
+export function buildRestrictedPath(baseDir, includeNode) {
   const bin = join(baseDir, `bin-${includeNode ? 'nojq' : 'nojq-nonode'}-${restrictedPathSeq++}`);
   mkdirSync(bin, { recursive: true });
   for (const tool of POSIX_TOOLS) {
@@ -907,6 +908,235 @@ function validateFindingsFallbackCase(ctx, includeNode) {
 }
 
 // ---------------------------------------------------------------------------
+// scripts/adapters/grok-review.sh — multi-model-review Task 68 Grok runner
+// (D28). A stub `grok` (written into the restricted PATH dir, never the real
+// CLI) replays a Grok 1.0.46 json-mode wrapper with a structuredOutput. The
+// happy path proves the node branch end to end; the fallback proves the
+// jq-only branch when jq is available here, and otherwise (every pinned
+// compat image lacks jq) the dependency-free unknown_error envelope the
+// runner prints when neither node nor jq is on PATH.
+// ---------------------------------------------------------------------------
+
+const GROK_SMOKE_WRAPPER = JSON.stringify({
+  text: '',
+  stopReason: 'end_turn',
+  usage: { input_tokens: 120, output_tokens: 30, total_tokens: 150 },
+  num_turns: 1,
+  modelUsage: { 'grok-4.7-build': { inputTokens: 120, outputTokens: 30, modelCalls: 1 } },
+  structuredOutput: {
+    findings: [
+      {
+        finding_id: 'security.getUser.sql-injection',
+        severity: 'critical',
+        category: 'security',
+        title: 'SQL injection in getUser',
+        description: 'The id is concatenated into the SQL string.',
+        file: 'src/users.js',
+        symbol: 'getUser',
+        line_range: null,
+        confidence: 'high',
+      },
+    ],
+  },
+});
+
+function writeGrokStub(pathDir) {
+  const stub = join(pathDir, 'grok');
+  writeFileSync(
+    stub,
+    `#!${join(pathDir, 'bash')}\n` +
+      'if [ "${1:-}" = "models" ]; then printf \'You are logged in with grok.com.\\n\'; exit 0; fi\n' +
+      `printf '%s' '${GROK_SMOKE_WRAPPER.replace(/'/g, "'\\''")}'\n`,
+  );
+  chmodSync(stub, 0o755);
+}
+
+function writeGrokEnvelope(workDir) {
+  const rel = join('.synthex', 'tmp', 'grok-review-prompter-5m0k3.input.json');
+  mkdirSync(join(workDir, '.synthex', 'tmp'), { recursive: true });
+  writeFileSync(
+    join(workDir, rel),
+    JSON.stringify({
+      command: 'review-code',
+      context_bundle: {
+        manifest: { artifact: { path: 'src/users.js' }, conventions: [], touched_files: [], specs: [] },
+        files: [{ path: 'src/users.js', content: "db.query('SELECT * FROM users WHERE id = ' + id);" }],
+      },
+      config: { model: null, family: null, raw_output_path: 'docs/reviews/raw/grok-review-prompter-5m0k3.json' },
+    }),
+  );
+  return rel;
+}
+
+function grokReviewHappyPathCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  writeGrokStub(pathDir);
+  const input = writeGrokEnvelope(ctx.workDir);
+  const result = runScript(ctx.scriptAbsPath, ['--input', input], { pathDir, cwd: ctx.workDir });
+  assert(result.code === 0, `grok-review.sh exited ${result.code}: ${result.stderr}`);
+  const envelope = JSON.parse(result.stdout);
+  assert(envelope.status === 'success', `expected status success, got: ${result.stdout}`);
+  assert(envelope.findings.length === 1, `expected 1 finding, got: ${result.stdout}`);
+  assert(
+    envelope.findings[0].source.reviewer_id === 'grok-review-prompter' && envelope.findings[0].source.family === 'xai',
+    `source was not injected correctly: ${result.stdout}`,
+  );
+  assert(envelope.usage && envelope.usage.model === 'grok-4.7-build', `usage.model should be the modelUsage key: ${result.stdout}`);
+  assert(
+    existsSync(join(ctx.workDir, 'docs', 'reviews', 'raw', 'grok-review-prompter-5m0k3.json')),
+    'raw output was not written to raw_output_path',
+  );
+}
+
+function grokReviewFallbackCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  writeGrokStub(pathDir);
+  const jq = resolveRealTool('jq');
+  if (jq) {
+    try {
+      symlinkSync(jq, join(pathDir, 'jq'));
+    } catch {
+      // ignore
+    }
+  }
+  const input = writeGrokEnvelope(ctx.workDir);
+  const result = runScript(ctx.scriptAbsPath, ['--input', input], { pathDir, cwd: ctx.workDir });
+  assert(result.code === 0, `grok-review.sh exited ${result.code}: ${result.stderr}`);
+  const envelope = JSON.parse(result.stdout);
+  if (jq) {
+    assert(envelope.status === 'success' && envelope.findings.length === 1, `jq-only path should succeed: ${result.stdout}`);
+    assert(envelope.usage && envelope.usage.model === 'grok-4.7-build', `jq-only usage.model: ${result.stdout}`);
+  } else {
+    assert(
+      envelope.status === 'failed' && envelope.error_code === 'unknown_error',
+      `expected the dependency-free unknown_error envelope, got: ${result.stdout}`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// scripts/adapters/cursor-review.sh — multi-model-review Task 69 Cursor runner
+// (D28, D37-D43). A stub `cursor-agent` (written into the restricted PATH
+// dir, never the real CLI) answers `status --format json` with a logged-in
+// form and replays a stream-json review. HOME is a scratch dir under the
+// case workDir, so the runner's D42 cleanup never sees a real ~/.cursor.
+// The happy path proves the node branch end to end; the fallback proves the
+// jq-only branch when jq is available here, and otherwise (every pinned
+// compat image lacks jq) the dependency-free unknown_error envelope the
+// runner prints when neither node nor jq is on PATH.
+// ---------------------------------------------------------------------------
+
+const CURSOR_SMOKE_FINDING = {
+  finding_id: 'security.getUser.sql-injection',
+  severity: 'critical',
+  category: 'security',
+  title: 'SQL injection in getUser',
+  description: 'The id is concatenated into the SQL string.',
+  file: 'src/users.js',
+  symbol: 'getUser',
+  line_range: null,
+  confidence: 'high',
+};
+
+const CURSOR_SMOKE_STREAM = [
+  { type: 'system', subtype: 'init', apiKeySource: 'login', cwd: '<scratch>', session_id: 'smoke-session-0001', model: 'Claude Opus 5', permissionMode: 'default' },
+  { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: JSON.stringify({ findings: [CURSOR_SMOKE_FINDING] }) }] }, session_id: 'smoke-session-0001' },
+  {
+    type: 'result',
+    subtype: 'success',
+    is_error: false,
+    result: JSON.stringify({ findings: [CURSOR_SMOKE_FINDING] }),
+    session_id: 'smoke-session-0001',
+    usage: { inputTokens: 120, outputTokens: 30, cacheReadTokens: 0, cacheWriteTokens: 0 },
+  },
+]
+  .map((e) => JSON.stringify(e))
+  .join('\n');
+
+function writeCursorStub(pathDir) {
+  const stub = join(pathDir, 'cursor-agent');
+  writeFileSync(
+    stub,
+    `#!${join(pathDir, 'bash')}\n` +
+      'if [ "${1:-}" = "status" ]; then printf \'{"isAuthenticated":true}\\n\'; exit 0; fi\n' +
+      'cat > /dev/null\n' +
+      `printf '%s\\n' '${CURSOR_SMOKE_STREAM.replace(/'/g, "'\\''")}'\n`,
+  );
+  chmodSync(stub, 0o755);
+}
+
+function writeCursorEnvelope(workDir) {
+  const rel = join('.synthex', 'tmp', 'cursor-review-prompter-5m0k3.input.json');
+  mkdirSync(join(workDir, '.synthex', 'tmp'), { recursive: true });
+  mkdirSync(join(workDir, 'home'), { recursive: true });
+  writeFileSync(
+    join(workDir, rel),
+    JSON.stringify({
+      command: 'review-code',
+      context_bundle: {
+        manifest: { artifact: { path: 'src/users.js' }, conventions: [], touched_files: [], specs: [] },
+        files: [{ path: 'src/users.js', content: "db.query('SELECT * FROM users WHERE id = ' + id);" }],
+      },
+      config: {
+        model: 'claude-opus-5-thinking-high',
+        family: 'anthropic',
+        raw_output_path: 'docs/reviews/raw/cursor-review-prompter-5m0k3.ndjson',
+      },
+    }),
+  );
+  return rel;
+}
+
+function cursorReviewHappyPathCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  writeCursorStub(pathDir);
+  const input = writeCursorEnvelope(ctx.workDir);
+  const result = runScript(ctx.scriptAbsPath, ['--input', input], { pathDir, cwd: ctx.workDir, env: { HOME: join(ctx.workDir, 'home') } });
+  assert(result.code === 0, `cursor-review.sh exited ${result.code}: ${result.stderr}`);
+  const envelope = JSON.parse(result.stdout);
+  assert(envelope.status === 'success', `expected status success, got: ${result.stdout}`);
+  assert(envelope.findings.length === 1, `expected 1 finding, got: ${result.stdout}`);
+  assert(
+    envelope.findings[0].source.reviewer_id === 'cursor-review-prompter' && envelope.findings[0].source.family === 'anthropic',
+    `source was not injected correctly: ${result.stdout}`,
+  );
+  assert(
+    envelope.usage && envelope.usage.input_tokens === 120 && envelope.usage.model === 'claude-opus-5-thinking-high',
+    `usage should come from the result event with the configured slug: ${result.stdout}`,
+  );
+  assert(
+    existsSync(join(ctx.workDir, 'docs', 'reviews', 'raw', 'cursor-review-prompter-5m0k3.ndjson')),
+    'raw output was not written to raw_output_path',
+  );
+}
+
+function cursorReviewFallbackCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  writeCursorStub(pathDir);
+  const jq = resolveRealTool('jq');
+  if (jq) {
+    try {
+      symlinkSync(jq, join(pathDir, 'jq'));
+    } catch {
+      // ignore
+    }
+  }
+  const input = writeCursorEnvelope(ctx.workDir);
+  const result = runScript(ctx.scriptAbsPath, ['--input', input], { pathDir, cwd: ctx.workDir, env: { HOME: join(ctx.workDir, 'home') } });
+  assert(result.code === 0, `cursor-review.sh exited ${result.code}: ${result.stderr}`);
+  const envelope = JSON.parse(result.stdout);
+  if (jq) {
+    assert(envelope.status === 'success' && envelope.findings.length === 1, `jq-only path should succeed: ${result.stdout}`);
+    assert(envelope.usage && envelope.usage.model === 'claude-opus-5-thinking-high', `jq-only usage.model: ${result.stdout}`);
+  } else {
+    assert(
+      envelope.status === 'failed' && envelope.error_code === 'unknown_error',
+      `expected the dependency-free unknown_error envelope, got: ${result.stdout}`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // scripts/task-completed-gate.sh and scripts/teammate-idle-gate.sh — Task 50
 // (FR-HM23) real TaskCompleted/TeammateIdle command hooks: a deterministic
 // classification table gated on `standing_pools.enabled` via config-get.sh.
@@ -1128,6 +1358,26 @@ export const SMOKE_CASES = {
     {
       name: 'missing jq/node fallback: dependency-free unknown_error envelope printed on stdout',
       run: (ctx) => validateFindingsFallbackCase(ctx, false),
+    },
+  ],
+  'scripts/adapters/grok-review.sh': [
+    {
+      name: 'happy path: stub grok structuredOutput normalized to a success envelope with xai family and modelUsage model (node present)',
+      run: (ctx) => grokReviewHappyPathCase(ctx, true),
+    },
+    {
+      name: 'missing node fallback: jq-only path succeeds when jq is present, else the dependency-free unknown_error envelope',
+      run: (ctx) => grokReviewFallbackCase(ctx, false),
+    },
+  ],
+  'scripts/adapters/cursor-review.sh': [
+    {
+      name: 'happy path: stub cursor-agent stream-json normalized to a success envelope with the configured family and slug (node present)',
+      run: (ctx) => cursorReviewHappyPathCase(ctx, true),
+    },
+    {
+      name: 'missing node fallback: jq-only path succeeds when jq is present, else the dependency-free unknown_error envelope',
+      run: (ctx) => cursorReviewFallbackCase(ctx, false),
     },
   ],
   'scripts/task-completed-gate.sh': [

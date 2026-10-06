@@ -446,7 +446,9 @@ describe('plan-linter retirement (FR-HM26, Task 45)', () => {
   // (FR-HM24, D11, Phase 6) then folded 3 pool agents in from synthex-plus,
   // raising the ceiling again. Upper bound only — see the coordination note
   // in Task 45's brief; inventory.mjs pins the exact current count.
+  // multi-model-review Task 68 added grok-review-prompter (27) and Task 69
+  // cursor-review-prompter (28).
   it('[T] agent count reflects the retirement (upper bound)', () => {
-    expect(AGENT_COUNT).toBeLessThanOrEqual(26);
+    expect(AGENT_COUNT).toBeLessThanOrEqual(28);
   });
 });

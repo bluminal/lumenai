@@ -981,7 +981,7 @@ ignores `effort:` — Task 7).
 ### Adapter envelope parse rates (vacuous per Task 7)
 
 The `*-review-prompter.md` adapters (`codex-`, `gemini-`, `ollama-`,
-`claude-`, `bedrock-`, `llm-review-prompter`) are Haiku-backed and, per the
+`claude-`, `bedrock-`, `llm-`, `grok-`, `cursor-review-prompter`) are Haiku-backed and, per the
 Task 30 contract above, carry **no** `effort:` key at all — there is no
 `effort: low` state to compare against a changed state, so "adapter envelope
 parse rates unchanged at `effort: low`" is vacuously true and no adapter was
@@ -1024,3 +1024,21 @@ Sonnet's implicit default and are also a cost win. `security-reviewer`,
 `terraform-plan-reviewer`, and `tech-lead` are neutral (pin codifies
 existing default). This table is for the Tech Lead orchestrator to present
 to the PM for `[H]` sign-off per A3 — it is not itself the PM's acceptance.
+
+## Multi-model review — Grok and Cursor adapters (Phase 9)
+
+The Grok and Cursor proposers (multi-model-review Tasks 66–70) are covered by
+Layer 1 suites only; none of them sends a prompt. Runner behaviour is tested
+against stub `grok` / `cursor-agent` binaries and the Task 67 spike recordings.
+
+| Suite (`tests/schemas/`) | Covers |
+|--------------------------|--------|
+| `grok-spike-recordings.test.ts`, `cursor-spike-recordings.test.ts` | Task 67 evidence: help fixtures, recordings, the D38 reference scan |
+| `grok-review-runner-behavioral.test.ts` | `scripts/adapters/grok-review.sh`: argv, isolation env, D33 schema and unwrap, D34 sandbox fallback, D36 incomplete-run guard, `--auth-check` exits |
+| `cursor-review-runner-behavioral.test.ts` | `scripts/adapters/cursor-review.sh`: D37 deny file, D38 tool-call scan, D39 stdin prompt, D40 unwrap, D42 cleanup, D43 Free plan, `--auth-check` exits |
+| `grok-adapter-md.test.ts`, `cursor-adapter-md.test.ts` | The two thin adapter definitions (size, labels, permission model, gotchas) |
+| `cursor-reviewer-config-shape.test.ts` | Every shipped Cursor reviewer example has a block-style, non-Auto `model` and a `family` |
+| `configure-multi-model-grok-cursor.test.ts` | Task 70: wizard detection, CLI-to-adapter mapping, manual opt-in listing, FR-MR27 additions, Option 2 snippet, `defaults.yaml` examples, the U23 `allow_api_key_billing` check, docs rows |
+
+The shared adapter suites (`adapter-size`, `external-permission-mode-key-validation`,
+`external-adapter-permission-model`, `portability-prose`) include both adapters.

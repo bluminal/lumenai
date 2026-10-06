@@ -29,8 +29,8 @@ describe('catalog budgets (Task 22, FR-HM9)', () => {
   it('records a numeric catalog budget for opencode', () => {
     const budget = catalogBudgets.opencode;
     expect(budget).toBeDefined();
-    expect(typeof budget.maxAvailableSkillsBlockBytes).toBe('number');
-    expect(budget.maxAvailableSkillsBlockBytes).toBeGreaterThan(0);
+    expect(typeof budget.maxAvailableSkillsBlockBytesPerSkill).toBe('number');
+    expect(budget.maxAvailableSkillsBlockBytesPerSkill).toBeGreaterThan(0);
   });
 
   it('requires codex descriptions to never be blanked or shortened by the catalog budget', () => {
@@ -52,12 +52,17 @@ describe('catalog budgets (Task 22, FR-HM9)', () => {
     expect(() => catalogBudget('not-a-real-harness')).toThrow(/No catalog budget recorded/);
   });
 
-  it('sets the opencode block-bytes budget at or under the Task 19 pre-diet baseline', () => {
+  it('sets the opencode per-skill budget under the Task 19 pre-diet baseline, and at 46 skills within the A17 ceiling', () => {
     const baseline = JSON.parse(
       readFileSync(join(baselinesRoot, 'opencode-catalog-pre-task19.json'), 'utf8'),
     );
-    const budget = catalogBudget('opencode').maxAvailableSkillsBlockBytes;
-    expect(budget).toBeLessThan(baseline.availableSkillsBlockBytes);
+    const perSkill = catalogBudget('opencode').maxAvailableSkillsBlockBytesPerSkill;
+    // Per skill, the budget must stay below the pre-diet catalog (16,037 bytes / 46 skills).
+    expect(perSkill).toBeLessThan(baseline.availableSkillsBlockBytes / baseline.skillCount);
+    // At the original 46 skills it must not exceed A17's 13,353-byte total (measured 12,717 + 5%).
+    expect(perSkill * baseline.skillCount).toBeLessThanOrEqual(13_353);
+    // And it must leave room for the post-diet measurement (12,717 bytes at 46 skills).
+    expect(perSkill * baseline.skillCount).toBeGreaterThan(12_717);
   });
 
   it('wires the recorded budget into the codex-activation scenario', () => {
@@ -75,7 +80,9 @@ describe('catalog budgets (Task 22, FR-HM9)', () => {
     const source = readFileSync(join(scenariosRoot, 'opencode-activation.mjs'), 'utf8');
     expect(source).toMatch(/from ['"]\.\.\/lib\/harnesses\.mjs['"]/);
     expect(source).toContain('catalogBudget(harness)');
-    expect(source).toContain('maxAvailableSkillsBlockBytes');
+    expect(source).toContain('maxAvailableSkillsBlockBytesPerSkill');
+    // The per-skill budget is scaled by the installed skill count, not used as a total.
+    expect(source).toMatch(/maxAvailableSkillsBlockBytesPerSkill \* entries\.length/);
     expect(source).toMatch(/throw new Error\(\s*\n?\s*`OpenCode <available_skills> block exceeded its budget/);
   });
 

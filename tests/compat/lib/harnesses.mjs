@@ -78,7 +78,16 @@ export const catalogBudgets = {
     // Per the Task 22 escalation path, the budget is set to the measured
     // value plus 5% headroom instead of the unattainable 60% target; the
     // 60% figure in the plan is expected to be amended by the orchestrator.
-    maxAvailableSkillsBlockBytes: 13_353,
+    //
+    // That 13,353-byte total was measured at 46 skills, about 290 bytes per
+    // skill. Each added skill adds roughly the same again (host markup, its
+    // name and absolute path, and a <=120-char description), so a fixed total
+    // failed CI for every new agent even though no description grew: 50
+    // skills measured 13,840 bytes, about 277 per skill. The budget is now per
+    // skill, multiplied by the installed skill count. It still fails when
+    // descriptions or per-skill markup grow, and at 46 skills it equals the
+    // original ceiling (46 x 290 = 13,340).
+    maxAvailableSkillsBlockBytesPerSkill: 290,
   },
 };
 

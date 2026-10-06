@@ -29,7 +29,7 @@ Sandbox flags do not apply (FR-MR26) — Ollama runs as a local server with no r
 
 Run `which ollama` AND probe `curl -sf http://localhost:11434/api/tags`. Either failure → `validate-findings --error cli_missing --message "curl -fsSL https://ollama.com/install.sh | sh; then ollama serve"`.
 
-**Safe-name assertion (Task 88):** The binary name `ollama` is HARDCODED in the `which ollama` invocation above. The adapter does NOT derive the binary name from any config key — prevents injecting a path-traversal/shell-metacharacter name into `which`. `tests/schemas/external-permission-mode-key-validation.test.ts` enforces only `{codex, claude, gemini, bedrock, llm, ollama, default}` as keys in `external_permission_mode`. CWE-20 defense-in-depth.
+**Safe-name assertion (Task 88):** The binary name `ollama` is HARDCODED in the `which ollama` invocation above. The adapter does NOT derive the binary name from any config key — prevents injecting a path-traversal/shell-metacharacter name into `which`. `tests/schemas/external-permission-mode-key-validation.test.ts` enforces only `{codex, claude, gemini, bedrock, llm, ollama, grok, cursor, default}` as keys in `external_permission_mode`. CWE-20 defense-in-depth.
 
 ### 2. Auth Check
 

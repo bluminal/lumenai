@@ -12,7 +12,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import { validateFullAdapterEnvelope } from './adapter-envelope';
+
+const VALIDATE_FINDINGS = join(__dirname, '..', '..', 'plugins', 'synthex', 'scripts', 'validate-findings');
 
 // ---------------------------------------------------------------------------
 // Shared finding builder — produces a minimal valid canonical finding.
@@ -306,4 +310,37 @@ describe('Task 60: claude-review-prompter Layer 1 validator', () => {
       expect(r.valid).toBe(false);
     });
   });
+});
+
+// ---------------------------------------------------------------------------
+// multi-model-review Task 66 (D32): the fast-follow adapters that are not
+// parent-mediated (llm, bedrock) document `parent-mediated` → error_code
+// cli_unsupported_mode. validate-findings now accepts that code, and the
+// envelope it prints passes the full Layer 1 validator.
+// ---------------------------------------------------------------------------
+describe('Task 66 (D32): cli_unsupported_mode failed envelopes for the fast-follow adapters', () => {
+  it.each(['llm-review-prompter', 'bedrock-review-prompter'])(
+    '%s: validate-findings --error cli_unsupported_mode prints an envelope that passes validateFullAdapterEnvelope',
+    (adapter) => {
+      const stdout = execFileSync(
+        'bash',
+        [
+          VALIDATE_FINDINGS,
+          '--error',
+          'cli_unsupported_mode',
+          '--message',
+          `parent-mediated is not supported by ${adapter}; use read-only`,
+          '--raw-output-path',
+          `docs/reviews/raw/${adapter}-uuid.json`,
+        ],
+        { encoding: 'utf-8' },
+      );
+      const envelope = JSON.parse(stdout);
+      expect(envelope.status).toBe('failed');
+      expect(envelope.error_code).toBe('cli_unsupported_mode');
+      expect(envelope.usage).toBeNull();
+      const r = validateFullAdapterEnvelope(envelope);
+      expect(r.valid, r.errors.join('; ')).toBe(true);
+    },
+  );
 });

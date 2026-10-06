@@ -4,7 +4,8 @@
  *
  * [T] criteria from the plan:
  *   1. Layer 1 test asserts every non-`default` key in
- *      external_permission_mode is in {codex, claude, gemini, bedrock, llm, ollama}
+ *      external_permission_mode is in {codex, claude, gemini, bedrock, llm, ollama, grok, cursor}
+ *      (grok and cursor added by multi-model-review Task 66)
  *   2. defaults.yaml inline comment documents that unknown keys are
  *      silently ignored and not passed to shell invocation
  *   3. Each adapter's Step 1 (CLI Presence Check) documents the
@@ -33,6 +34,8 @@ const SAFE_KEY_SET = new Set([
   'bedrock',
   'llm',
   'ollama',
+  'grok',
+  'cursor',
 ]);
 
 const ADAPTERS = [
@@ -43,6 +46,10 @@ const ADAPTERS = [
   { agent: 'bedrock-review-prompter.md', cliBinary: 'aws' },
   { agent: 'llm-review-prompter.md', cliBinary: 'llm' },
   { agent: 'ollama-review-prompter.md', cliBinary: 'ollama' },
+  // multi-model-review Task 68: the binary is hardcoded in the runner script.
+  { agent: 'grok-review-prompter.md', cliBinary: 'grok' },
+  // multi-model-review Task 69: hardcoded in the runner; never the `agent` alias.
+  { agent: 'cursor-review-prompter.md', cliBinary: 'cursor-agent' },
 ];
 
 describe('Task 88 [T] (1): Layer 1 enum-key validation for external_permission_mode', () => {
@@ -57,7 +64,7 @@ describe('Task 88 [T] (1): Layer 1 enum-key validation for external_permission_m
     expect(block).toBeTruthy();
   });
 
-  it('every key in the block is a member of the safe set {default, codex, claude, gemini, bedrock, llm, ollama}', () => {
+  it('every key in the block is a member of the safe set {default, codex, claude, gemini, bedrock, llm, ollama, grok, cursor}', () => {
     const unknownKeys: string[] = [];
     for (const key of Object.keys(block)) {
       if (!SAFE_KEY_SET.has(key)) {
@@ -107,6 +114,8 @@ describe('Task 88 [T] (2): defaults.yaml documents the safe-key allow-list rule'
     // The comment should enumerate the allowed CLI keys so a maintainer
     // editing defaults.yaml has the allow-list visible at the point of change
     expect(yamlText).toMatch(/codex.*claude.*gemini.*bedrock.*llm.*ollama|Allowed keys/);
+    // multi-model-review Task 66: the allow-list names grok and cursor too.
+    expect(yamlText).toMatch(/Allowed keys:[\s\S]{0,200}`grok`,\s*#?\s*`cursor`/);
   });
 
   it('cross-references the Layer 1 enum-key validator test by file name', () => {
@@ -146,7 +155,7 @@ describe('Task 88 [T] (3): each adapter Step 1 documents the safe-name assertion
 
       it('lists the safe-key allow-list explicitly', () => {
         expect(content).toMatch(
-          /\{codex, claude, gemini, bedrock, llm, ollama, default\}/,
+          /\{codex, claude, gemini, bedrock, llm, ollama, grok, cursor, default\}/,
         );
       });
 

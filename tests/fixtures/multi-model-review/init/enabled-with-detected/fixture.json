@@ -1,18 +1,64 @@
 {
   "scenario": "enabled-with-detected-mixed",
-  "description": "Detection scan finds codex (auth), gemini (no-auth), ollama (auth). User picks option 1. Config matches authenticated CLIs only; gemini surfaced separately with remediation hint.",
+  "description": "Detection scan finds codex (auth), gemini (no-auth), ollama (auth), and grok and cursor-agent (opt in manually). User picks option 1. Config gets the adapter names of authenticated, non-manual CLIs only; gemini is surfaced with a remediation hint and grok and cursor-agent in the manual opt-in listing.",
   "detection_results": {
-    "detected_and_authenticated": ["codex", "ollama"],
-    "detected_but_unauthenticated": [{ "cli": "gemini", "remediation_hint": "run `gcloud auth login` to enable" }],
-    "not_detected": ["llm", "aws", "claude"]
+    "detected_and_authenticated": [
+      "codex",
+      "ollama"
+    ],
+    "detected_but_unauthenticated": [
+      {
+        "cli": "gemini",
+        "remediation_hint": "run `gcloud auth login` to enable"
+      }
+    ],
+    "detected_opt_in_manually": [
+      {
+        "cli": "cursor-agent",
+        "auth_exit": 12,
+        "reason": "always opt in manually (D43): set per_reviewer.cursor-review-prompter.model and family; named models need a paid Cursor plan"
+      },
+      {
+        "cli": "grok",
+        "auth_exit": 12,
+        "reason": "only XAI_API_KEY is available and per_reviewer.grok-review-prompter.allow_api_key_billing is not true"
+      }
+    ],
+    "not_detected": [
+      "llm",
+      "aws",
+      "claude"
+    ]
   },
+  "synthex_host": "",
   "user_choice": 1,
   "expected_config_writes": {
     "multi_model_review.enabled": true,
-    "multi_model_review.reviewers": ["codex-review-prompter", "ollama-review-prompter"]
+    "multi_model_review.reviewers": [
+      "codex-review-prompter",
+      "ollama-review-prompter"
+    ]
   },
-  "expected_option_label_includes": ["codex", "ollama"],
-  "expected_option_label_excludes": ["gemini"],
-  "expected_remediation_hints_section_includes": ["gemini", "gcloud auth login"],
-  "expected_docs_reviews_created": true
+  "expected_option_label_includes": [
+    "codex",
+    "ollama"
+  ],
+  "expected_option_label_excludes": [
+    "gemini",
+    "grok",
+    "cursor-agent"
+  ],
+  "expected_remediation_hints_section_includes": [
+    "gemini",
+    "gcloud auth login"
+  ],
+  "expected_docs_reviews_created": true,
+  "expected_manual_listing_includes": [
+    "cursor-agent",
+    "per_reviewer.cursor-review-prompter.model",
+    "paid Cursor plan",
+    "grok",
+    "allow_api_key_billing: true",
+    "billed per token"
+  ]
 }

@@ -197,14 +197,10 @@ interface KnownUngatedEntry {
 }
 
 export const KNOWN_UNGATED: KnownUngatedEntry[] = [
-  // plugins/synthex/agents/codex-review-prompter.md:132 —
-  //   "2. **Waits for the parent's decision** via a follow-up `SendMessage`
-  //   from the orchestrator carrying the decision payload."
-  // Backticked `SendMessage`, not wrapped in a tool-presence gate. (A
-  // second, non-backticked, non-"tool"-suffixed mention of SendMessage
-  // exists at line 152 but does not meet the D3 token rule, so it is not
-  // a "reference" and needs no allowlist entry.)
-  { file: 'plugins/synthex/agents/codex-review-prompter.md', tool: 'SendMessage' },
+  // The codex-review-prompter.md `SendMessage` entry was removed when its
+  // Pattern 3 approval-proxy prose was dropped (that flow targeted a JSON-RPC
+  // method the Codex app-server protocol does not have; parent-mediated now
+  // runs read-only). The adapter no longer references or lists SendMessage.
 
   // Task 49 (FR-HM21) removed the two Task 47 pool entries below by
   // properly gating that prose instead of allowlisting it: the downstream

@@ -154,6 +154,8 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 | `codex-review-prompter` | Haiku-backed; OpenAI Codex CLI adapter for multi-model review (`agentic` tier; family `openai`) | Utility |
 | `gemini-review-prompter` | Haiku-backed; Google Gemini CLI adapter for multi-model review (`agentic` tier; family `google`) | Utility |
 | `ollama-review-prompter` | Haiku-backed; local Ollama HTTP API adapter for multi-model review (`text-only` tier; family `local-<model>`) | Utility |
+| `grok-review-prompter` | Haiku-backed; xAI Grok Build CLI adapter for multi-model review via the `grok-review.sh` runner; opt-in, subscription session only unless `allow_api_key_billing` (`text-only` tier; family `xai`) | Utility |
+| `cursor-review-prompter` | Haiku-backed; Cursor Agent CLI adapter for multi-model review via the `cursor-review.sh` runner; opt-in, needs an explicit non-Auto `model` and `family` and a paid plan (`text-only` tier; family from config) | Utility |
 
 ## Commands
 

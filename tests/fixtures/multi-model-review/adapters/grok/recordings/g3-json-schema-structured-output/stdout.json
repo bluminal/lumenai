@@ -1,0 +1,74 @@
+{
+  "text": "{\"findings\":[{\"finding_id\":\"users.js:sql-injection\",\"severity\":\"critical\",\"category\":\"security\",\"title\":\"SQL injection in getUser\",\"description\":\"getUser concatenates id into the SQL literal (\\\"WHERE id = '\\\" + id + \\\"'\\\"). The previous query used a bound placeholder. A caller-controlled id can close the quote and alter the statement, including reading or changing other rows. Restore a placeholder and pass id as a bound parameter.\",\"file\":\"src/users.js\",\"symbol\":\"getUser\",\"line_range\":{\"start\":4,\"end\":4},\"confidence\":\"high\"},{\"finding_id\":\"users.js:retry-swallows-errors\",\"severity\":\"medium\",\"category\":\"error-handling\",\"title\":\"retryFetch discards failures and returns undefined\",\"description\":\"The catch block is empty, so every thrown attempt is ignored. After seven failures the function falls off the end and returns undefined, and the last error is lost. fetch also resolves on HTTP 4xx/5xx, so those responses are returned on the first attempt and never retried. Rethrow or return the last error, and treat the status codes you intend to retry as failures.\",\"file\":\"src/users.js\",\"symbol\":\"retryFetch\",\"line_range\":{\"start\":8,\"end\":12},\"confidence\":\"high\"},{\"finding_id\":\"users.js:retry-no-backoff-or-timeout\",\"severity\":\"medium\",\"category\":\"reliability\",\"title\":\"Retries have no backoff and no timeout\",\"description\":\"The loop calls fetch up to seven times with no delay, jitter, or AbortSignal. Transient failures are issued back-to-back, and a request that never settles never rejects, so retries do not run and the caller can hang. Add a per-attempt timeout and exponential backoff, then surface the final failure.\",\"file\":\"src/users.js\",\"symbol\":\"retryFetch\",\"line_range\":{\"start\":9,\"end\":10},\"confidence\":\"high\"}]}",
+  "stopReason": "end_turn",
+  "sessionId": "<redacted-id>",
+  "requestId": "<redacted-id>",
+  "thought": "<redacted-thought>",
+  "usage": {
+    "input_tokens": 10944,
+    "cache_read_input_tokens": 1536,
+    "cache_creation_input_tokens": 0,
+    "output_tokens": 5108,
+    "reasoning_tokens": 4677,
+    "total_tokens": 17588
+  },
+  "num_turns": 1,
+  "total_cost_usd": 0.01812336,
+  "total_cost_usd_ticks": 181233600,
+  "modelUsage": {
+    "grok-4.7-build": {
+      "inputTokens": 10944,
+      "outputTokens": 5108,
+      "cacheReadInputTokens": 1536,
+      "cacheCreationInputTokens": 0,
+      "modelCalls": 1,
+      "costUSD": 0.01812336
+    }
+  },
+  "structuredOutput": {
+    "findings": [
+      {
+        "finding_id": "users.js:sql-injection",
+        "severity": "critical",
+        "category": "security",
+        "title": "SQL injection in getUser",
+        "description": "getUser concatenates id into the SQL literal (\"WHERE id = '\" + id + \"'\"). The previous query used a bound placeholder. A caller-controlled id can close the quote and alter the statement, including reading or changing other rows. Restore a placeholder and pass id as a bound parameter.",
+        "file": "src/users.js",
+        "symbol": "getUser",
+        "line_range": {
+          "start": 4,
+          "end": 4
+        },
+        "confidence": "high"
+      },
+      {
+        "finding_id": "users.js:retry-swallows-errors",
+        "severity": "medium",
+        "category": "error-handling",
+        "title": "retryFetch discards failures and returns undefined",
+        "description": "The catch block is empty, so every thrown attempt is ignored. After seven failures the function falls off the end and returns undefined, and the last error is lost. fetch also resolves on HTTP 4xx/5xx, so those responses are returned on the first attempt and never retried. Rethrow or return the last error, and treat the status codes you intend to retry as failures.",
+        "file": "src/users.js",
+        "symbol": "retryFetch",
+        "line_range": {
+          "start": 8,
+          "end": 12
+        },
+        "confidence": "high"
+      },
+      {
+        "finding_id": "users.js:retry-no-backoff-or-timeout",
+        "severity": "medium",
+        "category": "reliability",
+        "title": "Retries have no backoff and no timeout",
+        "description": "The loop calls fetch up to seven times with no delay, jitter, or AbortSignal. Transient failures are issued back-to-back, and a request that never settles never rejects, so retries do not run and the caller can hang. Add a per-attempt timeout and exponential backoff, then surface the final failure.",
+        "file": "src/users.js",
+        "symbol": "retryFetch",
+        "line_range": {
+          "start": 9,
+          "end": 10
+        },
+        "confidence": "high"
+      }
+    ]
+  }
+}

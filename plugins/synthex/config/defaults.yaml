@@ -499,6 +499,9 @@ multi_model_review:
   #   - codex-review-prompter      # OpenAI / Codex CLI
   #   - gemini-review-prompter     # Google / gcloud
   #   - ollama-review-prompter     # Local model (qwen, llama, deepseek, etc.)
+  #   - grok-review-prompter       # xAI / Grok CLI (grok login; grok.com session)
+  #   - cursor-review-prompter     # Cursor Agent CLI (cursor-agent login; paid plan;
+  #                                # needs per_reviewer model + family below)
 
   # Per-reviewer overrides. Each adapter may override its default model, family
   # tag, or invocation flags. Use the agent name as the key.
@@ -509,6 +512,16 @@ multi_model_review:
     # ollama-review-prompter:
     #   model: qwen2.5-coder:32b
     #   family: local-qwen
+    # grok-review-prompter:
+    #   # model: unset uses the account default; family defaults to xai
+    #   # (a model not starting grok- gives unknown unless you set family).
+    #   allow_api_key_billing: false   # true lets XAI_API_KEY / GROK_CODE_XAI_API_KEY
+    #                                  # bill per token; otherwise the runner unsets them
+    # cursor-review-prompter:
+    #   model: gpt-5.6-sol-high        # required, with family: a named slug from
+    #                                  # `cursor-agent models`; never auto
+    #   family: openai                 # the slug's vendor (anthropic, openai, google, xai, unknown)
+    #   allow_api_key_billing: false   # true lets CURSOR_API_KEY bill per request
 
   # Aggregator (consolidation step) configuration.
   aggregator:
@@ -521,6 +534,17 @@ multi_model_review:
     # When the strongest configured proposer is also a reviewer, the aggregator
     # invocation is a separate freshly-spawned CLI call with judge-mode prompt.
     # When no flagship matches, falls back to the host Claude session.
+    #
+    # Pinning (multi-model-review D31): tier_table rows match by family. Grok's
+    # family (xai) has no row, so `auto` never picks Grok. A
+    # cursor-review-prompter configured with a flagship slug and its family
+    # (e.g. claude-opus-* / anthropic, gpt-5* / openai) matches that row and
+    # can become the strongest configured proposer, so the judge call would go
+    # through Cursor: a second hop to the model vendor, ~16k tokens of Cursor
+    # overhead per call, and a failure on a Free plan. Neither Cursor nor Grok
+    # should be the aggregator unless you pin it on purpose; to keep them out,
+    # pin another proposer (or set either one here to choose it deliberately):
+    #   command: codex-review-prompter
     command: auto
 
     # D17 strict total-order tier table, highest tier first (tier: 1 wins).
@@ -598,8 +622,10 @@ multi_model_review:
   #                     default for every environment.
   #   - parent-mediated (Pattern 3): adapter invokes its CLI in a mode that
   #                     proxies tool-use approval requests back to the parent
-  #                     Claude session (Codex app-server requestApproval,
-  #                     Claude Code canUseTool over --output-format stream-json).
+  #                     Claude session (Claude Code canUseTool over
+  #                     --output-format stream-json). Codex's adapter does not
+  #                     implement Pattern 3 yet: it runs parent-mediated as
+  #                     read-only (Pattern 1) and logs one WARN line.
   #                     The parent session decides per request. Use this for
   #                     CLIs that natively support approval proxying.
   #   - sandbox-yolo    (Pattern 2): adapter invokes its CLI with full tool
@@ -608,7 +634,8 @@ multi_model_review:
   #                     Opt in only when you trust the CLI inside the sandbox.
   #
   # Defaults applied per CLI: Codex and Claude Code default to parent-mediated
-  # (Pattern 3) because their CLIs natively support approval proxying. All
+  # (Pattern 3) because their CLIs natively support approval proxying (Codex
+  # currently runs it as read-only; see the `codex` entry below). All
   # other CLIs default to read-only (Pattern 1) — the universal safe default.
   # Override any entry here per project to opt into sandbox-yolo (Pattern 2)
   # for a specific CLI; the spawning command will require explicit y/N
@@ -618,12 +645,13 @@ multi_model_review:
     default: read-only
     #
     # Allowed keys: `default`, plus the bare adapter names listed below
-    # (`codex`, `claude`, `gemini`, `bedrock`, `llm`, `ollama`). Any other
-    # key in this block is **silently ignored** by the adapters and is
-    # never propagated to a shell invocation. The adapter binary names
-    # (`which codex`, `which gemini`, `which aws`, etc.) are HARDCODED
-    # in each `*-review-prompter` agent's Step 1 (CLI Presence Check) —
-    # they are NOT derived from these config-key names. This prevents
+    # (`codex`, `claude`, `gemini`, `bedrock`, `llm`, `ollama`, `grok`,
+    # `cursor`). Any other key in this block is **silently ignored** by the
+    # adapters and is never propagated to a shell invocation. The adapter
+    # binary names (`which codex`, `which gemini`, `which aws`, etc.; the
+    # `grok` key's binary is `grok`, the `cursor` key's is `cursor-agent`)
+    # are HARDCODED in each `*-review-prompter` agent's Step 1 (CLI Presence
+    # Check) — they are NOT derived from these config-key names. This prevents
     # an adversarial project config from injecting a path-traversal or
     # shell-metacharacter binary name. The Layer 1 schema test
     # `tests/schemas/external-permission-mode-key-validation.test.ts`
@@ -631,12 +659,18 @@ multi_model_review:
     #
     # Per-CLI defaults. CLI names are the bare adapter name (the
     # `<cli>-review-prompter` agent file's prefix).
-    codex: parent-mediated      # Pattern 3 via `codex app-server` JSON-RPC requestApproval
+    codex: parent-mediated      # Runs as Pattern 1 (`codex exec --sandbox read-only`) + one WARN until Pattern 3 is built on the app-server protocol
     claude: parent-mediated     # Pattern 3 via Claude Code `canUseTool` over --output-format stream-json
-    gemini: read-only           # Pattern 1 via `--readonly` flag
+    gemini: read-only           # Pattern 1 via headless `--approval-mode default` (no TTY, so every confirmation-needing tool is denied; Task 25)
     bedrock: read-only          # Pattern 1 — `aws bedrock-runtime invoke-model` has no tool-use surface
     llm: read-only              # Pattern 1 — `llm` CLI is a stateless provider-API wrapper
     ollama: read-only           # Pattern 1 — Ollama HTTP API has no tool-use surface
+    # grok and cursor are text-only (multi-model-review D25). For both,
+    # `sandbox-yolo` is a no-op alias of read-only and `parent-mediated` is
+    # unsupported: the adapter returns cli_unsupported_mode without
+    # spawning the CLI (multi-model-review D29).
+    grok: read-only             # Pattern 1 — every built-in tool removed + --deny '*' + untrusted /tmp cwd + HOME isolation
+    cursor: read-only           # Pattern 1 — deny-all .cursor/cli.json in an untrusted scratch workspace (D37) + tool_call scan (D38); `cursor-agent --mode ask` + --sandbox enabled kept; never --force
 
   # Pattern 2 (sandbox-yolo) trust-boundary configuration.
   # Defines the OS-sandbox wrappers used when a CLI is configured for

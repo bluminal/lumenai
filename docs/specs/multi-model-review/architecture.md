@@ -267,6 +267,7 @@ External adapter failures surface one of these `error_code` values:
 | `timeout` | Per-reviewer timeout fired | No |
 | `sandbox_violation` | CLI attempted a forbidden operation | No (terminal) |
 | `unknown_error` | Catch-all for unexpected failures | No |
+| `cli_unsupported_mode` | Resolved permission mode unsupported by this CLI; CLI never spawned | No (terminal) |
 
 Adapters MUST NOT introduce new error_code values without updating FR-MR16 and `adapter-contract.md`.
 
