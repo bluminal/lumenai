@@ -73,7 +73,7 @@ Implements `docs/reqs/harness-modernization.md` (FR-HM1..45, NFR-HM1..7): tool-p
 - A16: FR-HM24 `configure-teams` is ungated.
 - A17: PRD §8 OpenCode catalog metric becomes "≤ 13,353 bytes (measured + 5%); descriptions ≤ 6,000 chars" (Task 22).
 - A18: FR-HM19 opt-in engine key, leaf-only verdict with a confirm leaf, in-turn idle, fresh-`runId` gate skip, all `--loop` commands (D34).
-- A19: PRD §8 OpenCode catalog metric becomes "≤ 290 bytes per installed skill (= A17's 13,353-byte ceiling at 46 skills); descriptions ≤ 6,000 chars" (amends A17; Task 22). A17's fixed total was measured at 46 skills (~290 bytes per skill, 46 × 290 = 13,340); the Grok and Cursor review adapters (multi-model-review Milestone 9.1, PR #25) took the catalog to 50 skills and 13,840 bytes (~277 per skill), so CI failed on skill count alone with no description growth. Codex's absolute ≤ 6,000-char budget is unchanged. Approved by A.J. Brown on 2026-10-06; code in `96e6f60`.
+- A19: PRD §8 OpenCode catalog metric becomes "≤ 290 bytes per installed skill (13,340 bytes at 46 skills, within A17's 13,353-byte ceiling); descriptions ≤ 6,000 chars" (amends A17; Task 22). A17's fixed total was measured at 46 skills (~290 bytes per skill); the Grok and Cursor review adapters (multi-model-review Milestone 9.1, PR #25) took the catalog to 50 skills and 13,840 bytes (~277 per skill), so CI failed on skill count alone with no description growth. Codex's absolute ≤ 6,000-char budget is unchanged. Approved by A.J. Brown on 2026-10-06; code in `96e6f60`.
 
 ## Open Questions
 

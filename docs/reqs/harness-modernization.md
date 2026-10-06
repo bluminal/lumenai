@@ -1,6 +1,6 @@
 # Product Requirements Document: Harness-Native Synthex
 
-**Status:** Draft v1.2 (2026-09-26; amendments A1 to A17 from `docs/plans/harness-modernization.md` applied)
+**Status:** Draft v1.2 (2026-10-06; amendments A1 to A19 from `docs/plans/harness-modernization.md` applied)
 **Owner:** Bluminal Labs
 **Related:** `docs/reqs/main.md`, `docs/reqs/multi-model-review.md`, `docs/reqs/plus.md` (superseded in part by this document), `docs/reqs/multi-model-teams.md` (superseded in part by this document), `docs/specs/decisions/ADR-003` (native looping)
 
@@ -604,8 +604,8 @@ Marketplace and manifest (`.claude-plugin/marketplace.json:26-39`, `plugins/synt
 |--------|--------|--------------|
 | `review-code` default-path prompt bytes | ≤ 15 KB (from 27.6 KB) | Layer 1 size assertion |
 | Claude Code sessions list zero `synthex:*` skills | 0 | Manual plus `/skill-doctor` |
-| Codex skill catalog under budget with no blanked descriptions | 100% of 46 non-blank | Compat activation capture |
-| OpenCode `<available_skills>` block size | ≤ 290 bytes per installed skill (46 × 290 = 13,340, within A17's 13,353-byte ceiling of measured 12,717 + 5%); description bytes ≤ 6,000. A19 made the budget per skill because A17's fixed total failed on skill count alone at 50 skills (13,840 bytes, ~277 per skill). The original 60% target was withdrawn: 8,044 bytes are host-rendered markup and absolute paths (A17) | Compat activation `catalog` phase |
+| Codex skill catalog under budget with no blanked descriptions | 100% of installed skills non-blank (46 at A17; 50 after multi-model-review Milestone 9.1) | Compat activation capture |
+| OpenCode `<available_skills>` block size | ≤ 290 bytes per installed skill (13,340 bytes at 46 skills, within A17's 13,353-byte ceiling of measured 12,717 + 5%); description bytes ≤ 6,000. A19 made the budget per skill because A17's fixed total failed on skill count alone at 50 skills (13,840 bytes, ~277 per skill). The original 60% target was withdrawn: 8,044 bytes are host-rendered markup and absolute paths (A17) | Compat activation `catalog` phase |
 | Loop bookkeeping tool calls per iteration | 1 (from 4 to 6) | Layer 2 transcript count |
 | Utility agents retired | 5 of 6 (commit-message-author, plan-scribe, plan-linter, context-bundle-assembler, audit-artifact-writer) | `plugin.json` diff |
 | Native-only review output byte-identical to FR-MR23 baseline | 100% | Snapshot |
