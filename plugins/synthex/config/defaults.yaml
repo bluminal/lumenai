@@ -483,6 +483,9 @@ multi_model_review:
   #   - codex-review-prompter      # OpenAI / Codex CLI
   #   - gemini-review-prompter     # Google / gcloud
   #   - ollama-review-prompter     # Local model (qwen, llama, deepseek, etc.)
+  #   - grok-review-prompter       # xAI / Grok CLI (grok login; grok.com session)
+  #   - cursor-review-prompter     # Cursor Agent CLI (cursor-agent login; paid plan;
+  #                                # needs per_reviewer model + family below)
 
   # Per-reviewer overrides. Each adapter may override its default model, family
   # tag, or invocation flags. Use the agent name as the key.
@@ -493,6 +496,15 @@ multi_model_review:
     # ollama-review-prompter:
     #   model: qwen2.5-coder:32b
     #   family: local-qwen
+    # grok-review-prompter:
+    #   # model: unset uses the account default; family defaults to xai.
+    #   allow_api_key_billing: false   # true lets XAI_API_KEY / GROK_CODE_XAI_API_KEY
+    #                                  # bill per token; otherwise the runner unsets them
+    # cursor-review-prompter:
+    #   model: gpt-5.6-sol-high        # required, with family: a named slug from
+    #                                  # `cursor-agent models`; never auto
+    #   family: openai                 # the slug's vendor (anthropic, openai, google, xai, unknown)
+    #   allow_api_key_billing: false   # true lets CURSOR_API_KEY bill per request
 
   # Aggregator (consolidation step) configuration.
   aggregator:
@@ -505,6 +517,17 @@ multi_model_review:
     # When the strongest configured proposer is also a reviewer, the aggregator
     # invocation is a separate freshly-spawned CLI call with judge-mode prompt.
     # When no flagship matches, falls back to the host Claude session.
+    #
+    # Pinning (multi-model-review D31): tier_table rows match by family. Grok's
+    # family (xai) has no row, so `auto` never picks Grok. A
+    # cursor-review-prompter configured with a flagship slug and its family
+    # (e.g. claude-opus-* / anthropic, gpt-5* / openai) matches that row and
+    # can become the strongest configured proposer, so the judge call would go
+    # through Cursor: a second hop to the model vendor, ~16k tokens of Cursor
+    # overhead per call, and a failure on a Free plan. Neither Cursor nor Grok
+    # should be the aggregator unless you pin it on purpose; to keep them out,
+    # pin another proposer (or set either one here to choose it deliberately):
+    #   command: codex-review-prompter
     command: auto
 
     # D17 strict total-order tier table, highest tier first (tier: 1 wins).
@@ -630,7 +653,7 @@ multi_model_review:
     # unsupported: the adapter returns cli_unsupported_mode without
     # spawning the CLI (multi-model-review D29).
     grok: read-only             # Pattern 1 — every built-in tool removed + --deny '*' + untrusted /tmp cwd + HOME isolation
-    cursor: read-only           # Pattern 1 — `cursor-agent --mode ask` + --sandbox enabled + scratch workspace + tool_call allowlist; never --force
+    cursor: read-only           # Pattern 1 — deny-all .cursor/cli.json in an untrusted scratch workspace (D37) + tool_call scan (D38); `cursor-agent --mode ask` + --sandbox enabled kept; never --force
 
   # Pattern 2 (sandbox-yolo) trust-boundary configuration.
   # Defines the OS-sandbox wrappers used when a CLI is configured for

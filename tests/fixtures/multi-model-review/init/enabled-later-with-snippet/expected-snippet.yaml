@@ -4,5 +4,14 @@
 #     # - codex-review-prompter      # OpenAI / Codex CLI  (codex login)
 #     # - gemini-review-prompter     # Google / gcloud     (gcloud auth login)
 #     # - ollama-review-prompter     # Local model         (ollama serve)
+#     # - grok-review-prompter       # xAI / Grok CLI      (grok login)
+#     # - cursor-review-prompter     # Cursor Agent CLI    (cursor-agent login; paid plan)
+#   per_reviewer:
+#     grok-review-prompter:
+#       allow_api_key_billing: false   # true bills XAI_API_KEY per token
+#     cursor-review-prompter:
+#       model: gpt-5.6-sol-high        # placeholder: a named slug from `cursor-agent models`, never auto
+#       family: openai                 # placeholder: the slug's vendor
+#       allow_api_key_billing: false   # true bills CURSOR_API_KEY per request
 #   aggregator:
 #     command: auto
