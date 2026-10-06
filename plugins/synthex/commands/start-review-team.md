@@ -139,7 +139,7 @@ When `multi_model: true`, run the multi-model-review preflight as defined in `mu
 
 ### Step 5a. Sandbox-Yolo Spawn Confirmation (ADR-003 / D27 / FR-MMT21)
 
-For each external CLI in the resolved roster (codex, claude, gemini, bedrock, llm, ollama — anything routed through a `*-review-prompter` adapter), look up the resolved value of `multi_model_review.external_permission_mode.<cli-name>` from `.synthex/config.yaml` (falling back to `plugins/synthex/config/defaults.yaml`).
+For each external CLI in the resolved roster (codex, claude, gemini, bedrock, llm, ollama, grok, cursor — anything routed through a `*-review-prompter` adapter; for grok and cursor, `sandbox-yolo` runs as `read-only`, multi-model-review D29), look up the resolved value of `multi_model_review.external_permission_mode.<cli-name>` from `.synthex/config.yaml` (falling back to `plugins/synthex/config/defaults.yaml`).
 
 **If any CLI in the roster resolves to `sandbox-yolo`**, display ONE warning line per such CLI, verbatim:
 
