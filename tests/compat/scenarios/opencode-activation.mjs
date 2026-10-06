@@ -149,8 +149,10 @@ try {
   const catalogBlankDescriptionCount = catalogEntries.filter(
     ({ description }) => description.length === 0,
   ).length;
-  const catalogOverBudget =
-    catalogBlock.bytes > catalogBudgetLimits.maxAvailableSkillsBlockBytes;
+  // The budget scales with the installed skill count (see harnesses.mjs).
+  const maxAvailableSkillsBlockBytes =
+    catalogBudgetLimits.maxAvailableSkillsBlockBytesPerSkill * entries.length;
+  const catalogOverBudget = catalogBlock.bytes > maxAvailableSkillsBlockBytes;
   emit(harness, 'catalog', {
     ok: !catalogOverBudget && catalogBlankDescriptionCount === 0,
     profile,
@@ -158,12 +160,12 @@ try {
     bytes: catalogBlock.bytes,
     systemPromptBytes: catalogBlock.systemPromptBytes,
     blankDescriptionCount: catalogBlankDescriptionCount,
-    budget: catalogBudgetLimits,
+    budget: { ...catalogBudgetLimits, skillCount: entries.length, maxAvailableSkillsBlockBytes },
   });
   if (catalogOverBudget) {
     throw new Error(
       `OpenCode <available_skills> block exceeded its budget: ${catalogBlock.bytes} bytes ` +
-        `(budget ${catalogBudgetLimits.maxAvailableSkillsBlockBytes})`,
+        `(budget ${maxAvailableSkillsBlockBytes}: ${catalogBudgetLimits.maxAvailableSkillsBlockBytesPerSkill} per skill x ${entries.length})`,
     );
   }
   if (catalogBlankDescriptionCount > 0) {
