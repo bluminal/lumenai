@@ -5,6 +5,26 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 2.2.0] - 2026-10-06
+
+### Added
+
+- (synthex) opt-in Workflow loop engine for every --loop command (Task 59, FR-HM19, D34)
+- (synthex) lease pending loop verdict runs with runId (Task 59, FR-HM19)
+- (synthex) add read-only loop-engine Workflow for --loop verdicts (Task 59, FR-HM19)
+
+### Fixed
+
+- (synthex) judge-command loop selectors tell the model to run the engine check (Task 59 live run)
+- (synthex) loop-engine accepts a namespaced command arg; doc names the bare form (Task 59 live run)
+
+### Changed
+
+- (plans) record Task 59 done; Milestone 8.1 and Phase 8 complete
+- (plans) Task 62 forces native_looping.engine to prose too (D34)
+- (plans) record D34 (opt-in loop engine for all --loop commands, in-turn idle, cold-path move); amend Task 59 and FR-HM19
+- (plans) mark Task 59 in progress
+
 ## [synthex 2.1.0] - 2026-10-05
 
 ### Added
