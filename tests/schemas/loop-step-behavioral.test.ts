@@ -31,6 +31,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 // loaded hosts and slow CI runners even though a single call takes ~40 ms.
 vi.setConfig({ testTimeout: 30_000 });
 import { execFileSync } from 'child_process';
+import { validateLoopStateFile } from './loop-state-file';
 import {
   mkdtempSync,
   mkdirSync,
@@ -626,5 +627,248 @@ describe('loop-step.sh — hosts without jq or node (sed/awk fallback)', () => {
     const r = run(['cancel', '--all'], { path: bin });
     expect(r.code).toBe(0);
     expect(r.stdout).toMatch(/Cancelled \(2\):/);
+  });
+
+  it('advance --run, hold --run and hold set and clear runId under the sed/awk fallback', () => {
+    const o = { path: bin, now: '2026-10-01T12:00:00Z' };
+    run(['begin', '/synthex:loop', '--completion-promise', 'X', '--name', 'nojq-run', '--max', '5'], o);
+    const adv = run(['advance', 'nojq-run', '--run'], o);
+    expect(adv.code).toBe(0);
+    expect(adv.stdout).toBe('[loop nojq-run iteration 1/5]\nrun-id: nojq-run-i1\n');
+    expect(readLoop('nojq-run').runId).toBe('nojq-run-i1');
+
+    const hold = run(['hold', 'nojq-run'], o);
+    expect(hold.code).toBe(0);
+    expect(hold.stdout).toBe('');
+    expect('runId' in readLoop('nojq-run')).toBe(false);
+
+    const holdRun = run(['hold', 'nojq-run', '--run'], o);
+    expect(holdRun.code).toBe(0);
+    expect(holdRun.stdout).toBe('run-id: nojq-run-i1\n');
+    expect(readLoop('nojq-run').runId).toBe('nojq-run-i1');
+
+    // A re-render under the fallback keeps the lease until something clears it.
+    const adv2 = run(['advance', 'nojq-run'], o);
+    expect(adv2.stdout).toBe('[loop nojq-run iteration 2/5]\n');
+    const state = readLoop('nojq-run');
+    expect('runId' in state).toBe(false);
+    expect(state.iteration).toBe(2);
+    expect(validateLoopStateFile(state).valid).toBe(true);
+  });
+
+  it('null fields stay JSON null across begin, advance and hold (sed/awk fallback)', () => {
+    const o = { path: bin };
+    expect(run(['begin', '/synthex:loop', '--completion-promise', 'X', '--name', 'nojq-null'], o).code).toBe(0);
+    expect(run(['advance', 'nojq-null'], o).code).toBe(0);
+    expect(run(['hold', 'nojq-null'], o).code).toBe(0);
+    const raw = readFileSync(join(loopsDir, 'nojq-null.json'), 'utf-8');
+    expect(raw).not.toContain('__NULL__');
+    const state = JSON.parse(raw);
+    expect(state.session_id).toBeNull();
+    expect(state.prompt_file).toBeNull();
+    expect(state.exited_at).toBeNull();
+    expect(state.exit_reason).toBeNull();
+    expect(validateLoopStateFile(state).valid).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-HM19 Stage 2 (Task 59): the runId lease. advance --run / hold --run set
+// it; every other mutation clears it; Stage 1 loops never carry the key.
+// ---------------------------------------------------------------------------
+
+const CANONICAL_KEYS = [
+  'schema_version', 'loop_id', 'session_id', 'command', 'args', 'prompt_file',
+  'completion_promise', 'max_iterations', 'iteration', 'isolation', 'status',
+  'started_at', 'last_updated', 'exited_at', 'exit_reason',
+  'consecutive_stop_blocks', 'last_gate_iteration', 'idle_streak', 'last_idle_iteration',
+];
+
+describe('runId lease (FR-HM19, Task 59) — jq-less PATH', () => {
+  let bin: string;
+  beforeEach(() => {
+    bin = buildPath(projectDir, true);
+  });
+  const o = (now?: string): RunOpts => ({ path: bin, ...(now ? { now } : {}) });
+  const begin = (name: string, extra: string[] = []) =>
+    run(['begin', '/synthex:next-priority', '--completion-promise', 'X', '--name', name, '--max', '5', ...extra], o());
+
+  it('advance --run sets runId <id>-i<N>, stamps last_updated from SYNTHEX_NOW, and prints run-id on line 2', () => {
+    begin('lease1');
+    expect(run(['advance', 'lease1'], o()).code).toBe(0);
+    const r = run(['advance', 'lease1', '--run'], o('2026-10-01T12:00:00Z'));
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('[loop lease1 iteration 2/5]\nrun-id: lease1-i2\n');
+    const state = readLoop('lease1');
+    expect(state.runId).toBe('lease1-i2');
+    expect(state.iteration).toBe(2);
+    expect(state.last_updated).toBe('2026-10-01T12:00:00Z');
+    // runId is the LAST key.
+    expect(Object.keys(state)).toEqual([...CANONICAL_KEYS, 'runId']);
+    expect(validateLoopStateFile(state).valid).toBe(true);
+    // --run before the id parses the same way.
+    const r2 = run(['advance', '--run', 'lease1'], o());
+    expect(r2.stdout).toBe('[loop lease1 iteration 3/5]\nrun-id: lease1-i3\n');
+  });
+
+  it('plain advance clears an existing runId', () => {
+    begin('lease2');
+    run(['advance', 'lease2', '--run'], o());
+    expect(readLoop('lease2').runId).toBe('lease2-i1');
+    const r = run(['advance', 'lease2'], o());
+    expect(r.stdout).toBe('[loop lease2 iteration 2/5]\n');
+    expect('runId' in readLoop('lease2')).toBe(false);
+  });
+
+  it('hold clears runId and keeps the iteration', () => {
+    begin('lease3');
+    run(['advance', 'lease3', '--run'], o());
+    const r = run(['hold', 'lease3'], o('2026-10-01T12:05:00Z'));
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+    const state = readLoop('lease3');
+    expect('runId' in state).toBe(false);
+    expect(state.iteration).toBe(1);
+    expect(state.last_updated).toBe('2026-10-01T12:05:00Z');
+  });
+
+  it('hold --run sets runId <id>-i<N> without incrementing and prints exactly run-id: <id>-i<N>', () => {
+    begin('lease4');
+    run(['advance', 'lease4'], o());
+    run(['advance', 'lease4'], o());
+    const r = run(['hold', 'lease4', '--run'], o('2026-10-01T12:10:00Z'));
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('run-id: lease4-i2\n');
+    const state = readLoop('lease4');
+    expect(state.runId).toBe('lease4-i2');
+    expect(state.iteration).toBe(2);
+    expect(state.last_updated).toBe('2026-10-01T12:10:00Z');
+    expect(validateLoopStateFile(state).valid).toBe(true);
+  });
+
+  it('hold --run exits 5 when the loops directory is not writable', () => {
+    begin('lease5');
+    run(['advance', 'lease5'], o());
+    const before = readFileSync(join(loopsDir, 'lease5.json'));
+    chmodSync(loopsDir, 0o555);
+    try {
+      const r = run(['hold', 'lease5', '--run'], o());
+      expect(r.code).toBe(5);
+      expect(r.stdout).toBe('');
+      expect(r.stderr).toMatch(/hold: cannot write to/);
+      // Plain hold stays best-effort: exit 0.
+      expect(run(['hold', 'lease5'], o()).code).toBe(0);
+    } finally {
+      chmodSync(loopsDir, 0o755);
+    }
+    expect(readFileSync(join(loopsDir, 'lease5.json')).equals(before)).toBe(true);
+  });
+
+  it('hold exits 3 for a loop cancelled while a run is pending, and the cancelled file has no runId', () => {
+    begin('lease6');
+    run(['advance', 'lease6', '--run'], o());
+    expect(run(['cancel', 'lease6'], o()).code).toBe(0);
+    const state = readLoop('lease6');
+    expect(state.status).toBe('cancelled');
+    expect('runId' in state).toBe(false);
+    expect(validateLoopStateFile(state).valid).toBe(true);
+    expect(run(['hold', 'lease6'], o()).code).toBe(3);
+    expect(run(['hold', 'lease6', '--run'], o()).code).toBe(3);
+    expect('runId' in readLoop('lease6')).toBe(false);
+  });
+
+  it('finish, cancel and cancel --all clear runId', () => {
+    begin('lease7a');
+    begin('lease7b');
+    begin('lease7c');
+    begin('lease7d');
+    for (const id of ['lease7a', 'lease7b', 'lease7c', 'lease7d']) {
+      run(['advance', id, '--run'], o());
+      expect(readLoop(id).runId).toBe(`${id}-i1`);
+    }
+    expect(run(['finish', 'lease7a', 'completed', 'plan-complete'], o()).code).toBe(0);
+    const fin = readLoop('lease7a');
+    expect(fin.status).toBe('completed');
+    expect(fin.exit_reason).toBe('plan-complete');
+    expect('runId' in fin).toBe(false);
+    expect(validateLoopStateFile(fin).valid).toBe(true);
+
+    expect(run(['cancel', 'lease7b'], o()).code).toBe(0);
+    expect('runId' in readLoop('lease7b')).toBe(false);
+
+    const all = run(['cancel', '--all'], o());
+    expect(all.code).toBe(0);
+    for (const id of ['lease7c', 'lease7d']) {
+      const st = readLoop(id);
+      expect(st.status).toBe('cancelled');
+      expect('runId' in st).toBe(false);
+      expect(validateLoopStateFile(st).valid).toBe(true);
+    }
+  });
+
+  it('begin --resume clears runId', () => {
+    begin('lease8', ['--session-id', 'orig']);
+    run(['advance', 'lease8', '--run'], o());
+    const r = run(['begin', '/synthex:next-priority', '--resume', 'lease8', '--session-id', 'new'], o());
+    expect(r.code).toBe(0);
+    const state = readLoop('lease8');
+    expect('runId' in state).toBe(false);
+    expect(state.session_id).toBe('new');
+    expect(state.iteration).toBe(1);
+  });
+
+  it('the max-iterations path clears runId', () => {
+    writeLoop('atmax-lease', { iteration: 3, max_iterations: 3, runId: 'atmax-lease-i3' });
+    const r = run(['advance', 'atmax-lease', '--run'], o());
+    expect(r.code).toBe(4);
+    expect(r.stdout).toBe('');
+    const state = readLoop('atmax-lease');
+    expect(state.status).toBe('max-iterations-reached');
+    expect('runId' in state).toBe(false);
+    expect(validateLoopStateFile(state).valid).toBe(true);
+
+    writeLoop('atmax-plain', { iteration: 3, max_iterations: 3, runId: 'atmax-plain-i3' });
+    expect(run(['advance', 'atmax-plain'], o()).code).toBe(4);
+    expect('runId' in readLoop('atmax-plain')).toBe(false);
+  });
+
+  it('advance and hold reject an unknown extra argument with exit 1', () => {
+    begin('lease9');
+    const path = join(loopsDir, 'lease9.json');
+    const before = readFileSync(path);
+    const cases: Array<[string[], RegExp]> = [
+      [['advance', 'lease9', '--bogus'], /Usage: loop-step\.sh advance <loop-id> \[--run\]/],
+      [['advance', 'lease9', 'extra'], /Usage: loop-step\.sh advance <loop-id> \[--run\]/],
+      [['advance', '--run'], /Usage: loop-step\.sh advance <loop-id> \[--run\]/],
+      [['advance'], /Usage: loop-step\.sh advance <loop-id> \[--run\]/],
+      [['hold', 'lease9', '--bogus'], /Usage: loop-step\.sh hold <loop-id> \[--run\]/],
+      [['hold', 'lease9', 'extra'], /Usage: loop-step\.sh hold <loop-id> \[--run\]/],
+      [['hold', '--run'], /Usage: loop-step\.sh hold <loop-id> \[--run\]/],
+      [['hold'], /Usage: loop-step\.sh hold <loop-id> \[--run\]/],
+    ];
+    for (const [args, usage] of cases) {
+      const r = run(args, o());
+      expect(r.code, args.join(' ')).toBe(1);
+      expect(r.stdout, args.join(' ')).toBe('');
+      expect(r.stderr, args.join(' ')).toMatch(usage);
+    }
+    expect(readFileSync(path).equals(before)).toBe(true);
+  });
+
+  it('a loop that never leases has no runId key after begin, advance and hold (Stage 1 byte-identity)', () => {
+    begin('stage1');
+    const raw0 = readFileSync(join(loopsDir, 'stage1.json'), 'utf-8');
+    expect(raw0).not.toContain('runId');
+    expect(Object.keys(JSON.parse(raw0))).toEqual(CANONICAL_KEYS);
+    run(['advance', 'stage1'], o());
+    const raw1 = readFileSync(join(loopsDir, 'stage1.json'), 'utf-8');
+    expect(raw1).not.toContain('runId');
+    expect(Object.keys(JSON.parse(raw1))).toEqual(CANONICAL_KEYS);
+    run(['hold', 'stage1'], o());
+    const raw2 = readFileSync(join(loopsDir, 'stage1.json'), 'utf-8');
+    expect(raw2).not.toContain('runId');
+    expect(Object.keys(JSON.parse(raw2))).toEqual(CANONICAL_KEYS);
+    // The last line before the closing brace is still the comma-free idle field.
+    expect(raw2.endsWith('  "last_idle_iteration": -1\n}\n')).toBe(true);
   });
 });

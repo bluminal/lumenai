@@ -10,6 +10,13 @@
 # the loop-id, its progress, its state-file path, and the exact command to
 # resume it.
 #
+# FR-HM19 Stage 2 (Task 59): when a running loop carries a `runId` (a pending
+# read-only synthex:loop-engine verdict run, leased by loop-step.sh
+# `advance --run` / `hold --run`), a SECOND line follows that loop's line,
+# telling the resumed session to wait for the run's Workflow notification and
+# run `loop-step.sh hold <loop-id>` first instead of advancing. Loops without
+# a runId print exactly the single line they always have.
+#
 # Prints nothing when no loop is running (including when the project has no
 # .synthex/loops directory at all). Never blocks the session.
 #
@@ -100,8 +107,15 @@ for f in "$LOOPS_DIR"/*.json; do
   max_iterations="$(field_get "$f" max_iterations)"
   [ -n "$max_iterations" ] || max_iterations=0
 
+  run_id="$(field_get "$f" runId)"
+
   printf 'Synthex loop %s is running (iteration %s/%s); state: .synthex/loops/%s.json — continue with loop-step.sh advance %s\n' \
     "$loop_id" "$iteration" "$max_iterations" "$loop_id" "$loop_id"
+
+  if [ -n "$run_id" ]; then
+    printf 'Verdict run %s is pending for %s: wait for its Workflow notification, then run loop-step.sh hold %s first (docs/engines/loop-workflow.md); do not advance.\n' \
+      "$run_id" "$loop_id" "$loop_id"
+  fi
 done
 
 exit 0

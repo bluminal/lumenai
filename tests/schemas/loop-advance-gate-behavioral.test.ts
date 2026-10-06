@@ -55,6 +55,8 @@ interface LoopState {
   completion_promise?: string;
   consecutive_stop_blocks?: number;
   last_gate_iteration?: number;
+  runId?: string;
+  last_updated?: string;
 }
 
 function writeLoop(state: LoopState): string {
@@ -90,6 +92,7 @@ function runGate(opts: {
   transcript: string;
   sessionId?: string;
   stopHookActive?: boolean;
+  env?: Record<string, string>;
 }): { stdout: string; blocked: boolean } {
   const payload = JSON.stringify({
     session_id: opts.sessionId ?? SESSION,
@@ -97,7 +100,11 @@ function runGate(opts: {
     transcript_path: opts.transcript,
     stop_hook_active: opts.stopHookActive ?? false,
   });
-  const stdout = execFileSync('bash', [GATE], { input: payload, encoding: 'utf-8' }).trim();
+  const stdout = execFileSync('bash', [GATE], {
+    input: payload,
+    encoding: 'utf-8',
+    env: { ...process.env, ...opts.env },
+  }).trim();
   return { stdout, blocked: stdout.length > 0 };
 }
 
@@ -185,5 +192,139 @@ describe.skipIf(!hasJq)('loop-advance-gate.sh — turn-per-iteration driver (ADR
   it('allows the stop when there are no loop state files at all', () => {
     const t = writeTranscript({ text: 'no marker' });
     expect(runGate({ transcript: t }).blocked).toBe(false);
+  });
+});
+
+describe.skipIf(!hasJq)('runId lease (FR-HM19, D30, Task 59)', () => {
+  const T0 = '2026-10-01T12:00:00Z';
+  const T0_MS = Date.parse(T0);
+  /** SYNTHEX_NOW at T0 + seconds (whole seconds, UTC, no fraction). */
+  const at = (seconds: number): string =>
+    new Date(T0_MS + seconds * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const BLOCKING_TEXT = 'Verdict run started; ending the turn.';
+
+  function leaseLoop(over: LoopState = {}): string {
+    return writeLoop({ iteration: 3, last_gate_iteration: -1, last_updated: T0, runId: 'np-1-i3', ...over });
+  }
+  const readState = (path: string) => JSON.parse(readFileSync(path, 'utf-8'));
+
+  it('exits 0 with no output and leaves the state file byte-identical when runId is fresh (+60 s)', () => {
+    const path = leaseLoop();
+    const before = readFileSync(path);
+    const t = writeTranscript({ text: BLOCKING_TEXT });
+    const { stdout, blocked } = runGate({ transcript: t, env: { SYNTHEX_NOW: at(60) } });
+    expect(stdout).toBe('');
+    expect(blocked).toBe(false);
+    expect(readFileSync(path).equals(before)).toBe(true);
+  });
+
+  it('blocks once runId is stale (+901 s), removes runId, and stamps last_updated from SYNTHEX_NOW', () => {
+    const path = leaseLoop();
+    const t = writeTranscript({ text: BLOCKING_TEXT });
+    const now = at(901);
+    const { stdout, blocked } = runGate({ transcript: t, env: { SYNTHEX_NOW: now } });
+    expect(blocked).toBe(true);
+    expect(JSON.parse(stdout).decision).toBe('block');
+    const s = readState(path);
+    expect('runId' in s).toBe(false);
+    expect(s.last_updated).toBe(now);
+    expect(s.consecutive_stop_blocks).toBe(1);
+    expect(s.last_gate_iteration).toBe(3);
+  });
+
+  it('899 s is fresh and 900 s is stale at the default threshold', () => {
+    const path = leaseLoop();
+    const t = writeTranscript({ text: BLOCKING_TEXT });
+    expect(runGate({ transcript: t, env: { SYNTHEX_NOW: at(899) } }).blocked).toBe(false);
+    expect(readState(path).runId).toBe('np-1-i3');
+    expect(runGate({ transcript: t, env: { SYNTHEX_NOW: at(900) } }).blocked).toBe(true);
+    expect('runId' in readState(path)).toBe(false);
+  });
+
+  it('honors SYNTHEX_LOOP_RUN_STALE (60: +61 s blocks, +59 s is fresh)', () => {
+    const path = leaseLoop();
+    const t = writeTranscript({ text: BLOCKING_TEXT });
+    const env = { SYNTHEX_LOOP_RUN_STALE: '60' };
+    expect(runGate({ transcript: t, env: { ...env, SYNTHEX_NOW: at(59) } }).blocked).toBe(false);
+    expect(readState(path).runId).toBe('np-1-i3');
+    expect(runGate({ transcript: t, env: { ...env, SYNTHEX_NOW: at(61) } }).blocked).toBe(true);
+    expect('runId' in readState(path)).toBe(false);
+  });
+
+  it('a non-integer SYNTHEX_LOOP_RUN_STALE falls back to 900', () => {
+    const t = writeTranscript({ text: BLOCKING_TEXT });
+    for (const stale of ['abc', '1.5', '-60', '']) {
+      const path = leaseLoop();
+      const env = { SYNTHEX_LOOP_RUN_STALE: stale };
+      expect(runGate({ transcript: t, env: { ...env, SYNTHEX_NOW: at(120) } }).blocked, stale).toBe(false);
+      expect(runGate({ transcript: t, env: { ...env, SYNTHEX_NOW: at(899) } }).blocked, stale).toBe(false);
+      expect(readState(path).runId, stale).toBe('np-1-i3');
+      expect(runGate({ transcript: t, env: { ...env, SYNTHEX_NOW: at(900) } }).blocked, stale).toBe(true);
+      expect('runId' in readState(path), stale).toBe(false);
+    }
+  });
+
+  it('treats a missing, unparseable or fractional-second last_updated as stale', () => {
+    const t = writeTranscript({ text: BLOCKING_TEXT });
+    const variants: Array<[string, string | undefined]> = [
+      ['missing', undefined],
+      ['unparseable', 'not-a-timestamp'],
+      ['fractional', '2026-10-01T12:00:00.500Z'],
+    ];
+    for (const [label, lu] of variants) {
+      const path = leaseLoop({ last_updated: lu });
+      if (lu === undefined) expect('last_updated' in readState(path), label).toBe(false);
+      expect(runGate({ transcript: t, env: { SYNTHEX_NOW: at(1) } }).blocked, label).toBe(true);
+      expect('runId' in readState(path), label).toBe(false);
+    }
+  });
+
+  it('treats last_updated more than 300 s in the future as stale and up to 300 s as fresh', () => {
+    const t = writeTranscript({ text: BLOCKING_TEXT });
+    let path = leaseLoop();
+    expect(runGate({ transcript: t, env: { SYNTHEX_NOW: at(-300) } }).blocked).toBe(false);
+    expect(readState(path).runId).toBe('np-1-i3');
+    path = leaseLoop();
+    expect(runGate({ transcript: t, env: { SYNTHEX_NOW: at(-301) } }).blocked).toBe(true);
+    expect('runId' in readState(path)).toBe(false);
+  });
+
+  it("ignores a runId on another session's loop", () => {
+    const other = writeLoop({
+      loop_id: 'np-other',
+      session_id: 'OTHER-SESSION',
+      iteration: 3,
+      last_updated: T0,
+      runId: 'np-other-i3',
+    });
+    const otherBefore = readFileSync(other);
+    const t = writeTranscript({ text: BLOCKING_TEXT });
+    // No loop for this session: allowed, and the other session's lease is untouched.
+    expect(runGate({ transcript: t, env: { SYNTHEX_NOW: at(5000) } }).blocked).toBe(false);
+    expect(readFileSync(other).equals(otherBefore)).toBe(true);
+    // This session's own lease-free loop still blocks; the other file stays untouched.
+    writeLoop({ iteration: 3, last_gate_iteration: -1, last_updated: T0 });
+    expect(runGate({ transcript: t, env: { SYNTHEX_NOW: at(60) } }).blocked).toBe(true);
+    expect(readFileSync(other).equals(otherBefore)).toBe(true);
+  });
+
+  it('a stale runId plus an emitted promise clears runId and still allows the stop', () => {
+    const path = leaseLoop();
+    const t = writeTranscript({ text: 'All tasks done.\n<promise>ALLDONE</promise>' });
+    expect(runGate({ transcript: t, env: { SYNTHEX_NOW: at(901) } }).blocked).toBe(false);
+    const s = readState(path);
+    expect('runId' in s).toBe(false);
+    expect(s.last_updated).toBe(T0);
+  });
+
+  it('a fresh runId allows the stop even when the transcript is unreadable', () => {
+    const missing = join(projectDir, 'no-such-transcript.jsonl');
+    const path = leaseLoop();
+    const before = readFileSync(path);
+    expect(runGate({ transcript: missing, env: { SYNTHEX_NOW: at(60) } }).stdout).toBe('');
+    expect(readFileSync(path).equals(before)).toBe(true);
+    // Contrast: a stale lease is cleared BEFORE the transcript read (skip 5a precedes skip 6).
+    expect(runGate({ transcript: missing, env: { SYNTHEX_NOW: at(901) } }).stdout).toBe('');
+    expect('runId' in readState(path)).toBe(false);
   });
 });

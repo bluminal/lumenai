@@ -4,7 +4,7 @@
 
 - Shell entry point: `plugins/synthex/scripts/loop-advance-gate.sh`
 - Hook registration: `plugins/synthex/hooks/hooks.json` (event: `Stop`)
-- Config: none — always on. Override the block cap with `SYNTHEX_LOOP_BLOCK_CAP` (default 7). To stop a loop intentionally, emit its completion promise or run `/synthex:cancel-loop <loop-id>`.
+- Config: none — always on. Override the block cap with `SYNTHEX_LOOP_BLOCK_CAP` (default 7) and the `runId` staleness threshold with `SYNTHEX_LOOP_RUN_STALE` (seconds, default 900; a non-integer value falls back to 900). To stop a loop intentionally, emit its completion promise or run `/synthex:cancel-loop <loop-id>`.
 
 The shell shim contains the full enforcement logic (jq + grep). There is no LLM-side review step on Stop — by the time the hook fires, the model has already produced its final message; the gate's job is to either let the turn end or re-invoke the model with a `decision: "block"` reason.
 
@@ -40,6 +40,7 @@ Input (Claude Code Stop hook contract — JSON on stdin):
 3. **`session_id` missing** — exit 0.
 4. **`.synthex/loops/` does not exist** — no loops in this project; exit 0.
 5. **No state file with `status: "running"` AND `session_id == <hook's session_id>`** — no live loop in this session; exit 0. (Loops from sibling sessions are ignored — they belong to a different process. Note: `--resume` refreshes the loop's `session_id` to the resuming session, so resumed loops stay protected — see [`state`](../docs/native-looping.md#state).)
+5a. **Fresh `runId` (FR-HM19 Stage 2, D30, Task 59)** — the matched loop carries a `runId` and `-300 <= now - last_updated < SYNTHEX_LOOP_RUN_STALE` (default 900 s; `SYNTHEX_NOW` overrides `now`). A read-only verdict run is in flight and its notification will re-drive the session, so the gate exits 0 with no output and no write. A stale, unparseable (fractional seconds included) or far-future (more than 300 s ahead) `runId` is deleted with an atomic `jq 'del(.runId)'` (tmp file + `mv -f`), and evaluation continues with skip 6. See [Pending verdict runs](#pending-verdict-runs).
 6. **Transcript file unreadable** — exit 0.
 7. **Last assistant message has no text and is not an AskUserQuestion** — nothing to evaluate; exit 0.
 
@@ -104,6 +105,21 @@ The gate's block reason names the script's absolute path, so a model that has lo
 
 ---
 
+<a id="pending-verdict-runs"></a>
+## Pending verdict runs (runId)
+
+On the FR-HM19 Stage 2 engine path, a `--loop` command ends its turn while a read-only `synthex:loop-engine` verdict run is in flight; that run's completion notification, not this gate, re-drives the session. The state file marks this with `runId` (`<loop-id>-i<N>`), the one camelCase key, written last and only while set.
+
+- **Writers.** Only `loop-step.sh advance --run` and `loop-step.sh hold --run` write `runId`. Plain `advance`, plain `hold`, `finish`, `cancel` (single and `--all`) and `begin --resume` clear it, as does the max-iterations transition. Stage 1 loops never carry it.
+- **Threshold.** 900 s is roughly 4x a worst-case verdict run (one Sonnet verdict leaf plus one confirm leaf).
+- **False stale is harmless.** Verdict runs are read-only, and a late result is fenced by its `runId`: the command ignores a result whose `runId` does not match the current lease.
+- **No extension.** Nothing refreshes a lease's freshness, so a crashed or lost run cannot make the gate skip forever; once it is stale the gate clears it and drives the loop as usual.
+- **Block path.** The gate's own block path also writes `last_updated`, which only happens after any `runId` was cleared.
+
+The command-side protocol lives in [`docs/engines/loop-workflow.md`](../docs/engines/loop-workflow.md).
+
+---
+
 ## Edge cases handled
 
 - **macOS lacks `tac`** — the script reverses the transcript JSONL with `awk '{a[NR]=$0} END {for (i=NR;i>0;i--) print a[i]}'`, so it works on Linux and macOS.
@@ -120,5 +136,7 @@ The gate's block reason names the script's absolute path, so a model that has lo
 |-----------|---------|------|
 | 0 (no stdout) | Allow stop | Any skip condition; pending AskUserQuestion; promise present; cap exceeded; any internal error (fail-open) |
 | 0 (with `{"decision":"block"}` on stdout) | Block stop, re-invoke | Running loop for this session, unfinished, under the cap |
+| 0 (no stdout, no write) | Allow stop | Fresh `runId` (skip 5a): a verdict run is pending |
+| 0 (per the rows above) | `runId` cleared, then normal evaluation | Stale, unparseable or far-future `runId` |
 
 Non-zero exit codes are reserved — the script always exits 0 even on internal errors, by design (a buggy hook must never wedge the user's session).

@@ -264,6 +264,7 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 | `retrospective.format` | start-stop-continue | Retrospective format |
 | `retrospective.max_improvement_items` | 3 | Max items per cycle |
 | `next_priority.concurrent_tasks` | `3` | Max parallel tasks for `next-priority` command |
+| `native_looping.engine` | `prose` | FR-HM19 Stage 2 loop engine for every `--loop` command (Claude Code only, opt-in, D34); `workflow` only takes effect with a `Workflow` tool in the caller's tool list and without `--loop-isolated` (`docs/engines/loop-workflow.md`) |
 | `worktrees.base_path` | `.claude/worktrees` | Base directory for parallel execution worktrees |
 | `worktrees.branch_prefix` | `feature/` | Branch name prefix for worktree branches |
 | `documents.requirements` | `docs/reqs/main.md` | Default PRD path |
