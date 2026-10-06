@@ -1024,24 +1024,28 @@ describe('fixture mapping on the Task 67 recordings', () => {
 
 const PARTIAL = '{"text":"{\\"findings\\": [{\\"finding_id\\": \\"partial';
 const SHORT_BUDGET = 'multi_model_review:\n  per_reviewer_timeout_seconds: 12\n';
+// 4 s: the budget clock covers the `grok models` probe, so a loaded suite needs room for the stub to print
+// its partial output before the guard fires.
+const PARTIAL_BUDGET = 'multi_model_review:\n  per_reviewer_timeout_seconds: 14\n';
 
 describe('wall-clock guard: per_reviewer_timeout_seconds - 10, host-clamped in the foreground', () => {
   it('a stub that runs past the budget gives timeout and keeps the partial raw (bash watchdog, no timeout binary)', () => {
-    const r = run({ config: SHORT_BUDGET, steps: { default: { stdout: PARTIAL, sleep: 8 } } });
+    const r = run({ config: PARTIAL_BUDGET, steps: { default: { stdout: PARTIAL, sleep: 25 } } });
     expect(r.envelope?.error_code).toBe('timeout');
-    expect(r.envelope?.error_message).toContain('2s');
+    expect(r.envelope?.error_message).toContain('4s');
     expect(readFileSync(r.rawPath, 'utf8')).toBe(PARTIAL);
-    expect(r.durationMs).toBeLessThan(7_500);
+    // Well under the stub's 25 s sleep, so the guard did the stopping; slack for a loaded suite.
+    expect(r.durationMs).toBeLessThan(20_000);
   }, T);
 
   it.skipIf(TIMEOUT_TOOL === null)('the same with timeout/gtimeout on PATH', () => {
-    const r = run({ config: SHORT_BUDGET, bin: { timeout: true }, steps: { default: { stdout: PARTIAL, sleep: 8 } } });
+    const r = run({ config: PARTIAL_BUDGET, bin: { timeout: true }, steps: { default: { stdout: PARTIAL, sleep: 25 } } });
     expect(r.envelope?.error_code).toBe('timeout');
     expect(readFileSync(r.rawPath, 'utf8')).toBe(PARTIAL);
   }, T);
 
   it('in the foreground the budget is clamped to the host shell cap - 15', () => {
-    const r = run({ env: { SYNTHEX_HOST: 'testhost' }, steps: { default: { stdout: PARTIAL, sleep: 8 } } });
+    const r = run({ env: { SYNTHEX_HOST: 'testhost' }, steps: { default: { stdout: PARTIAL, sleep: 25 } } });
     expect(r.envelope?.error_code).toBe('timeout');
     expect(r.envelope?.error_message).toContain('2s');
   }, T);

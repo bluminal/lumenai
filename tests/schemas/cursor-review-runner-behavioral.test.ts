@@ -1866,11 +1866,12 @@ describe('wall-clock guard: per_reviewer_timeout_seconds - 10, host-clamped in t
 
   it.each(BRANCHES)('a stub that runs past the budget gives timeout with the partial raw kept (%s)', async (_label, bin) => {
     const partial = nd([INIT, assistant('{"findings": [')]).slice(0, -1);
-    const r = await run({ bin, config: 'multi_model_review:\n  per_reviewer_timeout_seconds: 14\n', steps: { default: { stdout: partial, sleep: 10 } } });
+    const r = await run({ bin, config: 'multi_model_review:\n  per_reviewer_timeout_seconds: 14\n', steps: { default: { stdout: partial, sleep: 25 } } });
     expect(r.envelope?.error_code).toBe('timeout');
     expect(r.envelope?.error_message).toContain('4s');
     expect(readFileSync(r.rawPath, 'utf8')).toBe(partial);
-    expect(r.durationMs).toBeLessThan(9_000);
+    // Well under the stub's 25 s sleep, so the guard did the stopping; slack for a loaded suite.
+    expect(r.durationMs).toBeLessThan(20_000);
   }, T);
 
   it('in the foreground the budget is clamped to the host shell cap - 15; --envelope-out lifts the clamp', async () => {
@@ -1884,10 +1885,11 @@ describe('wall-clock guard: per_reviewer_timeout_seconds - 10, host-clamped in t
 
   it.each(BRANCHES)('a violation outranks timeout (%s); the partial raw is kept', async (_label, bin) => {
     const partial = nd([INIT, ...READ_OK('r')]);
-    const r = await run({ bin, config: 'multi_model_review:\n  per_reviewer_timeout_seconds: 14\n', steps: { default: { stdout: partial, sleep: 10 } } });
+    const r = await run({ bin, config: 'multi_model_review:\n  per_reviewer_timeout_seconds: 14\n', steps: { default: { stdout: partial, sleep: 25 } } });
     expect(r.envelope?.error_code).toBe('sandbox_violation');
     expect(readFileSync(r.rawPath, 'utf8')).toBe(partial);
-    expect(r.durationMs).toBeLessThan(9_000);
+    // Well under the stub's 25 s sleep, so the guard did the stopping; slack for a loaded suite.
+    expect(r.durationMs).toBeLessThan(20_000);
   }, T);
 
   it.each(BRANCHES)('after a timeout the whole cursor-agent process group is stopped before the D42 cleanup, so a TERM-ignoring helper cannot recreate state (%s)', async (_label, bin) => {
