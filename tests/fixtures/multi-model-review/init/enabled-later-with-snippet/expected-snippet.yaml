@@ -14,4 +14,4 @@
 #       family: openai                 # placeholder: the slug's vendor
 #       allow_api_key_billing: false   # true bills CURSOR_API_KEY per request
 #   aggregator:
-#     command: auto
+#     command: auto   # a Cursor reviewer with a flagship slug can win auto; pin another adapter (see defaults.yaml)

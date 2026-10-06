@@ -141,7 +141,9 @@ When `multi_model: true`, run the multi-model-review preflight as defined in `mu
 
 For each external CLI in the resolved roster (codex, claude, gemini, bedrock, llm, ollama, grok, cursor — anything routed through a `*-review-prompter` adapter; for grok and cursor, `sandbox-yolo` runs as `read-only`, multi-model-review D29), look up the resolved value of `multi_model_review.external_permission_mode.<cli-name>` from `.synthex/config.yaml` (falling back to `plugins/synthex/config/defaults.yaml`).
 
-**If any CLI in the roster resolves to `sandbox-yolo`**, display ONE warning line per such CLI, verbatim:
+**grok and cursor never count as `sandbox-yolo` here.** For them `sandbox-yolo` is a no-op alias of `read-only` (multi-model-review D29): their runners add no OS sandbox and no tools. When grok or cursor resolves to `sandbox-yolo`, print the info line `<cli-name> sandbox-yolo runs as read-only (D29)` instead of the warning, and do not prompt for it.
+
+**If any other CLI in the roster resolves to `sandbox-yolo`**, display ONE warning line per such CLI, verbatim:
 
 ```
 ⚠ <cli-name> is configured in sandbox-yolo mode — CLI will run with full tool permissions inside an OS sandbox.
@@ -157,7 +159,7 @@ Default is **N** (Enter without input = no). On `n` or empty input, abort cleanl
 
 **When stdin is not a TTY** (CI, scripted invocation, stdin redirected from `/dev/null`), treat as default-N and abort cleanly without prompting. This mirrors the TTY guard documented for the waiting indicator and prevents unbounded CI hangs on the unanswerable prompt. Detect non-TTY stdin before reading the prompt; do NOT block waiting for input that will never arrive.
 
-**Skip this step entirely** when no CLI in the resolved roster has `sandbox-yolo` configured (i.e., all CLIs resolve to `read-only` or `parent-mediated`). The check is a no-op in the default safe configuration.
+**Skip this step entirely** when no CLI in the resolved roster has `sandbox-yolo` configured (i.e., all CLIs resolve to `read-only` or `parent-mediated`, counting a grok or cursor `sandbox-yolo` as `read-only`; print its info line first). The check is a no-op in the default safe configuration.
 
 The verbatim warning string above is locked by **D25 / NFR-MMT7** (user-visible string copy locked verbatim) and is reused identically by `/synthex:review-code` and `/synthex:performance-audit` per Task 83.
 

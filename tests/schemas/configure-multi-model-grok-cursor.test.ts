@@ -139,6 +139,9 @@ describe('Task 70 Step 1a: grok and cursor-agent detection', () => {
   it('reads exit codes 0, 10, 11 and 12 for these two CLIs', () => {
     expect(s1a).toMatch(/For `grok` and `cursor-agent`, read the runner's exit code \(exit codes 0, 10, 11 and 12\)/);
     expect(s1a).toMatch(/^- \*\*0\*\* — authenticated/m);
+    // grok exit 0 also covers an opted-in XAI_API_KEY (grok-review.sh auth_probe), billed per token
+    const zero = /^- \*\*0\*\* — (.*)$/m.exec(s1a)?.[1] ?? '';
+    expect(zero).toContain('`XAI_API_KEY` with `per_reviewer.grok-review-prompter.allow_api_key_billing: true`, which bills per token');
     expect(s1a).toMatch(/^- \*\*10\*\* — the binary is not on PATH: treat as not-detected/m);
     expect(s1a).toMatch(/^- \*\*11\*\* — not authenticated/m);
     const twelve = /^- \*\*12\*\* — (.*)$/m.exec(s1a)?.[1] ?? '';
@@ -147,6 +150,23 @@ describe('Task 70 Step 1a: grok and cursor-agent detection', () => {
     expect(twelve).toContain('per_reviewer.cursor-review-prompter.model');
     expect(twelve).toContain('CURSOR_API_KEY');
     expect(twelve).toMatch(/non-Auto/);
+    // the Cursor key-only case names Cursor's own opt-in, and exit 12 only ever means the manual bucket
+    expect(twelve).toContain('only `CURSOR_API_KEY` is available and `per_reviewer.cursor-review-prompter.allow_api_key_billing` is not `true`');
+    expect(twelve).toContain('Exit 12 always lands in the manual bucket, never in detected-and-authenticated.');
+    expect(twelve).toContain('the check has not seen the login state');
+  });
+
+  it('the four buckets are a partition: manual wins, and exit 12 never reaches the authenticated bucket', () => {
+    expect(s1a).toContain('Each CLI lands in exactly one group; a CLI that matches the manual bucket goes there and nowhere else');
+    const authed = /^- \*\*detected-and-authenticated\*\* — (.*)$/m.exec(s1a)?.[1] ?? '';
+    expect(authed).toContain('both exited 0');
+    expect(authed).toContain('and the CLI is not in the manual bucket below');
+    expect(authed).not.toMatch(/\b12\b/);
+    const unauth = /^- \*\*detected-but-unauthenticated\*\* — (.*)$/m.exec(s1a)?.[1] ?? '';
+    expect(unauth).toContain('and the CLI is not in the manual bucket below');
+    expect(unauth).toContain('`cursor-agent` never lands here');
+    expect(unauth).not.toMatch(/cursor-agent[^.]*exit 11/);
+    expect(unauth).not.toMatch(/\b12\b/);
   });
 
   it('keeps the exit-0-only rule for the six older CLIs', () => {
@@ -177,8 +197,19 @@ describe('Task 70 Step 1a: grok and cursor-agent detection', () => {
     const bucket = /^- \*\*detected — opt in manually\*\* — (.*)$/m.exec(s1a)?.[1] ?? '';
     expect(bucket).toContain('`cursor-agent` whenever it is detected, whatever its auth exit (D43)');
     expect(bucket).toContain('`grok` on auth exit 12');
-    expect(bucket).toContain('`grok` whenever `SYNTHEX_HOST=grok`');
-    expect(s1a).toMatch(/read `SYNTHEX_HOST` from the environment/);
+    expect(bucket).toContain('`grok` whenever the host id is `grok`');
+  });
+
+  it('takes the host id from the host (the wrapper\'s SYNTHEX_HOST step), not from a separate environment read', () => {
+    const host = paragraphOf(s1a, '**Host id (for Step 1b).**');
+    expect(host).toContain("the id the wrapper's `SYNTHEX_HOST` step tells you to export (`grok` when you run in Grok Build");
+    expect(host).toContain('on Claude Code it is empty');
+    expect(host).toContain('Export it in the same Bash command as the runner auth checks');
+    expect(host).toContain('Do not decide it from a separate `echo $SYNTHEX_HOST`');
+    expect(wizard).not.toMatch(/read `SYNTHEX_HOST` from the environment/);
+    // the wrapper step the wizard points at really exists for the Grok host
+    const wrapper = readFileSync(join(PLUGIN, 'portable-skills', 'configure-multi-model', 'SKILL.md'), 'utf8');
+    expect(wrapper).toMatch(/export `SYNTHEX_HOST=<id>` for the current host \([^)]*`grok`/);
   });
 });
 
@@ -190,20 +221,52 @@ describe('Task 70 Step 1b: "detected — opt in manually" listing', () => {
   const manualLines = listing.split('\n').filter((l) => /^- `(grok|cursor-agent)`/.test(l));
 
   it('is shown as text, not as a new option (still exactly 3 numbered options)', () => {
-    expect(listing).toContain('print this listing as plain text after the options. It is NOT an option and adds no question');
+    expect(listing).toContain('print this listing as plain text before the question. It is NOT an option and adds no question');
     const options = s1b.split('\n').filter((l) => /^> \d+\. /.test(l));
     expect(options).toHaveLength(3);
     expect(options.join('\n')).not.toMatch(/opt in manually/i);
   });
 
-  it('lists Cursor always, with the model/family instruction and the paid-plan note (D43)', () => {
-    const cursor = manualLines.find((l) => l.startsWith('- `cursor-agent` (always, when detected)'));
+  it('prints both text listings before the question, so the billing and plan notes are read before choosing', () => {
+    expect(s1b).toContain('Print the two text listings below as plain text BEFORE asking the question, so the user reads them before choosing.');
+    expect(wizard).not.toContain('after the options');
+    // the instruction comes before both listings it governs
+    const before = s1b.indexOf('BEFORE asking the question');
+    expect(before).toBeLessThan(s1b.indexOf('surface them SEPARATELY'));
+    expect(before).toBeLessThan(s1b.indexOf('**Detected — opt in manually.**'));
+  });
+
+  it('lists Cursor always, with the model/family instruction, the paid-plan note and the login step (D43)', () => {
+    expect(listing).toContain('`cursor-agent` is always listed when detected (D43)');
+    expect(listing).toContain('for `cursor-agent`, exactly one of its four lines');
+    const cursor = manualLines.find((l) => l.startsWith('- `cursor-agent` without both model and family in the config (any auth exit)'));
     expect(cursor).toBeDefined();
     expect(cursor).toContain('per_reviewer.cursor-review-prompter.model');
     expect(cursor).toContain('.family');
     expect(cursor).toContain('never auto');
     expect(cursor).toContain('Named models need a paid Cursor plan');
     expect(cursor).toContain('the auth check cannot see the plan');
+    // the guard runs before `cursor-agent status`, so the login state is unknown here
+    expect(cursor).toContain('run cursor-agent login if you are not logged in');
+    expect(cursor).toContain('the auth check stops before it can see your login');
+  });
+
+  it('gives the right Cursor line once model and family are set: exit 0, 11 and 12', () => {
+    const line = (exit: number) => manualLines.find((l) => l.startsWith(`- \`cursor-agent\` with model and family set, auth exit ${exit}:`));
+    expect(line(0)).toContain('add cursor-review-prompter to reviewers');
+    expect(line(0)).toContain('Named models need a paid Cursor plan');
+    expect(line(11)).toContain('Run cursor-agent login');
+    expect(line(12)).toContain('only CURSOR_API_KEY is available');
+    expect(line(12)).toContain('Run cursor-agent login');
+    expect(line(12)).toContain('per_reviewer.cursor-review-prompter.allow_api_key_billing: true');
+    expect(line(12)).toContain('billed per request');
+    // exactly the four Cursor cases, no more
+    const cases = [
+      '- `cursor-agent` without both model and family in the config (any auth exit):',
+      ...[0, 11, 12].map((exit) => `- \`cursor-agent\` with model and family set, auth exit ${exit}:`),
+    ];
+    const cursorLines = manualLines.filter((l) => l.startsWith('- `cursor-agent`'));
+    expect(cursorLines.map((l) => cases.find((c) => l.startsWith(c)))).toEqual(cases);
   });
 
   it('lists grok on auth exit 12 with the opt-in instruction and its billing consequence', () => {
@@ -215,15 +278,19 @@ describe('Task 70 Step 1b: "detected — opt in manually" listing', () => {
   });
 
   it('lists grok when SYNTHEX_HOST=grok, with the self-review note (D24)', () => {
-    const host = manualLines.find((l) => l.startsWith('- `grok` when `SYNTHEX_HOST=grok` (self-review note)'));
+    const host = manualLines.find((l) => l.startsWith('- `grok` when the host id is `grok` (self-review note)'));
     expect(host).toBeDefined();
     expect(host).toContain('this session runs on Grok');
     expect(host).toContain('no family diversity');
   });
 
+  it('flags an opted-in grok API key in the Option 1 label (exit 0 can mean per-token billing)', () => {
+    expect(s1b).toContain('When the config sets `per_reviewer.grok-review-prompter.allow_api_key_billing: true`, show grok in the label as `grok (may bill XAI_API_KEY per token)`.');
+  });
+
   it('Option 1 writes only detected, authenticated, non-manual CLIs', () => {
     expect(s1b).toMatch(/never a manual opt-in CLI/);
-    expect(listing).toContain('nothing in it is ever written by Option 1');
+    expect(listing).toContain('Option 1 never adds anything in it');
     expect(subsection('1d.')).toContain(
       'Do NOT include detected-but-unauthenticated CLIs or manual opt-in CLIs in this list.'
     );
@@ -231,6 +298,18 @@ describe('Task 70 Step 1b: "detected — opt in manually" listing', () => {
 
   it('keeps the AskUserQuestion count at most 5', () => {
     expect((wizard.match(/AskUserQuestion/g) ?? []).length).toBeLessThanOrEqual(5);
+  });
+
+  it('a re-run keeps manual opt-in adapters already in reviewers, and says so', () => {
+    const s1d = subsection('1d.');
+    const keep = /^ {3}- \*\*Re-run: keep manual opt-ins\.\*\* (.*)$/m.exec(s1d)?.[1] ?? '';
+    expect(keep).toContain('`cursor-review-prompter`; `grok-review-prompter` when grok is in that bucket');
+    expect(keep).toContain('write the authenticated adapters first, then each kept entry in its existing order, without duplicates');
+    expect(keep).toContain('`Kept cursor-review-prompter (manual opt-in)`');
+    expect(keep).toContain('the wizard never removes it');
+    // Step 0's re-run option and Option 1's label both point at the rule
+    expect(wizard).toContain('overwrite `multi_model_review.reviewers`, keeping any manual opt-in adapter already in the list (Step 1d)');
+    expect(s1b).toContain('a re-run also keeps manual opt-in adapters already in `reviewers`; Step 1d');
   });
 });
 
@@ -302,6 +381,12 @@ describe('Task 70 Option 2 snippet', () => {
     expect(parsed.multi_model_review.aggregator.command).toBe('auto');
   });
 
+  it('warns on the aggregator line that a flagship Cursor reviewer can win auto, and points at pinning', () => {
+    expect(snippet).toMatch(
+      /^# {5}command: auto {3}# a Cursor reviewer with a flagship slug can win auto; pin another adapter \(see defaults\.yaml\)$/m
+    );
+  });
+
   it('the init fixture\'s expected-snippet.yaml is byte-identical to the wizard snippet', () => {
     expect(readFileSync(join(FIXTURES, 'enabled-later-with-snippet', 'expected-snippet.yaml'), 'utf8')).toBe(snippet);
   });
@@ -318,6 +403,9 @@ describe('Task 70 init fixtures match the wizard', () => {
       not_detected: string[];
     };
     expected_config_writes: Record<string, unknown>;
+    existing_config?: { multi_model_review?: { reviewers?: string[] } };
+    expected_kept_manual?: string[];
+    expected_confirmation_includes?: string[];
     expected_manual_listing_includes?: string[];
     expected_yaml_snippet_includes_commented_reviewers?: string[];
   }
@@ -326,8 +414,10 @@ describe('Task 70 init fixtures match the wizard', () => {
   const map = mappingTable();
   const s1b = subsection('1b.');
 
-  it('includes the grok-host self-review scenario', () => {
-    expect(dirs).toEqual(expect.arrayContaining(['enabled-with-detected', 'enabled-later-with-snippet', 'skip', 'grok-host-self-review']));
+  it('includes the grok-host self-review and re-run scenarios', () => {
+    expect(dirs).toEqual(
+      expect.arrayContaining(['enabled-with-detected', 'enabled-later-with-snippet', 'skip', 'grok-host-self-review', 'rerun-keeps-manual'])
+    );
   });
 
   it.each(fixtures.map((f) => [f.scenario, f]))('%s: every fixture records the manual bucket and the host', (_s, f) => {
@@ -350,12 +440,18 @@ describe('Task 70 init fixtures match the wizard', () => {
   it.each(fixtures.filter((f) => f.user_choice === 1).map((f) => [f.scenario, f]))(
     '%s: Option 1 writes the adapter names of authenticated, non-manual CLIs only',
     (_s, f) => {
-      const expected = f.detection_results.detected_and_authenticated.map((cli) => map[cli]);
-      expect(expected.every(Boolean)).toBe(true);
-      expect(f.expected_config_writes['multi_model_review.reviewers']).toEqual(expected);
-      for (const m of f.detection_results.detected_opt_in_manually) {
-        expect(f.expected_config_writes['multi_model_review.reviewers']).not.toContain(map[m.cli]);
+      const authed = f.detection_results.detected_and_authenticated.map((cli) => map[cli]);
+      expect(authed.every(Boolean)).toBe(true);
+      // Step 1d re-run rule: keep a manual-bucket adapter that is already in reviewers, after the authenticated ones
+      const existing = f.existing_config?.multi_model_review?.reviewers ?? [];
+      const manualAdapters = f.detection_results.detected_opt_in_manually.map((m) => map[m.cli]);
+      const kept = existing.filter((a) => manualAdapters.includes(a) && !authed.includes(a));
+      expect(f.expected_kept_manual ?? []).toEqual(kept);
+      expect(f.expected_config_writes['multi_model_review.reviewers']).toEqual([...authed, ...kept]);
+      for (const a of manualAdapters.filter((x) => !kept.includes(x))) {
+        expect(f.expected_config_writes['multi_model_review.reviewers']).not.toContain(a);
       }
+      for (const k of kept) expect(f.expected_confirmation_includes ?? []).toContain(`Kept ${k} (manual opt-in)`);
     }
   );
 
@@ -365,6 +461,15 @@ describe('Task 70 init fixtures match the wizard', () => {
       for (const s of f.expected_manual_listing_includes!) expect(s1b, s).toContain(s);
     }
   );
+
+  it('the re-run fixture starts from a hand-added cursor-review-prompter and keeps it', () => {
+    const f = fixtures.find((x) => x.scenario === 'rerun-keeps-manual')!;
+    expect(f).toBeDefined();
+    expect(f.existing_config?.multi_model_review?.reviewers).toContain('cursor-review-prompter');
+    expect(f.detection_results.detected_opt_in_manually.map((m) => m.cli)).toContain('cursor-agent');
+    expect(f.expected_config_writes['multi_model_review.reviewers']).toContain('cursor-review-prompter');
+    for (const s of f.expected_confirmation_includes ?? []) expect(subsection('1d.'), s).toContain(s.replace(/^Kept (\S+) .*/, 'Kept $1'));
+  });
 
   it('the snippet fixture expects the grok and cursor commented reviewers', () => {
     const f = fixtures.find((x) => x.scenario === 'enabled-later-with-snippet')!;
@@ -417,6 +522,15 @@ describe('Task 70 defaults.yaml examples', () => {
     expect(per['codex-review-prompter']).toEqual({ model: 'gpt-5', family: 'openai' });
   });
 
+  it('the grok example says family defaults to xai only for an unset or grok-* model (grok-review.sh)', () => {
+    expect(defaults).toContain(
+      '    #   # model: unset uses the account default; family defaults to xai\n' +
+        '    #   # (a model not starting grok- gives unknown unless you set family).\n'
+    );
+    const runner = readFileSync(join(PLUGIN, 'scripts', 'adapters', 'grok-review.sh'), 'utf8');
+    expect(runner).toMatch(/""\|grok-\*\) FAMILY="xai" ;;\s*\n\s*\*\) FAMILY="unknown" ;;/);
+  });
+
   it('has the aggregator pinning comment (why Cursor/Grok should not be the aggregator unless pinned)', () => {
     const agg = defaults.slice(defaults.indexOf('  aggregator:\n'), defaults.indexOf('    command: auto\n'));
     expect(agg).toContain('Pinning (multi-model-review D31)');
@@ -463,8 +577,26 @@ describe('Task 70 U23: no validator rejects per_reviewer.<id>.allow_api_key_bill
     ...walk(join(ROOT, 'tests', 'schemas')).filter((p) => p.endsWith('.ts') && !p.endsWith('.test.ts')),
   ].filter((p) => !/\.(md|ya?ml|txt)$/.test(p));
 
+  // Any mention of the bare key counts (dot, colon, bracket, optional chaining or a
+  // quoted string); per_reviewer_results / per_reviewer_timeout_seconds do not.
+  const PER_REVIEWER = /\bper_reviewer\b(?!_)/;
+
+  it('the reader pattern catches dot, bracket, optional-chaining and quoted access', () => {
+    for (const src of [
+      'cfg.multi_model_review.per_reviewer.x',
+      "cfg.multi_model_review['per_reviewer']?.[id]",
+      'mmr.per_reviewer?.[id]',
+      'mmr.per_reviewer[id]',
+      'const k = "per_reviewer";',
+      'per_reviewer:',
+    ]) {
+      expect(PER_REVIEWER.test(src), src).toBe(true);
+    }
+    for (const src of ['per_reviewer_results', 'per_reviewer_timeout_seconds']) expect(PER_REVIEWER.test(src), src).toBe(false);
+  });
+
   it('the only code that reads per_reviewer.<id> keys is the two runners, and both read allow_api_key_billing', () => {
-    const readers = CODE.filter((p) => /per_reviewer(?:\.|:)/.test(readFileSync(p, 'utf8'))).map((p) => relative(ROOT, p));
+    const readers = CODE.filter((p) => PER_REVIEWER.test(readFileSync(p, 'utf8'))).map((p) => relative(ROOT, p));
     expect(readers.sort()).toEqual([
       'plugins/synthex/scripts/adapters/cursor-review.sh',
       'plugins/synthex/scripts/adapters/grok-review.sh',
@@ -532,6 +664,21 @@ describe('Task 70 docs', () => {
   it('start-review-team.md roster includes grok and cursor', () => {
     const srt = readFileSync(join(PLUGIN, 'commands', 'start-review-team.md'), 'utf8');
     expect(srt).toContain('(codex, claude, gemini, bedrock, llm, ollama, grok, cursor —');
+  });
+
+  it('start-review-team Step 5a never warns or prompts for a grok/cursor sandbox-yolo (a read-only alias, D29)', () => {
+    const srt = readFileSync(join(PLUGIN, 'commands', 'start-review-team.md'), 'utf8');
+    const step = srt.slice(srt.indexOf('### Step 5a.'), srt.indexOf('### Step 6'));
+    expect(step).toContain('**grok and cursor never count as `sandbox-yolo` here.**');
+    expect(step).toContain('print the info line `<cli-name> sandbox-yolo runs as read-only (D29)` instead of the warning, and do not prompt for it');
+    expect(step).toContain('**If any other CLI in the roster resolves to `sandbox-yolo`**');
+    expect(step).toContain('counting a grok or cursor `sandbox-yolo` as `read-only`');
+    // the D25 / NFR-MMT7 locked warning string is unchanged
+    expect(step).toContain('⚠ <cli-name> is configured in sandbox-yolo mode — CLI will run with full tool permissions inside an OS sandbox.');
+    // and both runners really treat sandbox-yolo as read-only
+    for (const r of ['grok-review.sh', 'cursor-review.sh']) {
+      expect(readFileSync(join(PLUGIN, 'scripts', 'adapters', r), 'utf8'), r).toMatch(/sandbox-yolo is a no-op alias of\s*\n#\s*read-only/);
+    }
   });
 
   it('docs/testing.md lists the grok and cursor adapters and their suites', () => {

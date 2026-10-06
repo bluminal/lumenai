@@ -497,7 +497,8 @@ multi_model_review:
     #   model: qwen2.5-coder:32b
     #   family: local-qwen
     # grok-review-prompter:
-    #   # model: unset uses the account default; family defaults to xai.
+    #   # model: unset uses the account default; family defaults to xai
+    #   # (a model not starting grok- gives unknown unless you set family).
     #   allow_api_key_billing: false   # true lets XAI_API_KEY / GROK_CODE_XAI_API_KEY
     #                                  # bill per token; otherwise the runner unsets them
     # cursor-review-prompter:

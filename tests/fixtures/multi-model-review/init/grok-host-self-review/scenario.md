@@ -2,7 +2,9 @@
 
 ## Overview
 
-The wizard runs inside a Grok session, so `SYNTHEX_HOST=grok`. The detection scan finds `grok`
+The wizard runs inside a Grok session, so the host id is `grok` (the `SYNTHEX_HOST` value the Grok
+wrapper tells the model to export; the wizard takes it from the host, not from a separate
+environment read). The detection scan finds `grok`
 installed and logged in to a grok.com session (`grok-review.sh --auth-check` exits 0) and `codex`
 authenticated. Nothing else is installed.
 
@@ -24,7 +26,7 @@ family's work and adds no family diversity.
 ## Expected Behavior
 
 1. The option 1 label lists `codex` only; `grok` is not in it.
-2. The "detected — opt in manually" listing is printed as plain text (not a fourth option) with the
+2. Before the question, the "detected — opt in manually" listing is printed as plain text (not a fourth option) with the
    self-review note for grok.
 3. The FR-MR27 warning is displayed verbatim before any write.
 4. Config writes `multi_model_review.enabled: true` and
