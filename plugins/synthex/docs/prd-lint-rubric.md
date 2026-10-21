@@ -82,6 +82,8 @@ When `Current and Target State` is present:
 | Every supplied source appears in the Source Map | MEDIUM |
 | Every link in the PRD body is accounted for | MEDIUM |
 
+Report a source's accounting state as one of `yes`, `yes (no contribution)`, or `pending — awaiting ingest`. A pending row must appear in the report: it is in the Source Map but not in the supplied sources, and leaving it out of both is how a queued source becomes invisible.
+
 **A `pending` cell is valid, never a finding.** The `Contributed` column is a closed vocabulary: `pending` (or empty) means a human queued that source and it has not been ingested; `none`, `declined`, `unreadable — <reason>`, and `self-reference — not ingested` are outcomes Synthex writes. A `pending` row is a standing instruction to `/synthex:refine-requirements`, not an incomplete table.
 
 ## What this rubric deliberately does not check
