@@ -60,6 +60,10 @@ Present the findings to the Product Manager exactly as `lint-plan.mjs` would: a 
 
 A plan without one falls back to the configured default, which is the wrong epic in a multi-initiative repository. Do **not** invent a value when it is missing: report it, so the command can resolve the epic from the PRD or ask. A value derived from a filename or a branch name is worse than none: it matches no rows, and an empty queue reads as "all work complete" rather than as a misconfiguration.
 
+| A work-item link in a Task cell points at a real row, not a placeholder | HIGH |
+
+Only half of this is checkable. A linter sees one version of the document, so it cannot know a link used to be there — **never strip a work-item link to plain text when rewording a task** is an instruction to the Product Manager, not a check. A task whose row does not exist yet correctly has no link.
+
 ## Target State by Milestone (when present)
 
 | Check | Severity |
