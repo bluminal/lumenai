@@ -107,6 +107,16 @@ agreement, not an exception.
     renders nothing at all, so adding a `(M1.1)` suffix to a bare label
     silently destroys the diagram. Verified against the mermaid parser.
 
+16. ADDED, and deliberately only half of what it replaces. plan-scribe's
+    retired rule had two halves: never STRIP a work-item link from a Task
+    cell, and never INVENT one. Only the second is checkable here -- a
+    linter sees one version of the document, so it cannot know a link used
+    to be there. This script therefore rejects a link whose target is empty
+    or a placeholder, and the "never strip" half lives as an instruction in
+    product-manager.md's Writing the Plan In Place section, the same way
+    the renumbering rule does. Saying so beats implying the guarantee is
+    enforced when half of it is not.
+
 # Exit codes:
 #   0 - no CRITICAL or HIGH findings (MEDIUM findings, if any, are left to
 #       the Product Manager's discretion per write-implementation-plan.md
@@ -486,6 +496,32 @@ function lintPlan(text) {
         const deps = depsIdx >= 0 ? (row[depsIdx] ?? '').trim() : '';
         const status = statusIdx >= 0 ? (row[statusIdx] ?? '').trim() : '';
         const taskLabel = taskNum !== undefined ? `Task ${taskNum}` : `row ${rowIdx + 1}`;
+
+        // Reconciliation decision #16: a work-item link in the Task cell is
+        // that row's identity made visible. Only HALF of plan-scribe's old
+        // rule is checkable here -- see the header note.
+        const taskIdx = colIndex(taskTable.headers, 'Task');
+        const taskCell = taskIdx >= 0 ? (row[taskIdx] ?? '').trim() : '';
+        const link = taskCell.match(/\[[^\]]*\]\(([^)]*)\)/);
+        if (link) {
+          const target = link[1].trim();
+          const fabricated =
+            target === '' ||
+            /[<>]/.test(target) ||
+            /\b(row-id|task-id|url|link|todo|tbd)\b/i.test(target);
+          if (fabricated) {
+            findings.push(
+              makeFinding(
+                'HIGH',
+                `${taskLabel}: work-item link has no real target`,
+                `${milestone.title}, ${taskLabel} (line ${lineIndex + 1})`,
+                'Task-Level: a work-item link in the Task cell points at a real row',
+                `Link target "${target}" is a placeholder or empty. A fabricated row id points at nothing, or worse, at some other row.`,
+                'Point it at the actual work item, or make the cell plain text until the row exists.',
+              ),
+            );
+          }
+        }
 
         if (taskNum !== undefined && !taskLineIndex.has(taskNum)) {
           taskLineIndex.set(taskNum, lineIndex);

@@ -161,7 +161,7 @@ const gitDir = resolveGitDir(cwd);
 if (gitDir && fs.existsSync(path.join(gitDir, 'MERGE_HEAD'))) process.exit(0);
 
 // Extract the first -m/--message subject. -F/--file (including `-F -`)
-// always passes: its content isn't on the command line the hook receives.
+// always passes: its content is not on the command line the hook receives.
 let subject = null;
 let hasFileFlag = false;
 for (let i = 0; i < rest.length; i += 1) {

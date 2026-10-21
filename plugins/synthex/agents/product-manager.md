@@ -506,6 +506,8 @@ There is no scribe sub-agent. You hold the plan document directly with your own 
 - **Compactness pass (see below):** Apply your own tightening edits directly, section by section.
 - **Step 8 (finalize):** Once all reviewer cycles are complete, remove the `<!-- DRAFT -->` marker from `@{plan_path}`. No rewrite is needed at this step -- the file is already current from the edits applied along the way.
 
+**Work-item links:** under a tracker-backed plan a task's **Task** cell may be a markdown link to its work item — `[Add rate limiting](https://www.notion.so/<row-id>)`. The link is that row's identity made visible to a reader. When you edit a task's wording, **keep the link and retarget only the label**. Never strip one to plain text, and never invent one for a task that has none: a fabricated row id points at nothing, or worse, at some other row. A task you have just added correctly has no link until its row exists.
+
 **Renumbering rule:** Whenever an edit adds or removes a task or milestone, renumber the affected items and update every cross-reference (dependencies, "Task N" mentions in Parallelizable notes) in the same edit.
 
 ---

@@ -509,3 +509,56 @@ describe('lint-plan.mjs — Target State by Milestone (reconciliation decision #
     expect(report.findings.filter((f) => f.location.includes('Target State'))).toEqual([]);
   });
 });
+
+describe('lint-plan.mjs — work-item links (reconciliation decision #16)', () => {
+  const table = (taskCell: string) =>
+    [
+      '| # | Task | Complexity | Dependencies | Status |',
+      '|---|------|-----------|--------------|--------|',
+      `| 1 | ${taskCell} | S | None | pending |`,
+      '',
+      '**Task 1 Acceptance Criteria:** `[T]` Ships the thing.',
+      '',
+      '**Parallelizable:** None.',
+      '**Milestone Value:** Ships the thing.',
+    ].join('\n');
+
+  it('[T] accepts a real work-item link', () => {
+    const report = lintText(withPlan(table('[Add rate limiting](https://www.notion.so/26ab1f9f4c5f)')));
+    expect(report.findings.filter((f) => f.title.includes('work-item link'))).toEqual([]);
+  });
+
+  it('[T] accepts a plain-text cell — a task whose row does not exist yet', () => {
+    const report = lintText(withPlan(table('Add rate limiting')));
+    expect(report.findings.filter((f) => f.title.includes('work-item link'))).toEqual([]);
+  });
+
+  it('[T] flags a placeholder target (HIGH)', () => {
+    const report = lintText(withPlan(table('[Add rate limiting](https://www.notion.so/<row-id>)')));
+    expect(report.findings.some((f) => f.severity === 'HIGH' && f.title.includes('no real target'))).toBe(true);
+  });
+
+  it('[T] flags an empty target', () => {
+    const report = lintText(withPlan(table('[Add rate limiting]()')));
+    expect(report.findings.some((f) => f.severity === 'HIGH' && f.title.includes('no real target'))).toBe(true);
+  });
+
+  it('[T] flags a TBD-shaped target', () => {
+    const report = lintText(withPlan(table('[Add rate limiting](TBD)')));
+    expect(report.findings.some((f) => f.severity === 'HIGH' && f.title.includes('no real target'))).toBe(true);
+  });
+
+  it('[T] the never-strip half is carried as an instruction, not a check', () => {
+    // A linter sees one version of the document, so it cannot know a link used
+    // to be there. Saying so beats implying the guarantee is enforced.
+    const script = readFileSync(SCRIPT_PATH, 'utf8');
+    expect(script).toMatch(/deliberately only half of what it replaces/);
+    expect(script).toMatch(/cannot know a link used\n.*to be there/);
+    const pm = readFileSync(
+      join(import.meta.dirname, '..', '..', 'plugins', 'synthex', 'agents', 'product-manager.md'),
+      'utf8',
+    );
+    expect(pm).toMatch(/\*\*Work-item links:\*\*/);
+    expect(pm).toMatch(/Never strip one to plain text, and never invent one/);
+  });
+});
