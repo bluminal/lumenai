@@ -306,13 +306,17 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
         return count + (text.match(/docs\/native-looping\.md/g) ?? []).length;
       }, 0);
       expect(nativeLoopingMentions).toBeGreaterThanOrEqual(32);
-      expect(allIncludes).toHaveLength(23);
+      expect(allIncludes).toHaveLength(31);
       expect(new Set(allIncludes.map((i) => i.file))).toEqual(
         new Set([
           'plugins/synthex/commands/review-code.md',
           'plugins/synthex/commands/performance-audit.md',
           'plugins/synthex/commands/write-implementation-plan.md',
           'plugins/synthex/commands/write-prd.md',
+          'plugins/synthex/commands/reliability-review.md',
+          'plugins/synthex/commands/retrospective.md',
+          'plugins/synthex/commands/write-rfc.md',
+          'plugins/synthex/commands/write-adr.md',
           'plugins/synthex/commands/next-priority.md',
           'plugins/synthex/commands/loop.md',
           'plugins/synthex/commands/refine-requirements.md',
@@ -335,6 +339,7 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
           '${CLAUDE_PLUGIN_ROOT}/docs/adapter-common.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/plan-lint-rubric.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/prd-lint-rubric.md',
+          '${CLAUDE_PLUGIN_ROOT}/docs/document-backends.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/engines/loop-workflow.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/next-priority-loop.md',
         ]),

@@ -454,3 +454,58 @@ describe('plan-linter retirement (FR-HM26, Task 45)', () => {
     expect(AGENT_COUNT).toBeLessThanOrEqual(28);
   });
 });
+
+describe('lint-plan.mjs — Target State by Milestone (reconciliation decision #15)', () => {
+  const diagram = (body: string) =>
+    ['## Target State by Milestone', '```mermaid', 'graph LR', body, '```', ''].join('\n');
+
+  function withDiagram(body: string): string {
+    return withPlan(
+      [
+        '| # | Task | Complexity | Dependencies | Status |',
+        '|---|------|-----------|--------------|--------|',
+        '| 1 | Do the thing | S | None | pending |',
+        '',
+        '**Task 1 Acceptance Criteria:** `[T]` Ships the gateway.',
+        '',
+        '**Parallelizable:** None.',
+        '**Milestone Value:** Ships the thing.',
+      ].join('\n'),
+    ).replace('## Decisions', `${diagram(body)}## Decisions`);
+  }
+
+  it('[T] accepts attribution labels naming a milestone the plan defines', () => {
+    const report = lintText(withDiagram('  A[Client] --> G["Gateway (M1.1)"]'));
+    expect(report.findings.filter((f) => f.location.includes('Target State'))).toEqual([]);
+  });
+
+  it('[T] flags a progress marker on a milestone label (HIGH)', () => {
+    const report = lintText(withDiagram('  A[Client] --> G["Gateway (M1.1 shipped)"]'));
+    expect(report.findings.some((f) => f.severity === 'HIGH' && f.title.includes('Progress marker'))).toBe(true);
+  });
+
+  it('[T] flags a label naming a milestone the plan does not contain (HIGH)', () => {
+    const report = lintText(withDiagram('  A[Client] --> G["Gateway (M9.9)"]'));
+    expect(
+      report.findings.some((f) => f.severity === 'HIGH' && f.title.includes('which this plan does not contain')),
+    ).toBe(true);
+  });
+
+  it('[T] flags unquoted parentheses, which mermaid rejects outright (HIGH)', () => {
+    const report = lintText(withDiagram('  A[Client] --> G[Gateway (M1.1)]'));
+    expect(report.findings.some((f) => f.severity === 'HIGH' && f.title.includes('Unquoted parentheses'))).toBe(true);
+  });
+
+  it('[T] flags a non-mermaid Target State section (HIGH)', () => {
+    const text = withPlan('**Parallelizable:** None.\n**Milestone Value:** Ships it.').replace(
+      '## Decisions',
+      '## Target State by Milestone\nProse instead of a diagram.\n\n## Decisions',
+    );
+    expect(lintText(text).findings.some((f) => f.severity === 'HIGH' && f.title.includes('not a mermaid diagram'))).toBe(true);
+  });
+
+  it('[T] stays silent when the section is absent — the PRD may have omitted it', () => {
+    const report = lintText(withPlan('**Parallelizable:** None.\n**Milestone Value:** Ships it.'));
+    expect(report.findings.filter((f) => f.location.includes('Target State'))).toEqual([]);
+  });
+});

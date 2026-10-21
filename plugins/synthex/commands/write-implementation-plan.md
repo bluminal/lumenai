@@ -53,6 +53,12 @@ Every task in the implementation plan must have acceptance criteria. Each criter
 
 ---
 
+## Document Backend
+
+**When `notion.enabled` is `false` — the default — skip this section entirely** and resolve `requirements_path`, `specs_path`, `plan_path` directly against the filesystem exactly as the Workflow below describes. The disabled path must stay byte-identical to pre-Notion behavior (FR-NB2), and the surest way to guarantee that is to run no new logic at all.
+
+Otherwise Read `${CLAUDE_PLUGIN_ROOT}/docs/document-backends.md` and follow it, including the `write-implementation-plan` section for this command's specifics. On other hosts, resolve the plugin root from `.synthex/state.json`'s `plugin_root` field and read the same file relative to it.
+
 ## Workflow
 
 ### 1. Load Configuration
@@ -120,6 +126,7 @@ The Product Manager produces an initial implementation plan draft following the 
 - Parallelizable work explicitly called out (limit to `@{concurrent_tasks}` concurrent tasks per milestone, per config), with scheduling notes when a batch includes `[H]`-criteria tasks (start them early so user review overlaps with autonomous work)
 - A **Decisions** section documenting major planning decisions and rationale
 - An **Open Questions** section tracking items needing further discovery
+- A **Target State by Milestone** diagram, when the PRD has a `Current and Target State` section — attribution labels only, derived from the PRD's, per `product-manager.md`
 
 ### 5.5. Structural Lint Pass
 
@@ -269,6 +276,20 @@ The implementation plan will follow this structure:
 
 ## Overview
 [Brief summary linking back to the PRD. Keep this to 2-3 sentences.]
+
+## Target State by Milestone
+[One mermaid diagram: the system once this plan is delivered, with new or
+changed components labelled with the milestone that delivers them. Derived
+from the PRD's `Current and Target State`. Omit when the PRD omitted it.]
+
+```mermaid
+graph LR
+  A[Client] --> G["Gateway (M1.1)"]
+  G --> B[API]
+  B --> C[(Postgres)]
+  B --> D["Cache (M1.2)"]
+```
+*New or changed components carry the milestone that delivers them. Unlabelled components are unchanged.*
 
 ## Decisions
 

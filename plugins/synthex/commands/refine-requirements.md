@@ -10,6 +10,7 @@ Improve a Product Requirements Document (PRD) by running it through a multi-agen
 
 | Parameter | Description | Default | Required |
 |-----------|-------------|---------|----------|
+| `--from <path>` | New source material to fold into the PRD. Repeatable. Accepts a file, a glob, a directory, a URL, or a Notion page URL. Same semantics as `/synthex:write-prd`'s flag. | — | No |
 | `requirements_path` | Path to the PRD markdown file | `docs/reqs/main.md` | No |
 | `specs_path` | Path to technical specifications directory | `docs/specs` | No |
 | `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
@@ -35,6 +36,12 @@ You orchestrate the refinement of a PRD through:
 This command does NOT produce an implementation plan. It improves the PRD so that downstream agents (and humans) can understand it without ambiguity.
 
 ---
+
+## Document Backend
+
+**When `notion.enabled` is `false` — the default — skip this section entirely** and resolve `requirements_path` directly against the filesystem exactly as the Workflow below describes. The disabled path must stay byte-identical to pre-Notion behavior (FR-NB2), and the surest way to guarantee that is to run no new logic at all.
+
+Otherwise Read `${CLAUDE_PLUGIN_ROOT}/docs/document-backends.md` and follow it, including the `refine-requirements` section for this command's specifics. On other hosts, resolve the plugin root from `.synthex/state.json`'s `plugin_root` field and read the same file relative to it.
 
 ## Workflow
 
@@ -72,9 +79,107 @@ Read available technical context to inform whether reviewer questions already ha
 
 This context is critical — it lets you answer reviewer questions without bothering the user when the answers are already documented.
 
+### 3.5. Ingest New Sources
+
+**Skip this step entirely when there is nothing to ingest** — no `--from` was supplied and the Source Map holds no pending entry. That is the ordinary refinement run, and it must behave exactly as it did before this step existed.
+
+Amendment runs **before** the review loop, so reviewers see the amended document and the loop becomes the thing that makes the amendment safe.
+
+#### 3.5a. Collect the pending set
+
+Two inputs, combined:
+
+- Everything supplied via `--from` on this invocation.
+- Every Source Map row whose `Contributed` cell reads `pending`. **Pending rows are the `--from` list when no `--from` was given** — a human pasting a link into the Source Map is leaving a standing instruction, and that is the whole mechanism.
+
+**Find the Source Map by name, never by number.** It is `## 10.` under the filesystem shape and `## 7.` under the Notion shape.
+
+**Dedupe on resolved identity.** A `--from` path that already has a pending row fills that row rather than adding a second. The same URL pasted in two forms is one source.
+
+#### 3.5b. The `Contributed` column is a closed vocabulary
+
+| Value | Meaning | Written by |
+|-------|---------|------------|
+| `pending` *(or an empty cell)* | Not yet ingested | **A human — the only state a human writes** |
+| `FR-3, FR-9` | Ingested; contributed these | You |
+| `none` | Ingested; contributed nothing | You |
+| `declined` | Candidates presented; all rejected | You |
+| `unreadable — <reason>` | Attempted; could not be read | You |
+| `self-reference — not ingested` | Rejected as circular | You |
+
+`pending` is canonical; treat a blank or whitespace-only cell as the same thing.
+
+**Never leave a cell blank after a run.** Blank means pending, so a source that was read and yielded nothing would be re-ingested on the next run — and a conversational source would ask a human to re-confirm candidates they already declined.
+
+#### 3.5c. Reject self-reference
+
+**A document cannot be its own source.** Reject any entry resolving to the PRD being amended, to this initiative's epic page, implementation plan, or retrospectives, or to a glob that expands to include them. Mark the cell `self-reference — not ingested` and say why.
+
+Ingesting a PRD into itself converts every `[A]` it holds into an `[S]`. That is provenance laundering, and it passes every other check in the rubric.
+
+**Compare resolved identities, not typed strings.** A self-reference may arrive as a relative path, an absolute path, a Notion page URL, a Notion page id, or a directory containing the document.
+
+#### 3.5d. Classify each source, then confirm before fetching
+
+Each source is **authoritative** (a specification, an ADR, a prior PRD — a record of something decided) or **conversational** (a transcript, meeting notes, a chat log — a record of something discussed).
+
+**Default to conversational.** Where the kind is not evident, treat it as conversational and ask. Misclassifying a specification costs one confirmation step; misclassifying a transcript costs a requirement nobody agreed to.
+
+**A source cannot classify itself.** Propose a classification per entry and let the user correct it before anything is read for requirements.
+
+**Name the fetches before performing them.** List what will be read and confirm. Under the `notion` backend the PRD page is editable by the whole workspace, so a pending row is not necessarily something the person running this command put there.
+
+#### 3.5e. Assemble
+
+Run `plugins/synthex/scripts/assemble-bundle.sh assemble` (resolved from the installed plugin root — Claude Code: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/assemble-bundle.sh" assemble --source <path>...`) as ONE Bash call. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
+
+Pass `--source <path>` per collected entry. The script applies the byte caps, routes anything oversized to `needs_summary[]` without reading it, and returns the bundle path; summarize those entries yourself. Its `sources[]` manifest records what was read, what was summarized, and **what could not be read, with a reason** — the one category whose failures it records rather than skipping.
+
+**Promote the pending entries into `sources` before assembling.** By lint time every ingested row is then genuinely a supplied source, and `prd-linter`'s fabricated-citation check holds unchanged rather than needing to be weakened.
+
+**Technical context is not source material.** Step 3 reads specs, `CLAUDE.md`, and `package.json` to answer reviewer questions. Those do not enter the Source Map and are not ingested here.
+
+**A pending entry that cannot be read does not block the run.** Write `unreadable — <reason>` into its cell, leave the row where it is, and report it. Do not delete the row — it is the human's record of intent. Do not infer content from the URL, the page title, or the meeting name: a Source Map row naming a document nobody could open is a weaker claim than no row at all.
+
+**When network egress is denied, say so once.** Every URL fails identically under the sandbox, and a per-row "check your share link" message buries the real cause. Leave those rows `pending` rather than `unreadable` — they were never attempted, and `unreadable` would stop the next run retrying.
+
+**Say which entries arrived summarized**, before the confirmation pass. A user who learns their 90-minute transcript was compressed may prefer to amend one source at a time.
+
+#### 3.5f. Apply authoritative sources, then confirm conversational candidates
+
+**Authoritative first.** A candidate the user is asked to confirm must be shown against the PRD as it *will* stand, not as it stood before the run — otherwise a specification silently overwrites something they just confirmed.
+
+**Conversational sources produce candidates, never requirements.** Present them as one reviewable list with the location each came from, and let the user strike what was not decided:
+
+```
+From the Oct 8 sync, 4 candidates:
+  1. Bulk export    [12:04 Dana]
+  2. SSO by Q1      [23:51 Raj]
+  3. Drop the CSV   [31:02 Dana]   <- contradicts FR-7
+  4. Rate limiting  [44:17 Raj]
+
+Strike what wasn't decided.
+```
+
+**One confirmation pass per run**, with candidates grouped by the requirement they touch rather than the source they came from. Two transcripts describing one decision produce one question carrying both citations; asking twice invites two different answers.
+
+**A confirmed candidate is `[U]`, never `[S]`** — see `product-manager.md`, Provenance Tagging. The transcript is where it was said; the confirmation is what made it a requirement.
+
+**A candidate declined because the answer is unsettled goes to Open Questions.** One declined silently will be raised again by the next source that mentions it. A candidate declined as noise needs no record.
+
+#### 3.5g. Apply, atomically
+
+**FR ids append; they are never renumbered.** A new requirement takes the next unused id. Implementation plans and work items cite these ids, and renumbering silently repoints every one of them.
+
+**There is no partial ingestion.** The confirmation pass either completes — every candidate accepted or rejected — or it is abandoned and nothing is written. A `Contributed` cell cannot say "three of seven," and inventing a way for it to say that would make every later run reconstruct which three.
+
+**One write, at the end**, carrying both the requirement changes and the `Contributed` cell updates. Under the `notion` backend that is a single `patch` with several edits, not several patches. A run that adds requirements and leaves the entry `pending` will add them again on the next run.
+
 ### 4. PRD Review Loop
 
 This is the core quality mechanism. The PRD is reviewed by specialist sub-agents who identify areas that are unclear, incomplete, or ambiguous from their perspective.
+
+**Reviewers must leave pending Source Map entries alone.** A row whose `Contributed` cell reads `pending` is a standing instruction, not an incomplete table. Do not fill it with a plausible contribution, do not delete the row, and do not raise it as a finding. This breaks silently and is near-impossible to diagnose afterwards, because the evidence that a source was ever queued is the row itself.
 
 **Process:**
 
@@ -199,6 +304,12 @@ If significant changes were made to the PRD, submit the revised version for anot
 If max cycles are reached with unresolved findings, add them to an "Open Questions" section at the end of the PRD.
 
 ### 5. Write the Updated PRD
+
+**Lint before writing.** Run `plugins/synthex/scripts/lint-prd.mjs` (resolved from the installed plugin root — Claude Code: `node "${CLAUDE_PLUGIN_ROOT}/scripts/lint-prd.mjs" "@{requirements_path}" --sources <bundle_path>`) as ONE Bash call, guarded with `command -v node`. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from. Without node, Read `${CLAUDE_PLUGIN_ROOT}/docs/prd-lint-rubric.md` and self-check by hand, producing the same CRITICAL/HIGH/MEDIUM shape.
+
+This command changes requirements — in the triage step as well as on an amendment — and until now nothing checked that the result still carried honest provenance.
+
+**An amendment is linted whole, but only its own findings block it.** Report findings across the document, because a reader needs the full picture, but require resolution only of findings on requirements this run introduced or changed. A pre-existing unconfirmed assumption is a reason to keep refining, not a reason to block a pasted link from being ingested — and blocking on it pushes toward "resolving" an old `[A]` by inventing a confirmation. Say which findings were pre-existing rather than letting them pass unmentioned.
 
 Write the refined PRD back to `@{requirements_path}`.
 

@@ -19,6 +19,12 @@ You invoke the **SRE Agent sub-agent** to perform a comprehensive operational re
 
 ---
 
+## Document Backend
+
+**When `notion.enabled` is `false` — the default — skip this section entirely** and resolve `slo_document`, `runbooks_path` directly against the filesystem exactly as the Workflow below describes. The disabled path must stay byte-identical to pre-Notion behavior (FR-NB2), and the surest way to guarantee that is to run no new logic at all.
+
+Otherwise Read `${CLAUDE_PLUGIN_ROOT}/docs/document-backends.md` and follow it, including the `reliability-review` section for this command's specifics. On other hosts, resolve the plugin root from `.synthex/state.json`'s `plugin_root` field and read the same file relative to it.
+
 ## Workflow
 
 ### 1. Load Configuration
