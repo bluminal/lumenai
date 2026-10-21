@@ -56,6 +56,10 @@ Do **not** flag a task for lacking a `` `[T]` `` criterion just because all its 
 
 Present the findings to the Product Manager exactly as `lint-plan.mjs` would: a total count broken down by CRITICAL/HIGH/MEDIUM, and one entry per finding with its severity, location (milestone + task, or document section), the rule it violates, the issue, and a concrete fix. The PM addresses every CRITICAL and HIGH finding; MEDIUM findings are addressed at the PM's discretion.
 
+| `**Epic:**` line present beneath the H1 | MEDIUM |
+
+A plan without one falls back to the configured default, which is the wrong epic in a multi-initiative repository. Do **not** invent a value when it is missing: report it, so the command can resolve the epic from the PRD or ask. A value derived from a filename or a branch name is worse than none: it matches no rows, and an empty queue reads as "all work complete" rather than as a misconfiguration.
+
 ## Target State by Milestone (when present)
 
 | Check | Severity |

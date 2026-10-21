@@ -357,6 +357,8 @@ When asked to create or update an implementation plan:
 ```markdown
 # Implementation Plan: [Product Name]
 
+**Epic:** [This initiative's epic reference]
+
 ## Overview
 [Brief summary linking back to PRD. 2-3 sentences max.]
 

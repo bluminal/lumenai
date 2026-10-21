@@ -274,6 +274,8 @@ The implementation plan will follow this structure:
 ```markdown
 # Implementation Plan: [Product Name]
 
+**Epic:** [This initiative's epic reference]
+
 ## Overview
 [Brief summary linking back to the PRD. Keep this to 2-3 sentences.]
 

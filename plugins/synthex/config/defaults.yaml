@@ -432,12 +432,27 @@ documents:
 # correlation-resistant consolidation. CLI-only (no API keys in Synthex).
 # ────────────────────────────────────────────────────────────────────────────
 
-  # Document backend. `filesystem` (default) writes markdown into the repo;
-  # `notion` routes documents into an existing Notion workspace via MCP.
+  # Which storage backend serves each document type.
+  # `filesystem` (default) reads and writes the paths above using local markdown
+  # files — today's behavior, unchanged. `notion` routes documents to an existing
+  # Notion workspace via the `notion:` block below.
+  # Requires `notion.enabled: true`; setting `notion` here without enabling the
+  # feature is a configuration error, not a silent opt-in.
   backend: filesystem
-  # Per-document-type override map. Resolution: override > global > filesystem.
-  # A map, never an array: config merge replaces arrays wholesale, so an array
-  # would mean overriding one entry silently drops the rest.
+
+  # Optional per-document-type override of `backend`, as a map of
+  # <doc_type>: <backend>. Resolution order, first match wins:
+  #   backend_overrides.<doc_type>  >  backend  >  filesystem
+  # This mirrors the review_loops idiom (per-command > global > hardcoded).
+  # Use it to put the artifacts non-engineers read in Notion while leaving the
+  # ones Synthex itself reads on every run (specs, decisions) on local disk.
+  # Must be a map, never a list: config-merger.ts replaces arrays wholesale, so
+  # a list here would make a project override silently drop the other entries.
+  # Example:
+  #   backend_overrides:
+  #     requirements: notion
+  #     implementation_plan: notion
+  #     retros: notion
   backend_overrides: {}
 
 multi_model_review:
@@ -874,6 +889,22 @@ prd:
 # Used by the `refine-requirements` command
 # -------------------------------------------------------------------
 
+# ────────────────────────────────────────────────────────────────────────────
+# Notion backend (FR-NB1) — off by default. Routes Synthex's documents and
+# implementation-plan task state into a Notion workspace that ALREADY EXISTS,
+# so its output shows up inside the process a team already runs.
+#
+# The governing principle is bolt-on compatibility: Synthex adapts to the
+# workspace it finds and never imposes a structure on it. It roots documents
+# under a page you nominate, writes tasks into a database you nominate, maps
+# onto that database's existing properties, and scopes every row it touches to
+# an epic reference so it cannot see or modify other teams' tickets.
+#
+# Access is via the Notion MCP server — Synthex never holds a Notion API key.
+# Run `/synthex:configure-notion` to set this up interactively rather than
+# editing this block by hand; the wizard discovers your database's real schema
+# and offers valid mappings.
+# ────────────────────────────────────────────────────────────────────────────
 notion:
   # Master switch. When false, every document operation routes to the
   # filesystem backend and behaves byte-identically to pre-Notion Synthex

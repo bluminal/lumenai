@@ -317,7 +317,16 @@ Preserve the existing PRD structure and style. Do not reorganize or reformat sec
 
 ### 6. Summary
 
-Output a brief summary to the user:
+When sources were ingested, lead with the amendment delta — it is what tells a user their paste worked:
+
+```
+Amended from 2 sources
+  oct-8-sync.md (conversation)  4 candidates -> 3 confirmed -> FR-23, FR-24, FR-25
+  billing-spec.md (authoritative)                              FR-26
+  granola.ai/...  unreadable - 403, still listed, not ingested
+```
+
+Then output a brief summary to the user:
 - How many findings were identified across all reviewers
 - How many were addressed (and how: from context vs. user input)
 - Any remaining open questions added to the PRD
