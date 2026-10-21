@@ -54,6 +54,21 @@ const claudeManifest = JSON.parse(readFileSync(claudeManifestPath, 'utf8'));
 // "Use when the user asks for /synthex:x, $x, ..." boilerplate), and pair
 // with a short `argument-hint` for the generated frontmatter.
 export const COMMAND_DESCRIPTIONS = {
+  'configure-notion': {
+    description:
+      'Point Synthex at an existing Notion page and work database. Refuses to configure tasks unscoped.',
+    argumentHint: '[config_path]',
+  },
+  'use-epic': {
+    description:
+      'Set which epic this working copy operates on. Per-developer state, gitignored; never creates documents.',
+    argumentHint: '<epic-url|id|name>',
+  },
+  'write-prd': {
+    description:
+      'Author a PRD from supplied and discovered sources. Every requirement carries a provenance tag; assumptions block.',
+    argumentHint: '[--from <path>]... [--epic <url>] [--epic-only]',
+  },
   init: {
     description:
       'Scaffold .synthex/config.yaml and the docs/reqs, docs/plans, docs/specs directories for a new project.',
@@ -171,6 +186,10 @@ export const COMMAND_DESCRIPTIONS = {
 // asserts that fallback path is never exercised). Each entry must be <= 120
 // characters and a concrete one-line summary of what the agent does.
 export const AGENT_DESCRIPTIONS = {
+  'notion-document-store':
+    'Reads and writes Synthex documents in Notion via MCP, implementing the document-store contract.',
+  'notion-task-store':
+    'Reads and writes implementation-plan task state in an existing Notion work database, always epic-scoped.',
   architect:
     'Reviews system architecture, feasibility, and technical trade-offs; writes ADRs and RFC sections.',
   'bedrock-review-prompter':

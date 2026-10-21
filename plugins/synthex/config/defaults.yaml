@@ -431,6 +431,15 @@ documents:
 # across multiple LLM families (OpenAI, Google, local-Ollama) for richer,
 # correlation-resistant consolidation. CLI-only (no API keys in Synthex).
 # ────────────────────────────────────────────────────────────────────────────
+
+  # Document backend. `filesystem` (default) writes markdown into the repo;
+  # `notion` routes documents into an existing Notion workspace via MCP.
+  backend: filesystem
+  # Per-document-type override map. Resolution: override > global > filesystem.
+  # A map, never an array: config merge replaces arrays wholesale, so an array
+  # would mean overriding one entry silently drops the rest.
+  backend_overrides: {}
+
 multi_model_review:
   # Master switch. When false, today's native-only review behavior is preserved
   # byte-identically (FR-MR23 regression contract).
@@ -833,3 +842,173 @@ hooks:
       # role-matching unblocked task exists. When false, a frontend
       # teammate is only ever pointed at frontend tasks.
       allow_cross_functional: false
+
+prd:
+
+  # Total cap on ingested source material, in bytes. Sources beyond this are
+  # summarized largest-first rather than dropped. Raise it when you routinely
+  # feed in large research corpora; the cost is context spent on reading
+  # rather than on interviewing.
+  max_source_bytes: 200000
+
+  # Per-document cap, in bytes. A single document larger than this is
+  # summarized before it enters the bundle, so one long transcript cannot
+  # crowd out every other source.
+  max_file_bytes: 40000
+
+  # What happens to requirements the Product Manager had to assume.
+  #
+  # `blocking` (default) — the PRD Linter raises an unconfirmed `[A]`
+  #   requirement as CRITICAL, so every assumption must be confirmed with the
+  #   user, grounded in a source, or demoted to an Open Question before the PRD
+  #   is final. This is the default because an unconfirmed assumption presented
+  #   as a requirement is indistinguishable from a fabricated one to whoever
+  #   builds from it.
+  #
+  # `warn` — assumptions are reported as MEDIUM and the PRD may ship with them
+  #   acknowledged. Use deliberately for a fast first draft, not as a habit.
+  assumption_policy: blocking
+
+# -------------------------------------------------------------------
+# Refine Requirements Settings
+# Used by the `refine-requirements` command
+# -------------------------------------------------------------------
+
+notion:
+  # Master switch. When false, every document operation routes to the
+  # filesystem backend and behaves byte-identically to pre-Notion Synthex
+  # (FR-NB2 regression contract). Nothing below has any effect until this is
+  # true — including `documents.backend: notion`.
+  enabled: false
+
+  # Failure policy. When false (default), any Notion error falls back to the
+  # filesystem backend for that document type and emits a warning naming the
+  # error code — work continues against local markdown. When true, errors
+  # abort the command instead. Enable this where a silent divergence between
+  # Notion and local state would be worse than a failed command.
+  # Two failures never fall back regardless: an unscoped-query risk
+  # (see `epic` below) and a missing required property mapping.
+  strict_mode: false
+
+  # An EXISTING Notion database whose rows are your epics or initiatives, as a
+  # URL or database ID. Every row in a Notion database is itself a page that
+  # can hold subpages, so Synthex hangs each initiative's documents — its PRD,
+  # implementation plan, and retrospectives — beneath that initiative's own
+  # row. The row becomes the single entry point for everything about it.
+  # Synthex links to rows you already have; it offers to create one only when
+  # you ask, and never fills in fields it does not own.
+  # Leave null if your epics are a tag on the work database rather than
+  # rows in their own database.
+  epics_database: null
+
+  # An EXISTING Notion database holding the work items your epics break down
+  # into, as a URL or database ID. Synthex's tasks live alongside whatever else
+  # the team tracks there, which is why `epic` below is mandatory.
+  # If null, `/synthex:configure-notion` offers to create one.
+  tasks_database: null
+
+  # An EXISTING Notion page for CROSS-CUTTING documents only — specs, ADRs,
+  # RFCs, and runbooks, which outlive any single initiative and have no epic to
+  # hang from. Epic-scoped documents ignore this and resolve against their own
+  # epic row instead.
+  # These types default to the filesystem backend, because Synthex reads them
+  # on every review invocation and they are engineering-internal, so most
+  # projects never need to set this.
+  docs_root: null
+
+  # Resolved page IDs per document type, as a map of <doc_type>: <page id>.
+  # `/synthex:configure-notion` writes these as it nominates or creates each
+  # target. This is the deterministic resolution path and it survives a page
+  # being renamed; without an entry, Synthex falls back to matching a child of
+  # `docs_root` by title, which fails rather than guessing if several match.
+  # Populated by the wizard — you should not need to edit this by hand.
+  # Must be a map, never a list.
+  targets: {}
+
+  # Epic scoping (FR-NB4) — the multi-team safety guarantee, and the
+  # reason this integration can point at a live shared board at all.
+  # Every row Synthex creates is stamped with `value`, and EVERY query Synthex
+  # issues filters on `property` = `value`. Synthex therefore cannot read or
+  # mutate tickets belonging to other epics.
+  # Both keys are required when `tasks_database` is set. Synthex refuses to run
+  # unscoped against a shared database — falling back to an unfiltered query is
+  # never an acceptable degradation.
+  #
+  # The PROPERTY is a fact about your database's schema, so it is set once here.
+  # The VALUE identifies one initiative, and a repo commonly has several in
+  # flight at once — so each implementation plan carries its own value on a
+  # `**Epic:**` line beneath its H1. Resolution, first match wins:
+  #   the plan's `**Epic:**` line  >  `value` below  >  refuse to run
+  # Binding the value to the plan makes targeting the wrong initiative
+  # structurally impossible: a command cannot touch task rows without having
+  # read the plan those rows belong to, and that plan names its epic.
+  epic:
+    # Name of the property on `tasks_database` that links a work item to its
+    # epic — commonly a relation property literally called "Epic".
+    # Any type that can be filtered for equality works: relation, select,
+    # multi-select, status, or plain text. A relation is the normal shape and
+    # the only one that also lets Synthex anchor documents to the epic page.
+    #
+    # Name this property exactly, and be sure it is the one your team actually
+    # uses for the epic linkage. A database may carry other similarly-named
+    # fields left over from an earlier process; pointing Synthex at one of
+    # those yields queries that match nothing, which looks like "no work left"
+    # rather than like a misconfiguration. `/synthex:configure-notion` lists
+    # the real candidates with their types so you can pick deliberately.
+    property: null
+    # Default epic value, used only for plans that do not declare their
+    # own. Single-initiative projects can just set this and never think about
+    # it. Multi-initiative repos should leave it null and let each plan speak
+    # for itself, so a plan can never silently inherit the wrong epic.
+    value: null
+
+  # Assignee scoping — relevant when several engineers share one epic.
+  # Epic scoping alone still lets two engineers select the same item, so
+  # when `property` is set, task queries are additionally scoped to work the
+  # invoking engineer may legitimately take: assigned to them, OR unassigned.
+  # Items assigned to somebody else are never selected or modified.
+  # Synthex creates new items unassigned (a planned task is available work),
+  # then claims one by assigning it to the current user when moving it to
+  # in-progress. That claim is what stops two engineers taking the same item.
+  # The current user is resolved from Notion at runtime — nothing here
+  # identifies you.
+  # Leave `property` null to skip assignee scoping entirely, which is fine when
+  # an epic is effectively owned by one engineer at a time.
+  assignee:
+    # A person property on `tasks_database`.
+    property: null
+    # Whether unassigned items are considered claimable. Setting this false
+    # restricts Synthex to items already assigned to you, which means it will
+    # not pick up newly planned work until someone assigns it.
+    include_unassigned: true
+
+  # Maps Synthex's canonical task fields onto your database's actual property
+  # names, as a map of <canonical_field>: <your property name>.
+  # Required: title, status, epic. Without all three Synthex refuses to
+  # operate (error code `schema_mismatch`) rather than guess.
+  # Optional: complexity, milestone, dependencies, acceptance_criteria. When one
+  # is unmapped it degrades gracefully — the data is recorded in the plan
+  # overview page or the task page body instead of becoming a queryable column.
+  # Synthex NEVER alters an existing database's schema without explicit consent.
+  # Must be a map, never a list (see `documents.backend_overrides`).
+  # Example:
+  #   property_map:
+  #     title: Name
+  #     status: Status
+  #     epic: Team
+  #     complexity: Size
+  property_map: {}
+
+  # Maps Synthex's canonical task states onto the option names your database
+  # already uses, as a map of <canonical_state>: <your option name>.
+  # Canonical states are: pending, in_progress, done, blocked.
+  # Teams have their own vocabulary, so this avoids forcing Synthex's words
+  # onto an established board. Unmapped states fall back to the canonical name.
+  # Must be a map, never a list.
+  # Example:
+  #   status_values:
+  #     pending: Backlog
+  #     in_progress: In Progress
+  #     done: Shipped
+  #     blocked: Blocked
+  status_values: {}
