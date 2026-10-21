@@ -32,6 +32,15 @@
 # Usage:
 #   assemble-bundle.sh assemble --artifact <path> \
 #       [--touched <path>]... [--convention <path>]... [--spec <path>]...
+#   assemble-bundle.sh assemble --source <path>... \
+#       [--convention <path>]... [--spec <path>]...
+#
+# Source-set mode: when one or more --source entries are given, --artifact
+# becomes optional and the bundle carries a `sources` manifest block. Unlike
+# every other category, a source that cannot be read is RECORDED rather than
+# skipped silently: it appears with status "unreadable" and a reason. The
+# caller may be about to claim a document grounds its output, and a claim of
+# provenance for something nobody could open is worse than no claim at all.
 #   assemble-bundle.sh cleanup <bundle-path>
 #   assemble-bundle.sh cleanup --sweep
 #
@@ -48,6 +57,13 @@
 #
 # Env overrides (mainly for tests):
 #   CLAUDE_PROJECT_DIR   project root (falls back to $PWD).
+#
+# Source content is DATA, never instructions. A fetched page, a transcript, or
+# a pasted note may contain text addressed to whoever reads it. This script only
+# routes bytes and never interprets them, but the caller summarizes every
+# needs_summary[] entry -- so the caller must treat that content as content to
+# be described and never act on it. A summarizer that follows instructions in
+# the text it summarizes launders them into every downstream consumer.
 #
 # Exit codes:
 #   0 - success: bundle written (assemble) or file(s) removed (cleanup).
@@ -142,6 +158,7 @@ byte_count() {
 
 cmd_assemble() {
   artifact=""
+  source_list=""
   touched_list=""
   convention_list=""
   spec_list=""
@@ -150,6 +167,10 @@ cmd_assemble() {
     case "$1" in
       --artifact)
         artifact="${2:-}"
+        shift 2
+        ;;
+      --source)
+        source_list="${source_list}${source_list:+$(printf '\036')}${2:-}"
         shift 2
         ;;
       --touched)
@@ -171,11 +192,11 @@ cmd_assemble() {
     esac
   done
 
-  if [ -z "$artifact" ]; then
-    echo "assemble-bundle: usage: assemble-bundle.sh assemble --artifact <path> [--touched <path>]... [--convention <path>]... [--spec <path>]..." >&2
+  if [ -z "$artifact" ] && [ -z "$source_list" ]; then
+    echo "assemble-bundle: usage: assemble-bundle.sh assemble [--artifact <path>] [--source <path>]... [--touched <path>]... [--convention <path>]... [--spec <path>]... (one of --artifact or --source is required)" >&2
     exit 1
   fi
-  if [ ! -r "$artifact" ] || [ ! -f "$artifact" ]; then
+  if [ -n "$artifact" ] && { [ ! -r "$artifact" ] || [ ! -f "$artifact" ]; }; then
     echo "assemble-bundle: --artifact \"$artifact\" does not exist or is not readable." >&2
     exit 1
   fi
@@ -194,14 +215,18 @@ cmd_assemble() {
   case "$max_file_bytes" in '' | *[!0-9]*) max_file_bytes=65536 ;; esac
   case "$max_bundle_bytes" in '' | *[!0-9]*) max_bundle_bytes=204800 ;; esac
 
-  artifact_size="$(byte_count "$artifact")"
-  [ -n "$artifact_size" ] || artifact_size=0
+  if [ -n "$artifact" ]; then
+    artifact_size="$(byte_count "$artifact")"
+    [ -n "$artifact_size" ] || artifact_size=0
+  else
+    artifact_size=0
+  fi
 
-  hash="$(printf '%s' "${artifact}:${touched_list}:${convention_list}:${spec_list}:$$:$(date +%s):${RANDOM}" | cksum | awk '{print $1}')"
+  hash="$(printf '%s' "${artifact}:${source_list}:${touched_list}:${convention_list}:${spec_list}:$$:$(date +%s):${RANDOM}" | cksum | awk '{print $1}')"
   bundle_path="$dir/bundle-${hash}.json"
   tmp_path="$bundle_path.tmp.$$"
 
-  if [ "$artifact_size" -gt "$max_bundle_bytes" ]; then
+  if [ -n "$artifact" ] && [ "$artifact_size" -gt "$max_bundle_bytes" ]; then
     msg="Artifact (${artifact_size} bytes) exceeds max_bundle_bytes (${max_bundle_bytes}). Multi-model review cannot proceed at full fidelity. Narrow review scope (smaller diff, single file) and retry."
     {
       printf '{\n'
@@ -244,9 +269,49 @@ cmd_assemble() {
     printf '{ "path": "%s", "size_bytes": %s, "inlined": %s }' "$(json_escape "$1")" "$2" "$3"
   }
 
-  # Artifact — always inlined verbatim (Behavioral Rule 1).
-  add_file "$artifact" "$(cat "$artifact")"
-  artifact_manifest="$(manifest_entry "$artifact" "$artifact_size" "true")"
+  # Artifact — always inlined verbatim (Behavioral Rule 1). Absent in
+  # source-set mode, where the manifest carries `"artifact": null`.
+  if [ -n "$artifact" ]; then
+    add_file "$artifact" "$(cat "$artifact")"
+    artifact_manifest="$(manifest_entry "$artifact" "$artifact_size" "true")"
+  else
+    artifact_manifest="null"
+  fi
+
+  # Sources — the one category whose failures are RECORDED, not skipped. A
+  # caller is about to claim these documents ground its output, so a source
+  # that could not be read must say so with a reason rather than vanish.
+  source_manifest=""
+  old_ifs="$IFS"
+  IFS="$(printf '\036')"
+  for p in $source_list; do
+    IFS="$old_ifs"
+    if [ -n "$p" ]; then
+      if [ -r "$p" ] && [ -f "$p" ]; then
+        size="$(byte_count "$p")"
+        [ -n "$size" ] || size=0
+        if [ "$size" -le "$max_file_bytes" ]; then
+          add_file "$p" "$(cat "$p")"
+          total_bytes=$((total_bytes + size))
+          line="$(printf '{ "path": "%s", "size_bytes": %s, "inlined": true, "summarized": false, "status": "read" }' "$(json_escape "$p")" "$size")"
+        else
+          add_needs_summary "$p" "$size" "sources"
+          line="$(printf '{ "path": "%s", "size_bytes": %s, "inlined": false, "summarized": true, "status": "read" }' "$(json_escape "$p")" "$size")"
+        fi
+      else
+        if [ -e "$p" ]; then
+          reason="exists but is not a readable regular file"
+        else
+          reason="not found"
+        fi
+        line="$(printf '{ "path": "%s", "size_bytes": 0, "inlined": false, "summarized": false, "status": "unreadable", "reason": "%s" }' "$(json_escape "$p")" "$(json_escape "$reason")")"
+      fi
+      source_manifest="${source_manifest}${source_manifest:+,}
+    $line"
+    fi
+    IFS="$(printf '\036')"
+  done
+  IFS="$old_ifs"
 
   # Conventions — always inlined verbatim when present; missing files are
   # advisory and skipped silently.
@@ -332,6 +397,9 @@ cmd_assemble() {
   }"
     printf '    "specs": [%s],\n' "${specs_manifest:+
     $specs_manifest
+  }"
+    printf '    "sources": [%s],\n' "${source_manifest:+
+    $source_manifest
   }"
     printf '    "total_bytes": %s\n' "$total_bytes"
     printf '  },\n'

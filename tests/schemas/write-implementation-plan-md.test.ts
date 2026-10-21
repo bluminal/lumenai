@@ -191,9 +191,11 @@ describe('write-implementation-plan.md — Task 44: plan-scribe retired (FR-HM26
   it('[T] agent inventory drops by one (26 -> 25)', () => {
     // Upper bound, not equality: later Phase 5 retirements (Tasks 45, 46)
     // lowered it further, and Task 47 (FR-HM24, D11, Phase 6) then folded
-    // 3 pool agents in from synthex-plus, raising the ceiling again;
-    // inventory.mjs pins the exact current count.
-    expect(AGENT_COUNT).toBeLessThanOrEqual(26);
+    // 3 pool agents in from synthex-plus, raising the ceiling again, and the
+    // Notion backend then added 2 store adapters, raising it to 28;
+    // inventory.mjs pins the exact current count. plan-scribe's own
+    // retirement is asserted directly above and is what this guards.
+    expect(AGENT_COUNT).toBeLessThanOrEqual(28);
   });
 
 });

@@ -17,11 +17,12 @@ Set up the Synthex plugin configuration for a project. This command scaffolds th
 1. **Creates the project configuration file** at `.synthex/config.yaml` (or custom path)
 2. **Prompts for concurrent task parallelism** — detects CPU count and asks the user to choose a concurrency level (Yolo, Aggressive, Default, or custom)
 3. **Configures multi-model review (optional)** — scans for installed CLIs, runs auth checks, and offers opt-in options for multi-model review
-4. **Updates `.gitignore`** to exclude the worktrees directory (`.claude/worktrees/`) if not already present
-5. **Creates `.worktreeinclude`** so Claude Code copies env files (e.g., `.env`, `.env.local`) into every new worktree
-6. **Asks about starring the repo** — offers to open the Lumenai marketplace on GitHub so the user can star it
-7. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`, `docs/specs/decisions/`, `docs/specs/rfcs/`, `docs/runbooks/`, `docs/retros/`) if they don't exist
-8. **Provides guidance** on customizing the configuration for your project
+4. **Configures the Notion backend (optional)** — points Synthex at an existing Notion page and work database, if you want documents and task state to live there
+5. **Updates `.gitignore`** to exclude the worktrees directory (`.claude/worktrees/`) if not already present
+6. **Creates `.worktreeinclude`** so Claude Code copies env files (e.g., `.env`, `.env.local`) into every new worktree
+7. **Asks about starring the repo** — offers to open the Lumenai marketplace on GitHub so the user can star it
+8. **Creates document directories** (`docs/reqs/`, `docs/plans/`, `docs/specs/`, `docs/specs/decisions/`, `docs/specs/rfcs/`, `docs/runbooks/`, `docs/retros/`) if they don't exist
+9. **Provides guidance** on customizing the configuration for your project
 
 ## Workflow
 
@@ -157,12 +158,20 @@ Replace **both** `concurrent_tasks` values in the config file at `@{config_path}
 
 Delegate to the `/synthex:configure-multi-model` wizard at `plugins/synthex/commands/configure-multi-model.md`. Read that file and follow Steps 1a–1d (Detection Scan, Surface Three Options, Data-Transmission Warning, Apply the Chosen Option) inline as part of `init`. Skip Step 0 (re-entry check) — `init` always invokes the wizard in fresh-configuration mode.
 
+### 4.5. Configure Notion Backend (optional)
+
+Delegate to the `/synthex:configure-notion` wizard at `plugins/synthex/commands/configure-notion.md`. Read that file and follow Steps 1–8 (MCP Availability Check through Confirm) inline as part of `init`. Skip Step 0 (re-entry check) — `init` always invokes the wizard in fresh-configuration mode.
+
+The wizard exits cleanly on its own when the Notion MCP server is unavailable, which is the common case. That is not an error for the project: Synthex keeps using local markdown files. **A skipped or unavailable Notion setup must never abort `init`.**
+
 ### 5. Update .gitignore
 
 Check if `.gitignore` exists in the project root. Ensure it contains entries for **four** synthex-managed paths:
 
 1. The worktrees base path (`.claude/worktrees` by default, or the value from `worktrees.base_path` in the config file).
-2. The synthex upgrade-nudge state file (`.synthex/state.json`) — per FR-UO24, this file is per-developer/per-clone and must not be committed.
+2. The synthex upgrade-nudge state file (`.synthex/state.json
+# Synthex active epic (per-developer; the committed config holds no epic)
+.synthex/active-epic.json`) — per FR-UO24, this file is per-developer/per-clone and must not be committed.
 3. The synthex native-looping state directory (`.synthex/loops/`) — per D-NL14, loop state is per-developer/per-clone (each loop is per-session and includes a `session_id`).
 4. The synthex project facts file (`.synthex/facts.md`) — per FR-HM29 (D12), facts carry recorded SHAs and mtimes that differ per clone, so it is not committed.
 
@@ -251,10 +260,13 @@ Created:
 
 Next steps:
   1. Review .synthex/config.yaml and customize for your project
-  2. Create your PRD with the `write-implementation-plan` command
+  2. Create your PRD:          /write-prd
+                               Pass --from <paths> to ground it in meeting
+                               notes, research, or existing specs
   3. Or write your PRD manually at docs/reqs/main.md
 
 Available commands:
+  /write-prd                   — Author a PRD from supplied and discovered sources
   /write-implementation-plan   — Transform a PRD into an implementation plan
   /next-priority               — Execute the next highest-priority tasks
   /review-code                 — Multi-perspective code review

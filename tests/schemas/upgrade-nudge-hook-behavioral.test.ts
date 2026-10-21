@@ -134,8 +134,11 @@ function runHook(
   }
 }
 
+// Wall-clock budgets measured under full-suite contention; retried rather than
+// loosened, so a real regression still fails.
 describe.each(variants)(
   'upgrade-nudge.sh ($label) — Layer 2 behavioral fixtures',
+  { retry: 2 },
   (variant) => {
     let projectDir: string;
     let currentVersion: string;

@@ -1,7 +1,7 @@
 {
   "name": "synthex",
   "version": "2.2.0",
-  "description": "AI agents modeled after a software startup org chart — specialized roles that synthesize to discover, build, ship, operate, and learn from complete, production-quality software.",
+  "description": "AI agents modeled after a software startup org chart \u2014 specialized roles that synthesize to discover, build, ship, operate, and learn from complete, production-quality software.",
   "author": {
     "name": "Bluminal Labs"
   },
@@ -18,6 +18,8 @@
     "./agents/llm-review-prompter.md",
     "./agents/metrics-analyst.md",
     "./agents/multi-model-review-orchestrator.md",
+    "./agents/notion-document-store.md",
+    "./agents/notion-task-store.md",
     "./agents/ollama-review-prompter.md",
     "./agents/performance-engineer.md",
     "./agents/product-manager.md",
@@ -37,11 +39,14 @@
     "./commands/init.md",
     "./commands/cancel-loop.md",
     "./commands/configure-multi-model.md",
+    "./commands/configure-notion.md",
     "./commands/dismiss-upgrade-nudge.md",
     "./commands/list-loops.md",
     "./commands/loop.md",
     "./commands/next-priority.md",
     "./commands/refine-requirements.md",
+    "./commands/use-epic.md",
+    "./commands/write-prd.md",
     "./commands/write-implementation-plan.md",
     "./commands/review-code.md",
     "./commands/write-adr.md",

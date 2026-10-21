@@ -694,6 +694,114 @@ function lintPlanNodeGuardFallbackCase(ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// scripts/lint-prd.mjs - PRD and epic-page structural + provenance audit
+// (replaces the retired `prd-linter` agent, FR-HM26). Same shape as
+// lint-plan.mjs above: a node shebang and no bash entrypoint, so the
+// happy-path case spawns node directly and the "fallback" case proves the
+// CALLING `command -v node` guard degrades cleanly with a message - the
+// condition under which the prose fallback (self-checking against
+// docs/prd-lint-rubric.md) takes over.
+// ---------------------------------------------------------------------------
+
+const LINT_PRD_CLEAN_FIXTURE = [
+  '# Product Requirements Document: Smoke Fixture',
+  '',
+  '**Provenance:** `[S]` sourced, `[U]` user-stated, `[D]` derived, `[A]` assumed',
+  '',
+  '## 1. Vision & Purpose',
+  'Fixture PRD for the script-smoke suite.',
+  '',
+  '## 2. Target Users / Personas',
+  'The smoke suite.',
+  '',
+  '## 3. Current and Target State',
+  '**Today**',
+  '```mermaid',
+  'graph LR',
+  '  A[Client] --> B[API]',
+  '```',
+  '*Read off: the fixture*',
+  '',
+  '**Once delivered**',
+  '```mermaid',
+  'graph LR',
+  '  A[Client] --> G["Gateway"]',
+  '```',
+  '',
+  '## 4. Functional Requirements',
+  '#### FR-1: Keep it small `[U]`',
+  '**Source:** confirmed in the smoke fixture',
+  '**Acceptance Criteria:**',
+  '- Exits 0 on a clean fixture',
+  '',
+  '## 5. Non-Functional Requirements',
+  '#### NFR-1: Stay fast `[D]`',
+  '**Source:** the script header, which documents no network access',
+  '**Acceptance Criteria:**',
+  '- Completes under 20s',
+  '',
+  '## 6. Out of Scope',
+  'Everything else.',
+  '',
+  '## 7. Success Metrics',
+  'The suite passes.',
+  '',
+  '## 8. Assumptions & Constraints',
+  'None.',
+  '',
+  '## 9. Open Questions',
+  'None.',
+  '',
+  '## 10. Source Map',
+  '| Document | Contributed |',
+  '|----------|-------------|',
+  '| the smoke fixture | FR-1 |',
+  '',
+].join('\n');
+
+function lintPrdHappyPathCase(ctx) {
+  const pathDir = ctx.buildRestrictedPath(true);
+  const nodeBin = join(pathDir, 'node');
+  const prdPath = join(ctx.workDir, 'prd.md');
+  writeFileSync(prdPath, LINT_PRD_CLEAN_FIXTURE);
+  const result = spawnSync(nodeBin, [ctx.scriptAbsPath, prdPath], {
+    cwd: ctx.workDir,
+    env: { PATH: pathDir },
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  assert(result.status === 0, `lint-prd.mjs exited ${result.status} on a clean fixture: ${result.stderr}`);
+  const parsed = JSON.parse(result.stdout);
+  assert(parsed.total_findings === 0, `expected a clean fixture to have zero findings, got: ${result.stdout}`);
+  assert(parsed.passed === true, `expected passed: true on a clean fixture, got: ${result.stdout}`);
+  assert(
+    Array.isArray(parsed.checks_skipped) && parsed.checks_skipped.length > 0,
+    `expected checks_skipped to name the judgement-dependent checks, got: ${result.stdout}`,
+  );
+}
+
+function lintPrdNodeGuardFallbackCase(ctx) {
+  const pathDir = ctx.buildRestrictedPath(false);
+  const bash = join(pathDir, 'bash');
+  const guardScript = [
+    'if command -v node >/dev/null 2>&1; then',
+    `  node "${ctx.scriptAbsPath}" prd.md`,
+    'else',
+    '  echo "lint-prd: node not found; falling back to docs/prd-lint-rubric.md self-check (FR-HM26 node-guard fallback)." >&2',
+    '  exit 3',
+    'fi',
+  ].join('\n');
+  const result = spawnSync(bash, ['-c', guardScript], {
+    cwd: ctx.workDir,
+    env: { PATH: pathDir },
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  assert(result.status === 3, `expected the node-guard fallback to exit 3, got ${result.status}: ${result.stderr}`);
+  assert(/node not found/.test(result.stderr), `expected a node-not-found message, got: ${result.stderr}`);
+}
+
+// ---------------------------------------------------------------------------
 // scripts/assemble-bundle.sh — FR-HM26/FR-HM44 context bundle assembler
 // (replaces the retired `context-bundle-assembler` agent). The happy-path
 // case proves an in-cap file is inlined into `files[]` while an over-cap
@@ -1108,6 +1216,16 @@ export const SMOKE_CASES = {
     {
       name: 'missing node fallback: the calling `command -v node` guard degrades to a clean non-zero exit with a message',
       run: (ctx) => lintPlanNodeGuardFallbackCase(ctx),
+    },
+  ],
+  'scripts/lint-prd.mjs': [
+    {
+      name: 'happy path: a clean fixture PRD yields zero findings and exit 0 (node present)',
+      run: (ctx) => lintPrdHappyPathCase(ctx),
+    },
+    {
+      name: 'missing node fallback: the calling `command -v node` guard degrades to a clean non-zero exit with a message',
+      run: (ctx) => lintPrdNodeGuardFallbackCase(ctx),
     },
   ],
   'scripts/assemble-bundle.sh': [
