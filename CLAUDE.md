@@ -199,6 +199,25 @@ Synthex uses a **convention over configuration** approach for project-level cust
 - **With a config file:** Projects override specific settings in `.synthex/config.yaml`. Only include what you want to change.
 - **Config lives in the repo:** Version-controlled alongside code, so the team shares the same configuration.
 
+### Configuration Layers
+
+Resolved highest precedence first, mirroring Claude Code's settings precedence (project beats user):
+
+| Layer | Path |
+|-------|------|
+| Project-local | `<project>/.synthex/config.local.yaml` (gitignored) |
+| Project (shared) | `<project>/.synthex/config.yaml` |
+| Legacy project | `<project>/.synthex-plus/config.yaml` (D6, deprecated — warns on stderr) |
+| User | `$XDG_CONFIG_HOME/synthex/config.yaml`, default `~/.config/synthex/config.yaml` |
+| Plugin defaults | `plugins/synthex/config/defaults.yaml` |
+
+Two key classes break that order:
+
+- **User-owned** — `multi_model_review.per_reviewer.*`: the user layer is consulted first, because which external models a machine has installed is not the repo's business.
+- **Restrictive-wins** — `multi_model_review.enabled` and any `multi_model_review.*.enabled`: `false` in any hand-written layer wins, the way Claude Code unions permission deny rules. Plugin defaults are excluded from this vote, or the shipped `enabled: false` would pin the key off permanently.
+
+Both reader implementations must stay in step: `plugins/synthex/scripts/lib/config-get.sh` (prose/shell, node + awk paths) and `packages/synthex-mcp/src/lib/config-merger.ts` (`mergeConfig`). The two "is Synthex initialized here" hook probes (`task-completed-gate.sh`, `teammate-idle-gate.sh`) stay deliberately project-only — a user config must not make Synthex hooks fire in unrelated repos.
+
 ### Initialization
 
 Run the `init` command to create the configuration file and document directories:

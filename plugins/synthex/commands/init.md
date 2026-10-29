@@ -159,12 +159,13 @@ Delegate to the `/synthex:configure-multi-model` wizard at `plugins/synthex/comm
 
 ### 5. Update .gitignore
 
-Check if `.gitignore` exists in the project root. Ensure it contains entries for **four** synthex-managed paths:
+Check if `.gitignore` exists in the project root. Ensure it contains entries for **five** synthex-managed paths:
 
 1. The worktrees base path (`.claude/worktrees` by default, or the value from `worktrees.base_path` in the config file).
 2. The synthex upgrade-nudge state file (`.synthex/state.json`) — per FR-UO24, this file is per-developer/per-clone and must not be committed.
 3. The synthex native-looping state directory (`.synthex/loops/`) — per D-NL14, loop state is per-developer/per-clone (each loop is per-session and includes a `session_id`).
 4. The synthex project facts file (`.synthex/facts.md`) — per FR-HM29 (D12), facts carry recorded SHAs and mtimes that differ per clone, so it is not committed.
+5. The synthex project-local config (`.synthex/config.local.yaml`) — one developer's overrides for this repo; the shared `.synthex/config.yaml` is the committed one.
 
 For each entry:
 
@@ -186,6 +187,9 @@ Concretely, the resulting block to append (omitting any lines already present) i
 
 # Synthex cached project facts (per-clone SHAs and mtimes; FR-HM29)
 .synthex/facts.md
+
+# Synthex project-local config (one developer's overrides for this repo)
+.synthex/config.local.yaml
 ```
 
 ### 6. Create `.worktreeinclude`
