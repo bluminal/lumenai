@@ -16,6 +16,8 @@ When neither flag is set, the resolved config determines the path. **No complexi
 
 ### Step 6a — Multi-Model Active: Invoke Orchestrator
 
+A `- prompt: <path>` entry in `implementation_plan.reviewers` is not an agent and must not go into `native_reviewers` — the orchestrator Tasks these by name. Launch those reviewers yourself per `docs/prompt-file-reviewers.md` in the same turn, and merge their findings into the envelope's `findings` before handing it to the PM, or a configured reviewer is silently skipped: multi-model plan review has no complexity gate, so this is the only path once it is enabled.
+
 **Multi-model active → invoke orchestrator:**
 
 When multi-model is active, invoke the `multi-model-review-orchestrator` agent with:

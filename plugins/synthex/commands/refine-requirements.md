@@ -123,6 +123,8 @@ For each enabled reviewer in the configuration, launch a **fresh** sub-agent IN 
 - Instructions to review from a PRD clarity perspective (see feedback format below)
 - On cycles 2+: a compact summary of unresolved findings from the prior cycle
 
+**Prompt-file reviewers:** when a `reviewers` entry is `- prompt: <path>`, Read `${CLAUDE_PLUGIN_ROOT}/docs/prompt-file-reviewers.md` and follow it; a bad path skips that one reviewer, never the review. On other hosts, resolve the plugin root from `.synthex/state.json`.
+
 **Context Management:** Each review cycle spawns **new** sub-agent instances — never resume prior reviewer agents. Between cycles, carry forward only:
 1. The updated PRD (full text)
 2. A compact findings summary: for each unresolved finding, one line with severity, title, and which reviewer raised it

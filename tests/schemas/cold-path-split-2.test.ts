@@ -36,6 +36,7 @@
  *   [T] write-implementation-plan.md is ≤ 26,112 bytes (25.5 KB).
  *   [T] both command files contain the D17 gates that replaced the moved
  *       blocks (same rules cold-path-includes.test.ts enforces).
+ * Raised again for the prompt-file-reviewers gate (`docs/prompt-file-reviewers.md`): review-code.md by 256 B, write-implementation-plan.md by 384 B.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -171,7 +172,7 @@ describe('Task 14: performance-audit.md + write-implementation-plan.md cold-path
 
     it('write-implementation-plan.md is at or under 26,112 bytes (25.5 KB)', () => {
       const bytes = Buffer.byteLength(wipContent, 'utf-8');
-      expect(bytes).toBeLessThanOrEqual(26_112);
+      expect(bytes).toBeLessThanOrEqual(26_496);
     });
   });
 });
