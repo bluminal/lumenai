@@ -55,3 +55,12 @@ The complexity gate decides whether multi-model review is warranted for a given 
 
 **Cached for the loop's duration (D9):** The gate decision is computed ONCE at the start of the review and cached for all cycles within the same review-loop invocation. This prevents oscillation when the diff hasn't changed but the loop iterates (e.g., re-reviews after fixes).
 
+
+---
+
+### `native_reviewers` and prompt-file reviewers
+
+Step 5 passes `native_reviewers` as agent names. A `code_review.reviewers` entry
+of the form `- prompt: <path>` has no agent behind it, so drop it from that list
+— the orchestrator Tasks these names and would fail on a prompt path. Such a
+reviewer still runs in the native pass; see `docs/prompt-file-reviewers.md`.
