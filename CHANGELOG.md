@@ -5,6 +5,18 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 2.3.0] - 2026-10-29
+
+### Added
+
+- (config) add user-level and project-local config layers
+
+### Fixed
+
+- (synthex) codex adapter makes per-token API-key billing opt-in (allow_api_key_billing)
+- (synthex) codex adapter defaults reach codex exec, fail closed on empty output, and auth check works
+- (synthex) codex adapter uses commands and flags that exist on Codex CLI
+
 ## [synthex 2.2.0] - 2026-10-06
 
 ### Added
