@@ -94,6 +94,7 @@ This creates:
 | Path | Purpose |
 |------|---------|
 | `.synthex/config.yaml` | Project configuration (overrides defaults) |
+| `.synthex/config.local.yaml` | Your personal overrides for this repo (gitignored) |
 | `docs/reqs/` | Product requirements (PRDs) |
 | `docs/plans/` | Implementation plans |
 | `docs/specs/` | Technical specifications |
@@ -179,6 +180,32 @@ Synthex uses a **convention over configuration** approach:
 - **Without a config file:** All commands and agents use sensible embedded defaults. Everything works out of the box.
 - **With a config file:** Projects override specific settings in `.synthex/config.yaml`. Only include what you want to change.
 - **Config lives in the repo:** Version-controlled alongside code, so the team shares the same configuration.
+
+### Where settings can live
+
+Settings resolve across four layers, highest precedence first:
+
+| Layer | Path | Scope |
+|-------|------|-------|
+| Project-local | `.synthex/config.local.yaml` | Your settings for this one repo. Gitignored by `/synthex:init` — never committed. |
+| Project (shared) | `.synthex/config.yaml` | The team's settings for this repo. Committed. |
+| User | `~/.config/synthex/config.yaml` | Your settings for every repo. Honors `$XDG_CONFIG_HOME`. |
+| Plugin defaults | `config/defaults.yaml` | Shipped with Synthex. |
+
+Project settings beat user settings, matching [Claude Code's settings precedence](https://docs.claude.com/en/docs/claude-code/settings#settings-precedence) — a repo can pin behavior for everyone who works in it. Only include the keys you want to change at each layer; the rest fall through.
+
+Two narrow key classes break that order:
+
+- **User-owned — `multi_model_review.per_reviewer.*`.** Which external models are installed on a machine and what they are called is a fact about the machine, not the repo, so the user layer is consulted first. A repo asking for `qwen2.5-coder:32b` cannot override the model you actually pulled.
+- **Restrictive-wins — `multi_model_review.enabled` and any `multi_model_review.*.enabled`.** `false` in any hand-written layer disables it, the way Claude Code unions permission deny rules rather than replacing them. A repo cannot switch on sending your code to an external CLI when you have switched it off. (Plugin defaults do not vote here, so the shipped `false` is still just a default.)
+
+Setting these in your user config disables external review everywhere, whatever a repo asks for:
+
+```yaml
+# ~/.config/synthex/config.yaml
+multi_model_review:
+  enabled: false
+```
 
 See [`config/defaults.yaml`](config/defaults.yaml) for the full reference. Key settings:
 

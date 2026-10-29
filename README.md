@@ -99,7 +99,7 @@ Multi-model review fans review prompts out to multiple LLM-family proposers (Ope
 
 The primary benefit: catching correlated-error blind spots — bugs and issues that any single LLM family would miss but that show up when multiple families review independently.
 
-**Off by default.** Opt in via `/synthex:init` (interactive prompt) or by editing `.synthex/config.yaml`. CLI-only — Synthex does not store API keys.
+**Off by default.** Opt in via `/synthex:init` (interactive prompt) or by editing `.synthex/config.yaml`. CLI-only — Synthex does not store API keys. Setting `multi_model_review.enabled: false` in your user config (`~/.config/synthex/config.yaml`) keeps it off in every repo, whatever a given repo's committed config asks for — see [Configuration](plugins/synthex/README.md#where-settings-can-live).
 
 See [`docs/specs/multi-model-review/architecture.md`](docs/specs/multi-model-review/architecture.md) for the full design and [`docs/specs/multi-model-review/adapter-recipes.md`](docs/specs/multi-model-review/adapter-recipes.md) for per-adapter setup.
 

@@ -4,9 +4,15 @@
  * FR-HM40).
  *
  * `config-get.sh <dotted.key> [default]` resolves a scalar by checking, in
- * order: <project>/.synthex/config.yaml -> <project>/.synthex-plus/config.yaml
+ * order: <project>/.synthex/config.local.yaml ->
+ * <project>/.synthex/config.yaml -> <project>/.synthex-plus/config.yaml
  * (D6 legacy fallback, with a stderr deprecation notice) ->
+ * $XDG_CONFIG_HOME/synthex/config.yaml (user level) ->
  * plugins/synthex/config/defaults.yaml -> the [default] argument -> empty.
+ *
+ * Two key classes override that order: `multi_model_review.per_reviewer.*` is
+ * user-owned (user layer first), and `multi_model_review.*.enabled` is
+ * restrictive-wins (`false` in any hand-written layer wins).
  *
  * Every scenario below runs twice: once with `node` on PATH (the preferred
  * parser) and once on a minimal PATH that excludes `node` (the pure
@@ -30,20 +36,34 @@ const REPO_ROOT = join(__dirname, '..', '..');
 const CONFIG_GET = join(REPO_ROOT, 'plugins', 'synthex', 'scripts', 'lib', 'config-get.sh');
 
 let projectDir: string;
+/** Stands in for $XDG_CONFIG_HOME so no test reads the real user's config. */
+let userConfigHome: string;
 
 beforeEach(() => {
   projectDir = mkdtempSync(join(tmpdir(), 'config-get-'));
+  userConfigHome = mkdtempSync(join(tmpdir(), 'config-get-xdg-'));
   nodelessBin = null;
 });
 
 afterEach(() => {
   rmSync(projectDir, { recursive: true, force: true });
+  rmSync(userConfigHome, { recursive: true, force: true });
   if (nodelessBin) rmSync(nodelessBin, { recursive: true, force: true });
 });
 
 function writeProjectConfig(text: string): void {
   mkdirSync(join(projectDir, '.synthex'), { recursive: true });
   writeFileSync(join(projectDir, '.synthex', 'config.yaml'), text);
+}
+
+function writeLocalConfig(text: string): void {
+  mkdirSync(join(projectDir, '.synthex'), { recursive: true });
+  writeFileSync(join(projectDir, '.synthex', 'config.local.yaml'), text);
+}
+
+function writeUserConfig(text: string): void {
+  mkdirSync(join(userConfigHome, 'synthex'), { recursive: true });
+  writeFileSync(join(userConfigHome, 'synthex', 'config.yaml'), text);
 }
 
 function writeLegacyConfig(text: string): void {
@@ -67,7 +87,11 @@ function nodelessPath(): string {
 type RunResult = { stdout: string; stderr: string; status: number };
 
 function run(args: string[], withNode: boolean): RunResult {
-  const env: NodeJS.ProcessEnv = { ...process.env, CLAUDE_PROJECT_DIR: projectDir };
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    CLAUDE_PROJECT_DIR: projectDir,
+    XDG_CONFIG_HOME: userConfigHome,
+  };
   let bashBin = 'bash';
   if (!withNode) {
     const bin = nodelessPath();
@@ -225,6 +249,124 @@ describe('config-get.sh (D26, FR-HM23, FR-HM27, FR-HM40)', () => {
     const { node, noNode } = runBoth(['foo', 'fallback']);
     expect(node.stdout.trim()).toBe('fallback');
     expect(noNode.stdout.trim()).toBe('fallback');
+  });
+
+  // --- Layered config: local > project > legacy > user > defaults ---------
+
+  it('reads a user-level config at $XDG_CONFIG_HOME/synthex/config.yaml', () => {
+    writeUserConfig('foo:\n  bar: from-user\n');
+    const { node, noNode } = runBoth(['foo.bar']);
+    expect(node.stdout.trim()).toBe('from-user');
+    expect(noNode.stdout.trim()).toBe('from-user');
+  });
+
+  it('project config wins over user config (Claude Code precedence)', () => {
+    writeUserConfig('foo:\n  bar: from-user\n');
+    writeProjectConfig('foo:\n  bar: from-project\n');
+    const { node, noNode } = runBoth(['foo.bar']);
+    expect(node.stdout.trim()).toBe('from-project');
+    expect(noNode.stdout.trim()).toBe('from-project');
+  });
+
+  it('user config wins over plugin defaults', () => {
+    writeUserConfig('review_loops:\n  max_cycles: 7\n');
+    const { node, noNode } = runBoth(['review_loops.max_cycles']);
+    expect(node.stdout.trim()).toBe('7');
+    expect(noNode.stdout.trim()).toBe('7');
+  });
+
+  it('config.local.yaml wins over the shared project config', () => {
+    writeUserConfig('foo:\n  bar: from-user\n');
+    writeProjectConfig('foo:\n  bar: from-project\n');
+    writeLocalConfig('foo:\n  bar: from-local\n');
+    const { node, noNode } = runBoth(['foo.bar']);
+    expect(node.stdout.trim()).toBe('from-local');
+    expect(noNode.stdout.trim()).toBe('from-local');
+  });
+
+  it('user config still loses to the D6 legacy project config', () => {
+    writeUserConfig('foo:\n  bar: from-user\n');
+    writeLegacyConfig('foo:\n  bar: from-legacy\n');
+    const { node, noNode } = runBoth(['foo.bar']);
+    expect(node.stdout.trim()).toBe('from-legacy');
+    expect(noNode.stdout.trim()).toBe('from-legacy');
+    expect(node.stderr).toContain('deprecated');
+    expect(noNode.stderr).toContain('deprecated');
+  });
+
+  // --- Key class: user-owned ---------------------------------------------
+
+  it('user-owned per_reviewer keys beat the project config', () => {
+    writeUserConfig(
+      'multi_model_review:\n  per_reviewer:\n    ollama-review-prompter:\n      model: qwen-local\n',
+    );
+    writeProjectConfig(
+      'multi_model_review:\n  per_reviewer:\n    ollama-review-prompter:\n      model: qwen-not-installed-here\n',
+    );
+    const { node, noNode } = runBoth([
+      'multi_model_review.per_reviewer.ollama-review-prompter.model',
+    ]);
+    expect(node.stdout.trim()).toBe('qwen-local');
+    expect(noNode.stdout.trim()).toBe('qwen-local');
+  });
+
+  it('user-owned keys fall through to the project config when the user is silent', () => {
+    writeProjectConfig(
+      'multi_model_review:\n  per_reviewer:\n    ollama-review-prompter:\n      model: qwen-project\n',
+    );
+    const { node, noNode } = runBoth([
+      'multi_model_review.per_reviewer.ollama-review-prompter.model',
+    ]);
+    expect(node.stdout.trim()).toBe('qwen-project');
+    expect(noNode.stdout.trim()).toBe('qwen-project');
+  });
+
+  it('a sibling multi_model_review key is NOT user-owned (project still wins)', () => {
+    writeUserConfig('multi_model_review:\n  strict_mode: true\n');
+    writeProjectConfig('multi_model_review:\n  strict_mode: false\n');
+    const { node, noNode } = runBoth(['multi_model_review.strict_mode']);
+    expect(node.stdout.trim()).toBe('false');
+    expect(noNode.stdout.trim()).toBe('false');
+  });
+
+  // --- Key class: restrictive-wins ---------------------------------------
+
+  it('multi_model_review.enabled: false in user config beats true in the project', () => {
+    writeUserConfig('multi_model_review:\n  enabled: false\n');
+    writeProjectConfig('multi_model_review:\n  enabled: true\n');
+    const { node, noNode } = runBoth(['multi_model_review.enabled']);
+    expect(node.stdout.trim()).toBe('false');
+    expect(noNode.stdout.trim()).toBe('false');
+  });
+
+  it('a per_command enabled is restrictive-wins too', () => {
+    writeUserConfig(
+      'multi_model_review:\n  per_command:\n    review_code:\n      enabled: false\n',
+    );
+    writeLocalConfig(
+      'multi_model_review:\n  per_command:\n    review_code:\n      enabled: true\n',
+    );
+    const { node, noNode } = runBoth([
+      'multi_model_review.per_command.review_code.enabled',
+    ]);
+    expect(node.stdout.trim()).toBe('false');
+    expect(noNode.stdout.trim()).toBe('false');
+  });
+
+  it('restrictive-wins does not invent a false: true everywhere stays true', () => {
+    writeUserConfig('multi_model_review:\n  enabled: true\n');
+    writeProjectConfig('multi_model_review:\n  enabled: true\n');
+    const { node, noNode } = runBoth(['multi_model_review.enabled']);
+    expect(node.stdout.trim()).toBe('true');
+    expect(noNode.stdout.trim()).toBe('true');
+  });
+
+  it('an unrelated *.enabled key outside multi_model_review is not restrictive', () => {
+    writeUserConfig('standing_pools:\n  enabled: false\n');
+    writeProjectConfig('standing_pools:\n  enabled: true\n');
+    const { node, noNode } = runBoth(['standing_pools.enabled']);
+    expect(node.stdout.trim()).toBe('true');
+    expect(noNode.stdout.trim()).toBe('true');
   });
 
   it('exits 0 with usage guidance on stderr when no <dotted.key> is given', () => {

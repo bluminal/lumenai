@@ -9,6 +9,28 @@
 # Unspecified values use the defaults shown here.
 #
 # To create this file automatically, run the `init` command.
+#
+# Where settings can live, highest precedence first (mirrors Claude Code's
+# settings precedence, so project settings beat personal ones):
+#
+#   1. <project>/.synthex/config.local.yaml  your settings for this one repo
+#                                              (gitignored, not committed)
+#   2. <project>/.synthex/config.yaml        the team's settings for this repo
+#   3. ~/.config/synthex/config.yaml          your settings for every repo
+#                                              ($XDG_CONFIG_HOME aware)
+#   4. this file
+#
+# Two narrow key classes break that order:
+#
+#   multi_model_review.per_reviewer.*  is USER-OWNED. Which external models are
+#     installed on a machine and what they are called is a fact about the
+#     machine, not the repo, so the user layer is consulted first.
+#
+#   multi_model_review.enabled and any multi_model_review.*.enabled are
+#     RESTRICTIVE-WINS. `false` in any hand-written layer disables it, the way
+#     Claude Code unions permission deny rules rather than replacing them. A
+#     repo cannot switch on sending your code to an external CLI when you have
+#     switched it off. (The `false` shipped below is the default, not a veto.)
 
 # -------------------------------------------------------------------
 # Review Loop Settings (Global)

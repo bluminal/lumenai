@@ -1,19 +1,38 @@
 #!/usr/bin/env bash
-# config-get.sh — portable dotted-key reader for Synthex project config (D26).
+# config-get.sh — portable dotted-key reader for Synthex config (D26).
 #
 # Usage: config-get.sh <dotted.key> [default]
 #
 # Resolves a single scalar value for <dotted.key> by checking, in order:
 #
-#   1. <project>/.synthex/config.yaml        project override (current)
-#   2. <project>/.synthex-plus/config.yaml    D6 legacy fallback (deprecated;
+#   1. <project>/.synthex/config.local.yaml  project-local override
+#                                              (gitignored; one developer's
+#                                              settings for this repo)
+#   2. <project>/.synthex/config.yaml        project override, shared
+#   3. <project>/.synthex-plus/config.yaml    D6 legacy fallback (deprecated;
 #                                              kept for one major version).
 #                                              When the key resolves ONLY
 #                                              here, a deprecation notice is
 #                                              printed to stderr.
-#   3. <plugin>/config/defaults.yaml          plugin-shipped default
-#   4. the [default] argument, if given
-#   5. an empty string
+#   4. $XDG_CONFIG_HOME/synthex/config.yaml   user-level config, defaulting to
+#                                              ~/.config/synthex/config.yaml
+#   5. <plugin>/config/defaults.yaml          plugin-shipped default
+#   6. the [default] argument, if given
+#   7. an empty string
+#
+# User config sits BELOW project config, matching Claude Code's settings
+# precedence, so a repo can pin settings for everyone who works in it. Two
+# narrow key classes override that order:
+#
+#   user-owned (`multi_model_review.per_reviewer.*`) — which external models
+#     are installed and what they are called is a fact about the machine, not
+#     about the repo, so the user layer is checked FIRST for these keys.
+#
+#   restrictive-wins (`multi_model_review.enabled` and any
+#     `multi_model_review.*.enabled`) — `false` wins from ANY layer, the way
+#     Claude Code's permission deny rules are unioned rather than replaced.
+#     A project cannot turn on sending this machine's code to an external CLI
+#     when the user has turned it off.
 #
 # <plugin> is resolved from this script's own location (two directories
 # above plugins/synthex/scripts/lib/), so it works regardless of the
@@ -69,17 +88,21 @@ PLUGIN_DIR="$(cd -- "$SCRIPT_DIR/../.." 2>/dev/null && pwd -P)"
 DEFAULTS_FILE="${PLUGIN_DIR:-$SCRIPT_DIR}/config/defaults.yaml"
 
 PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
+LOCAL_CONFIG="$PROJECT_ROOT/.synthex/config.local.yaml"
 PROJECT_CONFIG="$PROJECT_ROOT/.synthex/config.yaml"
 LEGACY_CONFIG="$PROJECT_ROOT/.synthex-plus/config.yaml"
+USER_CONFIG="${XDG_CONFIG_HOME:-${HOME:-/nonexistent}/.config}/synthex/config.yaml"
 
 DEPRECATION_NOTICE="config-get: '$DOTTED_KEY' resolved from deprecated .synthex-plus/config.yaml (D6 fallback); migrate to .synthex/config.yaml before the next major release."
 
+
 # --- Preferred path: node -----------------------------------------------
 if command -v node >/dev/null 2>&1; then
-  node - "$DOTTED_KEY" "$CFG_DEFAULT" "$PROJECT_CONFIG" "$LEGACY_CONFIG" "$DEFAULTS_FILE" "$DEPRECATION_NOTICE" <<'NODE_SCRIPT'
+  node - "$DOTTED_KEY" "$CFG_DEFAULT" "$DEPRECATION_NOTICE" "$LEGACY_CONFIG" "$USER_CONFIG" \
+    "$LOCAL_CONFIG" "$PROJECT_CONFIG" "$DEFAULTS_FILE" <<'NODE_SCRIPT'
 const fs = require('fs');
-const [, , dottedKey, defaultValue, projectConfig, legacyConfig, defaultsFile, deprecationNotice] =
-  process.argv;
+const [, , dottedKey, defaultValue, deprecationNotice, legacyConfig, userConfig,
+  localConfig, projectConfig, defaultsFile] = process.argv;
 
 // Parses one already-unindented scalar token (the text after "key:").
 // Returns the unquoted string, or null if it looks malformed (an
@@ -150,35 +173,44 @@ function readKey(filePath, dotted) {
   return { status: 'notfound' };
 }
 
-let result = readKey(projectConfig, dottedKey);
-if (result.status === 'found') {
-  process.stdout.write(result.value + '\n');
-  process.exit(0);
-}
-if (result.status === 'malformed') {
-  process.stdout.write('\n');
-  process.exit(0);
+// Which external models are installed on this machine, and what they are
+// called, is a property of the machine rather than of the repo.
+const isUserOwned = dottedKey.startsWith('multi_model_review.per_reviewer.');
+
+// Sending this machine's code to an external CLI is opt-in at every layer:
+// `false` anywhere wins, so a repo cannot switch it on for a user who has
+// switched it off.
+const isRestrictive =
+  dottedKey === 'multi_model_review.enabled' ||
+  (dottedKey.startsWith('multi_model_review.') && dottedKey.endsWith('.enabled'));
+
+const order = isUserOwned
+  ? [userConfig, localConfig, projectConfig, legacyConfig, defaultsFile]
+  : [localConfig, projectConfig, legacyConfig, userConfig, defaultsFile];
+
+if (isRestrictive) {
+  // Only layers a human wrote vote here. The plugin defaults ship
+  // `enabled: false`, so including them would pin the key off forever.
+  for (const file of order.filter((f) => f !== defaultsFile)) {
+    const r = readKey(file, dottedKey);
+    if (r.status === 'found' && r.value.trim() === 'false') {
+      process.stdout.write('false\n');
+      process.exit(0);
+    }
+  }
 }
 
-result = readKey(legacyConfig, dottedKey);
-if (result.status === 'found') {
-  process.stderr.write(deprecationNotice + '\n');
-  process.stdout.write(result.value + '\n');
-  process.exit(0);
-}
-if (result.status === 'malformed') {
-  process.stdout.write('\n');
-  process.exit(0);
-}
-
-result = readKey(defaultsFile, dottedKey);
-if (result.status === 'found') {
-  process.stdout.write(result.value + '\n');
-  process.exit(0);
-}
-if (result.status === 'malformed') {
-  process.stdout.write('\n');
-  process.exit(0);
+for (const file of order) {
+  const result = readKey(file, dottedKey);
+  if (result.status === 'found') {
+    if (file === legacyConfig) process.stderr.write(deprecationNotice + '\n');
+    process.stdout.write(result.value + '\n');
+    process.exit(0);
+  }
+  if (result.status === 'malformed') {
+    process.stdout.write('\n');
+    process.exit(0);
+  }
 }
 
 process.stdout.write(defaultValue + '\n');
@@ -186,7 +218,6 @@ process.exit(0);
 NODE_SCRIPT
   exit $?
 fi
-
 # --- Fallback path: pure bash + awk (no node on PATH) --------------------
 #
 # Same resolution semantics as the node path above, implemented with an awk
@@ -287,21 +318,46 @@ read_key() {
   esac
 }
 
-read_key "$PROJECT_CONFIG" "$DOTTED_KEY"
-if [ "$RK_STATUS" = "found" ]; then printf '%s\n' "$RK_VALUE"; exit 0; fi
-if [ "$RK_STATUS" = "malformed" ]; then printf '\n'; exit 0; fi
+# Key classes (see the header). Mirrors the node path exactly.
+IS_USER_OWNED=0
+case "$DOTTED_KEY" in
+  multi_model_review.per_reviewer.*) IS_USER_OWNED=1 ;;
+esac
 
-read_key "$LEGACY_CONFIG" "$DOTTED_KEY"
-if [ "$RK_STATUS" = "found" ]; then
-  echo "$DEPRECATION_NOTICE" >&2
-  printf '%s\n' "$RK_VALUE"
-  exit 0
+IS_RESTRICTIVE=0
+case "$DOTTED_KEY" in
+  multi_model_review.enabled) IS_RESTRICTIVE=1 ;;
+  multi_model_review.*.enabled) IS_RESTRICTIVE=1 ;;
+esac
+
+if [ "$IS_USER_OWNED" -eq 1 ]; then
+  set -- "$USER_CONFIG" "$LOCAL_CONFIG" "$PROJECT_CONFIG" "$LEGACY_CONFIG" "$DEFAULTS_FILE"
+else
+  set -- "$LOCAL_CONFIG" "$PROJECT_CONFIG" "$LEGACY_CONFIG" "$USER_CONFIG" "$DEFAULTS_FILE"
 fi
-if [ "$RK_STATUS" = "malformed" ]; then printf '\n'; exit 0; fi
 
-read_key "$DEFAULTS_FILE" "$DOTTED_KEY"
-if [ "$RK_STATUS" = "found" ]; then printf '%s\n' "$RK_VALUE"; exit 0; fi
-if [ "$RK_STATUS" = "malformed" ]; then printf '\n'; exit 0; fi
+if [ "$IS_RESTRICTIVE" -eq 1 ]; then
+  # Only layers a human wrote vote here. The plugin defaults ship
+  # `enabled: false`, so including them would pin the key off forever.
+  for cfg_file in "$@"; do
+    [ "$cfg_file" = "$DEFAULTS_FILE" ] && continue
+    read_key "$cfg_file" "$DOTTED_KEY"
+    if [ "$RK_STATUS" = "found" ] && [ "$RK_VALUE" = "false" ]; then
+      printf 'false\n'
+      exit 0
+    fi
+  done
+fi
+
+for cfg_file in "$@"; do
+  read_key "$cfg_file" "$DOTTED_KEY"
+  if [ "$RK_STATUS" = "found" ]; then
+    [ "$cfg_file" = "$LEGACY_CONFIG" ] && echo "$DEPRECATION_NOTICE" >&2
+    printf '%s\n' "$RK_VALUE"
+    exit 0
+  fi
+  if [ "$RK_STATUS" = "malformed" ]; then printf '\n'; exit 0; fi
+done
 
 printf '%s\n' "$CFG_DEFAULT"
 exit 0
