@@ -4,11 +4,14 @@
 
 The adapter successfully completes the full happy-path flow:
 1. `which codex` returns a valid binary path (FR-MR8 step 1 — CLI Presence Check passes).
-2. `codex auth status` exits 0 (FR-MR8 step 2 — Auth Check passes).
+2. `codex login status` exits 0 (FR-MR8 step 2 — Auth Check passes).
 3. Prompt is constructed from `command: "review-code"` and `context_bundle` (FR-MR8 step 3).
 4. CLI is invoked with the mandatory sandbox flags per FR-MR26:
-   `--sandbox read-only`, `--approval-mode never`, `--json` (FR-MR8 step 4).
-5. Stdout is valid JSON; two findings parse successfully (FR-MR8 step 5).
+   `codex exec --sandbox read-only --ephemeral --json --output-schema <strict schema> -o <last> -`
+   with the prompt on stdin (FR-MR8 step 4). `codex exec` has no approval flag
+   (no `--approval-mode`; `-a` is rejected) and never prompts.
+5. The `-o` last-message file holds `{findings: [...]}` (two findings); usage comes from
+   the JSONL stream's last `turn.completed` event (FR-MR8 step 5).
 6. No retry needed (FR-MR8 step 6 — skipped).
 7. Each finding is normalized: `source.reviewer_id = "codex-review-prompter"`,
    `source.family = "openai"`, `source.source_type = "external"` (FR-MR8 step 7).
@@ -25,6 +28,6 @@ The adapter successfully completes the full happy-path flow:
 
 ## Fixture Files
 
-- `fixture.json` — recorded raw Codex CLI stdout (the `--json` envelope)
+- `fixture.json` — recorded `-o` last-message JSON and the `--json` JSONL event stream
 - `recorded-cli-invocation.txt` — exact CLI command string Codex was called with
 - `expected_envelope.json` — normalized canonical envelope the adapter must produce

@@ -5,7 +5,7 @@
 The adapter exercises the retry-once-on-parse-failure path (FR-MR8 step 6):
 
 1. `which codex` returns a valid binary path (CLI Presence Check passes).
-2. `codex auth status` exits 0 (Auth Check passes).
+2. `codex login status` exits 0 (Auth Check passes).
 3. First CLI call returns truncated JSON — the `text` field is cut off mid-string,
    making the entire `--json` envelope unparseable.
 4. Adapter detects parse failure and issues a single retry with the clarification prompt

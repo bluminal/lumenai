@@ -118,10 +118,13 @@ describe('init.md — Multi-Model Review section (Task 47)', () => {
     expect(section!).toMatch(/auth check/i);
   });
 
-  it('section includes codex auth check command (codex auth status)', () => {
+  // Was: codex auth status — that subcommand does not exist on Codex CLI 0.160.0
+  // ("unrecognized subcommand 'status'"); the real check is `codex login status`.
+  it('section includes codex auth check command (codex login status)', () => {
     const section = extractSection(content, 1, 'Configure Multi-Model Review');
     expect(section).not.toBeNull();
-    expect(section!).toContain('codex auth status');
+    expect(section!).toContain('codex login status');
+    expect(section!).not.toContain('codex auth status');
   });
 
   it('section includes gemini auth check command (gcloud auth list)', () => {

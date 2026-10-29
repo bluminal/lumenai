@@ -1,0 +1,29 @@
+{
+  "scenario": "auth-via-env",
+  "description": "Codex is authenticated only through an API-key environment variable (common in CI) and the user has OPTED IN to per-token billing (`config.allow_api_key_billing: true`). `codex login status` reports stored credentials only, so it would print 'Not logged in' and exit 1 even though `codex exec` would work; the adapter skips `codex login status` and goes on to `codex exec` with the key. Without the opt-in, the adapter unsets CODEX_API_KEY/OPENAI_API_KEY (no surprise per-token billing, matching Grok D26) and runs `codex login status`, which fails closed as cli_auth_failed. A 401 from `codex exec` remains the cli_auth_failed backstop.",
+  "env": {
+    "CODEX_API_KEY": "<non-empty>",
+    "CODEX_HOME": "<empty directory: no stored credentials>"
+  },
+  "auth_check_skipped": true,
+  "login_status_if_run": {
+    "command": "codex login status",
+    "exit_status": 1,
+    "stdout": "",
+    "stderr": "Not logged in"
+  },
+  "expected_next_step": "codex exec",
+  "must_not_return_error_code": "cli_auth_failed",
+  "backstop": "A 401 or login error on codex exec stderr maps to cli_auth_failed.",
+  "config": {
+    "allow_api_key_billing": true
+  },
+  "without_opt_in": {
+    "keys_unset": [
+      "CODEX_API_KEY",
+      "OPENAI_API_KEY"
+    ],
+    "auth_check_runs": true,
+    "expected_error_code": "cli_auth_failed"
+  }
+}

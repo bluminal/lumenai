@@ -7,7 +7,7 @@ Every wrapper's SYNTHEX_HOST step reads this file. For each harness it names the
 | Host (`SYNTHEX_HOST`) | Headless approval flag | Shell-call cap (s) | `SYNTHEX_LOOP_IDLE_MAX` | Idle wait |
 |------|------------------------|--------------------|-------------------------|-----------|
 | Claude Code (`claude`) | `--dangerously-skip-permissions` (or `--permission-mode bypassPermissions`) | 600 | 540 | in-turn wait only |
-| Codex CLI (`codex`) | `codex exec --sandbox workspace-write -a never` | 120 | 90 | in-turn wait only |
+| Codex CLI (`codex`) | `codex exec --sandbox workspace-write` | 120 | 90 | in-turn wait only |
 | Gemini CLI (`gemini`) | `--approval-mode yolo` (headless `default` denies writes) | 300 | 240 | in-turn wait only |
 | OpenCode (`opencode`) | `opencode run --command <slug> --auto` (`run` without `--auto` is read-only) | 120 | 90 | in-turn wait only |
 | Grok Build (`grok`) | `grok -p ... --yolo --max-turns N` (never `/loop` or `scheduler_create`) | 120 | 90 | Run the idle wait with `background: true` and poll `get_command_or_subagent_output` (up to one hour) instead of a foreground sleep. |

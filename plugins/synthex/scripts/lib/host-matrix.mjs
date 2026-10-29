@@ -197,11 +197,14 @@ export const HOSTS = Object.freeze({
       events: Object.freeze(['PreToolUse']),
     }),
     // FR-HM41 / FR-HM18 headless recipe (Task 35). Source: PRD FR-HM32 recipe; PRD §1 'two to five minutes' shell cap (120 s lower bound assumed).
+    // No `-a never`: `codex exec` rejects -a/--ask-for-approval (a top-level
+    // `codex` flag only) and never prompts anyway. Pinned against captured
+    // CLI help by tests/schemas/codex-cli-flags.test.ts.
     headless: Object.freeze({
-      approvalFlag: '`codex exec --sandbox workspace-write -a never`',
+      approvalFlag: '`codex exec --sandbox workspace-write`',
       shellCapSeconds: 120,
       idleMaxSeconds: 90,
-      writabilityHint: 'Codex: run `codex exec --sandbox workspace-write -a never`; the default `read-only` sandbox blocks state writes.',
+      writabilityHint: 'Codex: run `codex exec --sandbox workspace-write`; the default `read-only` sandbox blocks state writes.',
       backgroundPoll: null,
     }),
   }),

@@ -64,7 +64,7 @@ For each candidate CLI in `[codex, gemini, ollama, llm, aws, claude]`, run BOTH 
 
 | CLI | `which` check | Auth check command |
 |-----|---------------|--------------------|
-| `codex` | `which codex` | `codex auth status` |
+| `codex` | `which codex` | `codex login status` |
 | `gemini` | `which gemini` | `gcloud auth list` |
 | `ollama` | `which ollama` | `curl -sf http://localhost:11434/api/tags > /dev/null` |
 | `llm` | `which llm` | `llm keys list` |

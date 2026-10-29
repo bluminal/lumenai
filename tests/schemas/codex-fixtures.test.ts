@@ -4,7 +4,7 @@
  * Validates 4 fixture scenarios for the codex-review-prompter adapter:
  *   (a) successful      — happy path, 2 findings, usage, sandbox flags FR-MR26
  *   (b) malformed-output-retry — first and retry calls both fail to parse → parse_failed
- *   (c) auth-failure    — codex auth status exits non-zero → cli_auth_failed
+ *   (c) auth-failure    — codex login status exits non-zero → cli_auth_failed
  *   (d) cli-missing     — which codex returns nothing → cli_missing
  *
  * Each scenario:
@@ -56,6 +56,13 @@ function loadRecordedInvocation(scenario: string): string {
 describe('(a) successful — happy path, 2 findings', () => {
   const envelope = loadExpectedEnvelope('successful');
   const fixture = loadFixture('successful');
+
+  it('auth check: codex login status exits 0 with "Logged in using ..." on stderr (stdout empty)', () => {
+    const authCheck = fixture.auth_check as Record<string, unknown>;
+    expect(authCheck.exit_status).toBe(0);
+    expect(authCheck.stdout).toBe('');
+    expect(String(authCheck.stderr)).toMatch(/^Logged in using /);
+  });
 
   it('expected_envelope passes validateFullAdapterEnvelope', () => {
     const result = validateFullAdapterEnvelope(envelope);
@@ -125,8 +132,14 @@ describe('(a) successful — happy path, 2 findings', () => {
       expect(invocation).toContain('--sandbox read-only');
     });
 
-    it('recorded-cli-invocation.txt contains --approval-mode never', () => {
-      expect(invocation).toContain('--approval-mode never');
+    // Was: contains --approval-mode never. Codex CLI 0.160.0 evidence (tests/fixtures/cli-help/codex/): `codex exec` has no --approval-mode flag and rejects -a/--ask-for-approval; it never prompts.
+    it('recorded-cli-invocation.txt does not contain --approval-mode or -a', () => {
+      expect(invocation).not.toContain('--approval-mode');
+      expect(invocation).not.toMatch(/\s(-a|--ask-for-approval)\s/);
+    });
+
+    it('recorded-cli-invocation.txt contains --ephemeral', () => {
+      expect(invocation).toContain('--ephemeral');
     });
 
     it('recorded-cli-invocation.txt contains --json', () => {
@@ -137,8 +150,9 @@ describe('(a) successful — happy path, 2 findings', () => {
       expect(agentMd).toContain('--sandbox read-only');
     });
 
-    it('codex-review-prompter.md documents --approval-mode never (source authority)', () => {
-      expect(agentMd).toContain('--approval-mode never');
+    // Was: documents --approval-mode never. Codex CLI 0.160.0 evidence (tests/fixtures/cli-help/codex/): `codex exec` has no --approval-mode flag and rejects -a/--ask-for-approval; it never prompts.
+    it('codex-review-prompter.md documents --ephemeral (source authority)', () => {
+      expect(agentMd).toContain('--ephemeral');
     });
 
     it('codex-review-prompter.md documents --json (source authority)', () => {
@@ -186,7 +200,7 @@ describe('(b) malformed-output-retry — retry-then-fail → parse_failed', () =
 
 // ── (c) Auth Failure ──────────────────────────────────────────────────────────
 
-describe('(c) auth-failure — codex auth status non-zero → cli_auth_failed', () => {
+describe('(c) auth-failure — codex login status non-zero → cli_auth_failed', () => {
   const envelope = loadExpectedEnvelope('auth-failure');
   const fixture = loadFixture('auth-failure');
 
@@ -221,9 +235,22 @@ describe('(c) auth-failure — codex auth status non-zero → cli_auth_failed', 
     expect(envelope.error_message as string).toContain('codex login');
   });
 
+  it('fixture records the real auth check command (codex login status; `codex auth status` does not exist)', () => {
+    const authCheck = fixture.auth_check as Record<string, unknown>;
+    expect(authCheck.command).toBe('codex login status');
+  });
+
   it('fixture records auth check exit_status as non-zero', () => {
     const authCheck = fixture.auth_check as Record<string, unknown>;
     expect(authCheck.exit_status).not.toBe(0);
+  });
+
+  // `codex login status` writes its status line to stderr and nothing to stdout
+  // (Codex CLI 0.160.0), so a stdout-only `| grep 'Logged in'` always fails.
+  it('fixture records the auth status line on stderr, not stdout', () => {
+    const authCheck = fixture.auth_check as Record<string, unknown>;
+    expect(authCheck.stdout).toBe('');
+    expect(authCheck.stderr).toBe('Not logged in');
   });
 
   it('raw_output_path is echoed from fixture input', () => {
@@ -284,5 +311,54 @@ describe('(d) cli-missing — which codex returns nothing → cli_missing', () =
 
   it('raw_output_path is echoed from fixture input', () => {
     expect(envelope.raw_output_path).toBe(fixture.raw_output_path);
+  });
+});
+
+// ── (e) Auth via environment variable ─────────────────────────────────────────
+
+describe('(e) auth-via-env — CODEX_API_KEY set and allow_api_key_billing opted in → auth check skipped', () => {
+  const fixture = loadFixture('auth-via-env');
+  const adapter = readFileSync(CODEX_AGENT_MD, 'utf-8');
+  const step2 = adapter.split('### 2. Auth Check')[1]?.split(/\n### /)[0] ?? '';
+
+  it('fixture: login status would exit 1 ("Not logged in" on stderr) with env-only auth', () => {
+    const ls = fixture.login_status_if_run as Record<string, unknown>;
+    expect(ls.command).toBe('codex login status');
+    expect(ls.exit_status).toBe(1);
+    expect(ls.stderr).toBe('Not logged in');
+  });
+
+  it('per-token API billing is opt-in: without allow_api_key_billing the keys are unset and login status fails closed', () => {
+    // No surprise usage billing (matches Grok D26 in docs/plans/multi-model-review.md).
+    expect(fixture.config).toEqual({ allow_api_key_billing: true });
+    const w = fixture.without_opt_in as Record<string, unknown>;
+    expect(w.keys_unset).toEqual(['CODEX_API_KEY', 'OPENAI_API_KEY']);
+    expect(w.auth_check_runs).toBe(true);
+    expect(w.expected_error_code).toBe('cli_auth_failed');
+    expect(step2).toContain('allow_api_key_billing');
+    expect(step2).toMatch(/unset `CODEX_API_KEY` and `OPENAI_API_KEY`/);
+    expect(adapter).toContain('env -u CODEX_API_KEY -u OPENAI_API_KEY codex exec --sandbox read-only');
+  });
+
+  it('fixture: auth check is skipped and the adapter proceeds to codex exec', () => {
+    expect(fixture.auth_check_skipped).toBe(true);
+    expect(fixture.expected_next_step).toBe('codex exec');
+    expect(fixture.must_not_return_error_code).toBe('cli_auth_failed');
+  });
+
+  it('adapter Step 2 skips codex login status when CODEX_API_KEY or OPENAI_API_KEY is set', () => {
+    expect(step2).toContain('CODEX_API_KEY');
+    expect(step2).toContain('OPENAI_API_KEY');
+    expect(step2).toMatch(/skip/i);
+  });
+
+  it('adapter Step 2 judges codex login status by exit code, not by grepping stdout', () => {
+    expect(step2).toMatch(/exit code only/i);
+    expect(step2).toContain('stderr');
+    expect(step2).not.toMatch(/no `Logged in` in output/);
+  });
+
+  it('adapter keeps the 401 → cli_auth_failed backstop on codex exec', () => {
+    expect(adapter).toMatch(/401[\s\S]{0,40}cli_auth_failed|cli_auth_failed[\s\S]{0,40}401/);
   });
 });
