@@ -1,5 +1,7 @@
 # Routing — Discovery, Submission, and Routing Mode Reference
 
+> **Note:** This spec was written for the `synthex-plus` plugin. In v2.0.0 standing review pools were folded into `synthex` (`/synthex:start-review-team` and friends, config in `.synthex/config.yaml`) and synthex-plus was later removed; the `team-*` commands were retired. See [`docs/migrations/synthex-plus.md`](../../migrations/synthex-plus.md).
+
 **Audience:** Developers building standing pool routing logic for Synthex commands.  
 **Last Updated:** April 2026
 
@@ -9,7 +11,7 @@ This document is the normative source of truth for how standard Synthex commands
 
 The procedures, schemas, and verbatim requirement text in §1–§7 are normative and complete. New sections in this revision add narrative context and practical examples to make the routing system discoverable for implementers and operators.
 
-For users starting new standing pools, see [`standing-pools.md`](../../plugins/synthex-plus/docs/standing-pools.md) (forthcoming) for configuration and operational guidance.
+For users starting new standing pools, see [`standing-pools.md`](../../../plugins/synthex/docs/standing-pools.md) for configuration and operational guidance.
 
 ## Quick Reference: Routing Decisions
 
@@ -30,7 +32,7 @@ For users starting new standing pools, see [`standing-pools.md`](../../plugins/s
 - [`architecture.md`](./architecture.md) — Option B rationale, native-team-vs-orchestrator separation, cross-session lifetime model (forthcoming, Task 65)
 - [`pool-lifecycle.md`](./pool-lifecycle.md) — Pool storage schemas, state machine, writer-ordering rules, locking primitive (Task 29)
 - [`recovery.md`](./recovery.md) — FR-MMT24 per-task fallback, stale-pool cleanup, partial-dedup entry point (forthcoming)
-- [`standing-pools.md`](../../plugins/synthex-plus/docs/standing-pools.md) — User-facing design doc for standing pools (forthcoming, Task 53)
+- [`standing-pools.md`](../../../plugins/synthex/docs/standing-pools.md) — User-facing design doc for standing pools
 
 ---
 
@@ -98,7 +100,7 @@ Discovery executes **inline in the submitting command's workflow markdown** — 
 
 ## 2. Submission (FR-MMT16)
 
-When a standard Synthex command routes work to a standing pool, it does so via the file-based mechanism that synthex-plus already uses for intra-team coordination:
+When a standard Synthex command routes work to a standing pool, it does so via the file-based mechanism Agent Teams already uses for intra-team coordination:
 
 1. **Submit task(s)** by writing to the pool's task list at `~/.claude/tasks/standing/<name>/`. Each task has the same shape as a non-standing review task: subject, description (with diff scope, files, specs, focus area per reviewer), no `blockedBy` (review tasks are independent). **Filename:** each submitted task uses a UUID-based filename `<uuid>.json` to guarantee uniqueness across concurrent submitters. **Atomicity:** write to `<uuid>.json.tmp`, then `rename` to `<uuid>.json` — a partial write is never visible to the Pool Lead.
 2. **Send a notification** (optional, recommended) by writing to the Pool Lead's mailbox at `~/.claude/teams/standing/<name>/inboxes/lead/`. Filename `<uuid>.json` (same uuid as the task), atomic write per the same `.tmp` + rename pattern. The notification's payload: pool tasks just submitted, expected report destination.
@@ -151,7 +153,7 @@ The Pool Lead writes the envelope to `<report-to>.tmp` then `rename`s — partia
 
 ### 3.4 Polling Timeout
 
-The submitting command polls for at most `lifecycle.submission_timeout_seconds` (default `300` = 5 minutes; settable in `.synthex-plus/config.yaml` under `lifecycle.submission_timeout_seconds` — top-level sibling of `standing_pools:` per D23). If the timeout fires before all submitted tasks reach `completed` or before the report envelope appears, the submitting command:
+The submitting command polls for at most `lifecycle.submission_timeout_seconds` (default `300` = 5 minutes; settable in `.synthex/config.yaml` under `lifecycle.submission_timeout_seconds` — top-level sibling of `standing_pools:` per D23). If the timeout fires before all submitted tasks reach `completed` or before the report envelope appears, the submitting command:
 
 1. Marks the pool task(s) as `abandoned` (a new task status) so the Pool Lead can detect and stop work on them.
 2. Treats the routing as a pool failure and applies the FR-MMT24 per-task fallback path.
@@ -192,8 +194,8 @@ When `standing_pools.routing_mode: explicit-pool-required`:
   Routing mode is 'explicit-pool-required', so this command will not fall back to
   fresh-spawn reviewers. To proceed, either:
     1. Start a matching pool:
-         /synthex-plus:start-review-team --reviewers code-reviewer,security-reviewer
-    2. Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml
+         /synthex:start-review-team --reviewers code-reviewer,security-reviewer
+    2. Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml
   ```
 
   The example uses the actual `--reviewers` flag (not a `{reviewer_list}` placeholder) and shows the value comma-joined to match the `/start-review-team` flag format.
@@ -257,7 +259,7 @@ A pool is considered stale if either of the following conditions holds during th
 
 When inline discovery encounters a stale pool during the filter step:
 
-1. Invoke the `standing-pool-cleanup` agent (Task 32 agent at `plugins/synthex-plus/agents/standing-pool-cleanup.md`) with the pool name and detection reason.
+1. Invoke the `standing-pool-cleanup` agent (Task 32 agent at `plugins/synthex/agents/standing-pool-cleanup.md`) with the pool name and detection reason.
 2. The cleanup agent acquires `.index.lock`, removes the index entry, removes the metadata directory (if present), releases the lock, and returns a cleanup result.
 3. Emit the verbatim one-time-per-session warning to the user (substituting pool name and fallback action): **`"Standing pool '{name}' was stale and has been cleaned up. {fallback_action}."`** — this is the FR-MMT22 step 5 verbatim warning.
 4. After cleanup, continue with routing: treat the cleaned-up pool as absent and apply `routing_mode` per §4 (silent fallback in `prefer-with-fallback`; abort with no-pool error in `explicit-pool-required`).
@@ -271,14 +273,9 @@ To avoid showing the stale-pool warning repeatedly when a user runs multiple rev
 - If two different stale pools are cleaned up in the same session, each gets its own warning (suppression is per-pool, not global).
 - Implementation: **track a transient marker in the calling session's state** (e.g., a local variable in the command's workflow context; this is not persisted to disk and does not survive session boundaries).
 
-### 7.4 Distinction from FR-MMT28 (Orphan Scan at Team-Init Time)
+### 7.4 FR-MMT28 (Orphan Scan at Team-Init Time) — Retired
 
-FR-MMT22 (this section) covers in-session stale-pool detection during routing. FR-MMT28 (Task 49) covers orphan detection at `team-init` startup time. Both call the same cleanup agent, but emit **different verbatim warning strings**:
-
-- FR-MMT22 (routing, this section): `"Standing pool '{name}' was stale and has been cleaned up. {fallback_action}."`
-- FR-MMT28 (orphan scan, Task 49): uses a distinct verbatim string — **do NOT reuse FR-MMT22's wording**.
-
-The FR-MMT22 one-time-per-session suppression does NOT suppress FR-MMT28 orphan warnings at team-init time — the suppression marker is per-session-context and does not propagate to `team-init` invocations.
+FR-MMT28's orphan scan ran at `team-init` startup. `team-init` was retired with the other `team-*` commands; `/synthex:start-review-team` Step 1b now only warns about orphaned non-standing team directories and does not invoke the cleanup agent. In-session stale-pool cleanup (this section) is the only cleanup path.
 
 ### 7.5 FR-MMT22 Acceptance Criteria
 
@@ -338,8 +335,8 @@ This section walks through two real-world routing scenarios to illustrate how di
    Routing mode is 'explicit-pool-required', so this command will not fall back to
    fresh-spawn reviewers. To proceed, either:
      1. Start a matching pool:
-          /synthex-plus:start-review-team --reviewers code-reviewer,security-reviewer
-     2. Change routing_mode to 'prefer-with-fallback' in .synthex-plus/config.yaml
+          /synthex:start-review-team --reviewers code-reviewer,security-reviewer
+     2. Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml
    ```
 
 3. **User Action:** User either starts the pool or adjusts config, then retries.

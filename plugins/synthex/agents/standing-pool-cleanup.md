@@ -23,7 +23,6 @@ Atomically remove a stale standing pool's entry from `~/.claude/teams/standing/i
 - **By `/synthex:review-code`** (Task 54) — after that command's inline stale-pool check observes an entry matching FR-MMT13 "probably dead" or FR-MMT22 conditions.
 - **By `/synthex:performance-audit`** (Task 57) — same inline stale-pool check.
 - **By `/list-teams`** (Task 43) — when iterating the pool index and a stale entry is encountered.
-- **By `team-init`** (Task 49) — during orphan scanning at spawn time.
 
 You are always invoked by a caller; you are never user-facing. The caller has already determined the pool is stale per FR-MMT13 or FR-MMT22 conditions -- you do NOT re-validate that determination. Stale-pool detection is the caller's responsibility, performed inline. You receive a detection reason for informational purposes only (it influences the user-visible warning text the caller will emit, not anything you emit yourself).
 

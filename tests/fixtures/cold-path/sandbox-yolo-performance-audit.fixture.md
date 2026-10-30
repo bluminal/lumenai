@@ -20,7 +20,7 @@ Default is **N** (Enter without input = no). On `n` or empty input, abort the au
 
 **Skip this step entirely** when no CLI in the resolved roster has `sandbox-yolo` configured (i.e., all CLIs resolve to `read-only` or `parent-mediated`). The check is a no-op in the default safe configuration. Native-only invocations (no externals at all) also skip this step.
 
-The verbatim warning string above is locked by **D25 / NFR-MMT7** (user-visible string copy locked verbatim) and is identical to the strings used by `/synthex-plus:start-review-team` and `/synthex:review-code`.
+The verbatim warning string above is locked by **D25 / NFR-MMT7** (user-visible string copy locked verbatim) and is identical to the strings used by `/synthex:start-review-team` and `/synthex:review-code`.
 
 ---
 

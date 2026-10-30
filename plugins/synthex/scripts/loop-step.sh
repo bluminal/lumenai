@@ -520,7 +520,7 @@ gen_hex4() {
 
 # command_slug <command> — derives the native-looping.md "Command slugs"
 # table mapping from a slash-command string, e.g. "/synthex:next-priority"
-# -> "next-priority", "/synthex-plus:team-implement" -> "team-implement".
+# -> "next-priority", "/synthex:refine-requirements" -> "refine-requirements".
 # Falls back to lowercasing + hyphenating anything that isn't already a
 # bare slug (so `loop-step.sh begin <anything>` never produces an invalid
 # auto-generated loop-id prefix).

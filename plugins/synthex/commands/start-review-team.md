@@ -2,7 +2,7 @@
 
 Spawn a standing review pool — a persistent team of reviewer agents that waits idle between reviews, eliminating per-review spawn latency. This implements FR-MMT9 from the multi-model-teams PRD.
 
-Unlike `team-review`, which spawns a fresh team per review invocation, `start-review-team` creates a pool that persists across multiple review sessions. Standard Synthex commands (`review-code`, `performance-audit`) automatically route to a matching pool when one is idle, so submitters get review results faster and without the cost of spawning a full team for every diff.
+Unlike a per-invocation review, which spawns fresh reviewers every time, `start-review-team` creates a pool that persists across multiple review sessions. Standard Synthex commands (`review-code`, `performance-audit`) automatically route to a matching pool when one is idle, so submitters get review results faster and without the cost of spawning a full team for every diff.
 
 ## Parameters
 
@@ -26,16 +26,7 @@ If `SendMessage` and `ListAgents` are both in your tool list, continue to Step 1
 
 Run the following checks before any parameter resolution or filesystem writes.
 
-#### 1a. Synthex dependency
-
-Verify that the Synthex plugin is available by checking for `plugins/synthex/agents/tech-lead.md` OR `.synthex/config.yaml`. If neither exists, abort with:
-
-```
-Error: Synthex plugin not detected. Synthex+ requires Synthex agent definitions
-for pool member identities. Install and initialize Synthex first (/init).
-```
-
-#### 1b. Experimental flag
+#### 1a. Experimental flag
 
 Check that the environment variable `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is set to `1`. If it is not set or has any other value, abort with:
 
@@ -45,10 +36,10 @@ Set the following environment variable and restart Claude Code:
 
   export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 
-This flag enables the Agent Teams API used by Synthex+ commands.
+This flag enables the Agent Teams API used by standing review pools.
 ```
 
-#### 1c. Orphan detection
+#### 1b. Orphan detection
 
 Check for directories under `~/.claude/teams/` (excluding `~/.claude/teams/standing/`) that may be leftover from previous sessions. For each orphaned directory found, display a warning but do NOT abort:
 
@@ -57,7 +48,7 @@ Warning: Found orphaned team resources at ~/.claude/teams/{name}. These may be l
 over from a previous session. Consider cleaning up with: rm -rf ~/.claude/teams/{name}
 ```
 
-#### 1d. Duplicate pool detection
+#### 1c. Duplicate pool detection
 
 Before any writes, check whether a standing pool with the requested name already exists at `~/.claude/teams/standing/<name>/`. If the directory exists and contains a valid `config.json`, abort with:
 
