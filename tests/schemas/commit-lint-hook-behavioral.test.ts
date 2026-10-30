@@ -8,7 +8,10 @@
  *   - the regex equals the one .github/workflows/release.yml's CHANGELOG
  *     "OTHER=" classification step uses
  *   - blocks a bad `-m` subject
- *   - passes `-F -` (and `-F <file>`) — content not on the command line
+ *   - passes `-F <file>` — content not on the command line
+ *   - lints `-F -` when the same command supplies the message as a literal
+ *     (heredoc on the commit, `cat <<EOF |`, single-literal printf/echo
+ *     pipe), and fails open for anything it can't extract deterministically
  *   - tolerates an `rtk git commit` prefix
  *   - skips `--amend --no-edit`, `-C`, `-c`, `--fixup`, `--squash`, and
  *     merge commits
@@ -149,7 +152,7 @@ describe('commit-lint.sh (FR-HM27, Task 46)', () => {
     }
   });
 
-  it('passes `-F -` (heredoc/stdin message) unconditionally', () => {
+  it('passes a bare `-F -` (stdin not supplied in the command) — fail open', () => {
     writeConfig('conventional');
     const result = runHook('git commit -F -');
     expect(result.status).toBe(0);
@@ -157,8 +160,8 @@ describe('commit-lint.sh (FR-HM27, Task 46)', () => {
 
   it('passes `-F <file>` unconditionally', () => {
     writeConfig('conventional');
-    const result = runHook('git commit -F /tmp/some-message-file');
-    expect(result.status).toBe(0);
+    expect(runHook('git commit -F /tmp/some-message-file').status).toBe(0);
+    expect(runHook('git commit -F file.txt <<\'MSG\'\nbad subject\nMSG').status).toBe(0);
   });
 
   it('tolerates an `rtk git commit` prefix, still blocking a bad subject', () => {
@@ -276,5 +279,109 @@ describe('commit-lint.sh (FR-HM27, Task 46)', () => {
     const content = readFileSync(SCRIPT, 'utf-8');
     expect(content).toMatch(/^#\s*Exit codes:\s*$/m);
     expect(content).toContain('command -v node');
+  });
+});
+
+describe('commit-lint.sh `-F -` message extraction from the command string', () => {
+  const heredoc = (subject: string, tag = "'MSG'", end = 'MSG') =>
+    `git commit --no-gpg-sign -F - <<${tag}\n${subject}\n\nBody line.\n${end}`;
+
+  it('blocks a heredoc with a bad subject, with the fix hint', () => {
+    writeConfig('conventional');
+    const result = runHook(heredoc('add read-through cache'));
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain('does not match Conventional Commits');
+    expect(result.stderr).toContain('Fix:');
+    expect(result.stderr).toContain('add read-through cache');
+  });
+
+  it('allows a heredoc with a good subject', () => {
+    writeConfig('conventional');
+    expect(runHook(heredoc('feat(cache): add read-through cache')).status).toBe(0);
+  });
+
+  it.each([
+    ["'MSG'", 'MSG'],
+    ['"MSG"', 'MSG'],
+    ['MSG', 'MSG'],
+    ['-MSG', '\tMSG'],
+    [" 'MSG'", 'MSG'],
+  ])('handles heredoc tag form <<%s', (tag, end) => {
+    writeConfig('conventional');
+    expect(runHook(heredoc('bad subject', tag, end)).status).toBe(2);
+    expect(runHook(heredoc('fix: good subject', tag, end)).status).toBe(0);
+  });
+
+  it('accepts `--file -` and `--file=-`', () => {
+    writeConfig('conventional');
+    expect(runHook("git commit --file - <<'MSG'\nbad subject\nMSG").status).toBe(2);
+    expect(runHook("git commit --file=- <<'MSG'\nbad subject\nMSG").status).toBe(2);
+  });
+
+  it('finds the commit in an `&&` chain', () => {
+    writeConfig('conventional');
+    expect(runHook(`git add . && ${heredoc('bad subject')}`).status).toBe(2);
+    expect(runHook(`git add . && ${heredoc('feat: x')}`).status).toBe(0);
+  });
+
+  it('finds an `-m` commit in an `&&` chain too', () => {
+    writeConfig('conventional');
+    expect(runHook('git add . && git commit -m "bad subject"').status).toBe(2);
+  });
+
+  it('tolerates an `rtk` prefix on the heredoc form', () => {
+    writeConfig('conventional');
+    expect(runHook(`rtk ${heredoc('bad subject')}`).status).toBe(2);
+    expect(runHook(`rtk git add . && rtk ${heredoc('bad subject')}`).status).toBe(2);
+  });
+
+  it('lints `cat <<EOF | git commit -F -`', () => {
+    writeConfig('conventional');
+    expect(runHook("cat <<'EOF' | git commit -F -\nbad subject\nEOF").status).toBe(2);
+    expect(runHook("cat <<'EOF' | git commit -F -\nfeat: x\nEOF").status).toBe(0);
+  });
+
+  it('lints a single literal piped from printf or echo', () => {
+    writeConfig('conventional');
+    expect(runHook("printf '%s\\n' \"bad subject\" | git commit -F -").status).toBe(2);
+    expect(runHook("printf '%s\\n' \"feat: x\" \"\" \"body\" | git commit -F -").status).toBe(0);
+    expect(runHook("printf 'bad subject\\n\\nbody\\n' | git commit -F -").status).toBe(2);
+    expect(runHook('echo "bad subject" | git commit -F -').status).toBe(2);
+    expect(runHook('echo "fix: y" | git commit -F -').status).toBe(0);
+  });
+
+  it('lints only the subject: body and trailers are ignored', () => {
+    writeConfig('conventional');
+    const msg = 'feat: x\n\nthis body is not conventional\n\nCo-Authored-By: Someone <a@b.c>\nRefs: ABC-1';
+    expect(runHook(`git commit -F - <<'MSG'\n${msg}\nMSG`).status).toBe(0);
+    expect(runHook(`git commit -F - <<'MSG'\n\n# comment\nbad subject\n\nfeat: not the subject\nMSG`).status).toBe(2);
+  });
+
+  it.each([
+    ['a variable', 'printf \'%s\\n\' "$MSG" | git commit -F -'],
+    ['a variable via echo', 'echo "$MSG" | git commit -F -'],
+    ['command substitution', 'echo "$(make-msg)" | git commit -F -'],
+    ['an unquoted heredoc with expansion', 'git commit -F - <<MSG\n$SUBJECT\nMSG'],
+    ['two heredocs', "cat <<'A' >/dev/null && git commit -F - <<'MSG'\nx\nA\nbad subject\nMSG"],
+    ['an unterminated heredoc', "git commit -F - <<'MSG'\nbad subject"],
+    ['a here-string', 'git commit -F - <<< "bad subject"'],
+    ['an unknown producer', 'generate-msg | git commit -F -'],
+    ['a stdin file redirect', 'git commit -F - < msg.txt'],
+    ['`-m` with command substitution', "git commit -m \"$(cat <<'EOF'\nbad subject\nEOF\n)\""],
+    ['two git commits', 'git commit -m "bad subject" && git commit -m "also bad"'],
+  ])('fails open (allows) for %s', (_label, shellLine) => {
+    writeConfig('conventional');
+    expect(runHook(shellLine).status).toBe(0);
+  });
+
+  it('still honors skip rules on the heredoc form', () => {
+    writeConfig('conventional');
+    expect(runHook("git commit --amend --no-edit -F - <<'MSG'\nbad subject\nMSG").status).toBe(0);
+    expect(runHook("git commit --fixup HEAD -F - <<'MSG'\nbad subject\nMSG").status).toBe(0);
+  });
+
+  it('does not lint a heredoc form when git.commit_convention is not "conventional"', () => {
+    writeConfig('auto');
+    expect(runHook(heredoc('bad subject')).status).toBe(0);
   });
 });
