@@ -441,6 +441,43 @@ function buildVerificationRecord(votes) {
   };
 }
 
+
+/**
+ * Normalizes a configured `reviewers` list into what the engine launches.
+ *
+ * An entry is an agent name (a bare string, or `{agent}`) or a prompt-file
+ * reviewer the caller already resolved (`{id, promptBody}`). A prompt-file
+ * reviewer gets no `agentType`: there is no plugin agent behind it, so it runs
+ * as a plain sub-agent carrying the borrowed prompt. The caller does the
+ * reading, because a Workflow script has no `fs`
+ * (plugins/synthex/docs/prompt-file-reviewers.md).
+ *
+ * Entries with `enabled: false`, and entries naming neither an agent nor a
+ * prompt body, are dropped: one malformed line must not cost the review the
+ * reviewers that are fine.
+ *
+ * @param {Array<string|{agent?: string, id?: string, promptBody?: string, enabled?: boolean}>} entries
+ * @returns {Array<{id: string, agentType?: string, promptBody?: string}>}
+ */
+function normalizeReviewers(entries) {
+  return (Array.isArray(entries) ? entries : []).map((entry, index) => {
+    if (typeof entry === 'string') {
+      const id = entry.trim();
+      return id ? { id, agentType: `synthex:${id}` } : null;
+    }
+    if (!entry || typeof entry !== 'object') return null;
+    if (entry.enabled === false) return null;
+    if (typeof entry.promptBody === 'string' && entry.promptBody.trim()) {
+      return { id: entry.id || `prompt-reviewer-${index + 1}`, promptBody: entry.promptBody };
+    }
+    if (typeof entry.agent === 'string' && entry.agent.trim()) {
+      const agent = entry.agent.trim();
+      return { id: entry.id || agent, agentType: `synthex:${agent}` };
+    }
+    return null;
+  }).filter(Boolean);
+}
+
 // ---------------------------------------------------------------------------
 // END REVIEW-ENGINE-SYNC
 // ---------------------------------------------------------------------------
@@ -513,6 +550,26 @@ const REFUTER_LENSES = [
 ];
 
 // ── Prompts ──────────────────────────────────────────────────────────────
+
+// A borrowed prompt gets the same findings contract the named reviewers get, so
+// its findings dedupe, rank and attribute alongside theirs instead of landing in
+// a section of their own. The read-only clause matters because these prompts are
+// often written for CI, where posting a comment is the point.
+function promptFileReviewerPrompt(reviewer, diffText, projectContext, priorCycleSummary) {
+  return [
+    reviewer.promptBody.trim(),
+    '',
+    '---',
+    '',
+    'You are running as one reviewer inside a Synthex code review, not in CI.',
+    'Apply the review criteria above, but ignore any instruction in it to post a',
+    'comment, call `gh`, write a file, or otherwise act — this pass is read-only,',
+    'and the caller renders your findings. Where it names its own output format,',
+    'the contract below wins.',
+    '',
+    reviewerPrompt(reviewer.id, diffText, projectContext, priorCycleSummary),
+  ].join('\n');
+}
 
 function reviewerPrompt(reviewerName, diffText, projectContext, priorCycleSummary) {
   return [
@@ -613,25 +670,51 @@ const reviewed = input.reviewed || 'the resolved diff';
 const date = input.date || '(date not provided)';
 const diffText = input.diffText || '';
 const projectContext = input.projectContext || '';
-const reviewers = Array.isArray(input.reviewers) && input.reviewers.length
-  ? input.reviewers
-  : ['code-reviewer', 'security-reviewer'];
+const reviewers = normalizeReviewers(
+  Array.isArray(input.reviewers) && input.reviewers.length
+    ? input.reviewers
+    : ['code-reviewer', 'security-reviewer'],
+);
 const multiModel = input.multiModel || null;
 const refutePass = input.refutePass || null;
 const cycle = input.cycle || 1;
 const priorCycleSummary = input.priorCycleSummary || null;
 
+// Every configured reviewer can normalize away (all disabled, or every
+// prompt-file entry arrived unresolved), and an empty fan-out would render
+// a clean PASS that nothing actually reviewed.
+if (reviewers.length === 0) {
+  return {
+    report: [
+      `# Code Review: ${reviewed}`,
+      '',
+      '**Verdict: FAIL** — no usable reviewers.',
+      '',
+      'Every entry in the `reviewers` config resolved to nothing: each was',
+      'disabled, malformed, or a prompt file the caller could not read. Fix the',
+      '`reviewers` block and re-run; no code was reviewed.',
+    ].join('\n'),
+    verdict: 'FAIL',
+    cycle,
+    findings: [],
+  };
+}
+
 phase('Native Review');
 log(`[workflow cycle ${cycle}] launching ${reviewers.length} native reviewer(s) in parallel`);
 
 const nativeResults = await parallel(
-  reviewers.map((reviewerName) => () => agent(
-    reviewerPrompt(reviewerName, diffText, projectContext, priorCycleSummary),
+  reviewers.map((reviewer) => () => agent(
+    reviewer.promptBody
+      ? promptFileReviewerPrompt(reviewer, diffText, projectContext, priorCycleSummary)
+      : reviewerPrompt(reviewer.id, diffText, projectContext, priorCycleSummary),
     {
-      agentType: `synthex:${reviewerName}`,
+      // A prompt-file reviewer has no plugin agent behind it, so it runs as a
+      // plain sub-agent carrying the borrowed prompt.
+      ...(reviewer.agentType ? { agentType: reviewer.agentType } : {}),
       schema: REVIEWER_ENVELOPE_SCHEMA,
       phase: 'Native Review',
-      label: reviewerName,
+      label: reviewer.id,
     },
   )),
 );
@@ -641,16 +724,16 @@ const nativeResults = await parallel(
 // reliably omit it, and a Task 57 live run rendered "Raised by: unknown"
 // on every finding as a result. The script, not the model, knows which
 // reviewer it just invoked, so this is authoritative.
-const stampedResults = reviewers.map((reviewerName, i) => {
+const stampedResults = reviewers.map((reviewer, i) => {
   const result = nativeResults[i];
   const rawFindings = result && Array.isArray(result.findings) ? result.findings : [];
   const findings = stampReviewerSource(rawFindings, {
-    reviewer_id: reviewerName,
+    reviewer_id: reviewer.id,
     family: 'anthropic',
     source_type: 'native-team',
   });
   const positives = result && Array.isArray(result.positives) ? result.positives : [];
-  return { name: reviewerName, ok: Boolean(result), findings, positives };
+  return { name: reviewer.id, ok: Boolean(result), findings, positives };
 });
 
 const reviewerTable = stampedResults.map(({ name, ok, findings }) => {
@@ -683,7 +766,12 @@ if (multiModel && multiModel.enabled) {
         command: 'review-code',
         artifact_path: multiModel.artifactPath || reviewed,
         touched_files: multiModel.touchedFiles || [],
-        native_reviewers: reviewers,
+        // The orchestrator Tasks these by name, so it gets agent basenames:
+        // prompt-file reviewers have no agent behind them, and `id` on an
+        // agent-backed entry is only an attribution label.
+        native_reviewers: reviewers
+          .filter((r) => r.agentType)
+          .map((r) => r.agentType.replace(/^synthex:/, '')),
         config: multiModel.config || {},
         per_reviewer_timeout_seconds: multiModel.perReviewerTimeoutSeconds || 180,
       }),

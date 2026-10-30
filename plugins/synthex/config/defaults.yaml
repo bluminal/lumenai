@@ -158,6 +158,8 @@ implementation_plan:
   #   - Add project-specific reviewers (e.g., security-reviewer, compliance)
   #   - Disable default reviewers by setting enabled: false
   #   - Customize the focus area for each reviewer
+  #   - Point an entry at a markdown prompt file in this project instead of a
+  #     Synthex agent, with `- prompt: <path>` (docs/prompt-file-reviewers.md)
   reviewers:
     - agent: architect
       enabled: true
@@ -189,7 +191,9 @@ refine_requirements:
 
   # Sub-agents that review the PRD for clarity and completeness.
   # Each reviewer identifies ambiguities, gaps, and unclear areas
-  # from their professional perspective.
+  # from their professional perspective. An entry may also point at a markdown
+  # prompt file in this project with `- prompt: <path>` instead of naming a
+  # Synthex agent (docs/prompt-file-reviewers.md).
   reviewers:
     - agent: product-manager
       enabled: true
@@ -223,10 +227,17 @@ code_review:
   # Reviewers to run in parallel during code review.
   # code-reviewer and security-reviewer are always recommended.
   # Add performance-engineer for performance-critical codebases.
+  #
+  # An entry may also point at a markdown prompt file in this project instead of
+  # naming a Synthex agent. Its findings are deduped and severity-ranked with
+  # everyone else's. See docs/prompt-file-reviewers.md.
   reviewers:
     - code-reviewer
     - security-reviewer
     # - performance-engineer  # Uncomment for performance-critical code
+    # - prompt: .github/scripts/pr-guardian/prompt.md
+    #   id: pr-guardian       # Optional; defaults to frontmatter `name`
+    #   enabled: true         # Optional; defaults to true
 
   # Maximum diff size (in lines) before warning about review quality.
   # Large diffs produce lower-quality reviews. Google recommends < 300 LOC.

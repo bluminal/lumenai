@@ -181,6 +181,21 @@ Synthex uses a **convention over configuration** approach:
 - **With a config file:** Projects override specific settings in `.synthex/config.yaml`. Only include what you want to change.
 - **Config lives in the repo:** Version-controlled alongside code, so the team shares the same configuration.
 
+### Prompt-file reviewers
+
+A `reviewers` entry can point at a markdown prompt file in your project instead of naming a Synthex agent, so a review prompt you already maintain runs as part of a Synthex review:
+
+```yaml
+code_review:
+  reviewers:
+    - code-reviewer
+    - security-reviewer
+    - prompt: .github/scripts/pr-guardian/prompt.md
+      id: pr-guardian
+```
+
+Its findings are deduped, severity-ranked and attributed alongside every other reviewer's rather than landing in a section of their own. Accepted in `code_review.reviewers`, `implementation_plan.reviewers` and `refine_requirements.reviewers`. See [`docs/prompt-file-reviewers.md`](docs/prompt-file-reviewers.md) for frontmatter handling, the read-only rule, and failure modes.
+
 ### Where settings can live
 
 Settings resolve across four layers, highest precedence first:
@@ -216,7 +231,7 @@ See [`config/defaults.yaml`](config/defaults.yaml) for the full reference. Key s
 | `implementation_plan.reviewers` | architect, designer, tech-lead | Sub-agents that review draft implementation plans |
 | `implementation_plan.concurrent_tasks` | 3 | Max parallelizable tasks per milestone in the plan |
 | `implementation_plan.review_loops.max_cycles` | 3 | Per-command override (higher for high-stakes plans) |
-| `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `/review-code` |
+| `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `/review-code`. An entry may be `- prompt: <path>` instead of an agent name — see [Prompt-file reviewers](#prompt-file-reviewers). |
 | `code_review.max_diff_lines` | 300 | Warn when diff exceeds this size |
 | `code_review.spec_paths` | `[docs/specs]` | Specifications for compliance checking |
 | `quality.coverage_thresholds` | line: 80, branch: 70, function: 80 | Coverage thresholds |

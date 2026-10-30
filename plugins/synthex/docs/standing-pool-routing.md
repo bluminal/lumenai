@@ -2,6 +2,20 @@
 
 Cold-path detail for `/synthex:review-code` Step 1b (FR-HM5, D17). Read only when `standing_pools.enabled: true` resolves per the D6 fallback (Step 1b's own gate line in `plugins/synthex/commands/review-code.md`, which is what actually includes this file, spells out the fallback). This is not a standalone command — it has no frontmatter and is never registered in `plugin.json`.
 
+#### Prompt-file entries and the required-reviewer set
+
+A `- prompt:` entry in `code_review.reviewers` is not an agent name: drop it
+from the set 1b-i computes, before any matching or abort below. A pool roster
+holds agent names only, so a prompt path can never match, and leaving it in
+would abort an `explicit-pool-required` review that the pool otherwise covers.
+If dropping them leaves the set empty (every configured reviewer is a prompt
+file), skip pool routing entirely and proceed to Step 2 — an empty set is a
+subset of every roster, so `covers` would match an arbitrary pool and submit it
+zero tasks. When routing hands the review to a pool, the pool's report is the review (1b-iii
+step 6b skips Steps 2-7), so prompt-file reviewers do not run on that path at
+all — they apply to the fresh-spawn path in `review-code.md` Step 4
+(`docs/prompt-file-reviewers.md`).
+
 This step executes at command-invocation time, before any diff resolution or reviewer spawning.
 
 #### 1b-i. Compute Required-Reviewer-Set
@@ -113,7 +127,6 @@ Apply `standing_pools.routing_mode` (default: `prefer-with-fallback`). Resolve `
          /synthex:start-review-team --reviewers code-reviewer,security-reviewer
     2. Change routing_mode to 'prefer-with-fallback' in .synthex/config.yaml
   ```
-
 ## Capability Ladder (FR-HM21)
 
 `/synthex:review-code` and `/synthex:performance-audit` select their reviewer-orchestration strategy by walking this ladder, in order, at every invocation. Selection is always by tool presence, checked fresh each time — never by host name, and never by matching a feature name that only coincidentally resembles a Claude tool name on some other host.
@@ -125,4 +138,4 @@ Apply `standing_pools.routing_mode` (default: `prefer-with-fallback`). Resolve `
 
 **Depth-1 inline rule (FR-HM42):** on a depth-1 host, when the command is already running inside a subagent and a spawn at level 3 is refused, perform the reviewer roles inline in this session instead of falling to level 4 — the command still completes the review in one turn, it just performs the reviewer roles itself rather than spawning them out.
 
-**Level 2's `Workflow` `args` contract (Task 57; `refutePass` added Task 58):** pass `{reviewed, date, diffText, projectContext, reviewers, reviewLoops, multiModel, refutePass, cycle, priorCycleSummary}`. `reviewed` and `diffText` reflect the actual scope Step 2 resolved (e.g. "unstaged changes" when nothing is staged -- never a hardcoded "staged changes"). `date` is today's date (`YYYY-MM-DD`): Workflow scripts cannot call `Date.now()`, so the caller supplies it from its own turn. `refutePass` is `{enabled: boolean}`, resolved from `code_review.refute_pass: on|off` (default `off`) the same way `code_review.engine` is resolved -- via `scripts/lib/config-get.sh code_review.refute_pass off` when `Bash` is in your tool list, otherwise a direct config Read -- and is a SEPARATE key from the prose path's `code_review.verification: prose|off` (D18): see `docs/engines/review-code-workflow.md`'s "Adversarial Refute Pass (FR-HM17, Task 58)" for why the two are kept apart. A single `Workflow` call runs exactly one review cycle and returns -- a script cannot wait for a human to apply fixes between cycles. The command's own Review Loop (`review-code.md` Step 6) owns the fix-and-re-review loop across turns: on a FAIL verdict it re-invokes `Workflow {"name": "synthex:review-code-engine"}` for the next cycle, passing the incremented `cycle` number and a compact summary of unresolved findings from the prior cycle as `priorCycleSummary` -- the same inputs Step 6c already assembles for fresh reviewer subagents on the prose path.
+**Level 2's `Workflow` `args` contract (Task 57; `refutePass` added Task 58):** pass `{reviewed, date, diffText, projectContext, reviewers, reviewLoops, multiModel, refutePass, cycle, priorCycleSummary}`. Each `reviewers` entry is either an agent name (a bare string, or `{agent}`) or a prompt-file reviewer the caller already resolved, as `{id, promptBody}` -- the script has no `fs` and cannot read a prompt file itself (`docs/prompt-file-reviewers.md`). `reviewed` and `diffText` reflect the actual scope Step 2 resolved (e.g. "unstaged changes" when nothing is staged -- never a hardcoded "staged changes"). `date` is today's date (`YYYY-MM-DD`): Workflow scripts cannot call `Date.now()`, so the caller supplies it from its own turn. `refutePass` is `{enabled: boolean}`, resolved from `code_review.refute_pass: on|off` (default `off`) the same way `code_review.engine` is resolved -- via `scripts/lib/config-get.sh code_review.refute_pass off` when `Bash` is in your tool list, otherwise a direct config Read -- and is a SEPARATE key from the prose path's `code_review.verification: prose|off` (D18): see `docs/engines/review-code-workflow.md`'s "Adversarial Refute Pass (FR-HM17, Task 58)" for why the two are kept apart. A single `Workflow` call runs exactly one review cycle and returns -- a script cannot wait for a human to apply fixes between cycles. The command's own Review Loop (`review-code.md` Step 6) owns the fix-and-re-review loop across turns: on a FAIL verdict it re-invokes `Workflow {"name": "synthex:review-code-engine"}` for the next cycle, passing the incremented `cycle` number and a compact summary of unresolved findings from the prior cycle as `priorCycleSummary` -- the same inputs Step 6c already assembles for fresh reviewer subagents on the prose path.

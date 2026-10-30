@@ -12,11 +12,11 @@ When the decision framework selects the multi-model branch, invoke the `multi-mo
 - `command: "review-code"`
 - `artifact_path` from the target parameter
 - `touched_files` computed from the diff
-- `native_reviewers` from `code_review.reviewers` config (or `--reviewers` flag)
+- `native_reviewers` from `code_review.reviewers` config (or `--reviewers` flag), minus any `- prompt:` entry (see the preamble above)
 - `config`: the resolved `multi_model_review` block
 - `per_reviewer_timeout_seconds`: from `multi_model_review.per_reviewer_timeout_seconds` (default 180)
 
-The orchestrator returns the unified consolidated envelope. Render its `report` field as the command's final output, prefixed with the path-and-reason header per D21 (Step 7 below).
+The orchestrator returns the unified consolidated envelope. Merge any prompt-file reviewer's findings into its `report` first (see the preamble above), then render that report as the command's final output, prefixed with the path-and-reason header per D21 (Step 7 below).
 
 Native-only branch continues to call today's review-code logic byte-identically (FR-MR23 regression — verified by Task 38(a) snapshot diff against Task 0 baseline).
 
@@ -31,6 +31,6 @@ Render the **path-and-reason header** per the D21 spec (see "### Path-and-Reason
 **Step 8 — Emit consolidated review**
 
 Emit the consolidated review per the chosen branch:
-- **Multi-model branch:** surface the orchestrator's `report` field, prefixed with the D21 header.
+- **Multi-model branch:** surface the orchestrator's `report` field with any prompt-file findings merged in (see the preamble above), prefixed with the D21 header.
 - **Native-only branch:** surface the review from the native workflow, prefixed with the D21 header.
 
