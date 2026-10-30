@@ -3,8 +3,8 @@
 > {One-sentence purpose statement describing what this team formation is optimized for.}
 
 <!--
-  This is the canonical template skeleton for Synthex+ team templates.
-  All concrete templates (implementation.md, review.md, planning.md) MUST
+  This is the canonical template skeleton for Synthex team templates.
+  All concrete templates (currently review.md) MUST
   conform to this structure: same heading levels, same section ordering,
   same prose density rules.
 
@@ -133,13 +133,13 @@ read-on-spawn instruction for that teammate).
 
 ## Labeled Prose Overlay Convention
 
-<!-- IMPORTANT: This section documents a Synthex+ architectural convention (D22).
+<!-- IMPORTANT: This section documents a Synthex architectural convention (D22).
      It applies to ALL concrete templates, not just this skeleton.
      When adding a new conditional behavior to any template, follow this pattern. -->
 
 ### What are labeled overlay sections?
 
-Synthex+ templates may expose **labeled prose overlay sections** — named Markdown subtrees that
+Synthex templates may expose **labeled prose overlay sections** — named Markdown subtrees that
 commands conditionally include verbatim into teammate spawn prompts when specific feature flags
 resolve true. The section naming convention is:
 
@@ -166,7 +166,7 @@ section above for what replaced it):
 ### There is no rendering engine
 
 **IMPORTANT:** There is no Handlebars, Mustache, Jinja2, or any other template rendering engine
-in Synthex+. Template files are plain Markdown. Conditional composition is NOT performed by
+in Synthex. Template files are plain Markdown. Conditional composition is NOT performed by
 expanding `{{#if flag}}…{{/if}}` blocks at read time.
 
 Composition works as follows:
@@ -188,13 +188,13 @@ syntax.
 ### How to add a new overlay to a template
 
 1. Append a new `### <Name> Overlay (apply when <flag>=true)` section to the relevant template
-   file (e.g., `review.md`, `implementation.md`, `planning.md`).
+   file (e.g., `review.md`).
 2. Keep the overlay as a **single contiguous Markdown subtree** under the heading. Do not scatter
    fragments across multiple headings.
 3. Include a composition note at the top of the overlay section documenting: (a) that there is no
    rendering engine, (b) when the overlay fires (which flag, which spawn-prompt point), and (c) how
    command workflow markdown is responsible for verbatim inclusion.
-4. Update the command workflow markdown (e.g., `commands/team-review.md`) to include an explicit
+4. Update the command workflow markdown (e.g., `commands/start-review-team.md`) to include an explicit
    instruction for when and how to include the overlay verbatim.
 5. Add a Layer 1 schema test asserting the overlay heading and at least one key verbatim string are
    present in the composed spawn-prompt blob.

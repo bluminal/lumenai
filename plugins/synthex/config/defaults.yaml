@@ -589,9 +589,9 @@ multi_model_review:
       enabled: false               # When true, plan-review uses multi-model
       # No complexity gate for plan review (FR-MR22): plans are always reviewed.
     team_review:
-      enabled: false               # FR-MMT3: when true, /team-review uses multi-model orchestration
-      # No complexity gate for team-review (parallels FR-MR22's design for write-implementation-plan):
-      # team-review is invoked deliberately for high-risk changes; the user has already opted in
+      enabled: false               # FR-MMT3: multi-model orchestration for /team-review
+      # Unused: /team-review was retired with synthex-plus (docs/migrations/synthex-plus.md).
+      # Nothing reads this key.
 
   # Consolidation pipeline configuration.
   consolidation:

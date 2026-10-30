@@ -67,12 +67,12 @@ This is best-effort surfacing for users to clean up by hand. Do NOT auto-mutate 
 ```
 RUNNING (2):
   next-priority-3f2a    iter 5/20    started 2h ago    session abc12345
-  team-implement-7e1d   iter 11/30   started 4h ago    session (none, resumable)
+  review-code-7e1d      iter 11/30   started 4h ago    session (none, resumable)
 
 COMPLETED (3):
   refine-requirements-9b22  completed (promise)  iter 3/20    finished 1h ago
   loop-write-rfc-1a08       max-iterations       iter 20/20   finished 30m ago
-  team-plan-4c66            cancelled            iter 6/15    finished 5m ago
+  loop-lint-4c66            cancelled            iter 6/15    finished 5m ago
 ```
 
 ### Example 2: Empty project

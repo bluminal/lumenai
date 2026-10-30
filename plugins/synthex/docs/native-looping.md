@@ -1,6 +1,6 @@
 # Native Synthex Looping — Framework Specification
 
-This document is the canonical specification for Synthex's native looping primitive (introduced in synthex 0.7.0 / synthex-plus 0.4.0 per `docs/plans/native-looping.md`). Every command that accepts a `--loop` flag cross-references this doc rather than duplicating the iteration mechanics. Seven section anchors are defined below — keep their IDs stable, as schema tests and other commands link to them.
+This document is the canonical specification for Synthex's native looping primitive (introduced in synthex 0.7.0 per `docs/plans/native-looping.md`). Every command that accepts a `--loop` flag cross-references this doc rather than duplicating the iteration mechanics. Seven section anchors are defined below — keep their IDs stable, as schema tests and other commands link to them.
 
 ## Seven cross-reference anchors
 
