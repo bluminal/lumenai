@@ -274,6 +274,12 @@ Synthex 0.8+ ships a **native looping primitive** that iterates a command until 
 
 `/next-priority` accepts an opt-in `--auto-decide` flag for unattended `--loop` runs. Normally, when the Tech Lead sub-agent reaches a high-impact decision or an ambiguous requirement it already has a recommendation for, it stops and asks via `AskUserQuestion` — which halts an unattended loop. With `--auto-decide` set, the Tech Lead takes its own recommended option instead of asking, and records the decision, the alternatives it considered, and its reasoning in the implementation plan for later human review.
 
+On Claude Code the flag also arms a PreToolUse hook (`scripts/auto-decide-gate.sh`) for that session only. Any `AskUserQuestion` whose questions each have exactly one `(Recommended)` option is answered with that option automatically; the dialog never opens. Every auto-decision is then:
+
+- logged to `.synthex/auto-decide/<session_id>.jsonl`, with the commit before it;
+- recorded as an `Auto-Decision: <question> => <choice>` trailer on the commit that implements it, so `git log --grep '^Auto-Decision:'` finds it and `<sha>^` is the code before it;
+- listed in a bold **Auto-decisions** section at the top of the PR description.
+
 This is scoped narrowly: `[H]` (human-validated) acceptance criteria are **never** affected. Those always require explicit user approval via `AskUserQuestion` before merge, with or without `--auto-decide` — the flag only removes discretionary escalations that already have a clear recommendation, not formal sign-off gates.
 
 ```bash

@@ -38,6 +38,15 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/commit-lint.sh"
           }
         ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/auto-decide-gate.sh"
+          }
+        ]
       }
     ],
     "TaskCompleted": [
