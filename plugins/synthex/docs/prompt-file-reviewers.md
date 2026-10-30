@@ -20,14 +20,14 @@ code_review:
     - code-reviewer
     - security-reviewer
     - prompt: .github/scripts/pr-guardian/prompt.md
-      id: pr-guardian        # optional; defaults to frontmatter `name`, then the filename
+      id: pr-guardian        # optional; here it would default to `pr-guardian` anyway
       enabled: true          # optional; defaults to true
 ```
 
 | Key | Required | Meaning |
 |-----|----------|---------|
 | `prompt` | yes | Path to the prompt file, relative to the project root. Absolute paths and paths escaping the project root are rejected. |
-| `id` | no | Attribution label in the report and in `reviewer_id` on each finding. Falls back to the frontmatter `name`, then the filename without its extension. |
+| `id` | no | Attribution label in the report and in `reviewer_id` on each finding. Falls back to the frontmatter `name`; then, when the filename is a generic one (`prompt.md`, `review.md`, `index.md`), the name of the directory holding it; otherwise the filename without its extension. A prompt is conventionally stored as `<tool>/prompt.md`, where the directory is the name worth reporting. |
 | `enabled` | no | `false` skips the reviewer, matching `- agent:` entries. |
 
 `- prompt:` and `- agent:` entries mix freely in one list. In blocks that
@@ -37,7 +37,8 @@ support `focus:` (`implementation_plan`, `refine_requirements`), a `focus:` on a
 ## Frontmatter
 
 The file may carry YAML frontmatter between `---` fences. Only `name` is read,
-as the `id` fallback. Every other field — `description`, `model`, `tools`,
+as the `id` fallback — a prompt written for CI usually has none, so expect the
+directory-name fallback above to be what names the reviewer. Every other field — `description`, `model`, `tools`,
 anything project-specific — is ignored rather than rejected, so a prompt written
 for another runner stays valid here.
 

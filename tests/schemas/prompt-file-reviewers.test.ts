@@ -127,6 +127,13 @@ describe('prompt-file reviewer contracts', () => {
     expect(doc).toMatch(/escapes the project root/);
   });
 
+  it('names the directory-name fallback for a generic filename', () => {
+    // `<tool>/prompt.md` is the usual layout, so the filename alone reports
+    // nothing useful.
+    expect(doc).toMatch(/`prompt\.md`/);
+    expect(doc).toMatch(/the name of the directory holding it/);
+  });
+
   it.each([
     ['review-code.md'],
     ['write-implementation-plan.md'],
