@@ -34,18 +34,22 @@ Read `@{config_path}` (default `.synthex/config.yaml`).
 >
 > - `enabled: true`
 > - `reviewers: [<list from config>]`
+> - `per_command.review_code.enabled: <value from config>`
+> - `per_command.write_implementation_plan.enabled: <value from config>`
 > - `aggregator.command: <value from config>`
+>
+> (If both `per_command` values are `false`, add: "No command uses multi-model review yet — choose Re-run to turn it on.")
 >
 > What would you like to do?
 >
-> 1. **Re-run the wizard** — re-detect installed CLIs and overwrite `multi_model_review.reviewers`. The data-transmission warning (Step 1c) will be re-displayed before any write.
+> 1. **Re-run the wizard** — re-detect installed CLIs and overwrite `multi_model_review.reviewers` and the two `per_command` switches. The data-transmission warning (Step 1c) will be re-displayed before any write.
 > 2. **Reset to disabled** — set `multi_model_review.enabled: false` (preserve the rest of the block, per D-UO5). The user can re-enable later by re-running this wizard.
 > 3. **Leave as-is** — exit without changes.
 
 Apply the chosen option:
 
 - **Re-run the wizard:** proceed to Step 1.
-- **Reset to disabled:** edit `@{config_path}` so that `multi_model_review.enabled: false`. Do NOT delete the `multi_model_review` block — the explicit `false` value is the signal that the user opted out (D-UO5). Print a one-line confirmation: `Multi-model review disabled. Re-run /synthex:configure-multi-model to re-enable.` Exit.
+- **Reset to disabled:** edit `@{config_path}` so that `multi_model_review.enabled: false` (the master switch gates every `per_command` switch, so leave those as-is). Do NOT delete the `multi_model_review` block — the explicit `false` value is the signal that the user opted out (D-UO5). Print a one-line confirmation: `Multi-model review disabled. Re-run /synthex:configure-multi-model to re-enable.` Exit.
 - **Leave as-is:** print `No changes made.` Exit.
 
 ### 1. Configure Multi-Model Review (optional)
@@ -62,14 +66,16 @@ Detecting installed CLIs...
 
 For each candidate CLI in `[codex, gemini, ollama, llm, aws, claude]`, run BOTH a `which` check AND a lightweight auth check per the adapter's documented auth check command (D22 — auth pre-validation):
 
-| CLI | `which` check | Auth check command |
-|-----|---------------|--------------------|
-| `codex` | `which codex` | `codex login status` |
-| `gemini` | `which gemini` | `gcloud auth list` |
-| `ollama` | `which ollama` | `curl -sf http://localhost:11434/api/tags > /dev/null` |
-| `llm` | `which llm` | `llm keys list` |
-| `aws` | `which aws` | `aws sts get-caller-identity --output text` |
-| `claude` | `which claude` | `claude --version` |
+Each auth check mirrors Step 2 of the named adapter (`agents/<adapter>.md`), so the wizard never lists a CLI that the adapter would then reject, or the reverse:
+
+| CLI | Adapter (`reviewers` entry) | `which` check | Auth check command |
+|-----|-----------------------------|---------------|--------------------|
+| `codex` | `codex-review-prompter` | `which codex` | `codex login status`, run with `CODEX_API_KEY`/`OPENAI_API_KEY` unset (API-key billing is opt-in per adapter) |
+| `gemini` | `gemini-review-prompter` | `which gemini` | `[ -n "$GEMINI_API_KEY$GOOGLE_API_KEY" ] \|\| [ -n "$(gcloud auth list 2>/dev/null)" ]` (API key first, then gcloud) |
+| `ollama` | `ollama-review-prompter` | `which ollama` | `curl -sf http://localhost:11434/api/tags > /dev/null` |
+| `llm` | `llm-review-prompter` | `which llm` | none — the adapter skips auth (keys are per provider plugin); treat as authenticated |
+| `aws` | `bedrock-review-prompter` | `which aws` | `aws sts get-caller-identity --output text` |
+| `claude` | `claude-review-prompter` | `which claude` | `claude auth status` |
 
 **All `which` and auth checks dispatch concurrently in a single parallel Bash batch** — preflight wall-clock is bounded by the slowest single check + collation overhead, not by the sum of per-CLI latencies.
 
@@ -91,11 +97,11 @@ Use the `AskUserQuestion` tool to present the options:
 >
 > Detection results: detected-and-authenticated [`<list of authenticated CLIs>`]; detected-but-unauthenticated [`<list with remediation hints>`]; not-detected [`<list>`].
 >
-> 1. **Enable with detected CLIs** — write `multi_model_review.enabled: true` + `reviewers: [<ONLY authenticated CLIs by name>]` to `.synthex/config.yaml`. Option label lists ONLY authenticated CLIs (D22 — option only includes CLIs that pass both `which` AND auth check).
+> 1. **Enable with detected CLIs** — write `multi_model_review.enabled: true`, `reviewers: [<adapter names of ONLY authenticated CLIs>]`, and `per_command.review_code.enabled: true` + `per_command.write_implementation_plan.enabled: true` to `.synthex/config.yaml`. Option label lists ONLY authenticated CLIs (D22 — option only includes CLIs that pass both `which` AND auth check).
 > 2. **Enable later (show snippet)** — print a commented-out `multi_model_review:` YAML snippet matching the `multi_model_review:` block structure from `defaults.yaml`; detected CLIs appear as commented-out reviewers. User can uncomment when ready.
 > 3. **Skip** — do not write any `multi_model_review` config. Default behavior preserved.
 
-If the detection results include detected-but-unauthenticated CLIs, surface them SEPARATELY with remediation hints (per D22 — e.g., `"Detected but unauthenticated: gemini — run \`gcloud auth login\` to enable"`).
+If the detection results include detected-but-unauthenticated CLIs, surface them SEPARATELY with remediation hints (per D22 — e.g., `"Detected but unauthenticated: gemini — set \`GEMINI_API_KEY\` or run \`gcloud auth login\` to enable"`).
 
 If no CLIs are detected-and-authenticated, option 1 is still presented but its label reads "Enable with detected CLIs (none currently authenticated — authenticate a CLI first)". The option remains available; the user can still choose it and fix auth afterward.
 
@@ -118,7 +124,9 @@ Proceed to write the config only after this warning is displayed.
 1. Display the data-transmission warning (step 1c).
 2. Write the following keys to `.synthex/config.yaml`:
    - `multi_model_review.enabled: true`
-   - `multi_model_review.reviewers: [<authenticated CLIs only>]` — list contains ONLY the CLIs that passed both `which` AND auth check (D22). Do NOT include detected-but-unauthenticated CLIs in this list.
+   - `multi_model_review.reviewers: [<authenticated CLIs only>]` — list contains the adapter names (table in 1a, e.g. `codex-review-prompter`) of ONLY the CLIs that passed both `which` AND auth check (D22). Do NOT include detected-but-unauthenticated CLIs in this list.
+   - `multi_model_review.per_command.review_code.enabled: true`
+   - `multi_model_review.per_command.write_implementation_plan.enabled: true` — `/synthex:review-code` and `/synthex:write-implementation-plan` run multi-model only when the master switch AND their own switch are on. (`per_command.team_review` is retired; never write it.)
 3. Run the orchestrator's preflight subroutine (FR-MR20). Report the preflight summary in FR-MR20 format:
    - `N reviewers configured, M available, K families, aggregator: <name>`
    - **Preflight failure during init prints remediation but does NOT abort init.** The user can fix CLI auth and re-run preflight later.
@@ -135,6 +143,11 @@ Print the following commented-out YAML snippet (structure matches the `multi_mod
 #     # - codex-review-prompter      # OpenAI / Codex CLI  (codex login)
 #     # - gemini-review-prompter     # Google / gcloud     (gcloud auth login)
 #     # - ollama-review-prompter     # Local model         (ollama serve)
+#   per_command:
+#     review_code:
+#       enabled: true
+#     write_implementation_plan:
+#       enabled: true
 #   aggregator:
 #     command: auto
 ```
