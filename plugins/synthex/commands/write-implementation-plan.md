@@ -164,6 +164,8 @@ When multi-model is NOT active (`multi_model_review.enabled: false` AND no `--mu
 - Instructions to provide structured feedback
 - On cycles 2+: a compact summary of unresolved findings from the prior cycle (see Context Management below)
 
+**Prompt-file reviewers:** when a `reviewers` entry is `- prompt: <path>`, Read `${CLAUDE_PLUGIN_ROOT}/docs/prompt-file-reviewers.md` and follow it; a bad path skips that one reviewer, never the review. On other hosts, resolve the plugin root from `.synthex/state.json`.
+
 **Context Management:** Each review cycle spawns **new** sub-agent instances — never resume prior reviewer agents. This prevents context exhaustion across multiple cycles. Between cycles, the orchestrating command carries forward only:
 1. The updated plan (full text — this is the artifact under review)
 2. A compact findings summary: for each unresolved finding, one line with severity, title, and which reviewer raised it
