@@ -135,7 +135,7 @@ The resolved aggregator name and source ("configured" | "tier-table" | "host-fal
 
 **FR-MR12 verbatim:** "Native and external proposers run in a single parallel Task batch."
 
-If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Build, and Hermes), perform the role inline in this session, then continue. Concretely: instead of spawning the `*-review-prompter` adapter agents, invoke each configured external CLI directly via Bash and pipe its raw stdout through `${CLAUDE_PLUGIN_ROOT}/scripts/validate-findings --reviewer-id <adapter> --family <family> --raw-output-path <path>` (FR-HM28) to get the same FR-MR9 envelope the adapter agent would have returned — the depth-1 rule is a call-shape substitution, not a feature loss.
+If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Build, and Hermes), perform the role inline in this session, then continue. Concretely: instead of spawning the `*-review-prompter` adapter agents, invoke each configured external CLI directly via Bash (honoring the same per-reviewer `config` as below) and pipe its raw stdout through `${CLAUDE_PLUGIN_ROOT}/scripts/validate-findings --reviewer-id <adapter> --family <family> --raw-output-path <path>` (FR-HM28) to get the same FR-MR9 envelope the adapter agent would have returned — the depth-1 rule is a call-shape substitution, not a feature loss.
 
 On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
@@ -151,12 +151,15 @@ Issue ONE parallel Task batch containing:
     "command": "<command>",
     "context_bundle": { "manifest": ..., "files": [...] },
     "config": {
-      "model": "<resolved model id>",
-      "family": "<family override or null>",
+      "model": "<per_reviewer.<adapter>.model, or null for the adapter default>",
+      "family": "<per_reviewer.<adapter>.family, or null>",
+      "allow_api_key_billing": "<per_reviewer.codex-review-prompter.allow_api_key_billing (codex only)>",
       "raw_output_path": "<config.audit.raw_output_path>/<adapter>-<uuid>.json"
     }
   }
   ```
+
+  Build `config` by copying the adapter's resolved `config.multi_model_review.per_reviewer.<adapter>` block (keyed by adapter agent name; user-owned, resolved user-layer-first) verbatim, then setting `raw_output_path`; `model` and `family` are `null` when unset. Every other key in that block passes through unchanged — e.g. codex reads `allow_api_key_billing` (per-token API-key billing stays off unless it is `true`).
 
 **MUST NOT:** serialize proposers, gate one on another, fall back to sequential ordering when an early proposer errors. The single-batch property is REQUIRED for FR-MR17's native-only continuation: when an external fails, the natives' findings are already in hand because they ran in the same batch.
 

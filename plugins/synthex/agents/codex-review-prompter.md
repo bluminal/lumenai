@@ -47,7 +47,7 @@ Run `which codex`. Missing → `validate-findings --error cli_missing --message 
 
 ### 2. Auth Check
 
-Per-token API billing is opt-in: unless `config.allow_api_key_billing` is true, unset `CODEX_API_KEY` and `OPENAI_API_KEY` for Steps 2 and 4. If opted in with a key set, skip this check. Otherwise run `codex login status` (no model call) and judge by **exit code only**: it prints `Logged in using ...` on stderr, not stdout. Non-zero → `validate-findings --error cli_auth_failed --message "Run codex login"`.
+Per-token API billing is opt-in: unless `config.allow_api_key_billing` (from `per_reviewer.codex-review-prompter`) is true, unset `CODEX_API_KEY` and `OPENAI_API_KEY` for Steps 2 and 4. If opted in with a key set, skip this check. Otherwise run `codex login status` (no model call) and judge by **exit code only**: it prints `Logged in using ...` on stderr, not stdout. Non-zero → `validate-findings --error cli_auth_failed --message "Run codex login"`.
 
 ### 3. Prompt Construction
 
