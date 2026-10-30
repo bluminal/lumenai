@@ -216,8 +216,6 @@ export const AGENT_DESCRIPTIONS = {
     "Atomically removes a stale standing pool's index entry and metadata directory under the cross-session lock.",
   'standing-pool-submitter':
     "Submits review tasks to a standing pool's task list and polls for the consolidated report envelope.",
-  'team-orchestrator-bridge':
-    'Bridges native team reviewer mailbox messages into the canonical finding envelope for multi-model review.',
   'tech-lead': 'Primary coding and orchestration agent; implements features and delegates to specialists.',
   'technical-writer': 'Writes and maintains API docs, user guides, migration guides, and changelogs.',
   'terraform-plan-reviewer':

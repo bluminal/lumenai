@@ -31,12 +31,7 @@ const INVENTORY_NOUN_RE = /\b(commands?|agents?|entr(y|ies)|probes?)\b/i;
 // other than the global Synthex command/agent/wrapper inventory tracked by
 // tests/compat/lib/inventory.mjs, so a bare numeric literal is correct
 // there. Keyed by `<repo-relative path>:<1-based line number>`.
-const ALLOWLIST = new Set([
-  // The 3 pool-management slash commands surfaced by one team-init wizard
-  // step (start-review-team / stop-review-team / list-teams) -- a
-  // fixture-local list, not the plugin manifest's command inventory.
-  'tests/schemas/team-init-fixtures.test.ts:163',
-]);
+const ALLOWLIST = new Set<string>([]);
 
 function collectSourceFiles(root: string): string[] {
   const absoluteRoot = resolve(repoRoot, root);

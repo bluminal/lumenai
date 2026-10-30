@@ -24,29 +24,8 @@ describe('Task 2 (MMT): multi_model_review MMT extensions in defaults.yaml', () 
     expect(typeof parsed).toBe('object');
   });
 
-  describe('FR-MMT3: per_command.team_review.enabled', () => {
-    it('multi_model_review.per_command.team_review exists', () => {
-      expect(parsed.multi_model_review).toBeDefined();
-      expect(parsed.multi_model_review.per_command).toBeDefined();
-      expect(parsed.multi_model_review.per_command.team_review).toBeDefined();
-    });
-
-    it('multi_model_review.per_command.team_review.enabled defaults to false', () => {
-      expect(parsed.multi_model_review.per_command.team_review.enabled).toBe(false);
-    });
-
-    it('FR-MMT3 inline comment reference is present in the file', () => {
-      expect(content).toMatch(/FR-MMT3/);
-    });
-
-    it('team_review.enabled inline comment mentions FR-MMT3 and multi-model orchestration', () => {
-      // Find the line containing team_review enabled and verify the FR ref is nearby
-      const lines = content.split('\n');
-      const idx = lines.findIndex((l) => l.includes('team_review:'));
-      expect(idx).toBeGreaterThan(-1);
-      const window = lines.slice(idx, idx + 5).join('\n');
-      expect(window).toMatch(/FR-MMT3/);
-    });
+  it('per_command.team_review is gone (/team-review retired with synthex-plus)', () => {
+    expect(parsed.multi_model_review.per_command.team_review).toBeUndefined();
   });
 
   describe('FR-MMT30a: audit.record_finding_attribution_telemetry', () => {

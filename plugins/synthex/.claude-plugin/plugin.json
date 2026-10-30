@@ -27,7 +27,6 @@
     "./agents/sre-agent.md",
     "./agents/standing-pool-cleanup.md",
     "./agents/standing-pool-submitter.md",
-    "./agents/team-orchestrator-bridge.md",
     "./agents/tech-lead.md",
     "./agents/technical-writer.md",
     "./agents/terraform-plan-reviewer.md",
