@@ -106,6 +106,7 @@ describe('normalizeReviewers', () => {
 
 describe('prompt-file reviewer contracts', () => {
   const doc = readFileSync(join(pluginRoot, 'docs', 'prompt-file-reviewers.md'), 'utf-8');
+  const engine = readFileSync(join(pluginRoot, 'workflows', 'review-code-engine.js'), 'utf-8');
 
   it('documents the three native reviewer blocks that accept a prompt entry', () => {
     for (const block of [
@@ -132,6 +133,12 @@ describe('prompt-file reviewer contracts', () => {
     // nothing useful.
     expect(doc).toMatch(/`prompt\.md`/);
     expect(doc).toMatch(/the name of the directory holding it/);
+  });
+
+  it('tells a borrowed prompt not to add sections of its own', () => {
+    // A CI prompt ships its own report shape; the renderer has nowhere to put it.
+    expect(doc).toMatch(/return those fields and no others/);
+    expect(engine).toMatch(/Do not add a section of your own/);
   });
 
   it.each([
