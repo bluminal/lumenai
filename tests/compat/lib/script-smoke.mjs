@@ -848,6 +848,39 @@ function commitLintFallbackCase(ctx, includeNode) {
 }
 
 // ---------------------------------------------------------------------------
+// scripts/auto-decide-gate.sh — PreToolUse(AskUserQuestion) hook for
+// next-priority --auto-decide. Happy path: an armed session gets the single
+// (Recommended) option back as updatedInput.answers. Fallback: without node
+// the hook fails open (no output), so the user is asked as usual.
+// ---------------------------------------------------------------------------
+
+function autoDecideCase(ctx, includeNode) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const env = { CLAUDE_PROJECT_DIR: ctx.workDir, CLAUDE_CODE_SESSION_ID: 'smoke' };
+  const on = runScript(ctx.scriptAbsPath, ['on'], { pathDir, cwd: ctx.workDir, env });
+  assert(on.code === 0, `expected "on" to exit 0, got ${on.code}: ${on.stderr}`);
+
+  const result = runScript(ctx.scriptAbsPath, [], {
+    pathDir,
+    cwd: ctx.workDir,
+    env,
+    stdin: JSON.stringify({
+      session_id: 'smoke',
+      cwd: ctx.workDir,
+      tool_name: 'AskUserQuestion',
+      tool_input: { questions: [{ question: 'Pick?', header: 'Pick', multiSelect: false, options: [{ label: 'A (Recommended)', description: '' }, { label: 'B', description: '' }] }] },
+    }),
+  });
+  assert(result.code === 0, `expected exit 0, got ${result.code}: ${result.stderr}`);
+  if (includeNode) {
+    const answers = JSON.parse(result.stdout).hookSpecificOutput.updatedInput.answers;
+    assert(answers['Pick?'] === 'A (Recommended)', `expected the recommended answer, got ${result.stdout}`);
+  } else {
+    assert(result.stdout === '', `expected no output without node, got: ${result.stdout}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // scripts/validate-findings — FR-HM28 adapter-output normalizer. Node is
 // preferred; when node is absent this script falls back to jq, but jq is
 // NEVER on PATH in these restricted-PATH scenarios either (see the module
@@ -1078,6 +1111,16 @@ export const SMOKE_CASES = {
     {
       name: 'missing node fallback: the command -v node guard fails open (allows) the same bad subject',
       run: (ctx) => commitLintFallbackCase(ctx, false),
+    },
+  ],
+  'scripts/auto-decide-gate.sh': [
+    {
+      name: 'happy path: an armed session gets the single (Recommended) option as updatedInput.answers (node present)',
+      run: (ctx) => autoDecideCase(ctx, true),
+    },
+    {
+      name: 'missing node fallback: the command -v node guard fails open with no output',
+      run: (ctx) => autoDecideCase(ctx, false),
     },
   ],
   'scripts/init-scaffold.sh': [

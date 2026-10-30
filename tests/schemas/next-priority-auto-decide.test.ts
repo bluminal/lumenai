@@ -95,6 +95,39 @@ describe('next-priority autonomous decision record (Step 9)', () => {
   });
 });
 
+describe('next-priority --auto-decide hook, trailer, and PR rules', () => {
+  const doc = readFileSync(
+    join(__dirname, '..', '..', 'plugins', 'synthex', 'docs', 'auto-decide.md'),
+    'utf8'
+  );
+
+  it('points at docs/auto-decide.md from the command', () => {
+    expect(section('## Auto-Decide Mode', '## Native Looping')).toContain('docs/auto-decide.md');
+  });
+
+  it('arms the auto-decide-gate hook and disarms it when the command ends', () => {
+    expect(doc).toContain('auto-decide-gate.sh" on');
+    expect(doc).toContain('auto-decide-gate.sh" off');
+  });
+
+  it('requires an Auto-Decision commit trailer for every auto-decision', () => {
+    expect(section('### 5. Delegate to Tech Lead', '### 6. Monitor Progress')).toContain(
+      'Add an `Auto-Decision: <question> => <choice>` git trailer'
+    );
+    expect(doc).toContain('never a squash');
+  });
+
+  it('requires a bold Auto-decisions section at the top of any PR', () => {
+    expect(doc).toContain('must start its description, before the summary, with a bold section');
+    expect(doc).toContain('**Auto-decisions');
+  });
+
+  it('keeps [H] approval questions out of the hook', () => {
+    const step7 = section('### 7. Validate Completion', '### 8. Merge Results');
+    expect(step7).toContain('with `[H]` in each question and no `(Recommended)` option');
+  });
+});
+
 describe('--auto-decide scope guard (D3/D9)', () => {
   it('is implemented purely as next-priority.md delegation text, never in tech-lead.md', () => {
     expect(techLeadContent).not.toContain('--auto-decide');

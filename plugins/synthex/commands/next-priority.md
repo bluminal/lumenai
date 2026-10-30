@@ -20,7 +20,7 @@ Automatically identify and execute the next highest-priority tasks from the impl
 | `--max-iterations <int>` | Iteration cap. Hard ceiling 200. | `20` | No |
 | `--loop-isolated` | Fresh-subagent isolation mode per iteration. | off (shared-context default) | No |
 | `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
-| `--auto-decide` | Opt-in autonomy directive. When set, the Tech Lead sub-agent takes its own recommended option instead of calling `AskUserQuestion` at decision points where it already has a clear recommendation (high-impact escalations, ambiguous-task clarification) — and records the decision, alternatives, and reasoning in the plan for later review (see Step 9). Does **not** affect `[H]` acceptance-criteria approval, which always requires explicit user sign-off (see Step 7). Propagated to any sub-agent the Tech Lead delegates to. | off | No |
+| `--auto-decide` | Take the recommended option at discretionary decision points instead of asking, and record each one (see Auto-Decide Mode). Never applies to `[H]` approval (Step 7). | off | No |
 | `--profile <economy\|balanced\|premium>` | Override `models.profile` for spawned reviewers (see Model Resolution). | `models.profile` config (`balanced`) | No |
 
 ### Model Resolution
@@ -95,6 +95,7 @@ If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Buil
   - Tell the Tech Lead: for this task, when you reach a decision point where you already have a clear recommendation — a high-impact escalation per your Decision Authority table, or an ambiguous requirement under Behavioral Rule 7 — take the recommended option yourself instead of calling `AskUserQuestion`. Record the decision, the alternatives considered, and your reasoning so it can be reviewed later (see Step 9).
   - This does **not** apply to `[H]` acceptance criteria: those always require explicit user approval via `AskUserQuestion` before merge, regardless of `--auto-decide` (see Step 7).
   - Propagate this directive to any sub-agent you delegate to — an un-propagated directive just moves the blocking question one level down, where it still halts the loop.
+  - Add an `Auto-Decision: <question> => <choice>` git trailer to the first commit after each decision.
 
 The Tech Lead will:
 - Analyze the task and determine which sub-agents are needed
@@ -120,7 +121,7 @@ For each completed task, validate acceptance criteria by type:
 - If any `[T]` criterion lacks a linked test, send the task back to the Tech Lead to write the missing test
 
 **`[H]` criteria (human-validated):**
-- Present the implemented work to the user using `AskUserQuestion`
+- Present the implemented work to the user using `AskUserQuestion`, with `[H]` in each question and no `(Recommended)` option
 - Show what was built, how it addresses the criterion, and any alternatives considered
 - The user must explicitly approve each `[H]` criterion before the task can proceed to merge
 - If the user rejects, send specific feedback back to the Tech Lead for iteration
@@ -164,13 +165,17 @@ Mark completed tasks as "done" in the implementation plan with:
 - Completion notes
 - **Test linkage:** For each `[T]` criterion, record the test file and test name that proves it (e.g., `[T] Email validation → src/auth/__tests__/login.test.ts: "validates email format"`)
 - **`[H]` approval record:** Note that human approval was obtained for `[H]` criteria
-- **Autonomous decision record (when `--auto-decide` was set):** For each decision the Tech Lead resolved on its own recommendation instead of asking, record the decision taken, the alternatives considered, and the reasoning — one line is enough — so it can be reviewed later
+- **Autonomous decision record (when `--auto-decide` was set):** For each decision the Tech Lead resolved on its own recommendation instead of asking, record the decision taken, the alternatives considered, and the reasoning — one line is enough — plus its trailer commit
 - Any learnings or discoveries
 - Follow-up tasks identified during implementation
 
 Update the project instruction file (`CLAUDE.md` on Claude Code; otherwise the first of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.hermes.md` that exists) with any build/test optimization insights discovered.
 
 Under `--loop`, follow the loop protocol you loaded.
+
+## Auto-Decide Mode
+
+When `--auto-decide` is set, Read `${CLAUDE_PLUGIN_ROOT}/docs/auto-decide.md` before Step 1 and follow it. On other hosts, use the installed plugin root.
 
 ## Native Looping
 
