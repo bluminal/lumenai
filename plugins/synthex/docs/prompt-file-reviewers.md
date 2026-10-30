@@ -58,7 +58,10 @@ A file with no frontmatter is fine. The whole file is the prompt body.
    (`agents/_shared/canonical-finding.schema.json`) plus positives and a summary,
    with no verdict field; `refine-requirements` and `write-implementation-plan`
    each append their own reviewer format instead. Where the borrowed prompt
-   specifies its own output format, the appended contract wins.
+   specifies its own output format, the appended contract wins, and the reviewer
+   is told to return those fields and no others. A prompt written for CI tends to
+   carry report sections of its own; drop any the contract does not name rather
+   than passing them into the rendered report.
 4. On the multi-model branch the command launches them alongside the
    orchestrator and merges their findings into its report
    (`docs/multi-model-decision.md`); a review routed to a standing pool does
