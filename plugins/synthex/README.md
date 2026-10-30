@@ -228,7 +228,7 @@ See [`config/defaults.yaml`](config/defaults.yaml) for the full reference. Key s
 |---------|---------|-------------|
 | `review_loops.max_cycles` | 2 | Global max review loop iterations for all commands |
 | `review_loops.min_severity_to_address` | high | Global minimum severity that must be resolved |
-| `implementation_plan.reviewers` | architect, designer, tech-lead | Sub-agents that review draft implementation plans |
+| `implementation_plan.reviewers` | architect, design-system-agent, tech-lead | Sub-agents that review draft implementation plans |
 | `implementation_plan.concurrent_tasks` | 3 | Max parallelizable tasks per milestone in the plan |
 | `implementation_plan.review_loops.max_cycles` | 3 | Per-command override (higher for high-stakes plans) |
 | `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `/review-code`. An entry may be `- prompt: <path>` instead of an agent name — see [Prompt-file reviewers](#prompt-file-reviewers). |

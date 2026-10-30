@@ -262,7 +262,7 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 | `review_loops.min_severity_to_address` | high | Global minimum severity that must be resolved |
 | `models.profile` | `balanced` | Active model tier (`economy`\|`balanced`\|`premium`); `balanced` is the shipped frontmatter, `economy`/`premium` are per-agent deltas over it (D29) |
 | `models.agents.<name>` | `{}` | Named per-agent `{model, effort}` override; highest-priority resolution step below the `--profile` flag |
-| `refine_requirements.reviewers` | product-manager, tech-lead, design-system-agent | Sub-agents that review PRD for clarity |
+| `refine_requirements.reviewers` | product-manager, tech-lead, lead-frontend-engineer | Sub-agents that review PRD for clarity |
 | `implementation_plan.reviewers` | architect, design-system-agent, tech-lead | Sub-agents that review draft implementation plans |
 | `implementation_plan.concurrent_tasks` | 3 | Max parallelizable tasks per milestone in the plan |
 | `implementation_plan.review_loops.max_cycles` | 3 | Per-command override (higher for high-stakes plans) |

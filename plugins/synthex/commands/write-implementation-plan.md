@@ -69,7 +69,7 @@ Check for a project configuration file at `@{config_path}`. If it exists, load t
 
 | Setting | Default |
 |---------|---------|
-| Reviewers | architect, designer, tech-lead (all enabled) |
+| Reviewers | architect, design-system-agent, tech-lead (all enabled) |
 | `review_loops.max_cycles` | 3 (per-command override; global default is 2) |
 | `review_loops.min_severity_to_address` | high (inherited from global) |
 | `documents.requirements` | `docs/reqs/main.md` |
@@ -157,7 +157,7 @@ If multi-model is active, Read `${CLAUDE_PLUGIN_ROOT}/docs/plan-multi-model.md` 
 
 **Native-only active → spawn native reviewers directly:**
 
-When multi-model is NOT active (`multi_model_review.enabled: false` AND no `--multi-model` flag, OR `--no-multi-model` flag is set): run today's native-only path byte-identically (FR-MR23). For each enabled reviewer in the configuration, launch a **fresh** sub-agent IN PARALLEL with:
+When multi-model is NOT active (`multi_model_review.enabled: false` AND no `--multi-model` flag, OR `--no-multi-model` flag is set): run today's native-only path byte-identically (FR-MR23). For each enabled reviewer in the configuration (legacy `agent: designer` means `design-system-agent`), launch a **fresh** sub-agent IN PARALLEL with:
 - The full draft implementation plan (current version)
 - The PRD for reference
 - The reviewer's specific focus area
@@ -363,7 +363,7 @@ implementation_plan:
     - agent: architect
       enabled: true
       focus: "Technical architecture, feasibility, NFR coverage"
-    - agent: designer
+    - agent: design-system-agent
       enabled: true
       focus: "Design tasks, UX impact, visual design clarity"
     - agent: tech-lead
@@ -376,7 +376,7 @@ implementation_plan:
 
 ### Disabling a Default Reviewer
 
-To skip the designer reviewer for a backend-only project:
+To skip the design-system-agent reviewer for a backend-only project:
 
 ```yaml
 implementation_plan:
@@ -384,7 +384,7 @@ implementation_plan:
     - agent: architect
       enabled: true
       focus: "Technical architecture, feasibility, NFR coverage"
-    - agent: designer
+    - agent: design-system-agent
       enabled: false
     - agent: tech-lead
       enabled: true
