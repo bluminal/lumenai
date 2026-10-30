@@ -352,6 +352,7 @@ jobs:
 
       - name: Commit, tag, and push
         if: steps.bump.outputs.bump != 'none'
+        id: push
         env:
           MARKET_NEW: ${{ steps.versions.outputs.market_new }}
           SYNTHEX_NEW: ${{ steps.versions.outputs.synthex_new }}
@@ -372,11 +373,24 @@ jobs:
           git commit -m "release: synthex ${SYNTHEX_NEW}"
           git tag "v${MARKET_NEW}"
 
-          git push origin HEAD:main
+          # Runs are serialized (concurrency above), but each checks out its own
+          # push's SHA. If another PR merged while this run worked, main has moved
+          # and the push is rejected. Stand down: that merge queued its own run,
+          # which starts from the newer main and releases these commits too.
+          if ! git push origin HEAD:main; then
+            git fetch origin main
+            if [ "$(git rev-parse origin/main)" != "$(git rev-parse HEAD^)" ]; then
+              echo "::notice::main moved during this run — leaving the release to the newer run."
+              echo "pushed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            exit 1
+          fi
           git push origin "v${MARKET_NEW}"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release
-        if: steps.bump.outputs.bump != 'none'
+        if: steps.push.outputs.pushed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MARKET_NEW: ${{ steps.versions.outputs.market_new }}
@@ -399,7 +413,7 @@ jobs:
       #   ANTHROPIC_API_KEY      — Anthropic API key for the agent
       # ───────────────────────────────────────────────────────────────
       - name: Mint docs-repo App token
-        if: steps.bump.outputs.bump != 'none' && env.HAVE_APP_CREDS == 'true'
+        if: steps.push.outputs.pushed == 'true' && env.HAVE_APP_CREDS == 'true'
         id: docs_app_token
         env:
           HAVE_APP_CREDS: ${{ secrets.DOCS_PR_APP_ID != '' && secrets.DOCS_PR_APP_PRIVATE_KEY != '' }}
@@ -411,7 +425,7 @@ jobs:
           repositories: slashsynthex.com
 
       - name: Propose slashsynthex docs updates via Claude agent
-        if: steps.bump.outputs.bump != 'none' && env.HAVE_AGENT_SECRETS == 'true'
+        if: steps.push.outputs.pushed == 'true' && env.HAVE_AGENT_SECRETS == 'true'
         env:
           HAVE_AGENT_SECRETS: ${{ secrets.ANTHROPIC_API_KEY != '' && steps.docs_app_token.outputs.token != '' }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
