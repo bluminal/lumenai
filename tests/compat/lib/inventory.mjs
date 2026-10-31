@@ -27,7 +27,9 @@ export const COMMAND_COUNT = 22;
 // scripts/lint-plan.mjs), dropping 28 to 23. Task 47 (FR-HM24, D11) then
 // folded in 3 pool agents (standing-pool-cleanup, standing-pool-submitter,
 // team-orchestrator-bridge) from synthex-plus, taking 23 to 26.
-export const AGENT_COUNT = 26;
+// team-orchestrator-bridge was then removed as dead code (only the retired
+// /team-review invoked it), taking 26 to 25.
+export const AGENT_COUNT = 25;
 
 /** Wrappers = every generated portable skill, one per command + agent. */
 export const WRAPPER_COUNT = COMMAND_COUNT + AGENT_COUNT;
