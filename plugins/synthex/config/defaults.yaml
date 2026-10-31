@@ -165,7 +165,7 @@ implementation_plan:
       enabled: true
       focus: "Technical architecture, feasibility, NFR coverage, missing technical tasks"
 
-    - agent: designer
+    - agent: design-system-agent
       enabled: true
       focus: "Design tasks, UX impact, visual/interaction design clarity"
 
@@ -203,7 +203,7 @@ refine_requirements:
       enabled: true
       focus: "Technical clarity, implicit assumptions, NFR targets, missing requirements"
 
-    - agent: designer
+    - agent: lead-frontend-engineer
       enabled: true
       focus: "UX clarity, interaction patterns, accessibility, user flow completeness"
 

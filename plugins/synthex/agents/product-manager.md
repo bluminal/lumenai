@@ -196,7 +196,7 @@ When the `write-implementation-plan` command is used, the draft implementation p
 
 ### Receiving Feedback
 
-Reviewer sub-agents (configured per-project, defaults: architect, designer, tech lead) provide structured feedback with severity levels:
+Reviewer sub-agents (configured per-project, defaults: architect, design-system-agent, tech lead) provide structured feedback with severity levels:
 - **CRITICAL** — Plan cannot be executed as-is. Fundamental issues.
 - **HIGH** — Significant quality issues that will cause rework or block engineers.
 - **MEDIUM** — Improvement opportunities, minor concerns.

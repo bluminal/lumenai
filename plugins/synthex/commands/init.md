@@ -299,7 +299,7 @@ implementation_plan:
     - agent: architect
       enabled: true
       focus: "Technical architecture, feasibility, NFR coverage"
-    - agent: designer
+    - agent: design-system-agent
       enabled: true
       focus: "Design tasks, UX impact, visual design clarity"
     - agent: tech-lead
@@ -315,7 +315,7 @@ implementation_plan:
 ```yaml
 implementation_plan:
   reviewers:
-    - agent: designer
+    - agent: design-system-agent
       enabled: false
 ```
 
