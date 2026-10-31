@@ -16,14 +16,25 @@
 #     `auto` default, or any other explicit value (`issue-key`, `gitmoji`,
 #     `plain`) is NEVER linted
 #   - the tool invoked is the host's shell tool (Claude "Bash" / Codex
-#     "shell") and its command is a `git commit` invocation (an optional
-#     leading `rtk ` prefix is stripped first, so `rtk git commit ...` is
-#     recognized the same as `git commit ...`)
+#     "shell") and its command contains exactly one `git commit`
+#     invocation — alone, or as one step of an `&&`/`||`/`;`/newline chain
+#     or the last stage of a pipe (an optional leading `rtk ` prefix is
+#     stripped first, so `rtk git commit ...` is recognized the same as
+#     `git commit ...`)
 #   - the commit isn't `--amend --no-edit`, `-C`, `-c`, `--fixup`,
 #     `--squash`, or in progress inside a merge (`.git/MERGE_HEAD` present)
-#   - the subject is extractable deterministically from an inline `-m`
-#     (`-F <file>` / `-F -` pass unconditionally — their content is on
-#     stdin or in a file the hook never sees, not on the command line)
+#   - the subject is extractable deterministically from the command string:
+#       * an inline literal `-m` / `--message=` value, or
+#       * `-F -` / `--file -` / `--file=-` whose stdin is a literal in the
+#         same command: a heredoc on the commit (`git commit -F - <<'MSG'`,
+#         `<<MSG`, `<<"MSG"`, `<<-MSG`), a heredoc piped in
+#         (`cat <<EOF | git commit -F -`), or a single quoted literal piped
+#         in (`printf '%s\n' "feat: x" | ...`, `echo "feat: x" | ...`); the
+#         subject is the message's first non-empty, non-`#` line
+#     Everything else passes unlinted: `-F <file>` (content not on the
+#     command line), `-m "$MSG"` / `-m "$(cat <<EOF ...)"`, an unquoted
+#     heredoc containing `$`/backticks, a here-string, more than one
+#     heredoc, more than one `git commit`, or any other stdin producer.
 #
 # On block: exit 2 with a fix hint on stderr. Claude Code shows a
 # PreToolUse hook's stderr back to the model when it blocks with exit 2;
@@ -31,7 +42,7 @@
 #
 # Exit codes:
 #   0 - allow (the default; see the fail-open conditions above).
-#   2 - blocked: the `-m` subject failed the Conventional Commits regex.
+#   2 - blocked: the extracted subject failed the Conventional Commits regex.
 
 set -u
 
@@ -87,47 +98,130 @@ const toolInput = payload.tool_input || payload.toolInput || {};
 const command = typeof toolInput.command === 'string' ? toolInput.command : '';
 if (!command.trim()) process.exit(0);
 
-// FR-HM27: tolerate an `rtk git commit ...` prefix the same as `git commit ...`.
-let cmd = command.trim().replace(/^rtk\s+/, '');
-if (!/^git\s+commit\b/.test(cmd)) process.exit(0);
-
-// Minimal shell tokenizer (single/double quotes only) — good enough for a
-// hook that only needs to find flag tokens on a `git commit` invocation;
-// anything genuinely ambiguous falls through to "no -m found" -> allow.
-function tokenize(s) {
-  const tokens = [];
+// Minimal shell lexer: words (single/double quotes, backslash escapes),
+// the list/pipe operators && || | ; and newline, and heredocs (<<TAG,
+// <<'TAG', <<"TAG", <<-TAG) whose bodies are read after the next newline,
+// as the shell does. Each word records whether it holds an unquoted or
+// double-quoted `$`/backtick (an expansion the hook can't evaluate).
+// Returns null for anything it can't read deterministically (an
+// unterminated heredoc), which the caller treats as "allow".
+function lex(s) {
+  const items = []; // { word, exp, quoted } | { op } | { heredoc }
+  const heredocs = [];
+  let pending = [];
   let i = 0;
-  while (i < s.length) {
-    while (i < s.length && /\s/.test(s[i])) i += 1;
-    if (i >= s.length) break;
-    let token = '';
-    while (i < s.length && !/\s/.test(s[i])) {
+  const isBreak = (j) =>
+    /\s/.test(s[j]) || s[j] === '|' || s[j] === ';' || s.startsWith('&&', j) || s.startsWith('<<', j);
+  function readWord() {
+    let word = '';
+    let exp = false;
+    let quoted = false;
+    while (i < s.length && !isBreak(i)) {
       const c = s[i];
-      if (c === '"' || c === "'") {
-        const quote = c;
+      if (c === "'") {
+        quoted = true;
+        const end = s.indexOf("'", i + 1);
+        const stop = end === -1 ? s.length : end;
+        word += s.slice(i + 1, stop);
+        i = stop + 1;
+      } else if (c === '"') {
+        quoted = true;
         i += 1;
-        while (i < s.length && s[i] !== quote) {
-          if (quote === '"' && s[i] === '\\' && i + 1 < s.length) {
-            token += s[i + 1];
+        while (i < s.length && s[i] !== '"') {
+          if (s[i] === '\\' && /[$`"\\\n]/.test(s[i + 1] ?? '')) {
+            word += s[i + 1];
             i += 2;
             continue;
           }
-          token += s[i];
+          if (s[i] === '$' || s[i] === '`') exp = true;
+          word += s[i];
           i += 1;
         }
         i += 1; // closing quote
+      } else if (c === '\\' && i + 1 < s.length) {
+        quoted = true;
+        word += s[i + 1];
+        i += 2;
       } else {
-        token += c;
+        if (c === '$' || c === '`') exp = true;
+        word += c;
         i += 1;
       }
     }
-    tokens.push(token);
+    return { word, exp, quoted };
   }
-  return tokens;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '\\' && s[i + 1] === '\n') {
+      i += 2; // line continuation
+    } else if (c === '\n') {
+      items.push({ op: ';' });
+      i += 1;
+      for (const h of pending) {
+        const lines = [];
+        for (;;) {
+          if (i >= s.length) return null; // unterminated heredoc
+          let end = s.indexOf('\n', i);
+          if (end === -1) end = s.length;
+          let line = s.slice(i, end);
+          i = end + 1;
+          if (h.strip) line = line.replace(/^\t+/, '');
+          if (line === h.tag) break;
+          lines.push(line);
+        }
+        h.body = lines.join('\n');
+      }
+      pending = [];
+    } else if (/\s/.test(c)) {
+      i += 1;
+    } else if (s.startsWith('&&', i) || s.startsWith('||', i)) {
+      items.push({ op: s.slice(i, i + 2) });
+      i += 2;
+    } else if (c === '|' || c === ';') {
+      items.push({ op: c });
+      i += 1;
+    } else if (s.startsWith('<<<', i)) {
+      items.push({ word: '<<<', exp: true, quoted: false }); // here-string: not extracted
+      i += 3;
+    } else if (s.startsWith('<<', i)) {
+      i += 2;
+      const strip = s[i] === '-';
+      if (strip) i += 1;
+      while (s[i] === ' ' || s[i] === '\t') i += 1;
+      const tag = readWord();
+      if (!tag.word) return null;
+      const h = { tag: tag.word, strip, quoted: tag.quoted, body: null };
+      heredocs.push(h);
+      pending.push(h);
+      items.push({ heredoc: h });
+    } else {
+      items.push(readWord());
+    }
+  }
+  if (pending.length) return null;
+  return { items, heredocs };
 }
 
-const tokens = tokenize(cmd);
-const rest = tokens.slice(2); // drop "git", "commit"
+const lexed = lex(command);
+if (!lexed) process.exit(0);
+
+// Split into simple commands, remembering the operator before each, so a
+// `git commit` is found anywhere in a chain (`git add . && git commit ...`)
+// or at the end of a pipe (`cat <<EOF | git commit -F -`).
+const segments = [{ prevOp: null, words: [], heredocs: [] }];
+for (const item of lexed.items) {
+  if (item.op) segments.push({ prevOp: item.op, words: [], heredocs: [] });
+  else if (item.heredoc) segments[segments.length - 1].heredocs.push(item.heredoc);
+  else segments[segments.length - 1].words.push(item);
+}
+// FR-HM27: tolerate an `rtk git commit ...` prefix the same as `git commit ...`.
+for (const seg of segments) if (seg.words[0]?.word === 'rtk') seg.words.shift();
+const commitIdx = segments
+  .map((seg, idx) => (seg.words[0]?.word === 'git' && seg.words[1]?.word === 'commit' ? idx : -1))
+  .filter((idx) => idx !== -1);
+if (commitIdx.length !== 1) process.exit(0); // none, or more than one: ambiguous
+const commitSeg = segments[commitIdx[0]];
+const rest = commitSeg.words.slice(2).map((w) => w.word); // drop "git", "commit"
 
 // Skip: -C, -c, --fixup, --squash (any form), and --amend --no-edit.
 const skipExact = new Set(['-C', '-c', '--fixup', '--squash']);
@@ -160,24 +254,64 @@ const cwd = payload.cwd || process.cwd();
 const gitDir = resolveGitDir(cwd);
 if (gitDir && fs.existsSync(path.join(gitDir, 'MERGE_HEAD'))) process.exit(0);
 
-// Extract the first -m/--message subject. -F/--file (including `-F -`)
-// always passes: its content isn't on the command line the hook receives.
+// Extract the first -m/--message subject, or the -F/--file argument.
 let subject = null;
-let hasFileFlag = false;
+let fileArg = null;
 for (let i = 0; i < rest.length; i += 1) {
   const t = rest[i];
   if (t === '-m' || t === '--message') {
-    if (subject === null) subject = rest[i + 1] ?? '';
+    if (subject !== null) continue;
+    subject = rest[i + 1] ?? '';
+    // `-m "$(cat <<EOF ...)"` / `-m "$MSG"`: the value isn't literal — allow.
+    if (commitSeg.words[i + 3]?.exp) process.exit(0);
   } else if (t.startsWith('--message=')) {
-    if (subject === null) subject = t.slice('--message='.length);
+    if (subject !== null) continue;
+    subject = t.slice('--message='.length);
+    if (commitSeg.words[i + 2].exp) process.exit(0);
   } else if (t === '-F' || t === '--file') {
-    hasFileFlag = true;
+    fileArg = rest[i + 1] ?? '';
   } else if (t.startsWith('--file=')) {
-    hasFileFlag = true;
+    fileArg = t.slice('--file='.length);
   }
 }
 
-if (hasFileFlag) process.exit(0);
+// `-F -`: lint the stdin message only when this same command supplies it
+// as a literal — a heredoc on the commit, or a heredoc / single-literal
+// printf/echo piped into it. Anything else (a variable, command
+// substitution, a here-string, a second heredoc, another producer)
+// returns null -> allow.
+function stdinMessage() {
+  if (lexed.heredocs.length > 1) return null;
+  if (rest.some((t) => t.startsWith('<'))) return null; // other stdin redirect
+  const fromHeredoc = (h) => (h.quoted || !/[$`]/.test(h.body) ? h.body : null);
+  if (commitSeg.heredocs.length === 1) {
+    return commitSeg.prevOp === '|' ? null : fromHeredoc(commitSeg.heredocs[0]);
+  }
+  if (commitSeg.prevOp !== '|') return null;
+  const producer = segments[commitIdx[0] - 1];
+  if (producer.words.some((w) => w.exp)) return null;
+  const argv = producer.words.map((w) => w.word);
+  if (argv[0] === 'cat' && argv.length === 1 && producer.heredocs.length === 1) {
+    return fromHeredoc(producer.heredocs[0]);
+  }
+  if (producer.heredocs.length) return null;
+  if (argv[0] === 'echo' && argv.length === 2 && !argv[1].startsWith('-')) return argv[1];
+  if (argv[0] === 'printf' && argv.length >= 2 && !argv[1].startsWith('-')) {
+    const [fmt, ...args] = argv.slice(1);
+    if (fmt.replace(/\\n/g, '') === '%s' && args.length) return args.join('\n');
+    if (!args.length && !fmt.includes('%') && !/\\[^n]/.test(fmt)) return fmt.replace(/\\n/g, '\n');
+  }
+  return null;
+}
+
+if (fileArg !== null) {
+  // `-F <path>` (content not on the command line), or -m with -F (git
+  // rejects that itself): allow.
+  if (subject !== null || fileArg !== '-') process.exit(0);
+  const message = stdinMessage();
+  if (message === null) process.exit(0);
+  subject = message.split('\n').find((l) => l.trim() && !l.startsWith('#')) ?? '';
+}
 if (subject === null) process.exit(0);
 
 const regex = new RegExp(regexSrc);
@@ -188,7 +322,7 @@ process.stderr.write(
     `  Got:      "${subject}"\n` +
     `  Expected: <type>[(scope)][!]: <description>\n` +
     `  Types:    feat, fix, refactor, perf, build, ci, chore, docs, style, test, revert\n` +
-    `  Fix:      rewrite the -m subject (e.g. "feat: add x" or "fix(scope): correct y") and retry.\n`,
+    `  Fix:      rewrite the subject — the -m value, or the first line of the -F - message (e.g. "feat: add x" or "fix(scope): correct y") and retry.\n`,
 );
 process.exit(1);
 NODE_SCRIPT
