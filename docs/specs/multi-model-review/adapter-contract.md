@@ -48,6 +48,7 @@ The orchestrator invokes each adapter via the Task tool with this JSON shape:
 - **config.model** — resolved model id (e.g., `gpt-5`, `gemini-2.5-pro`, `qwen2.5-coder:32b`).
 - **config.family** — optional family tag override; null means use the adapter's default.
 - **config.raw_output_path** — adapter MUST write its raw CLI output here for audit trail (FR-MR24 §6).
+- **Other keys** — the orchestrator copies the adapter's `multi_model_review.per_reviewer.<adapter>` block verbatim into `config` (`model` and `family` come from it too), so adapter-specific settings arrive here, e.g. `config.allow_api_key_billing` for `codex-review-prompter` (per-token API-key billing; off unless `true`).
 
 ---
 

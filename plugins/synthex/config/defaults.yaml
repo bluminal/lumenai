@@ -534,11 +534,13 @@ multi_model_review:
   #   - ollama-review-prompter     # Local model (qwen, llama, deepseek, etc.)
 
   # Per-reviewer overrides. Each adapter may override its default model, family
-  # tag, or invocation flags. Use the agent name as the key.
+  # tag, or invocation flags. Use the agent name as the key. The orchestrator
+  # forwards the adapter's whole block verbatim as its input envelope `config`.
   per_reviewer:
     # codex-review-prompter:
     #   model: gpt-5
     #   family: openai
+    #   allow_api_key_billing: false  # Opt-in: true lets codex use CODEX_API_KEY/OPENAI_API_KEY (per-token billing); otherwise they are unset
     # ollama-review-prompter:
     #   model: qwen2.5-coder:32b
     #   family: local-qwen

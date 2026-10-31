@@ -147,3 +147,28 @@ describe('Task 19: multi-model-review-orchestrator.md', () => {
     });
   });
 });
+
+// Regression: the adapter envelope's `config` only carried model/family/raw_output_path,
+// so codex's `config.allow_api_key_billing` could never be set. The orchestrator now
+// forwards the adapter's whole `multi_model_review.per_reviewer.<adapter>` block.
+describe('Step 3: adapter envelope forwards per_reviewer settings', () => {
+  let content: string;
+  let defaults: string;
+  beforeAll(() => {
+    content = readFileSync(ORCHESTRATOR, 'utf8');
+    defaults = readFileSync(join(__dirname, '..', '..', 'plugins', 'synthex', 'config', 'defaults.yaml'), 'utf8');
+  });
+
+  it('envelope config includes allow_api_key_billing', () => {
+    expect(content).toContain('"allow_api_key_billing"');
+  });
+
+  it('envelope config is built from the per_reviewer.<adapter> block, forwarded verbatim', () => {
+    expect(content).toMatch(/per_reviewer\.<adapter>` block[^\n]*verbatim/);
+  });
+
+  it('defaults.yaml documents per_reviewer.codex-review-prompter.allow_api_key_billing as opt-in', () => {
+    const block = defaults.slice(defaults.indexOf('  per_reviewer:'), defaults.indexOf('  aggregator:'));
+    expect(block).toMatch(/codex-review-prompter:\n(?:\s*#.*\n)*?\s*#\s*allow_api_key_billing: false\s+#.*[Oo]pt-in/);
+  });
+});
