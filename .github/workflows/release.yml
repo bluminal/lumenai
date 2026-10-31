@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: write
+  issues: write  # docs-PR agent failures open an issue (see the docs step)
 
 # Serialize releases — never run two release jobs concurrently against main.
 concurrency:
@@ -431,6 +432,10 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ steps.docs_app_token.outputs.token }}
           APP_SLUG: ${{ steps.docs_app_token.outputs.app-slug }}
+          # The App token above only reaches slashsynthex.com; failure issues go to this repo.
+          REPO_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v${{ steps.versions.outputs.market_new }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
 
@@ -556,7 +561,15 @@ jobs:
             saying "No user-facing changes in this release" rather than
             fabricating content.
           PROMPT
-          )" || {
-            echo "::warning title=Docs PR agent failed::The Claude agent did not open a docs PR for this release (likely hit --max-turns or crashed). Check the step log; release was NOT blocked. Open a docs PR manually or raise --max-turns and re-run on the next release."
+          )" 2>&1 | tee "$RUNNER_TEMP/docs-agent.log" || {
+            # Fails without blocking the release, but loudly: v1.0.0-v2.2.0 shipped with no
+            # docs because an out-of-credit API key only produced a warning nobody saw.
+            TAIL="$(tail -n 20 "$RUNNER_TEMP/docs-agent.log" 2>/dev/null || true)"
+            echo "::error title=Docs PR agent failed::No docs PR was opened for ${RELEASE_TAG}. Release was NOT blocked. See the issue opened for this release."
+            # shellcheck disable=SC2016  # backticks below are literal Markdown
+            BODY="$(printf 'The release workflow could not open a slashsynthex.com docs PR for **%s**. The release itself shipped.\n\nRun: %s\n\nLast output from the docs agent:\n\n```\n%s\n```\n\nCommon causes: the `ANTHROPIC_API_KEY` is out of credit ("Credit balance is too low"), or the agent hit `--max-turns`. Fix the cause, then open the docs PR by hand or let the next release catch up.' "$RELEASE_TAG" "$RUN_URL" "$TAIL")"
+            GH_TOKEN="$REPO_TOKEN" gh issue create -R "$GITHUB_REPOSITORY" \
+              --title "Docs PR not opened for ${RELEASE_TAG}" --body "$BODY" \
+              || echo "::warning::Could not open the docs-failure issue."
             exit 0
           }
