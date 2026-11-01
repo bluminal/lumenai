@@ -168,8 +168,11 @@ describe('wrapper tool-name map (Task 20, FR-HM12/FR-HM45)', () => {
   const allSlugs = [...Object.keys(COMMAND_DESCRIPTIONS), ...Object.keys(AGENT_DESCRIPTIONS)];
   const table = renderToolMapTable();
 
-  it('renders a non-empty table keyed by the five non-Claude hosts', () => {
-    expect(table).toMatch(/^\| Claude tool \| Codex CLI \| Gemini CLI \| OpenCode \| Grok Build \| Hermes Agent \|$/m);
+  it('renders a non-empty table keyed by the non-Claude hosts (incl. Cursor, FR-CA6)', () => {
+    const header = table.split('\n')[0] ?? '';
+    expect(header).toBe(
+      '| Claude tool | Codex CLI | Gemini CLI | OpenCode | Grok Build | Hermes Agent | Cursor |',
+    );
     expect(table).not.toContain('Claude Code');
   });
 
