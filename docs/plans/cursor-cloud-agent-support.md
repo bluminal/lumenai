@@ -102,9 +102,9 @@ Claude Code cloud sessions exist (`claude --cloud`, Projects threads) but **clou
 Reviewers need results before consolidation; Cursor background would return before findings exist.
 
 - `[T]` Capability ladder level 3 states: parallel reviewer spawns use **foreground** (`run_in_background: false` / omit); never background.
-- `[T]` `review-code.md` Step 4 (and performance-audit if it duplicates the ladder pointer) restates the same FG rule.
+- `[T]` `review-code.md` keeps the FR-HM21 pointer into that ladder (file is size-gated; FG prose lives in the ladder, not duplicated inline).
 - `[T]` `multi-model-review-orchestrator.md` Step 3 single-batch fan-out uses foreground Task calls.
-- `[T]` Layer 1 tests cover the three surfaces; cross-ref FR-CA1 so next-priority BG workers stay distinct.
+- `[T]` Layer 1 tests cover the ladder + orchestrator; cross-ref FR-CA1 so next-priority BG workers stay distinct.
 
 ### T6 (S) — Cursor Task discovery wrappers
 

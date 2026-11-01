@@ -13,10 +13,6 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = join(__dirname, '..', '..');
-const reviewCode = readFileSync(
-  join(ROOT, 'plugins', 'synthex', 'commands', 'review-code.md'),
-  'utf8',
-);
 const orchestrator = readFileSync(
   join(ROOT, 'plugins', 'synthex', 'agents', 'multi-model-review-orchestrator.md'),
   'utf8',
@@ -25,12 +21,15 @@ const ladder = readFileSync(
   join(ROOT, 'plugins', 'synthex', 'docs', 'standing-pool-routing.md'),
   'utf8',
 );
+const reviewCode = readFileSync(
+  join(ROOT, 'plugins', 'synthex', 'commands', 'review-code.md'),
+  'utf8',
+);
 
-describe('review-code.md foreground reviewer spawns (T5)', () => {
-  it('requires foreground / run_in_background false for reviewers', () => {
-    expect(reviewCode).toMatch(/Foreground \(FR-CA1 \/ T5\)/);
-    expect(reviewCode).toMatch(/run_in_background:\s*false/);
-    expect(reviewCode).toMatch(/do not background them/i);
+describe('review-code.md defers FG/BG to the capability ladder (size-gated)', () => {
+  it('still routes level 3-4 through standing-pool-routing.md where FR-CA1/T5 lives', () => {
+    expect(reviewCode).toContain('docs/standing-pool-routing.md');
+    expect(reviewCode).toMatch(/FR-HM21 levels 3-4/);
   });
 });
 
