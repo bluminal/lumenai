@@ -281,6 +281,15 @@ Parallel plan-task workers run in the **background**; advisory reviewers stay **
 /synthex:next-priority --in-cloud --loop
 ```
 
+## Cursor Task agents
+
+Synthex ships generated Cursor subagent wrappers at `plugins/synthex/cursor-agents/` (regenerate with `node plugins/synthex/scripts/generate-codex-skills.mjs`; do not hand-edit). Each file has Cursor-native frontmatter (`name`, `description`, `model: inherit`, `readonly` for advisory roles) and points at the canonical `agents/<slug>.md`.
+
+- **This marketplace repo:** wrappers are also written to `.cursor/agents/` so the Agents Window discovers them automatically.
+- **Consumer projects:** copy or symlink the plugin's `cursor-agents/` directory to your project `.cursor/agents/` (or merge selected roles). Cursor also loads `.claude/agents/`; these wrappers are the Cursor-frontmatter path.
+
+Foreground vs background remains a per-call Task argument (`run_in_background`) — wrappers never set `is_background`.
+
 ## Autonomous Decisions (`--auto-decide`)
 
 `/next-priority` accepts an opt-in `--auto-decide` flag for unattended `--loop` runs. Normally, when the Tech Lead sub-agent reaches a high-impact decision or an ambiguous requirement it already has a recommendation for, it stops and asks via `AskUserQuestion` — which halts an unattended loop. With `--auto-decide` set, the Tech Lead takes its own recommended option instead of asking, and records the decision, the alternatives it considered, and its reasoning in the implementation plan for later human review.

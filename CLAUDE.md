@@ -49,7 +49,7 @@ lumenai/
 - **Commands** are markdown files in `commands/` that define orchestration workflows (parameters, workflow steps, which agents to invoke)
 - **plugin.json** registers agents and commands within a plugin. Claude Code reads `.claude-plugin/plugin.json`. Codex and Grok read their own manifests and load the generated `skills/` wrappers, which point back at those same files.
 - **marketplace.json** registers plugins within the marketplace. Claude Code, Codex, and Grok each have their own marketplace file (`.claude-plugin/`, `.agents/plugins/`, `.grok-plugin/`).
-- After adding or renaming a command or agent, regenerate the shared skill wrappers with `node plugins/synthex/scripts/generate-codex-skills.mjs`. Do not hand-edit `skills/*/SKILL.md`.
+- After adding or renaming a command or agent, regenerate the shared skill wrappers with `node plugins/synthex/scripts/generate-codex-skills.mjs`. Do not hand-edit `skills/*/SKILL.md` or `cursor-agents/*.md` / `.cursor/agents/*.md` (Cursor Task discovery wrappers).
 
 ## Adding a New Agent
 

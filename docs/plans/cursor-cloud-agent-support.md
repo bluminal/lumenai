@@ -1,6 +1,6 @@
 # Implementation Plan: Cursor Cloud Agent Support for `next-priority` Parallel Tasks
 
-**Status:** T1–T4 shipped (`2a844a3`). T5 (review FG/BG) shipped. T6 (`.cursor/agents` wrappers) still optional/deferred.
+**Status:** Complete (T1–T6). Commits: `2a844a3` (cloud/next-priority), `dd66c44` (review FG/BG), plus T6 Cursor agent wrappers.
 
 **Source:** Research conversation 2026-11-01 (Cursor subagents docs, Cloud Agents API, Claude cloud/cross-session messaging). No separate PRD — scope is host/config/command prose plus Layer 1 tests; functional requirements are listed as FR-CA* below.
 
@@ -106,9 +106,12 @@ Reviewers need results before consolidation; Cursor background would return befo
 - `[T]` `multi-model-review-orchestrator.md` Step 3 single-batch fan-out uses foreground Task calls.
 - `[T]` Layer 1 tests cover the three surfaces; cross-ref FR-CA1 so next-priority BG workers stay distinct.
 
-### T6 (S, optional follow-up) — `.cursor/agents/` discovery wrappers
+### T6 (S) — Cursor Task discovery wrappers
 
-Generate thin `.cursor/agents/<name>.md` stubs (or document that Cursor already loads `.claude/agents/`) so Synthex roles appear in Task hints with Cursor-native frontmatter. Deferred unless demanded; not blocking T5.
+- `[T]` `generate-codex-skills.mjs` writes `plugins/synthex/cursor-agents/<slug>.md` for every `plugin.json` agent (name, description, `model: inherit`, `readonly` for advisory roles; never `is_background`).
+- `[T]` Marketplace checkout also materializes `.cursor/agents/` with paths to `plugins/synthex/agents/`.
+- `[T]` README documents copy/symlink for consumer projects that install the plugin elsewhere.
+- `[T]` Layer 1 `cursor-agents.test.ts` covers the set, generator byte-identity, readonly matrix, and project mirror.
 
 ## Milestone order
 
