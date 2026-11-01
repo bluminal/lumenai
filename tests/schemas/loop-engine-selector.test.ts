@@ -179,7 +179,7 @@ describe('Task 59 (FR-HM19, D34): loop engine selector in the other --loop comma
   });
 
   it("CLAUDE.md's What's Configurable table has the native_looping.engine row", () => {
-    const text = readFileSync(join(REPO_ROOT, 'CLAUDE.md'), 'utf-8');
+    const text = readFileSync(join(REPO_ROOT, 'AGENTS.md'), 'utf-8');
     const row =
       "| `native_looping.engine` | `prose` | FR-HM19 Stage 2 loop engine for every `--loop` command (Claude Code only, opt-in, D34); `workflow` only takes effect with a `Workflow` tool in the caller's tool list and without `--loop-isolated` (`docs/engines/loop-workflow.md`) |";
     expect(countOccurrences(text, row)).toBe(1);

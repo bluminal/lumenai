@@ -1,0 +1,410 @@
+# LumenAI — Developer Instructions
+
+## Project Overview
+
+This is **LumenAI** — a Claude Code plugin marketplace by Bluminal Labs. The first plugin is **Synthex**, a collection of AI agents modeled after a software startup org chart.
+
+## Directory Structure
+
+```
+lumenai/
+├── .claude-plugin/
+│   └── marketplace.json        # Claude Code marketplace registry
+├── .grok-plugin/
+│   └── marketplace.json        # Grok marketplace registry (Synthex only)
+├── .github/
+│   └── workflows/
+│       └── agent-tests.yml     # CI pipeline (3-tier agent testing)
+├── plugins/
+│   └── synthex/                # First plugin: Synthex
+│       ├── .claude-plugin/
+│       │   └── plugin.json     # Plugin manifest (lists agents + commands)
+│       ├── agents/             # Agent definitions (.md files)
+│       ├── commands/           # Command/skill definitions (.md files)
+│       └── config/             # Default configuration templates
+│           └── defaults.yaml   # Default project configuration
+├── tests/                      # Automated agent testing framework
+│   ├── schemas/                # Layer 1: Schema validators + Vitest tests
+│   ├── helpers/                # Invocation wrapper, cache, parser, snapshots
+│   ├── fixtures/               # Synthetic test inputs with planted issues
+│   └── promptfoo.config.yaml   # Layer 2+3: Behavioral + semantic tests
+├── docs/
+│   ├── reqs/                   # Product requirements documents
+│   │   └── main.md             # Primary PRD
+│   ├── plans/                  # Implementation plans
+│   │   └── main.md             # Primary implementation plan
+│   ├── specs/
+│   │   └── multi-model-teams/  # Multi-model team pool specifications (architecture, lifecycle, routing, recovery)
+│   ├── migrations/
+│   │   └── synthex-plus.md     # synthex-plus → synthex migration guide (D6/D7/D8)
+│   ├── agent-interactions.md   # Agent interaction map and orchestration flows
+│   └── research-sources.md     # Research sources behind agent designs
+├── AGENTS.md                   # This file (CLAUDE.md imports it)
+└── README.md                   # Project overview
+```
+
+## How Plugins Work
+
+- **Agents** are markdown files in `agents/` that define an AI role (identity, responsibilities, behavioral rules, output format)
+- **Commands** are markdown files in `commands/` that define orchestration workflows (parameters, workflow steps, which agents to invoke)
+- **plugin.json** registers agents and commands within a plugin. Claude Code reads `.claude-plugin/plugin.json`. Codex and Grok read their own manifests and load the generated `skills/` wrappers, which point back at those same files.
+- **marketplace.json** registers plugins within the marketplace. Claude Code, Codex, and Grok each have their own marketplace file (`.claude-plugin/`, `.agents/plugins/`, `.grok-plugin/`).
+- After adding or renaming a command or agent, regenerate the shared skill wrappers with `node plugins/synthex/scripts/generate-codex-skills.mjs`. Do not hand-edit `skills/*/SKILL.md` or `cursor-agents/*.md` / `.cursor/agents/*.md` (Cursor Task discovery wrappers).
+
+## Adding a New Agent
+
+1. Create a new `.md` file in `plugins/[plugin-name]/agents/`
+2. Define the agent's role, responsibilities, workflow, output format, and behavioral rules
+3. Add the agent name to the `agents` array in `plugins/[plugin-name]/.claude-plugin/plugin.json`
+
+## Adding a New Command
+
+1. Create a new `.md` file in `plugins/[plugin-name]/commands/`
+2. Define parameters, workflow steps, and which agents to invoke
+3. Add the command filename to the `commands` array in `plugins/[plugin-name]/.claude-plugin/plugin.json`
+
+## Adding a New Plugin
+
+1. Create a new directory under `plugins/`
+2. Add `.claude-plugin/plugin.json` with agent and command registrations
+3. Add the plugin to the `plugins` array in `.claude-plugin/marketplace.json`
+
+## Releasing
+
+Releases are **automated** by `.github/workflows/release.yml` on every merge to `main`. Do **not** hand-edit marketplace versions, `plugins/*/.claude-plugin/plugin.json`, `plugins/synthex/.codex-plugin/plugin.json`, `plugins/synthex/.grok-plugin/plugin.json` versions, or `CHANGELOG.md` in feature PRs — the workflow owns all of those.
+
+How it works:
+
+1. The workflow runs Layer 1 schema tests as the gate.
+2. It walks commits since the previous `v*` tag and picks a semver bump from [Conventional Commits](https://www.conventionalcommits.org/):
+   - `BREAKING CHANGE:` footer or `<type>!:` subject → **major**
+   - `feat:` → **minor**
+   - `fix:` / `perf:` / `refactor:` / `revert:` / `build:` / `ci:` / `chore:` / `docs:` / `style:` / `test:` → **patch**
+   - No Conventional Commits since the last tag → **no release** (skipped silently)
+3. Both plugins and the marketplace top-level version are lockstep-bumped, a CHANGELOG entry is generated from the same commit range, the release commit is tagged `v<marketplace-version>`, and a GitHub release is published.
+4. After the GitHub release is created, a Claude Code agent step opens a **draft pull request** in `bluminal/slashsynthex.com` with proposed docs updates (release notes entry, command/agent reference updates, version bumps). The step is best-effort (`continue-on-error: true`) and never blocks the release. It runs only when all three required secrets are present (`ANTHROPIC_API_KEY`, `DOCS_PR_APP_ID`, `DOCS_PR_APP_PRIVATE_KEY`); otherwise it is skipped silently.
+
+### Required secrets
+
+Configure on `bluminal/lumenai` for the cross-repo docs-PR step to run:
+
+| Secret | Source | Scope |
+|--------|--------|-------|
+| `ANTHROPIC_API_KEY` | console.anthropic.com | Pay-per-use; per release runs roughly $1–3 at the 30-turn cap |
+| `DOCS_PR_APP_ID` | GitHub App ID | App must be installed on both `bluminal/lumenai` and `bluminal/slashsynthex.com` |
+| `DOCS_PR_APP_PRIVATE_KEY` | GitHub App private key (PEM) | Permissions: contents:write, pull-requests:write on `slashsynthex.com` only |
+
+The agent always opens a **draft** PR — a human reviews and merges. If the agent can't find a sensible docs home for a code change, it flags it in the PR body under "Could not auto-document" rather than fabricating.
+
+Implications for contributors:
+
+- Use Conventional Commit subjects on every commit that lands on `main` (the Tech Lead / Lead Frontend Engineer / `next-priority` command write these directly, per FR-HM27; a fail-open `PreToolUse` hook — `scripts/commit-lint.sh` — lints them when `git.commit_convention` is explicitly `conventional`).
+- Mark breaking changes with `<type>!:` or a `BREAKING CHANGE:` footer — getting this wrong means a major change ships as a minor.
+- The bot pushes the release commit and tag using `GITHUB_TOKEN`, which by GitHub policy does not re-trigger workflows, so there's no release loop.
+
+## Conventions
+
+- Agent filenames: `kebab-case.md` (e.g., `tech-lead.md`, `security-reviewer.md`)
+- Command filenames: `kebab-case.md` (e.g., `next-priority.md`)
+- Commands can be nested in subdirectories (e.g., `commands/testing/fix-tests.md`)
+- All agent and command definitions are markdown — no runtime code
+- PRDs go in `docs/reqs/`, implementation plans go in `docs/plans/`
+- NEVER place implementation plans or progress tracking in this file (AGENTS.md)
+
+## Agents (Synthex)
+
+### Orchestration Layer
+
+| Agent | Role | Type |
+|-------|------|------|
+| `tech-lead` | Full-stack orchestrator, primary coding agent | Execution + Orchestration |
+| `lead-frontend-engineer` | Frontend tech lead, delegates to framework specialists | Execution + Delegation |
+| `product-manager` | Requirements gathering, implementation planning, product strategy | Planning + Strategy |
+| `multi-model-review-orchestrator` | Sonnet-backed; orchestrates multi-model review (fan-out, consolidation pipeline, audit emission). Invoked by `/synthex:review-code` (when multi-model branch fires) and `/synthex:write-implementation-plan` (when multi-model is enabled). | Execution + Orchestration |
+
+### Specialist Layer
+
+| Agent | Role | Type |
+|-------|------|------|
+| `architect` | System architecture guidance, ADRs, plan feasibility review | Advisory + Planning |
+| `code-reviewer` | Craftsmanship review, specification compliance, convention adherence | Advisory (PASS/WARN/FAIL) |
+| `security-reviewer` | Security review quality gate (vulnerabilities, secrets, access control) | Advisory (PASS/WARN/FAIL) |
+| `terraform-plan-reviewer` | Infrastructure-as-code review (cost, risk, security) | Advisory (PASS/WARN/FAIL) |
+| `quality-engineer` | Test strategy, coverage analysis, test writing | Execution + Advisory |
+| `design-system-agent` | Design tokens, component governance, compliance audits | Execution + Advisory |
+| `performance-engineer` | Full-stack performance analysis (Core Web Vitals, queries, bundles) | Advisory |
+| `sre-agent` | SLOs/SLIs, observability, runbooks, blameless postmortems | Advisory + Execution |
+| `technical-writer` | API docs, user guides, migration guides, changelogs | Execution |
+
+### Research & Analysis Layer
+
+| Agent | Role | Type |
+|-------|------|------|
+| `ux-researcher` | Research plans, personas, journey maps, Opportunity Solution Trees | Planning + Advisory |
+| `metrics-analyst` | DORA metrics, HEART/AARRR frameworks, OKR tracking | Advisory |
+| `retrospective-facilitator` | Structured retrospectives, improvement item tracking | Planning + Advisory |
+
+### Utility Layer (Haiku-backed helpers)
+
+Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical work. Not invoked directly by users.
+
+| Agent | Role | Type |
+|-------|------|------|
+| `findings-consolidator` | Dedup, group, and sort findings from multiple reviewers (preserves attribution) | Utility |
+| `codex-review-prompter` | Haiku-backed; OpenAI Codex CLI adapter for multi-model review (`agentic` tier; family `openai`) | Utility |
+| `gemini-review-prompter` | Haiku-backed; Google Gemini CLI adapter for multi-model review (`agentic` tier; family `google`) | Utility |
+| `ollama-review-prompter` | Haiku-backed; local Ollama HTTP API adapter for multi-model review (`text-only` tier; family `local-<model>`) | Utility |
+
+## Commands
+
+| Command | Purpose | Agents Orchestrated |
+|---------|---------|-------------------|
+| `init` | Initialize project configuration and directories. During first-run, delegates the "Configure Multi-Model Review (optional)" sub-step to `/synthex:configure-multi-model` per FR-UO3. | — |
+| `configure-multi-model` | Re-runnable wizard for the `multi_model_review` config block. Detects installed CLIs, runs auth checks, surfaces 3 options (Enable with detected / Enable later / Skip), and shows FR-MR27 data-transmission warning. Idempotent — re-entering when already enabled offers Re-run / Reset to disabled / Leave as-is. | — |
+| `dismiss-upgrade-nudge` | Silence the SessionStart upgrade nudge for this project by writing `dismissed: true` to `.synthex/state.json`. Idempotent; no arguments. | — |
+| `loop` | Generic native-looping primitive. Loops an arbitrary prompt (literal `--prompt` or `--prompt-file <path>`) until the completion promise is emitted or `--max-iterations` is reached. Per-session state at `.synthex/loops/<loop-id>.json`; supports `--resume <id>` / `--resume-last`. | — |
+| `list-loops` | Enumerate running and recent terminal-status loops in `.synthex/loops/`. Read-only. Output format: `RUNNING (N)` + `COMPLETED (M)` blocks sorted by recency. | — |
+| `cancel-loop` | Cancel a loop by id, or `--all` running loops in the project. Mutates state-file `status: "cancelled"` atomically; idempotent on terminal-status loops. Polled at the looping command's iteration boundary (worst-case latency: one iteration). | — |
+| `next-priority` | Execute next highest-priority tasks. Supports `--loop` for native iteration until every task is `done` (or milestone-boundary exit). Supports `--auto-decide` so the Tech Lead resolves discretionary escalations with its own recommendation instead of asking, recording the decision and alternatives for later review. On Claude Code it arms the `auto-decide-gate` PreToolUse hook, which answers single-`(Recommended)` `AskUserQuestion` calls; each decision gets an `Auto-Decision:` commit trailer and a bold section at the top of the PR. `[H]` acceptance-criteria approval is always exempt. Supports `--in-cloud` / `--local` and `next_priority.execution_environment` so parallel Tech Leads can run as Cursor cloud subagents (own VM + branch) instead of local worktrees; non-Cursor hosts fall back to local. | Tech Lead |
+| `refine-requirements` | Improve PRD clarity through multi-agent review | PM + Tech Lead + Lead Frontend Engineer |
+| `write-implementation-plan` | Transform PRD into implementation plan. Supports multi-model plan-review via the orchestrator (FR-MR22); no complexity gate applied. Use `--multi-model` / `--no-multi-model` to override config. | PM + Architect + design-system-agent + Tech Lead |
+| `review-code` | Multi-perspective code review. Supports multi-model review via FR-MR21 8-step decision framework + complexity gate (FR-MR21a). Use `--multi-model` / `--no-multi-model` to override config. When multi-model is active, fans out to native + external proposers via the orchestrator. | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
+| `write-adr` | Create Architecture Decision Record | Architect (interactive) |
+| `write-rfc` | Create Request for Comments | Architect + PM + Tech Lead + Security Reviewer |
+| `test-coverage-analysis` | Analyze test gaps, optionally write tests | Quality Engineer |
+| `design-system-audit` | Audit frontend for design system compliance | design-system-agent |
+| `retrospective` | Structured cycle retrospective | Metrics Analyst + Retrospective Facilitator |
+| `reliability-review` | Operational readiness assessment | SRE Agent + Terraform Plan Reviewer (opt.) |
+| `performance-audit` | Full-stack performance analysis | Performance Engineer |
+| `start-review-team` | Start a standing review pool | Launches a persistent pool of reviewer agents; pool ID returned for routing |
+| `stop-review-team` | Stop a standing review pool | Gracefully drains in-flight reviews and tears down the pool |
+| `list-teams` | List running pools | Shows active pool IDs, reviewer composition, and current load |
+| `configure-teams` | Re-runnable wizard for the `standing_pools` config block. Surfaces enable/skip + routing_mode + matching_mode questions. Does NOT spawn a pool (FR-MMT27 #3). Idempotent. | — |
+
+See `docs/agent-interactions.md` for the complete interaction map and `docs/research-sources.md` for the research behind each agent's design.
+
+### Pool Routing (standing review pools)
+
+When a standing review pool is running (started via `/synthex:start-review-team`), `/review-code` and `/performance-audit` automatically route to it instead of invoking the default single-model reviewer sequence. Pool routing requires `standing_pools.enabled: true` in `.synthex/config.yaml` (a project still on `.synthex-plus/config.yaml` keeps working for one major version — see `docs/migrations/synthex-plus.md`). See `docs/specs/multi-model-teams/` for full pool specifications (architecture, lifecycle, routing rules, and recovery).
+
+> **synthex-plus is removed.** Its pool commands, pool agents, templates, docs, capability ladder, and lifecycle hooks were folded into `synthex` (Milestone 6.1); the plugin itself shipped a tombstone release and was then removed from the marketplace (Milestone 6.2). See `docs/migrations/synthex-plus.md`.
+
+## Project Configuration Framework
+
+Synthex uses a **convention over configuration** approach for project-level customization.
+
+### How It Works
+
+- **Without a config file:** Commands and agents use sensible embedded defaults. Everything works out of the box.
+- **With a config file:** Projects override specific settings in `.synthex/config.yaml`. Only include what you want to change.
+- **Config lives in the repo:** Version-controlled alongside code, so the team shares the same configuration.
+
+### Configuration Layers
+
+Resolved highest precedence first, mirroring Claude Code's settings precedence (project beats user):
+
+| Layer | Path |
+|-------|------|
+| Project-local | `<project>/.synthex/config.local.yaml` (gitignored) |
+| Project (shared) | `<project>/.synthex/config.yaml` |
+| Legacy project | `<project>/.synthex-plus/config.yaml` (D6, deprecated — warns on stderr) |
+| User | `$XDG_CONFIG_HOME/synthex/config.yaml`, default `~/.config/synthex/config.yaml` |
+| Plugin defaults | `plugins/synthex/config/defaults.yaml` |
+
+Two key classes break that order:
+
+- **User-owned** — `multi_model_review.per_reviewer.*`: the user layer is consulted first, because which external models a machine has installed is not the repo's business.
+- **Restrictive-wins** — `multi_model_review.enabled` and any `multi_model_review.*.enabled`: `false` in any hand-written layer wins, the way Claude Code unions permission deny rules. Plugin defaults are excluded from this vote, or the shipped `enabled: false` would pin the key off permanently.
+
+Both reader implementations must stay in step: `plugins/synthex/scripts/lib/config-get.sh` (prose/shell, node + awk paths) and `packages/synthex-mcp/src/lib/config-merger.ts` (`mergeConfig`). The two "is Synthex initialized here" hook probes (`task-completed-gate.sh`, `teammate-idle-gate.sh`) stay deliberately project-only — a user config must not make Synthex hooks fire in unrelated repos.
+
+### Initialization
+
+Run the `init` command to create the configuration file and document directories:
+```
+/init
+```
+
+This creates:
+- `.synthex/config.yaml` — Project configuration (copied from `plugins/synthex/config/defaults.yaml`)
+- `docs/reqs/` — Product requirements directory
+- `docs/plans/` — Implementation plans directory
+- `docs/specs/` — Technical specifications directory
+- `docs/specs/decisions/` — Architecture Decision Records (ADRs)
+- `docs/specs/rfcs/` — Requests for Comments (RFCs)
+- `docs/runbooks/` — Operational runbooks
+- `docs/retros/` — Retrospective documents
+
+### Configuration File Location
+
+```
+your-project/
+├── .synthex/
+│   └── config.yaml         # Project-level config (overrides defaults)
+├── docs/
+│   ├── reqs/main.md        # PRD
+│   ├── plans/main.md       # Implementation plan
+│   ├── specs/              # Technical specifications
+│   │   ├── decisions/      # Architecture Decision Records (ADRs)
+│   │   └── rfcs/           # Requests for Comments (RFCs)
+│   ├── runbooks/           # Operational runbooks
+│   └── retros/             # Retrospective documents
+└── ...
+```
+
+### What's Configurable
+
+See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `review_loops.max_cycles` | 2 | Global max review loop iterations for all commands |
+| `review_loops.min_severity_to_address` | high | Global minimum severity that must be resolved |
+| `models.profile` | `balanced` | Active model tier (`economy`\|`balanced`\|`premium`); `balanced` is the shipped frontmatter, `economy`/`premium` are per-agent deltas over it (D29) |
+| `models.agents.<name>` | `{}` | Named per-agent `{model, effort}` override; highest-priority resolution step below the `--profile` flag |
+| `refine_requirements.reviewers` | product-manager, tech-lead, lead-frontend-engineer | Sub-agents that review PRD for clarity |
+| `implementation_plan.reviewers` | architect, design-system-agent, tech-lead | Sub-agents that review draft implementation plans |
+| `implementation_plan.concurrent_tasks` | 3 | Max parallelizable tasks per milestone in the plan |
+| `implementation_plan.review_loops.max_cycles` | 3 | Per-command override (higher for high-stakes plans) |
+| `code_review.engine` | `prose` | FR-HM16 workflow review engine (Claude Code only, opt-in); `workflow` only takes effect with a `Workflow` tool in the caller's tool list (capability-ladder level 2, `docs/standing-pool-routing.md`) |
+| `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `review-code`. An entry may be `- prompt: <path>` pointing at a project prompt file instead of an agent name (`plugins/synthex/docs/prompt-file-reviewers.md`) |
+| `code_review.max_diff_lines` | 300 | Warn when diff exceeds this size |
+| `code_review.spec_paths` | `[docs/specs]` | Specifications for compliance checking |
+| `code_review.spec_inline_bytes` | 65536 | Size gate for inline spec scan in Step 2 (above this, only the first 50 lines of each spec are scanned) |
+| `code_review.verification` | `off` | FR-HM17 prose verification pass (D18) for code-reviewer/security-reviewer/performance-engineer; `prose` verifies top-5 CRITICAL/HIGH findings via LSP or grep, `off` skips it |
+| `quality.coverage_thresholds` | line: 80, branch: 70, function: 80 | Coverage thresholds |
+| `quality.test_runner` | vitest | Test runner for coverage reports |
+| `architecture.decisions_path` | `docs/specs/decisions` | ADR storage |
+| `architecture.rfcs_path` | `docs/specs/rfcs` | RFC storage |
+| `design_system.spec_path` | `docs/specs/design-system.md` | Design system spec |
+| `design_system.scan_paths` | `[src/]` | Paths to audit for compliance |
+| `reliability.slo_document` | `docs/specs/slos.md` | SLO/SLI definitions |
+| `reliability.runbooks_path` | `docs/runbooks` | Operational runbooks |
+| `retrospective.format` | start-stop-continue | Retrospective format |
+| `retrospective.max_improvement_items` | 3 | Max items per cycle |
+| `next_priority.concurrent_tasks` | `3` | Max parallel tasks for `next-priority` command |
+| `next_priority.execution_environment` | `local` | `local` (worktrees) or `cloud` (Cursor Task `environment: "cloud"`; overridden by `--in-cloud` / `--local`) |
+| `native_looping.engine` | `prose` | FR-HM19 Stage 2 loop engine for every `--loop` command (Claude Code only, opt-in, D34); `workflow` only takes effect with a `Workflow` tool in the caller's tool list and without `--loop-isolated` (`docs/engines/loop-workflow.md`) |
+| `worktrees.base_path` | `.claude/worktrees` | Base directory for parallel execution worktrees |
+| `worktrees.branch_prefix` | `feature/` | Branch name prefix for worktree branches |
+| `documents.requirements` | `docs/reqs/main.md` | Default PRD path |
+| `documents.implementation_plan` | `docs/plans/main.md` | Default plan path |
+| `documents.specs` | `docs/specs` | Specs directory |
+
+### Design Pattern
+
+This configuration framework is designed to be extended. As new commands and agents are added, their configurable settings are added to `config/defaults.yaml` with sensible defaults. Projects only override what they need to change.
+
+## Automated Testing Framework
+
+The agents and commands are tested using a three-layer testing pyramid. Since agents are pure markdown (no runtime code), testing works by invoking agents with synthetic fixtures and validating their outputs.
+
+### Testing Pyramid
+
+```
+         /\            Layer 3: SEMANTIC EVAL
+        /  \           (Manual trigger — LLM-as-judge)
+       /    \
+      /------\         Layer 2: BEHAVIORAL ASSERTIONS
+     / cached  \       (Manual trigger — one LLM call, many assertions)
+    /  outputs  \
+   /------------\      Layer 1: SCHEMA VALIDATION
+  / zero LLM cost \   (Every PR — golden snapshots)
+ /________________\
+```
+
+| Layer | What | Cost | When |
+|-------|------|------|------|
+| 1 - Schema | Validates markdown structure, sections, tables, verdict format | $0 | Every PR |
+| 2 - Behavioral | Regex/JS assertions against cached agent outputs | ~$3/run (cached) | Manual trigger |
+| 3 - Semantic | LLM-as-judge evaluates accuracy and quality | ~$8/run | Manual trigger |
+
+### Test Directory Structure
+
+```
+tests/
+├── promptfoo.config.yaml         # Layer 2+3 config (behavioral + semantic)
+├── vitest.config.ts              # Layer 1 config
+├── schemas/                      # Layer 1: Output structure validators
+│   ├── helpers.ts                # Markdown parsing utilities (verdict, finding, section, table parsers)
+│   ├── terraform-reviewer.ts     # Terraform plan review validator
+│   ├── security-reviewer.ts      # Security review validator
+│   ├── implementation-plan.ts    # Implementation plan template validator
+│   ├── code-reviewer.ts          # Code review validator (craftsmanship, conventions)
+│   ├── design-system-agent.ts    # Design system compliance validator
+│   ├── architect.ts              # Plan review + ADR validator (dual-mode)
+│   ├── performance-engineer.ts   # Performance audit validator (quantified impact)
+│   ├── sre-agent.ts              # Reliability review validator (SLOs, observability)
+│   ├── quality-engineer.ts       # Coverage analysis validator
+│   ├── metrics-analyst.ts        # DORA/HEART metrics validator
+│   ├── retrospective-facilitator.ts  # Retrospective format validator
+│   ├── ux-researcher.ts          # Multi-artifact validator (5 types: OST, persona, journey map, etc.)
+│   ├── technical-writer.ts       # Multi-document validator (6 types: API doc, changelog, etc.)
+│   └── *.test.ts                 # Vitest test suites (one per validator)
+├── helpers/
+│   ├── claude-provider.js        # Promptfoo custom provider (wraps claude -p)
+│   ├── invoke-agent.ts           # Agent invocation wrapper with caching
+│   ├── cache.ts                  # SHA-256 hash-based LLM output cache
+│   ├── parse-markdown-output.ts  # Structured markdown parser
+│   └── snapshot-manager.ts       # Golden snapshot management
+├── fixtures/                     # Synthetic test inputs with planted issues
+│   ├── terraform/                # 8 TF plan fixtures
+│   ├── security/                 # 7 code diff fixtures
+│   ├── code-reviewer/            # 3 diff fixtures (clean-code, god-object, missing-error-handling)
+│   ├── product-manager/          # 3 PM input fixtures
+│   └── commands/                 # Command integration fixtures
+├── __snapshots__/                # Golden outputs for regression
+└── .cache/                       # LLM output cache (gitignored)
+```
+
+### Schema Validator Coverage
+
+Every testable agent has a schema validator and a corresponding test suite with inline sample outputs:
+
+| Agent | Validator | Tests | Fixtures | Key Validations |
+|-------|-----------|-------|----------|----------------|
+| terraform-reviewer | `terraform-reviewer.ts` | 46 | 8 | Resource changes, cost analysis, destructive actions, security |
+| security-reviewer | `security-reviewer.ts` | 33 | 7 | CWE references, severity sorting, verdict consistency |
+| implementation-plan | `implementation-plan.ts` | 14 | -- | Milestone structure, task decomposition, dependency graph |
+| code-reviewer | `code-reviewer.ts` | 16 | 3 | Educational content, convention compliance, reuse opportunities |
+| design-system-agent | `design-system-agent.ts` | 7 | -- | Token violations table, accessibility findings, compliance verdict |
+| architect | `architect.ts` | 15 | -- | Dual-mode (Plan Review + ADR), alternatives table, severity sorting |
+| performance-engineer | `performance-engineer.ts` | 9 | -- | Quantified impact (ms, KB), performance budget table |
+| sre-agent | `sre-agent.ts` | 10 | -- | Readiness verdict, SLO/observability tables, deployment assessment |
+| quality-engineer | `quality-engineer.ts` | 7 | -- | Coverage table, gap priorities, test strategy |
+| metrics-analyst | `metrics-analyst.ts` | 8 | -- | DORA metrics table, OKR tracking, quantitative content |
+| retrospective-facilitator | `retrospective-facilitator.ts` | 12 | -- | Format detection, improvement item limits, blameless language |
+| ux-researcher | `ux-researcher.ts` | 17 | -- | 5 artifact types, evidence basis, confidence levels |
+| technical-writer | `technical-writer.ts` | 17 | -- | 6 document types, section structure per type |
+
+**Total: 206 tests, 13 test suites, 0 failures.**
+
+### Running Tests
+
+```bash
+cd tests
+
+# Layer 1: Schema validation (instant, free)
+npx vitest run schemas/
+
+# Layer 2: Behavioral assertions (uses cached LLM outputs)
+npx promptfoo eval --config promptfoo.config.yaml --filter-pattern "B[0-9]"
+
+# Layer 3: Semantic evaluation (LLM-as-judge)
+npx promptfoo eval --config promptfoo.config.yaml --filter-pattern "S[0-9]"
+
+# All layers
+npm run test:all
+```
+
+### Caching Strategy
+
+LLM outputs are cached by `hash(agent.md + fixture + model)`. Changing an agent definition or fixture invalidates the cache and triggers a fresh LLM call. Unchanged agents reuse cached outputs at zero cost.
+
+### Adding Tests for a New Agent
+
+1. Create fixtures in `tests/fixtures/{agent-name}/`
+2. Add a schema validator in `tests/schemas/{agent-name}.ts`
+3. Add Vitest tests in `tests/schemas/{agent-name}.test.ts`
+4. Add behavioral assertions to `tests/promptfoo.config.yaml`
+5. Generate golden snapshots: `npm run snapshots:update`

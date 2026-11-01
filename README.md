@@ -117,7 +117,7 @@ All agents are tested using a three-layer testing pyramid. Since agents are pure
 | 2 - Behavioral | Regex/JS assertions against cached agent outputs | ~$3/run (cached) | Manual trigger |
 | 3 - Semantic | LLM-as-judge evaluates accuracy and quality | ~$8/run | Manual trigger |
 
-**Current coverage:** see `tests/schemas/` for the full Layer 1 suite (Synthex agents, commands, and shared infrastructure). See [CLAUDE.md](./CLAUDE.md) for full details.
+**Current coverage:** see `tests/schemas/` for the full Layer 1 suite (Synthex agents, commands, and shared infrastructure). See [AGENTS.md](./AGENTS.md) for full details.
 
 ```bash
 cd tests && npx vitest run schemas/   # Layer 1: instant, free
@@ -152,13 +152,13 @@ lumenai/
 │   ├── plans/main.md                   # Implementation plan
 │   ├── agent-interactions.md           # Agent interaction map and orchestration flows
 │   └── research-sources.md             # Research behind each agent's design
-├── CLAUDE.md                           # Developer instructions
+├── AGENTS.md                           # Developer instructions (CLAUDE.md imports it)
 └── README.md                           # This file
 ```
 
 ## How to Extend
 
-See [CLAUDE.md](./CLAUDE.md) for instructions on adding new agents, commands, and plugins.
+See [AGENTS.md](./AGENTS.md) for instructions on adding new agents, commands, and plugins.
 
 ## License
 
