@@ -1,6 +1,6 @@
 # Implementation Plan: Cursor Cloud Agent Support for `next-priority` Parallel Tasks
 
-**Status:** Complete (T1–T4 shipped). Verified Layer 1: `next-priority-cloud`, `host-matrix`, `hosts-doc`, `next-priority-auto-decide`, `wrapper-catalog` (59 tests) green.
+**Status:** T1–T4 shipped (`2a844a3`). T5 (review FG/BG) shipped. T6 (`.cursor/agents` wrappers) still optional/deferred.
 
 **Source:** Research conversation 2026-11-01 (Cursor subagents docs, Cloud Agents API, Claude cloud/cross-session messaging). No separate PRD — scope is host/config/command prose plus Layer 1 tests; functional requirements are listed as FR-CA* below.
 
@@ -45,7 +45,7 @@ Claude Code cloud sessions exist (`claude --cloud`, Projects threads) but **clou
 | # | Question | Impact | Resolution path |
 |---|----------|--------|-----------------|
 | Q1 | Exact Cursor Task schema surface area across IDE builds (`environment`, `cloud_base_branch`, `run_in_background`) — this session's tool descriptor omitted `environment` even though staff/docs confirm it. | Prose must say "when the Task tool accepts `environment`" and omit the field (never send empty `cloud_base_branch` with `local`). | Ship capability-gated prose; pin with Layer 1 string contracts + a manual Cursor smoke later. |
-| Q2 | Should review-code / multi-model fan-out also get explicit FG/BG? | Consistency vs scope. | **Out of this plan's command edits** except a one-line cross-ref if needed. FR-CA1 for next-priority workers is in scope; broader review fan-out is a follow-up. |
+| Q2 | Should review-code / multi-model fan-out also get explicit FG/BG? | Consistency vs scope. | **Resolved as T5:** reviewers stay **foreground** (parallel one-message batch, wait for all results). Do not apply next-priority's background rule to advisory fan-out. |
 | Q3 | When a cloud worker opens a PR instead of only pushing a branch, prefer merge-via-PR or always fetch+ff-merge the branch? | Merge UX. | **D6 branch fetch + ff-merge** first; if the worker only opened a PR, parent checks out/fetches the PR head. Document both. |
 
 ## Tasks
@@ -97,9 +97,24 @@ Claude Code cloud sessions exist (`claude --cloud`, Projects threads) but **clou
 | R3 | Cloud MCP/secrets differ from local. | Document; workers use team cloud env. |
 | R4 | Nesting limit (depth 2) — cloud Tech Lead spawning specialists may hit the ceiling. | Same as local Cursor; Tech Lead specialists must not fan out further. Surfaced in Step 5 note. |
 
+### T5 (M) — Review / orchestrator FG vs BG (Q2)
+
+Reviewers need results before consolidation; Cursor background would return before findings exist.
+
+- `[T]` Capability ladder level 3 states: parallel reviewer spawns use **foreground** (`run_in_background: false` / omit); never background.
+- `[T]` `review-code.md` Step 4 (and performance-audit if it duplicates the ladder pointer) restates the same FG rule.
+- `[T]` `multi-model-review-orchestrator.md` Step 3 single-batch fan-out uses foreground Task calls.
+- `[T]` Layer 1 tests cover the three surfaces; cross-ref FR-CA1 so next-priority BG workers stay distinct.
+
+### T6 (S, optional follow-up) — `.cursor/agents/` discovery wrappers
+
+Generate thin `.cursor/agents/<name>.md` stubs (or document that Cursor already loads `.claude/agents/`) so Synthex roles appear in Task hints with Cursor-native frontmatter. Deferred unless demanded; not blocking T5.
+
 ## Milestone order
 
 1. T1 config + parameters  
 2. T2 command workflow prose  
 3. T3 host matrix + regenerate  
 4. T4 tests + README/CLAUDE.md  
+5. T5 review FG/BG  
+6. T6 optional `.cursor/agents`  
