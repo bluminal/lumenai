@@ -2,6 +2,9 @@
 model: haiku
 description: "Specialty adapter invoking a second Claude CLI session as an external multi-model review proposer."
 tools: Bash, Read, Write
+maxTurns: 20
+omitClaudeMd: true
+color: cyan
 ---
 
 # Claude Review Prompter

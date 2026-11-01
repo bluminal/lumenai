@@ -3,6 +3,7 @@ model: sonnet
 effort: high
 description: "Reviews terraform plan output for cost, security, and destructive-change risk."
 tools: Read, Grep, Glob, Bash, WebFetch
+color: red
 ---
 
 # Terraform Plan Reviewer

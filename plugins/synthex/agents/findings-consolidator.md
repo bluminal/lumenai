@@ -2,6 +2,9 @@
 model: haiku
 description: "Deduplicates and merges findings from multiple reviewers into one attributed, sorted list."
 tools: Read
+maxTurns: 10
+omitClaudeMd: true
+color: cyan
 ---
 
 # Findings Consolidator
