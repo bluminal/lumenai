@@ -3,17 +3,17 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
 const ROOT = join(__dirname, '..', '..');
-const CLAUDE_MD_PATH = join(ROOT, 'CLAUDE.md');
+const AGENTS_MD_PATH = join(ROOT, 'AGENTS.md');
 
-describe('Task 53: CLAUDE.md agent table + command table updates', () => {
+describe('Task 53: AGENTS.md agent table + command table updates', () => {
   let content: string;
 
   beforeAll(() => {
-    content = readFileSync(CLAUDE_MD_PATH, 'utf8');
+    content = readFileSync(AGENTS_MD_PATH, 'utf8');
   });
 
-  it('CLAUDE.md file exists', () => {
-    expect(existsSync(CLAUDE_MD_PATH)).toBe(true);
+  it('AGENTS.md file exists', () => {
+    expect(existsSync(AGENTS_MD_PATH)).toBe(true);
   });
 
   // ----------------------------------------------------------------
