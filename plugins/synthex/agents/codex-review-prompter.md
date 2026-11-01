@@ -2,6 +2,9 @@
 model: haiku
 description: "Adapter that invokes the OpenAI Codex CLI as an external proposer in multi-model review."
 tools: Bash, Read, Write
+maxTurns: 20
+omitClaudeMd: true
+color: cyan
 ---
 
 # Codex Review Prompter
@@ -89,7 +92,7 @@ Return `validate-findings`'s printed stdout unchanged.
 
 ## Install One-Liner
 
-`npm install -g @openai/codex`, then auth with `codex login`.
+`npm install -g @openai/codex`, then `codex login`.
 
 ## Known Gotchas
 

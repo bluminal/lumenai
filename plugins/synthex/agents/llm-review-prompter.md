@@ -2,6 +2,9 @@
 model: haiku
 description: "Adapter that invokes Simon Willison's llm CLI as an external code-review proposer."
 tools: Bash, Read, Write
+maxTurns: 20
+omitClaudeMd: true
+color: cyan
 ---
 
 # LLM Review Prompter

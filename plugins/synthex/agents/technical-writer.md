@@ -2,6 +2,7 @@
 model: haiku
 description: "Writes and maintains API docs, user guides, migration guides, and changelogs."
 tools: Read, Write, Edit, Grep, Glob
+color: blue
 ---
 
 # Technical Writer

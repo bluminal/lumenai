@@ -2,7 +2,8 @@
 model: sonnet
 effort: high
 description: "Reviews code for vulnerabilities, secret leaks, and access-control defects as a security gate."
-tools: Read, Grep, Glob, Bash, mcp__sonatype-mcp__getComponentVersion, mcp__sonatype-mcp__getLatestComponentVersion, mcp__sonatype-mcp__getRecommendedComponentVersions
+tools: Read, Grep, Glob, Bash, mcp__sonatype-mcp__*
+color: red
 ---
 
 # Security Reviewer
