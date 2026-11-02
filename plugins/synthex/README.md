@@ -153,7 +153,7 @@ Agents focused on understanding users, measuring outcomes, and driving improveme
 | `/loop` | Generic looping primitive — loops a prompt (literal or file) until a completion promise is emitted or `--max-iterations` is reached. See "Native Looping" below. | -- |
 | `/list-loops` | Enumerate running and recently-terminal loops in the project. Read-only. | -- |
 | `/cancel-loop` | Cancel a loop by id, or `--all` running loops. Idempotent on terminal-status loops. | -- |
-| `/next-priority` | Execute next highest-priority tasks. Supports `--auto-decide` for unattended runs (see "Autonomous Decisions" below). | Tech Lead |
+| `/next-priority` | Execute next highest-priority tasks. Supports `--auto-decide` for unattended runs (see "Autonomous Decisions" below) and `--in-cloud` / `execution_environment: cloud` for Cursor cloud subagents (see "Cloud Execution" below). | Tech Lead |
 | `/write-implementation-plan` | Transform PRD into implementation plan | PM + Architect + Design System Agent + Tech Lead |
 | `/review-code` | Multi-perspective code review | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
 | `/write-adr` | Create Architecture Decision Record | Architect (interactive) |
@@ -245,6 +245,7 @@ See [`config/defaults.yaml`](config/defaults.yaml) for the full reference. Key s
 | `retrospective.format` | start-stop-continue | Retrospective format |
 | `retrospective.max_improvement_items` | 3 | Max items per cycle |
 | `next_priority.concurrent_tasks` | 3 | Max parallel tasks for `/next-priority` |
+| `next_priority.execution_environment` | `local` | `local` worktrees or `cloud` Cursor Task subagents (`--in-cloud` / `--local` override) |
 | `documents.requirements` | `docs/reqs/main.md` | Default PRD path |
 | `documents.implementation_plan` | `docs/plans/main.md` | Default plan path |
 | `documents.specs` | `docs/specs` | Specs directory |
@@ -269,6 +270,25 @@ Synthex 0.8+ ships a **native looping primitive** that iterates a command until 
 ```
 
 `--loop` is supported on `next-priority`, `write-implementation-plan`, `refine-requirements`, and `review-code`. The flag is opt-in — when absent, every command behaves identically to today. See [`plugins/synthex/docs/native-looping.md`](./docs/native-looping.md) for the full framework spec, state-file schema, and emission-point details per command.
+
+## Cloud Execution (`--in-cloud`)
+
+On Cursor, `/next-priority` can fan out each parallel Tech Lead as a **cloud subagent** under the parent session (`Task` with `environment: "cloud"`, `run_in_background: true`). Each worker gets its own VM and branch; the parent merges by fetching that branch after validation. Set a project default with `next_priority.execution_environment: cloud` in `.synthex/config.yaml`, or pass `--in-cloud` / `--local` per call (flag wins; `--local` wins if both are set).
+
+Parallel plan-task workers run in the **background**; advisory reviewers stay **foreground**. Cloud workers never use standing-pool filesystem inboxes — completion is via Task result / resume and git. Non-Cursor hosts print a one-line notice and fall back to local worktrees (Claude cloud parent orchestration is deferred). Uncommitted local edits are invisible to cloud clones; commit and push (or use `--local`) first. See `docs/plans/cursor-cloud-agent-support.md`.
+
+```
+/synthex:next-priority --in-cloud --loop
+```
+
+## Cursor Task agents
+
+Synthex ships generated Cursor subagent wrappers at `plugins/synthex/cursor-agents/` (regenerate with `node plugins/synthex/scripts/generate-codex-skills.mjs`; do not hand-edit). Each file has Cursor-native frontmatter (`name`, `description`, `model: inherit`, `readonly` for advisory roles) and points at the canonical `agents/<slug>.md`.
+
+- **This marketplace repo:** wrappers are also written to `.cursor/agents/` so the Agents Window discovers them automatically.
+- **Consumer projects:** copy or symlink the plugin's `cursor-agents/` directory to your project `.cursor/agents/` (or merge selected roles). Cursor also loads `.claude/agents/`; these wrappers are the Cursor-frontmatter path.
+
+Foreground vs background remains a per-call Task argument (`run_in_background`) — wrappers never set `is_background`.
 
 ## Autonomous Decisions (`--auto-decide`)
 

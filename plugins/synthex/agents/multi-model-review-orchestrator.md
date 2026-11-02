@@ -142,6 +142,8 @@ On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUG
 
 Issue ONE parallel Task batch containing:
 
+**Foreground (FR-CA1 / T5):** every Task/Agent call in this batch is **foreground** (`run_in_background: false` or omit the field). The orchestrator must collect every proposer envelope before Stage 1 consolidation; background mode would return before findings exist. Parallelism comes from issuing multiple foreground calls in one message, not from `run_in_background: true` (that flag is for `next-priority` implementers).
+
 - **Native sub-agents:** for each name in `native_reviewers`, issue a Task call with the sub-agent identity. Each native receives the assembled bundle PLUS its standard host-session context PLUS an explicit `output_schema` requirement so it emits canonical findings (per `canonical-finding-schema.md`). Native source attribution: `source.source_type = "native-team"`, `source.family = "anthropic"`, `source.reviewer_id = <native agent name>`.
 
   When `config.multi_model_review.include_native_reviewers === false`: Skipped entirely — no native Task calls are issued.

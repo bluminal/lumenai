@@ -168,6 +168,13 @@ describe('Task 49 (FR-HM21, D22): capability-ladder.test.ts', () => {
       }
     });
 
+    it('level 3 requires foreground reviewer spawns (FR-CA1 / T5)', () => {
+      expect(section).toMatch(/Foreground vs background \(FR-CA1 \/ T5\)/);
+      expect(section).toMatch(/run_in_background:\s*false/);
+      expect(section).toMatch(/Do \*\*not\*\* use background mode here/);
+      expect(section).toContain('next-priority');
+    });
+
     it('level 4 (sequential) is documented as the always-working floor, not a degraded mode', () => {
       expect(section).toMatch(/\*\*Sequential reviewers\.\*\*/);
       expect(section).toMatch(/today's baseline/);

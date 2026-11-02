@@ -49,7 +49,7 @@ lumenai/
 - **Commands** are markdown files in `commands/` that define orchestration workflows (parameters, workflow steps, which agents to invoke)
 - **plugin.json** registers agents and commands within a plugin. Claude Code reads `.claude-plugin/plugin.json`. Codex and Grok read their own manifests and load the generated `skills/` wrappers, which point back at those same files.
 - **marketplace.json** registers plugins within the marketplace. Claude Code, Codex, and Grok each have their own marketplace file (`.claude-plugin/`, `.agents/plugins/`, `.grok-plugin/`).
-- After adding or renaming a command or agent, regenerate the shared skill wrappers with `node plugins/synthex/scripts/generate-codex-skills.mjs`. Do not hand-edit `skills/*/SKILL.md`.
+- After adding or renaming a command or agent, regenerate the shared skill wrappers with `node plugins/synthex/scripts/generate-codex-skills.mjs`. Do not hand-edit `skills/*/SKILL.md` or `cursor-agents/*.md` / `.cursor/agents/*.md` (Cursor Task discovery wrappers).
 
 ## Adding a New Agent
 
@@ -165,7 +165,7 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 | `loop` | Generic native-looping primitive. Loops an arbitrary prompt (literal `--prompt` or `--prompt-file <path>`) until the completion promise is emitted or `--max-iterations` is reached. Per-session state at `.synthex/loops/<loop-id>.json`; supports `--resume <id>` / `--resume-last`. | — |
 | `list-loops` | Enumerate running and recent terminal-status loops in `.synthex/loops/`. Read-only. Output format: `RUNNING (N)` + `COMPLETED (M)` blocks sorted by recency. | — |
 | `cancel-loop` | Cancel a loop by id, or `--all` running loops in the project. Mutates state-file `status: "cancelled"` atomically; idempotent on terminal-status loops. Polled at the looping command's iteration boundary (worst-case latency: one iteration). | — |
-| `next-priority` | Execute next highest-priority tasks. Supports `--loop` for native iteration until every task is `done` (or milestone-boundary exit). Supports `--auto-decide` so the Tech Lead resolves discretionary escalations with its own recommendation instead of asking, recording the decision and alternatives for later review. On Claude Code it arms the `auto-decide-gate` PreToolUse hook, which answers single-`(Recommended)` `AskUserQuestion` calls; each decision gets an `Auto-Decision:` commit trailer and a bold section at the top of the PR. `[H]` acceptance-criteria approval is always exempt. | Tech Lead |
+| `next-priority` | Execute next highest-priority tasks. Supports `--loop` for native iteration until every task is `done` (or milestone-boundary exit). Supports `--auto-decide` so the Tech Lead resolves discretionary escalations with its own recommendation instead of asking, recording the decision and alternatives for later review. On Claude Code it arms the `auto-decide-gate` PreToolUse hook, which answers single-`(Recommended)` `AskUserQuestion` calls; each decision gets an `Auto-Decision:` commit trailer and a bold section at the top of the PR. `[H]` acceptance-criteria approval is always exempt. Supports `--in-cloud` / `--local` and `next_priority.execution_environment` so parallel Tech Leads can run as Cursor cloud subagents (own VM + branch) instead of local worktrees; non-Cursor hosts fall back to local. | Tech Lead |
 | `refine-requirements` | Improve PRD clarity through multi-agent review | PM + Tech Lead + Lead Frontend Engineer |
 | `write-implementation-plan` | Transform PRD into implementation plan. Supports multi-model plan-review via the orchestrator (FR-MR22); no complexity gate applied. Use `--multi-model` / `--no-multi-model` to override config. | PM + Architect + design-system-agent + Tech Lead |
 | `review-code` | Multi-perspective code review. Supports multi-model review via FR-MR21 8-step decision framework + complexity gate (FR-MR21a). Use `--multi-model` / `--no-multi-model` to override config. When multi-model is active, fans out to native + external proposers via the orchestrator. | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
@@ -283,6 +283,7 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 | `retrospective.format` | start-stop-continue | Retrospective format |
 | `retrospective.max_improvement_items` | 3 | Max items per cycle |
 | `next_priority.concurrent_tasks` | `3` | Max parallel tasks for `next-priority` command |
+| `next_priority.execution_environment` | `local` | `local` (worktrees) or `cloud` (Cursor Task `environment: "cloud"`; overridden by `--in-cloud` / `--local`) |
 | `native_looping.engine` | `prose` | FR-HM19 Stage 2 loop engine for every `--loop` command (Claude Code only, opt-in, D34); `workflow` only takes effect with a `Workflow` tool in the caller's tool list and without `--loop-isolated` (`docs/engines/loop-workflow.md`) |
 | `worktrees.base_path` | `.claude/worktrees` | Base directory for parallel execution worktrees |
 | `worktrees.branch_prefix` | `feature/` | Branch name prefix for worktree branches |
