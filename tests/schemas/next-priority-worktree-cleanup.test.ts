@@ -23,7 +23,9 @@ const content = readFileSync(COMMAND_PATH, 'utf8');
 describe('next-priority merged-worktree lifecycle', () => {
   it('requires worktree removal immediately after a successful merge and before plan updates', () => {
     const merge = content.indexOf('git merge --ff-only');
-    const cleanup = content.indexOf('**Immediate cleanup invariant:**');
+    // The heading gained a "(local only)" qualifier when cloud execution
+    // landed; a cloud task has no worktree to remove.
+    const cleanup = content.indexOf('**Immediate cleanup invariant');
     const remove = content.indexOf('git worktree remove', cleanup);
     const planUpdate = content.indexOf('### 9. Update the Plan');
 
@@ -37,7 +39,7 @@ describe('next-priority merged-worktree lifecycle', () => {
 
   it('requires verification and refuses destructive cleanup of uncommitted work', () => {
     const cleanupToPlanUpdate = content.slice(
-      content.indexOf('**Immediate cleanup invariant:**'),
+      content.indexOf('**Immediate cleanup invariant'),
       content.indexOf('### 9. Update the Plan')
     );
 

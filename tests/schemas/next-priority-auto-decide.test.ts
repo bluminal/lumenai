@@ -31,6 +31,10 @@ const TECH_LEAD_PATH = join(
   'tech-lead.md'
 );
 const content = readFileSync(COMMAND_PATH, 'utf8');
+const autoDecideDoc = readFileSync(
+  join(__dirname, '..', '..', 'plugins', 'synthex', 'docs', 'auto-decide.md'),
+  'utf8'
+);
 const techLeadContent = readFileSync(TECH_LEAD_PATH, 'utf8');
 
 function section(startMarker: string, endMarker: string): string {
@@ -55,7 +59,12 @@ describe('next-priority --auto-decide parameter', () => {
 });
 
 describe('next-priority --auto-decide delegation directive (Step 5)', () => {
-  const step5 = () => section('### 5. Delegate to Tech Lead', '### 6. Monitor Progress');
+  // The directive is `--auto-decide`-only detail, so it sits in the cold-path
+  // doc the command already gates on rather than in Step 5 itself.
+  const step5 = () =>
+    autoDecideDoc.slice(
+      autoDecideDoc.indexOf('## Delegating the directive (next-priority Step 5)')
+    );
 
   it('is conditional on --auto-decide, leaving the default path unchanged', () => {
     expect(step5()).toContain('only when `--auto-decide` is set');
@@ -111,7 +120,7 @@ describe('next-priority --auto-decide hook, trailer, and PR rules', () => {
   });
 
   it('requires an Auto-Decision commit trailer for every auto-decision', () => {
-    expect(section('### 5. Delegate to Tech Lead', '### 6. Monitor Progress')).toContain(
+    expect(autoDecideDoc).toContain(
       'Add an `Auto-Decision: <question> => <choice>` git trailer'
     );
     expect(doc).toContain('never a squash');
