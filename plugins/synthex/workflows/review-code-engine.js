@@ -579,6 +579,8 @@ function reviewerPrompt(reviewerName, diffText, projectContext, priorCycleSummar
     'Return findings that conform to the canonical finding schema',
     '(agents/_shared/canonical-finding.schema.json): finding_id, severity,',
     'category, title, description, file, and (optional) symbol/line_range.',
+    'severity is one of critical, high, medium, low — lowercase, as the schema',
+    'enum spells it.',
     'finding_id must be stable across re-review and MUST NOT contain a line',
     'number. Also return positives (what the diff does well) and a short',
     'summary. Do not include a PASS/WARN/FAIL verdict field — the caller',
