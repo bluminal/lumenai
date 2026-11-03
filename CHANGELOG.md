@@ -5,6 +5,20 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 2.6.0] - 2026-11-03
+
+### Added
+
+- (synthex) generate Cursor Task agent discovery wrappers
+- (synthex) keep review fan-out foreground on Cursor Task
+- (synthex) add Cursor cloud execution for next-priority
+
+### Fixed
+
+- (synthex) restore the next-priority test suite
+- (synthex) finish AGENTS.md merge and size-gated review FG/BG
+- (review) keep a borrowed prompt's own report sections out of the report
+
 ## [synthex 2.5.5] - 2026-11-01
 
 ### Fixed
