@@ -299,14 +299,14 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
       'docs/plan-lint-rubric.md; Task 59 (FR-HM19) adds 6 more gates — next-priority.md\'s ' +
       'engine selector reads docs/engines/loop-workflow.md or docs/next-priority-loop.md, and ' +
       'loop.md, review-code.md, refine-requirements.md and write-implementation-plan.md each ' +
-      'read docs/engines/loop-workflow.md; prompt-file reviewers add 3 more — review-code.md, write-implementation-plan.md and refine-requirements.md each read docs/prompt-file-reviewers.md; next-priority.md adds 1 more gate for docs/auto-decide.md (--auto-decide)',
+      'read docs/engines/loop-workflow.md; prompt-file reviewers add 3 more — review-code.md, write-implementation-plan.md and refine-requirements.md each read docs/prompt-file-reviewers.md; next-priority.md adds 1 more gate for docs/auto-decide.md (--auto-decide); cloud execution adds 1 more in next-priority.md for docs/next-priority-cloud.md',
     () => {
       const nativeLoopingMentions = files.reduce((count, relFile) => {
         const text = readFileSync(join(ROOT, relFile), 'utf8');
         return count + (text.match(/docs\/native-looping\.md/g) ?? []).length;
       }, 0);
       expect(nativeLoopingMentions).toBeGreaterThanOrEqual(32);
-      expect(allIncludes).toHaveLength(26);
+      expect(allIncludes).toHaveLength(27);
       expect(new Set(allIncludes.map((i) => i.file))).toEqual(
         new Set([
           'plugins/synthex/commands/review-code.md',
@@ -325,6 +325,7 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
       );
       expect(new Set(allIncludes.map((i) => i.rawTarget))).toEqual(
         new Set([
+          '${CLAUDE_PLUGIN_ROOT}/docs/next-priority-cloud.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/standing-pool-routing.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/sandbox-yolo.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/multi-model-decision.md',

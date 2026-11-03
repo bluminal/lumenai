@@ -48,3 +48,11 @@ Build it from `git log <base>..HEAD --format='%h %(trailers:key=Auto-Decision,va
 When the command finishes (under `--loop`, when the loop ends for any reason), run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/auto-decide-gate.sh" off`. The log stays.
 
 On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
+
+## Delegating the directive (next-priority Step 5)
+
+- **Autonomy directive — only when `--auto-decide` is set:**
+  - Tell the Tech Lead: for this task, when you reach a decision point where you already have a clear recommendation — a high-impact escalation per your Decision Authority table, or an ambiguous requirement under Behavioral Rule 7 — take the recommended option yourself instead of calling `AskUserQuestion`. Record the decision, the alternatives considered, and your reasoning so it can be reviewed later (see Step 9).
+  - This does **not** apply to `[H]` acceptance criteria: those always require explicit user approval via `AskUserQuestion` before merge, regardless of `--auto-decide` (see Step 7).
+  - Propagate this directive to any sub-agent you delegate to — an un-propagated directive just moves the blocking question one level down, where it still halts the loop.
+  - Add an `Auto-Decision: <question> => <choice>` git trailer to the first commit after each decision.

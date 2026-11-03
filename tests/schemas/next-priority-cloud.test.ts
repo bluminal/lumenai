@@ -13,14 +13,18 @@ const COMMAND_PATH = join(ROOT, 'plugins', 'synthex', 'commands', 'next-priority
 const DEFAULTS_PATH = join(ROOT, 'plugins', 'synthex', 'config', 'defaults.yaml');
 
 const content = readFileSync(COMMAND_PATH, 'utf8');
+// Cloud execution is opt-in and off by default, so its detail lives in a D17
+// cold-path doc the command Reads only when the environment resolves to cloud.
+const CLOUD_PATH = join(ROOT, 'plugins', 'synthex', 'docs', 'next-priority-cloud.md');
+const cloud = readFileSync(CLOUD_PATH, 'utf8');
 const defaults = readFileSync(DEFAULTS_PATH, 'utf8');
 
-function section(startMarker: string, endMarker: string): string {
-  const start = content.indexOf(startMarker);
-  const end = content.indexOf(endMarker, start);
+function section(startMarker: string, endMarker: string, text = content): string {
+  const start = text.indexOf(startMarker);
+  const end = text.indexOf(endMarker, start);
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
-  return content.slice(start, end);
+  return text.slice(start, end);
 }
 
 describe('next-priority cloud / local parameters (FR-CA3)', () => {
@@ -33,7 +37,7 @@ describe('next-priority cloud / local parameters (FR-CA3)', () => {
     expect(row).toBeDefined();
     expect(row).toMatch(/\|\s*off\s*\|/);
     expect(row).toMatch(/\|\s*No\s*\|/);
-    expect(row).toMatch(/environment:\s*"cloud"|environment: "cloud"/);
+    expect(cloud).toMatch(/environment:\s*"cloud"/);
   });
 
   it('documents --local as opt-in override defaulting to off', () => {
@@ -47,8 +51,8 @@ describe('next-priority cloud / local parameters (FR-CA3)', () => {
 
   it('documents resolution order flag > config > local', () => {
     const env = section('### Execution Environment Resolution', '## Core Responsibilities');
-    expect(env).toMatch(/flag.*>.*next_priority\.execution_environment.*>.*`local`/s);
-    expect(env).toContain('`--local` wins');
+    expect(env).toMatch(/--local.*--in-cloud.*next_priority\.execution_environment/s);
+    expect(cloud).toContain('`--local` wins');
   });
 });
 
@@ -59,7 +63,7 @@ describe('defaults.yaml next_priority.execution_environment (FR-CA2)', () => {
 });
 
 describe('next-priority Step 4 cloud / local environments', () => {
-  const step4 = () => section('### 4. Set Up Work Environments', '### 5. Delegate to Tech Lead');
+  const step4 = () => section('## Step 4 — work environments', '## Step 5', cloud);
 
   it('skips local worktrees when cloud', () => {
     expect(step4()).toMatch(/Do \*\*not\*\* create local worktrees/);
@@ -76,7 +80,7 @@ describe('next-priority Step 4 cloud / local environments', () => {
 });
 
 describe('next-priority Step 5 FG/BG + cloud spawn (FR-CA1, FR-CA4, FR-CA5)', () => {
-  const step5 = () => section('### 5. Delegate to Tech Lead', '### 6. Monitor Progress');
+  const step5 = () => section('## Step 5 — spawning workers', '## Step 8', cloud);
 
   it('requires background for parallel Tech Lead workers', () => {
     expect(step5()).toContain('run_in_background: true');
@@ -94,18 +98,18 @@ describe('next-priority Step 5 FG/BG + cloud spawn (FR-CA1, FR-CA4, FR-CA5)', ()
   });
 
   it('falls back when host lacks environment parameter (FR-CA5)', () => {
-    expect(content).toContain(
+    expect(cloud).toContain(
       'Cloud execution is not supported on this host — falling back to local worktrees.',
     );
   });
 
   it('forbids standing-pool inbox / A2A for cloud workers (FR-CA7)', () => {
-    expect(content).toMatch(/never.*standing-pool filesystem inboxes|never.*A2A mailbox/is);
+    expect(cloud).toMatch(/never.*standing-pool filesystem inboxes|never.*A2A mailbox/is);
   });
 });
 
 describe('next-priority Step 8 cloud merge', () => {
-  const step8 = () => section('### 8. Merge Results', '### 9. Update the Plan');
+  const step8 = () => section("## Step 8 — merging a cloud worker's branch", '\n# ', cloud + '\n# ');
 
   it('fetches worker branch instead of removing a worktree', () => {
     expect(step8()).toContain('git fetch origin');
