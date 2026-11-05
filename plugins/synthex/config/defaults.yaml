@@ -411,10 +411,15 @@ next_priority:
   # Can be overridden per-invocation via the `concurrent_tasks` parameter.
   concurrent_tasks: 3
 
-  # Where parallel Tech Lead workers run for next-priority (FR-CA2).
-  # Options: local | cloud. Default local keeps today's worktree fan-out.
+  # Where parallel Tech Lead workers run for next-priority (FR-CA2, FR-HW1).
+  # Options: local | cloud | workspace. Default local keeps today's worktree
+  # fan-out (on Claude Code, via Agent isolation: "worktree" when
+  # worktrees.base_path is .claude/worktrees — FR-HW8).
   # cloud is Cursor-first: Task tool environment=cloud (own VM + branch).
-  # Overridden per call by --in-cloud / --local (flag > this key > local).
+  # workspace runs each worker in an Orca or Herdr child workspace; other
+  # sessions fall back to local with a one-line notice (FR-HW3).
+  # Overridden per call by --in-cloud / --in-workspace / --local
+  # (flag > this key > local; --local wins any conflict).
   # On hosts without Cursor-style Task environment support, cloud falls
   # back to local with a one-line notice (FR-CA5) — Claude cloud parent
   # orchestration is deferred until bidirectional messaging exists.

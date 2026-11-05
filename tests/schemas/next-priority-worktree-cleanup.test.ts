@@ -48,11 +48,18 @@ describe('next-priority merged-worktree lifecycle', () => {
     expect(cleanupToPlanUpdate).toContain('never remove a worktree that has uncommitted changes');
   });
 
-  it('skips creating and removing a worktree when the host gives each worker its own checkout', () => {
+  it('uses Claude Code isolation instead of git worktree add when the default base path is in effect (FR-HW8)', () => {
     const step4 = content.slice(content.indexOf('### 4.'), content.indexOf('### 5.'));
-    expect(step4).toMatch(/skip entirely when[^\n]*cloud[^\n]*host gives each worker its own checkout/);
-    expect(step4).toContain('isolation: "worktree"');
-    expect(content).toContain('**Host checkout:** Check out the task branch');
-    expect(content).toMatch(/\*\*Immediate cleanup invariant \(worktrees this command created; a host-owned checkout is the host's to clean up\):\*\*/);
+    expect(step4).toMatch(/\*\*Claude Code isolation \(FR-HW8\):\*\* when local, your spawn tool accepts `isolation`, and `worktrees\.base_path` is `\.claude\/worktrees`, create no worktree here/);
+    expect(step4).toContain('Rerun a worker that reports `blocked: git refused in isolated worktree` with a manual worktree below.');
+    expect(step4).toContain('**Local (otherwise; skip entirely for `cloud` or `workspace`):**');
+    // The worker keeps worktrees.branch_prefix by renaming the harness branch.
+    expect(content).toContain('**Isolated:** First run `git branch -m <task-branch>`');
+    expect(content).toContain('"$(command -v git)"');
+  });
+
+  it('removes the isolated worktree the spawn returned as part of the cleanup invariant (FR-HW8)', () => {
+    expect(content).toContain('**Immediate cleanup invariant (every local task checkout):**');
+    expect(content).toContain('remove that task\'s exact worktree (under isolation, the `worktreePath` its spawn returned):');
   });
 });

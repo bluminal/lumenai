@@ -153,7 +153,7 @@ Agents focused on understanding users, measuring outcomes, and driving improveme
 | `/loop` | Generic looping primitive — loops a prompt (literal or file) until a completion promise is emitted or `--max-iterations` is reached. See "Native Looping" below. | -- |
 | `/list-loops` | Enumerate running and recently-terminal loops in the project. Read-only. | -- |
 | `/cancel-loop` | Cancel a loop by id, or `--all` running loops. Idempotent on terminal-status loops. | -- |
-| `/next-priority` | Execute next highest-priority tasks. Supports `--auto-decide` for unattended runs (see "Autonomous Decisions" below) and `--in-cloud` / `execution_environment: cloud` for Cursor cloud subagents (see "Cloud Execution" below). | Tech Lead |
+| `/next-priority` | Execute next highest-priority tasks. Supports `--auto-decide` for unattended runs (see "Autonomous Decisions" below) `--in-cloud` / `execution_environment: cloud` for Cursor cloud subagents (see "Cloud Execution" below), and `--in-workspace` / `execution_environment: workspace` for Orca or Herdr child workspaces (see "Host Workspaces" below). | Tech Lead |
 | `/write-implementation-plan` | Transform PRD into implementation plan | PM + Architect + Design System Agent + Tech Lead |
 | `/review-code` | Multi-perspective code review | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
 | `/write-adr` | Create Architecture Decision Record | Architect (interactive) |
@@ -245,7 +245,7 @@ See [`config/defaults.yaml`](config/defaults.yaml) for the full reference. Key s
 | `retrospective.format` | start-stop-continue | Retrospective format |
 | `retrospective.max_improvement_items` | 3 | Max items per cycle |
 | `next_priority.concurrent_tasks` | 3 | Max parallel tasks for `/next-priority` |
-| `next_priority.execution_environment` | `local` | `local` worktrees or `cloud` Cursor Task subagents (`--in-cloud` / `--local` override) |
+| `next_priority.execution_environment` | `local` | `local` worktrees, `cloud` Cursor Task subagents, or `workspace` Orca/Herdr child workspaces (`--in-cloud` / `--in-workspace` / `--local` override) |
 | `documents.requirements` | `docs/reqs/main.md` | Default PRD path |
 | `documents.implementation_plan` | `docs/plans/main.md` | Default plan path |
 | `documents.specs` | `docs/specs` | Specs directory |
@@ -280,6 +280,16 @@ Parallel plan-task workers run in the **background**; advisory reviewers stay **
 ```
 /synthex:next-priority --in-cloud --loop
 ```
+
+## Host Workspaces (`--in-workspace`)
+
+If you run Synthex inside [Orca](https://github.com/stablyai/orca) or [Herdr](https://herdr.dev), `/next-priority --in-workspace` launches each parallel Tech Lead as its own agent session in a **child workspace** (`orca worktree create --parent-worktree current --agent …`, or `herdr worktree create` + `herdr agent start`). The workspace owns the checkout, so Synthex creates nothing under `worktrees.base_path`. You can watch each task in the host's UI and step in when it is blocked. Once a task is validated and merged, Synthex removes its workspace through the host CLI. Opt in per call, or set `next_priority.execution_environment: workspace`. `scripts/lib/detect-workspace-host.sh` does the detection. Conductor is detected but not supported, and any other session prints a one-line notice and falls back to local worktrees. Commit local edits first: child workspaces are fresh checkouts. See `docs/plans/next-priority-host-workspaces.md`.
+
+```
+/synthex:next-priority --in-workspace --loop
+```
+
+On Claude Code, local runs (the default) use the Agent tool's `isolation: "worktree"` for each Tech Lead whenever `worktrees.base_path` is the default `.claude/worktrees`. Each worker renames its harness branch to the task branch, and Synthex removes the worktree right after merging. A custom `base_path`, or any other host, keeps the manual `git worktree add`.
 
 ## Cursor Task agents
 

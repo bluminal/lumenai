@@ -23,7 +23,8 @@ Automatically identify and execute the next highest-priority tasks from the impl
 | `--auto-decide` | Take the recommended option at discretionary decision points instead of asking, and record each one (see Auto-Decide Mode). Never applies to `[H]` approval (Step 7). | off | No |
 | `--profile <economy\|balanced\|premium>` | Override `models.profile` for spawned reviewers (see Model Resolution). | `models.profile` config (`balanced`) | No |
 | `--in-cloud` | Force cloud execution for this call's parallel Tech Lead workers (FR-CA3). | off | No |
-| `--local` | Force local worktree execution for this call, overriding a project `next_priority.execution_environment: cloud` default. | off | No |
+| `--in-workspace` | Run each worker in a child workspace of the Orca or Herdr session you are in (FR-HW1). | off | No |
+| `--local` | Force local worktree execution for this call, overriding a project `next_priority.execution_environment` of `cloud` or `workspace`. | off | No |
 
 ### Model Resolution
 
@@ -31,9 +32,11 @@ Each spawned agent's model and effort resolve in this order: `--profile` flag > 
 
 ### Execution Environment Resolution
 
-Resolved **before** Step 4 (FR-CA3): `--local` beats `--in-cloud`, then `--in-cloud`, then `bash "${CLAUDE_PLUGIN_ROOT}/scripts/lib/config-get.sh" next_priority.execution_environment local`. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
+Resolved **before** Step 4 (FR-CA3, FR-HW1): `--local` beats `--in-cloud` and `--in-workspace`; passing both of those is refused with one line; then the flag, then `bash "${CLAUDE_PLUGIN_ROOT}/scripts/lib/config-get.sh" next_priority.execution_environment local`. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
 
 **When it resolves to `cloud`:** Read `${CLAUDE_PLUGIN_ROOT}/docs/next-priority-cloud.md` and follow it; it governs Steps 4, 5 and 8. On other hosts, resolve the plugin root from `.synthex/state.json`.
+
+**When it resolves to `workspace`:** Read `${CLAUDE_PLUGIN_ROOT}/docs/next-priority-workspace.md` and follow it; it governs Steps 4, 5, 6 and 8. On other hosts, resolve the plugin root from `.synthex/state.json`.
 
 ## Core Responsibilities
 
@@ -74,7 +77,9 @@ Immediately update the implementation plan marking selected tasks as "in progres
 
 Resolve each selected task's branch name as `{worktrees.branch_prefix}[task-id]-[short-description]` (same in local and cloud).
 
-**Local (default; skip entirely when the environment resolved to `cloud`, or when the host gives each worker its own checkout — e.g. Claude Code Agent `isolation: "worktree"` or a per-task host workspace):** For each selected task, create a git worktree using the configured base path and branch prefix:
+**Claude Code isolation (FR-HW8):** when local, your spawn tool accepts `isolation`, and `worktrees.base_path` is `.claude/worktrees`, create no worktree here — Step 5 spawns each Tech Lead with `isolation: "worktree"`. Rerun a worker that reports `blocked: git refused in isolated worktree` with a manual worktree below.
+
+**Local (otherwise; skip entirely for `cloud` or `workspace`):** For each selected task, create a git worktree using the configured base path and branch prefix:
 
 ```bash
 git worktree add {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short-description] -b {worktrees.branch_prefix}[task-id]-[short-description]
@@ -91,7 +96,7 @@ Spawn parallel Tech Lead workers in the **background** (`run_in_background: true
 **This is the key orchestration step.** For each task, launch a **Tech Lead sub-agent** instance with:
 
 - The specific task description and acceptance criteria (with their type tags: `[T]`, `[H]`, `[O]`)
-- The worktree path as the working directory (local), or the branch name and the cloud VM as its isolation (cloud)
+- The worktree path as the working directory (local), the branch name with `isolation: "worktree"` (Claude Code isolation), or the branch name and the cloud VM as its isolation (cloud)
 - Context about the project (link to specs, PRD, design system docs)
 - Acceptance criteria instructions:
   - For each `[T]` criterion: write an automated test that proves it, ensure the test passes, and report the test file path and test name in the completion summary
@@ -99,7 +104,7 @@ Spawn parallel Tech Lead workers in the **background** (`run_in_background: true
   - For `[O]` criteria: note them as post-deployment metrics — no action required during implementation
 - Git workflow instructions:
   - **Local:** Work in the assigned worktree
-  - **Host checkout:** Check out the task branch in your own checkout and commit there
+  - **Isolated:** First run `git branch -m <task-branch>`. If a hook refuses git there, retry as `"$(command -v git)"`; if still refused, stop and report `blocked: git refused in isolated worktree`
   - Commit changes with descriptive messages using `git commit --no-gpg-sign`
   - **Write the commit message yourself** (FR-HM27): follow the project's convention (`git.commit_convention` — Conventional Commits when it is `conventional`, otherwise match `git log`), carrying any task-level issue key (only if known with certainty — e.g., a Jira key embedded in the worktree branch name or supplied to you) verbatim, then pipe it into `git commit -F -`.
   - Do NOT merge — merging is handled by this command after completion
@@ -158,7 +163,7 @@ git merge --ff-only {worktrees.branch_prefix}[task-id]-[short-description]
 
 If fast-forward merge is not possible, attempt a merge commit. If conflicts arise, resolve them carefully.
 
-**Immediate cleanup invariant (worktrees this command created; a host-owned checkout is the host's to clean up):** A task is not complete when its merge succeeds; the merge handoff is complete only when its task worktree has been removed. Immediately after each successful merge — **before** merging or selecting another task, updating the plan, starting another loop iteration, or reporting success to the user — remove that task's exact worktree:
+**Immediate cleanup invariant (every local task checkout):** A task is not complete when its merge succeeds; the merge handoff is complete only when its task worktree has been removed. Immediately after each successful merge — **before** merging or selecting another task, updating the plan, starting another loop iteration, or reporting success to the user — remove that task's exact worktree (under isolation, the `worktreePath` its spawn returned):
 
 ```bash
 git worktree remove {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short-description]

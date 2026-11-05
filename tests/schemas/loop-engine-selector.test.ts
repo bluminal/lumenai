@@ -187,7 +187,7 @@ describe('Task 59 (FR-HM19, D34): loop engine selector in the other --loop comma
     expect(
       text.includes(
         '| `next_priority.concurrent_tasks` | `3` | Max parallel tasks for `next-priority` command |\n' +
-          '| `next_priority.execution_environment` | `local` | `local` (worktrees) or `cloud` (Cursor Task `environment: "cloud"`; overridden by `--in-cloud` / `--local`) |\n' +
+          '| `next_priority.execution_environment` | `local` | `local` (worktrees; Claude Code uses Agent `isolation: "worktree"`), `cloud` (Cursor Task `environment: "cloud"`) or `workspace` (Orca/Herdr child workspaces); overridden by `--in-cloud` / `--in-workspace` / `--local` |\n' +
           row +
           '\n',
       ),
