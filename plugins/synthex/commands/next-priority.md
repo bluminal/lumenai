@@ -74,7 +74,7 @@ Immediately update the implementation plan marking selected tasks as "in progres
 
 Resolve each selected task's branch name as `{worktrees.branch_prefix}[task-id]-[short-description]` (same in local and cloud).
 
-**Local (default; skip entirely when the environment resolved to `cloud`):** For each selected task, create a git worktree using the configured base path and branch prefix:
+**Local (default; skip entirely when the environment resolved to `cloud`, or when the host gives each worker its own checkout — e.g. Claude Code Agent `isolation: "worktree"` or a per-task host workspace):** For each selected task, create a git worktree using the configured base path and branch prefix:
 
 ```bash
 git worktree add {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short-description] -b {worktrees.branch_prefix}[task-id]-[short-description]
@@ -99,6 +99,7 @@ Spawn parallel Tech Lead workers in the **background** (`run_in_background: true
   - For `[O]` criteria: note them as post-deployment metrics — no action required during implementation
 - Git workflow instructions:
   - **Local:** Work in the assigned worktree
+  - **Host checkout:** Check out the task branch in your own checkout and commit there
   - Commit changes with descriptive messages using `git commit --no-gpg-sign`
   - **Write the commit message yourself** (FR-HM27): follow the project's convention (`git.commit_convention` — Conventional Commits when it is `conventional`, otherwise match `git log`), carrying any task-level issue key (only if known with certainty — e.g., a Jira key embedded in the worktree branch name or supplied to you) verbatim, then pipe it into `git commit -F -`.
   - Do NOT merge — merging is handled by this command after completion
@@ -157,7 +158,7 @@ git merge --ff-only {worktrees.branch_prefix}[task-id]-[short-description]
 
 If fast-forward merge is not possible, attempt a merge commit. If conflicts arise, resolve them carefully.
 
-**Immediate cleanup invariant (local only):** A task is not complete when its merge succeeds; the merge handoff is complete only when its task worktree has been removed. Immediately after each successful merge — **before** merging or selecting another task, updating the plan, starting another loop iteration, or reporting success to the user — remove that task's exact worktree:
+**Immediate cleanup invariant (worktrees this command created; a host-owned checkout is the host's to clean up):** A task is not complete when its merge succeeds; the merge handoff is complete only when its task worktree has been removed. Immediately after each successful merge — **before** merging or selecting another task, updating the plan, starting another loop iteration, or reporting success to the user — remove that task's exact worktree:
 
 ```bash
 git worktree remove {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short-description]
