@@ -55,7 +55,8 @@ describe('next-priority merged-worktree lifecycle', () => {
     expect(step4).toContain('**Local (otherwise; skip entirely for `cloud` or `workspace`):**');
     // The worker keeps worktrees.branch_prefix by renaming the harness branch.
     expect(content).toContain('**Isolated:** First run `git branch -m <task-branch>`');
-    expect(content).toContain('"$(command -v git)"');
+    // Live spike 2026-11-05: the isolation guard refuses `"$(command -v git)"` but accepts a literal path.
+    expect(content).toContain('retry with the literal path `command -v git` prints (no `$(...)`)');
   });
 
   it('removes the isolated worktree the spawn returned as part of the cleanup invariant (FR-HW8)', () => {

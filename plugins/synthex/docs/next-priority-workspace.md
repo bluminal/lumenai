@@ -35,21 +35,23 @@ Launch every worker before waiting on any of them. Read identifiers from each `-
 
 ```bash
 orca worktree create --name <task-id>-<short-description> --parent-worktree current \
-  --base-branch <base> --branch <task-branch> --agent <agent-id> \
+  --base-branch <base> --branch <task-branch> --agent <agent-id> --surface terminal \
   --prompt "Read <run_dir>/<task-id>.brief.md and follow it." --json
 ```
 
-Record the new worktree's path and the agent's terminal handle from the reply.
+Record `result.worktree.path` and the terminal handle `result.launch.outcome.handle` from the reply. `--surface terminal` is required: a chat surface returns no terminal handle to wait on.
 
 **Herdr (FR-HW5):** create the worktree workspace, start the agent in its root pane, then prompt it:
 
 ```bash
-herdr worktree create --branch <task-branch> --base <base> --no-focus
+herdr worktree create --workspace "$HERDR_WORKSPACE_ID" --branch <task-branch> --base <base> --no-focus
 herdr agent start <name> --kind <agent-id> --pane <root-pane-id>
-herdr agent prompt <name> "Read <run_dir>/<task-id>.brief.md and follow it."
+herdr agent prompt <name> "Read <run_dir>/<task-id>.brief.md and follow it." --wait --until working
 ```
 
-`<name>` matches `[a-z][a-z0-9_-]{0,31}` (e.g. `t-<task-id>`). Record the workspace id, checkout path and agent name.
+`<name>` matches `[a-z][a-z0-9_-]{0,31}` (e.g. `t-<task-id>`). Record `result.workspace.workspace_id`, `result.worktree.path` and `result.root_pane.pane_id` from the create reply. `--wait --until working` returns as soon as the agent picks up the prompt, so the later wait cannot match the idle state from before the prompt arrived.
+
+**Startup prompts (both hosts):** a new checkout path can stop the agent at startup, for example on Claude Code's folder-trust question. Herdr's `agent start` then returns `agent_not_ready`. Read the screen, tell the user which workspace is waiting and on what, and never accept a trust or permission prompt yourself. Once the user has answered, `herdr agent wait <name> --until idle`, then send the prompt.
 
 ## Step 6 — wait for results (FR-HW6)
 
@@ -58,7 +60,7 @@ For each worker, wait until it settles, then read its result file:
 - **Orca:** `orca terminal wait --terminal <handle> --for tui-idle --json`
 - **Herdr:** `herdr agent wait <name>` (returns on `idle`, `done` or `blocked`)
 
-If `<task-id>.result.md` exists, treat it as the Tech Lead's completion summary and continue with Step 7 as normal. If it is missing, or the agent is `blocked` or asking a question, read its screen (`orca terminal read --terminal <handle> --screen`, `herdr agent read <name>`). Surface the workspace name and what it is waiting on to the user. Never answer a worker's question or approve a prompt on the user's behalf, and never guess at a result.
+If `<task-id>.result.md` exists, treat it as the Tech Lead's completion summary and continue with Step 7 as normal. If it is missing and the screen shows the agent still starting or working, wait again. If it is missing, or the agent is `blocked` or asking a question, read its screen (`orca terminal read --terminal <handle> --screen`, `herdr agent read <name>`). Surface the workspace name and what it is waiting on to the user. Never answer a worker's question or approve a prompt on the user's behalf, and never guess at a result.
 
 ## Step 8 — merge and remove the child workspace (FR-HW7)
 

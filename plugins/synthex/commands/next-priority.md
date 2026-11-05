@@ -104,7 +104,7 @@ Spawn parallel Tech Lead workers in the **background** (`run_in_background: true
   - For `[O]` criteria: note them as post-deployment metrics — no action required during implementation
 - Git workflow instructions:
   - **Local:** Work in the assigned worktree
-  - **Isolated:** First run `git branch -m <task-branch>`. If a hook refuses git there, retry as `"$(command -v git)"`; if still refused, stop and report `blocked: git refused in isolated worktree`
+  - **Isolated:** First run `git branch -m <task-branch>`. If a hook refuses git there, retry with the literal path `command -v git` prints (no `$(...)`); if still refused, stop and report `blocked: git refused in isolated worktree`
   - Commit changes with descriptive messages using `git commit --no-gpg-sign`
   - **Write the commit message yourself** (FR-HM27): follow the project's convention (`git.commit_convention` — Conventional Commits when it is `conventional`, otherwise match `git log`), carrying any task-level issue key (only if known with certainty — e.g., a Jira key embedded in the worktree branch name or supplied to you) verbatim, then pipe it into `git commit -F -`.
   - Do NOT merge — merging is handled by this command after completion

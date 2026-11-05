@@ -72,11 +72,23 @@ describe('next-priority-workspace.md cold path', () => {
   it('spawns Orca child workspaces under the current one (FR-HW4)', () => {
     expect(doc).toMatch(/orca worktree create [^\n]*--parent-worktree current/);
     expect(doc).toMatch(/--branch <task-branch> --agent <agent-id>/);
+    // Live smoke 2026-11-05: only a terminal surface returns a handle to wait on.
+    expect(doc).toContain('--surface terminal');
+    expect(doc).toContain('result.launch.outcome.handle');
   });
 
   it('spawns Herdr worktree workspaces and starts the agent (FR-HW5)', () => {
-    expect(doc).toContain('herdr worktree create --branch <task-branch> --base <base>');
+    expect(doc).toContain('--branch <task-branch> --base <base> --no-focus');
     expect(doc).toContain('herdr agent start <name> --kind <agent-id> --pane <root-pane-id>');
+    // Live smoke 2026-11-05: no active workspace means create needs one; a
+    // plain prompt then wait races the pre-prompt idle state.
+    expect(doc).toContain('herdr worktree create --workspace "$HERDR_WORKSPACE_ID"');
+    expect(doc).toContain('--wait --until working');
+  });
+
+  it('surfaces startup trust prompts to the user instead of accepting them', () => {
+    expect(doc).toContain('agent_not_ready');
+    expect(doc).toMatch(/never accept a trust or permission prompt yourself/);
   });
 
   it('waits per host and never answers for the user (FR-HW6)', () => {
