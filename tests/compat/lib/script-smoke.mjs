@@ -232,6 +232,15 @@ function loopStepLifecycle(ctx, includeNode) {
 // config/defaults.yaml when no project override exists.
 // ---------------------------------------------------------------------------
 
+// scripts/lib/detect-workspace-host.sh (FR-HW2) — needs no node or jq; the
+// restricted PATH has neither orca nor herdr, so only env vars decide.
+function detectWorkspaceHostCase(ctx, includeNode, env, expected) {
+  const pathDir = ctx.buildRestrictedPath(includeNode);
+  const result = runScript(ctx.scriptAbsPath, [], { pathDir, cwd: ctx.workDir, env });
+  assert(result.code === 0, `detect-workspace-host exited ${result.code}: ${result.stderr}`);
+  assert(result.stdout.trim() === expected, `expected ${expected}, got ${JSON.stringify(result.stdout)}`);
+}
+
 function configGetCase(ctx, includeNode) {
   const pathDir = ctx.buildRestrictedPath(includeNode);
   const result = runScript(ctx.scriptAbsPath, ['review_loops.max_cycles', 'MISSING'], {
@@ -1051,6 +1060,16 @@ export const SMOKE_CASES = {
     {
       name: 'missing jq/node fallback: resolves the same key via the awk parser',
       run: (ctx) => configGetCase(ctx, false),
+    },
+  ],
+  'scripts/lib/detect-workspace-host.sh': [
+    {
+      name: 'happy path: reports conductor from CONDUCTOR_WORKSPACE_PATH (node present)',
+      run: (ctx) => detectWorkspaceHostCase(ctx, true, { CONDUCTOR_WORKSPACE_PATH: ctx.workDir }, 'conductor'),
+    },
+    {
+      name: 'missing jq/node fallback: reports none on a bare PATH',
+      run: (ctx) => detectWorkspaceHostCase(ctx, false, {}, 'none'),
     },
   ],
   'scripts/compact-recover.sh': [

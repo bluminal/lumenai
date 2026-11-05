@@ -36,7 +36,11 @@ const BASELINE = 26_426;
 // The Step 4/5/8 rule that skips creating (and removing) a worktree when the
 // host gives each worker its own checkout must also stay on the default path
 // (it applies on local runs): +289 B.
-const HOST_CHECKOUT_DELTA = 289;
+// Host workspaces (FR-HW1, FR-HW8) moved their Orca/Herdr detail to the D17
+// cold-path doc docs/next-priority-workspace.md. What stays inline costs
+// 783 B: the --in-workspace row, the resolution rule and Read gate, and the
+// Claude Code isolation rule, which is the default Claude Code local path.
+const HOST_CHECKOUT_DELTA = 289 + 783;
 const BUDGET = BASELINE - 7_613 + HOST_CHECKOUT_DELTA;
 const CLOUD_DELTA = 579 + HOST_CHECKOUT_DELTA;
 const NP_CAP = 15_729 + HOST_CHECKOUT_DELTA;
