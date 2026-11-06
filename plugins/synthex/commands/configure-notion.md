@@ -36,6 +36,7 @@ Read `@{config_path}`.
 > - `epics_database: <value>`
 > - `tasks_database: <value>`
 > - `epic: <property>` (value read per plan; default `<value>`)
+> - `repo_scope: <property = value, or "not scoped">`
 > - `assignee: <property, or "not scoped">`
 > - `docs_root: <value>` (cross-cutting documents)
 > - document types routed to Notion: `<resolved list>`
@@ -189,6 +190,55 @@ Synthex resolves who you are from Notion at runtime, so nothing here records you
 
 If the user picks option 2, leave `notion.assignee.property` null and tell them plainly what they are opting out of: two engineers on the same epic can select the same item.
 
+### 3c. Repo Scoping (optional — for an epic spanning multiple repos)
+
+Skippable, and skipped by default — most epics live in one repo and have nothing to configure here.
+
+> **Does this initiative's work span more than one git repository?**
+>
+> Epic scoping keeps Synthex from touching other teams' tickets, but it doesn't separate one epic's own tasks by repo. If this epic has tasks in more than one repo — say, backend functions in one and a dashboard in another — a run from this checkout can otherwise select a task whose code isn't here.
+>
+> 1. **Yes — set up repo scoping.**
+> 2. **No — this epic lives in one repo.** (default)
+
+If the user picks option 2, leave `notion.repo_scope.property` null and move on. Nothing else in this step applies.
+
+If the user picks option 1, reuse the exact discovery UX from Step 3 against the already-fetched work-database schema:
+
+> **How does a work item say which repo it belongs to?**
+>
+> Filterable properties found in your database: `<list with types>`
+>
+> 1. **Use an existing property** — pick one from the list.
+> 2. **Add a `Repo` property** — Synthex adds one select property to your database. This is a schema change and needs your explicit confirmation.
+
+**Propose, do not assume.** Pre-select an exact, unambiguous `Repo`-named property only if it exists and is actually populated on a sample of rows — the same verification Step 3 requires for the epic property, for the same reason: an empty candidate is almost certainly not in use. **Warn about lookalikes** the same way Step 3 does, if more than one plausible property exists, and do not pre-select among them.
+
+**If the user picks option 2**, confirm explicitly before making the schema change, naming the database and the property, default no — identical phrasing and default to Step 3's option 2:
+
+> Add a `Repo` select property to the `<database name>` database? This modifies a database your team shares. (y/N)
+
+Decline means fall back to option 1, or exit this step with repo scoping unset.
+
+Then ask for **this project's** value. Unlike the epic value, this is not read per-plan — it identifies the repo this config file lives in, so it's set once, here:
+
+> **This repo's value for that property**
+>
+> Every task row Synthex creates or selects in this repo will be stamped with this value. If the property already has options (a select or multi-select), pick one; otherwise type the value you want this repo to use.
+
+Then, only if an epic genuinely has a long-lived primary repo with existing untagged rows, offer the catch-all:
+
+> **Is this the default repo for untagged work?**
+>
+> If this repo's existing rows were never tagged, Synthex can treat a row with no value on this property as belonging here — so you don't have to backfill them. Every other repo sharing this database still requires its rows to be explicitly tagged.
+>
+> 1. **No — require an explicit tag, same as any other repo.** (default)
+> 2. **Yes — treat untagged rows as mine.**
+
+Default to option 1. If the user picks option 2, warn them plainly that at most one repo sharing the database should make this choice, and that Synthex cannot check that from here — it's a convention they're responsible for keeping. Record as `notion.repo_scope.default` (boolean); omit or leave `false` for option 1.
+
+Record `notion.repo_scope.property`, `notion.repo_scope.value`, and `notion.repo_scope.default`. The first two are required together — do not write one without the other.
+
 ### 4. Map Properties
 
 Using the fetched schema, map Synthex's canonical task fields onto real properties. Propose a mapping by matching on name and type, then show it for confirmation — do not apply a guessed mapping silently.
@@ -279,6 +329,10 @@ notion:
   epic:
     property: <property name>
     value: <default value, or null>
+  repo_scope:
+    property: <property name, or null>
+    value: <this repo's value, or null>
+    default: <true only if this repo answered "yes" to the catch-all question; otherwise omit or false>
   assignee:
     property: <person property name, or null>
     include_unassigned: true
@@ -300,6 +354,8 @@ Notion backend configured.
   Epics database:   <database name>            (or "none — scoping by tag")
   Work database:    <database name>
   Scoped by:        <epic property>  +  <assignee property, or "no assignee scoping">
+  Repo scope:       <repo property = value, or "not scoped — single-repo epic">
+                    <"(default repo — untagged rows count as mine)" if default: true>
   Cross-cutting:    <page title, or "kept in git">
 
   Epic-scoped docs: <list>   -> subpages of each epic

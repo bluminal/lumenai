@@ -179,6 +179,16 @@ Default policy is **fail-soft** — fall back to `filesystem` for that document 
 
 Two exceptions: a epic-scoping failure never degrades to an unscoped query (FR-NB4), and `mcp_unavailable` across all document types emits one remediation message rather than one per type.
 
+### FR-NB10: Optional repo scoping
+
+An epic can span more than one git repository — one epic's tasks spanning Firestore functions, dbt, and a dashboard, each in its own repo, is a confirmed case. Epic scoping alone does not separate those repos' rows, so a run from one checkout can select a task whose code lives elsewhere.
+
+`notion.repo_scope.{property,value}` is a second, optional, independent equality filter ANDed onto the epic filter. Absent, it is a no-op — byte-identical to not having this requirement at all. Present, it is enforced with the same rigor as epic scoping: every query filters on it, every created task is stamped with it, every write verifies it, and a misconfiguration fails rather than silently degrading to epic-only scoping.
+
+Two behaviors keep this from quietly losing information: legacy rows with no value on the property are excluded and counted separately from ordinary non-matches (so a partial backfill is visible, not indistinguishable from "no work"), and a dependency excluded by repo scoping is resolved by name and its own repo value for reporting, rather than treated as missing or satisfied.
+
+The value is static per repo checkout, not per-plan like the epic reference — there is no filesystem-backend equivalent, since a filesystem plan is already one-per-initiative-per-repo.
+
 ---
 
 ## 5. Non-Functional Requirements

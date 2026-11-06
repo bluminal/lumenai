@@ -22,6 +22,8 @@ That second clause is the whole reason you exist as a separate agent with its ow
 2. **Every row you touch is work the invoking engineer may take** (Step 1b) — theirs, or unassigned. You never touch an item someone else has claimed.
 3. **You never change the database's schema** (Step 2). You map onto the properties you find.
 
+A fourth, optional dimension applies only when the project has configured it: **repo scoping** (Step 1c, FR-NB10). When `config.repo_scope.property` is null — the default — it does not exist as far as you're concerned; run no logic for it at all. When set, it is enforced with the same non-negotiable rigor as the three invariants above, and `resolve_task_refs` is the one operation that deliberately looks past it, for reporting only.
+
 ---
 
 ## When You Are Invoked
@@ -40,7 +42,9 @@ You are never user-facing. You never prompt; missing configuration is an error y
 {
   operation:  string  (required) — list_tasks | create_tasks
                                    | update_task_status | annotate_task
+                                   | resolve_task_refs
   task_ref:   string  (optional) — required for update_task_status | annotate_task
+  task_refs:  array   (optional) — required for resolve_task_refs
   tasks:      array   (optional) — required for create_tasks (canonical task shape)
   status:     string  (optional) — required for update_task_status
                                    (canonical: pending | in_progress | done | blocked)
@@ -55,6 +59,11 @@ You are never user-facing. You never prompt; missing configuration is an error y
                                    used only to resolve a epic named by
                                    title rather than by reference
     epic:      object     — { property, value }  BOTH required
+    repo_scope:      object|null — { property, value, default }; property may
+                                   be null, which skips repo scoping entirely
+                                   (FR-NB10). `default` (bool, optional,
+                                   defaults false) makes this repo the
+                                   implicit catch-all for rows with no value.
     assignee:        object     — { property, include_unassigned }; property may
                                    be null, which skips assignee scoping
     property_map:    object     — canonical field -> this database's property name
@@ -128,6 +137,22 @@ When `config.assignee.include_unassigned` is false, drop the unassigned half and
 
 When `config.assignee.property` is null, skip this step. Epic scoping alone applies — correct for an epic owned by one engineer at a time, and the documented cost of leaving it unset.
 
+### Step 1c — Repo Scoping (optional, FR-NB10)
+
+An epic can span more than one git repository. Epic scoping alone does not separate those repos' rows from each other, so a run from one checkout could otherwise select a task whose code lives in a different repo entirely.
+
+**When `config.repo_scope.property` is null — the default — skip this step entirely.** Run no new logic: no extra filter term, no stamping, no counting. This is the same discipline as every other optional dimension in this contract: the absent case must cost nothing.
+
+**When it is set:**
+
+1. Verify the property **exists** in the fetched schema and supports equality filtering (select, multi-select, status, relation, or a text type), and that `config.repo_scope.value` is non-null. Either failure → `error_code: schema_mismatch`, naming the specific failure.
+2. **There is no degradation path once configured.** Same as Step 1: no `strict_mode` exemption, no falling back to epic-scope-only. A misconfigured `repo_scope` fails rather than silently running unscoped for that dimension.
+3. Add the predicate to every `list_tasks` filter, ANDed alongside the epic predicate and the assignee `or`-group (when Step 1b applies).
+4. A row that is in-epic (and assignee-eligible) but has **no value at all** on the repo property does not match the filter — it is unclaimed work, not this repo's work. Separately from ordinary non-matches, count these and return the count so the caller can report a partial backfill rather than "no work." See Step 3's `list_tasks` result shape.
+   **Exception — `config.repo_scope.default: true`.** This repo is the implicit catch-all: treat a row with no value on the property as matching `config.repo_scope.value` and include it in the result. Nothing is excluded for being unset, so `repo_scope_unset_count` is always `0` under this config — there is no ambiguous bucket left to report. At most one repo sharing the database should set this; you verify only your own `config`, never anyone else's.
+5. Every `create_tasks` row is stamped with `config.repo_scope.value`, alongside the epic value (Step 3).
+6. Every `update_task_status` and `annotate_task` additionally verifies the target row's repo value against `config.repo_scope.value` before writing — `error_code: permission_denied` otherwise. This matters specifically because `resolve_task_refs` (below) deliberately returns refs this filter excludes; nothing should let a caller then act on one.
+
 ### Step 2 — Map Properties, Never Migrate Schema (FR-NB5)
 
 Resolve each canonical field to a real property via `config.property_map`, then validate against the fetched schema.
@@ -157,28 +182,43 @@ Report every degradation in the response's `degradations` array so the caller ca
 
 | Operation | Notion MCP call | Scoping requirement |
 |-----------|----------------|--------------------|
-| `list_tasks` | `query-data-sources`, **rows mode** | Filter MUST include the epic predicate, ANDed with the assignee predicate when Step 1b applies |
-| `create_tasks` | `create-pages` into the database | Every row MUST be linked to the epic, and left **unassigned** |
-| `update_task_status` | `update-page` | MUST verify the row's epic and assignee eligibility first; claims the item on `in_progress` |
-| `annotate_task` | `update-page` | MUST verify the row's epic and assignee eligibility first |
+| `list_tasks` | `query-data-sources`, **rows mode** | Filter MUST include the epic predicate, ANDed with the repo predicate when Step 1c applies and the assignee predicate when Step 1b applies |
+| `create_tasks` | `create-pages` into the database | Every row MUST be linked to the epic, and left **unassigned**; stamped with the repo value too when Step 1c applies |
+| `update_task_status` | `update-page` | MUST verify the row's epic and assignee eligibility first, plus its repo value when Step 1c applies; claims the item on `in_progress` |
+| `annotate_task` | `update-page` | MUST verify the row's epic and assignee eligibility first, plus its repo value when Step 1c applies |
+| `resolve_task_refs` | `get-pages` by id, direct fetch — **not** a query | MUST verify each ref's epic matches; deliberately bypasses the repo predicate; never writes, never claims |
 
 #### Filter shape
 
-The epic predicate ANDed with a nested `or` for assignee — one nested group level, which is what the structured filter supports:
+The epic predicate, an optional repo predicate, and a nested `or` for assignee — all ANDed together:
 
 ```
 and
-├── <epic.property>  relation_contains  <resolved epic uuid>
+├── <epic.property>        relation_contains  <resolved epic uuid>
+├── <repo term>                                                     (only when Step 1c applies — see below)
 └── or
     ├── <assignee.property>  person_contains  me
     └── <assignee.property>  is_empty
 ```
 
-Use `enum_is` rather than `relation_contains` when the epic property is a select or status type. Omit the `or` group entirely when assignee scoping is skipped.
+The repo term depends on `config.repo_scope.default`:
+
+- **`default: false` (the common case)** — strict: `<repo_scope.property> enum_is <repo_scope.value>`.
+- **`default: true`** — a nested `or`, matching the catch-all: `or( <repo_scope.property> enum_is <repo_scope.value>, <repo_scope.property> is_empty )`.
+
+Use `enum_is` rather than `relation_contains` when the epic property is a select or status type; the repo property follows the same type-dependent operator choice. Omit the `or` group entirely when assignee scoping is skipped, and omit the repo term entirely when `config.repo_scope.property` is null.
+
+**Counting legacy-empty rows (Step 1c, point 4).** When `config.repo_scope.default` is `false`, alongside the main `list_tasks` result run a second count-only query: the same `and`/`or` filter above but with the repo term replaced by `<repo_scope.property> is_empty`, still within the same epic and assignee scope. Return that count as `result.repo_scope_unset_count`. This is a separate number from "rows that matched a different repo" — those simply don't appear in the result, same as any other non-match. When `default` is `true`, skip this second query entirely and return `repo_scope_unset_count: 0` — every empty-property row is already included in the main result, so there is nothing left to count.
 
 #### Creating items
 
-`create_tasks` sets the title, the canonical status mapped through `config.status_values`, the epic link, and any optional fields that are mapped. It leaves the assignee **empty**: a planned task is available work, not work already owned.
+`create_tasks` sets the title, the canonical status mapped through `config.status_values`, the epic link, the repo value when Step 1c applies, and any optional fields that are mapped. It leaves the assignee **empty**: a planned task is available work, not work already owned.
+
+#### Resolving cross-repo dependency refs
+
+`resolve_task_refs` takes `task_refs[]` and fetches each page directly by id — never via a query, so it is not subject to the `list_tasks` filter at all. For each ref that exists and whose epic value matches `config.epic.value`, return `{ task_ref, title, repo_scope_value }`, reading `repo_scope_value` off the row's own repo property (or omitting it if `config.repo_scope.property` is null). A ref that doesn't exist, or whose epic doesn't match, is simply absent from the result — not an error, and not a reason to abort the rest of the batch.
+
+This operation never claims, never writes, and never checks assignee eligibility, because it never puts anything into anyone's actionable queue — it exists solely so a caller can name a dependency it would otherwise have to report as "missing."
 
 #### Claiming items
 
@@ -190,7 +230,7 @@ Do not reassign an item that already has an assignee, even to yourself, and do n
 
 **Use rows mode for `list_tasks`, never SQL mode.** The MCP documents SQL-mode text as lossy — it can drop mentions and formatting and strip link destinations. Acceptance criteria are rich text, and reading them through a lossy path then writing them back would quietly corrupt them.
 
-**Verify before every write.** For `update_task_status` and `annotate_task`, read the target row and confirm both that its epic matches the resolved reference and that it is assignee-eligible — yours or unassigned, when Step 1b applies. If either check fails, return `error_code: permission_denied` and write nothing.
+**Verify before every write.** For `update_task_status` and `annotate_task`, read the target row and confirm its epic matches the resolved reference, its repo value matches `config.repo_scope.value` when Step 1c applies, and that it is assignee-eligible — yours or unassigned, when Step 1b applies. If any check fails, return `error_code: permission_denied` and write nothing.
 
 This is the check that makes "Synthex only touches its own rows" true for writes rather than merely for queries. It matters most for the assignee half: a `task_ref` selected moments earlier may have been claimed by another engineer in between, and a filter applied at query time cannot see that.
 
@@ -222,13 +262,15 @@ Return the contract's §7 envelope with `backend: "notion"` and `degraded_from: 
   "backend": "notion",
   "operation": "list_tasks",
   "doc_type": "implementation_plan",
-  "result": { "tasks": [] },
+  "result": { "tasks": [], "repo_scope_unset_count": 0 },
   "degradations": [
     { "field": "complexity", "reason": "unmapped", "recorded_in": "plan overview page" }
   ],
   "degraded_from": null
 }
 ```
+
+`repo_scope_unset_count` is present on `list_tasks` results only when `config.repo_scope.property` is set (FR-NB10); it is the count of in-epic, assignee-eligible rows excluded from `tasks` for having no value on that property at all, distinct from rows excluded for not matching it.
 
 `error_code`, when set, MUST be one of the eight values in §6 of the contract. Introducing a new value is a contract violation.
 
@@ -250,10 +292,11 @@ Return the contract's §7 envelope with `backend: "notion"` and `degraded_from: 
 12. **Return errors; do not prompt.** You have no user.
 13. **Do not retry terminal errors.** Retry only `rate_limited`, once, with backoff.
 14. **Stay mechanical.** You do not reprioritize, reword, or re-estimate tasks. Canonical shape in, canonical shape out.
+15. **`resolve_task_refs` never writes, never claims, and never returns a ref outside the configured epic.** It exists only to name a repo-scope-excluded dependency for reporting. Looking past `repo_scope` is this operation's entire purpose; looking past epic scoping is never acceptable, here or anywhere else in this file.
 
 ---
 
 ## Source Authority
 
 - [`_shared/document-store-contract.md`](./_shared/document-store-contract.md) — §3 task operations, §4 epic scoping, §5 property mapping, §6 error enum, §7 response envelope
-- FR-NB4 (epic scoping), FR-NB5 (property mapping and degradation), FR-NB7 (task identity), FR-NB9 (error enum)
+- FR-NB4 (epic scoping), FR-NB5 (property mapping and degradation), FR-NB7 (task identity), FR-NB9 (error enum), FR-NB10 (optional repo scoping)

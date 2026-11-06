@@ -135,6 +135,7 @@ This matters when several engineers share one epic. Without it, two of them runn
 - **Identity.** A task's identity is its `task_ref`, which is opaque. `ordinal` is display-only and gets renumbered whenever tasks are inserted or removed. Never look a task up by ordinal and never treat a renumber as re-identifying a task.
 - **Prose vs. rows.** Under the `notion` backend an implementation plan is two things: an overview page holding the prose sections (Overview, Decisions, Open Questions, milestone summaries) and a set of task rows in the task database. Read and write each through the matching adapter.
 - **Degraded fields.** When the target database has no home for `complexity`, `milestone`, or `dependencies`, the adapter reports a degradation and that data belongs in the overview page instead. Honor that — do not invent a property to hold it.
+- **Repo scoping (optional, FR-NB10) passes straight from config, unlike the epic reference.** When `notion.repo_scope.property` is set, pass `notion.repo_scope` to the task store exactly as configured — there's no plan-level resolution step for it, because it identifies the checkout, not the initiative. See [`_shared/document-store-contract.md`](../agents/_shared/document-store-contract.md) § Repo scoping for the filtering, stamping, and cross-repo-dependency-naming rules.
 
 ---
 
@@ -179,11 +180,14 @@ This command reads the implementation plan's task queue and writes task state ba
 - **Work is additionally scoped to what you may take.** When `notion.assignee.property` is set, the task store returns only items assigned to the current user or unassigned, and claims an item by assigning it to that user when Step 3 moves it to `in_progress`. Two consequences for this command:
   - **Another engineer's in-flight work never enters your queue**, so two engineers can run this command against the same epic concurrently without selecting the same item.
   - **"No actionable tasks" can mean "all remaining work is claimed by someone else."** That is a normal outcome, not a completion. Do not emit the completion promise; report what remains and who holds it, exactly as with blocked or `[H]`-gated tasks.
+- **Repo scoping passes straight through, unlike the epic reference.** When `notion.repo_scope.property` is set, pass `notion.repo_scope` to `notion-task-store` exactly as configured — there is no per-plan resolution step for it, because it identifies this checkout, not an initiative, and this repo's own `.synthex/config.yaml` already carries the right value. `list_tasks` excludes rows outside this repo and additionally returns `repo_scope_unset_count`: how many in-epic rows have no value on that property at all. Report that count once per run, when non-zero, distinct from "no actionable tasks" — it means some of this epic's work hasn't been tagged with a repo yet, not that none exists.
+- **A dependency excluded by repo scoping is named, not dropped.** When checking whether a selected task's dependencies are satisfied (Step 1), a `task_ref` that doesn't appear anywhere in the fetched (repo-scoped) queue is not automatically "missing" — it may belong to a different repo within the same epic. Before reporting such a task as blocked on an unknown dependency, call `resolve_task_refs` for exactly that ref. If it resolves, report: `blocked on "<title>", scoped to a different repo (<repo_scope_value>)`. If it does not resolve (truly nonexistent, or cross-epic), report it as missing as before. Only call `resolve_task_refs` when `notion.repo_scope.property` is set and a ref is actually absent from the queue — never as a matter of course.
 - This is the one command that mutates task state, so it is the one most affected by the backend. Under `notion`, delegate every task read and write to `notion-task-store`:
 
   | Workflow step | Task-store operation |
   |---------------|---------------------|
-  | Step 1 — select work | `list_tasks` (epic-filtered) |
+  | Step 1 — select work | `list_tasks` (epic-filtered, additionally repo-filtered when configured) |
+  | Step 1 — name a cross-repo dependency | `resolve_task_refs` (only when repo scoping is active and a dependency ref is absent from the queue) |
   | Step 3 — mark in progress | `update_task_status` with `in_progress` |
   | Step 9 — mark done | `update_task_status` with `done`, then `annotate_task` |
   | Error handling — blocker | `update_task_status` with `blocked` |

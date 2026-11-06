@@ -1041,6 +1041,45 @@ notion:
     # for itself, so a plan can never silently inherit the wrong epic.
     value: null
 
+  # Repo scoping (FR-NB10) — optional, for an epic whose tasks span more than
+  # one git repository (e.g. an initiative with Firestore functions in one repo
+  # and a dashboard in another). This is a SECOND, independent equality filter,
+  # ANDed onto the epic filter above — it does not replace epic scoping.
+  #
+  # Unlike `epic.value`, this value is NOT read from the plan: it identifies
+  # this checkout, not an initiative, and a repo's own committed
+  # `.synthex/config.yaml` is already scoped to that repo. So the property is
+  # a fact about the shared database's schema (set once here) and the value is
+  # also just set here — there is no per-plan override to reconcile.
+  #
+  # Leave `property` null to skip repo scoping entirely — the default, and the
+  # correct choice for any epic whose work lives in one repo. When set, every
+  # task query additionally filters on it, every task Synthex creates is
+  # stamped with it, and legacy rows with no value on this property are
+  # excluded (not matched) rather than silently included.
+  #
+  # No filesystem-backend equivalent: a filesystem plan is already
+  # one-per-initiative-per-repo, so there is nothing to scope.
+  repo_scope:
+    # A select, multi-select, status, relation, or text property on
+    # `tasks_database` that identifies which repo a work item belongs to.
+    # `/synthex:configure-notion` can add a new `Repo` select property with
+    # your explicit confirmation if the database doesn't have one yet.
+    property: null
+    # This repo's identifier, as it appears (or will appear) in that property.
+    # Example: "dashboards".
+    value: null
+    # When true, this repo treats a row with NO value on `property` as if it
+    # matched `value` — the implicit catch-all for everything nobody has
+    # tagged yet. Lets a long-lived primary repo adopt repo_scope without
+    # backfilling its existing rows; only the newer, minority repo(s) need
+    # explicit tags. `create_tasks` still always stamps the literal value
+    # regardless — this only changes what a read matches.
+    # At most one repo sharing a database should set this to true. It is
+    # this repo's own choice, made in its own config; Synthex has no way to
+    # (and does not try to) coordinate it across repos.
+    default: false
+
   # Assignee scoping — relevant when several engineers share one epic.
   # Epic scoping alone still lets two engineers select the same item, so
   # when `property` is set, task queries are additionally scoped to work the
