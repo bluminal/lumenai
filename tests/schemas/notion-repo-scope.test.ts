@@ -37,6 +37,8 @@ describe('FR-NB10: optional repo scoping', () => {
   let wizard: string;
   let sharedDoc: string;
   let nextPriorityStanza: string;
+  let wipStanza: string;
+  let productManager: string;
   let defaults: any;
 
   beforeAll(async () => {
@@ -45,6 +47,8 @@ describe('FR-NB10: optional repo scoping', () => {
     wizard = read('commands/configure-notion.md');
     sharedDoc = read('docs/document-backends.md');
     nextPriorityStanza = sharedDoc.split('### next-priority')[1]?.split('\n### ')[0] ?? '';
+    wipStanza = sharedDoc.split('### write-implementation-plan')[1]?.split('\n### ')[0] ?? '';
+    productManager = read('agents/product-manager.md');
     defaults = await loadDefaultsYaml();
   });
 
@@ -289,9 +293,90 @@ describe('FR-NB10: optional repo scoping', () => {
     it.each([
       ['notion-task-store', () => taskStore],
       ['next-priority stanza', () => nextPriorityStanza],
+      ['write-implementation-plan stanza', () => wipStanza],
     ])('%s gates every repo_scope behavior on it being configured', (_name, get) => {
       const text = get();
       expect(text).toMatch(/repo_scope\.property.*(?:is set|is null|applies)/);
+    });
+  });
+
+  describe('Per-task attribution on create (write-implementation-plan, FR-NB10 follow-on)', () => {
+    it('contract names repo_scope_value as create-time only, never read-side', () => {
+      expect(contract).toMatch(/\*\*Create-time only: `repo_scope_value`\.\*\*/);
+      expect(contract).toMatch(/It is input-only — `list_tasks` does not return it/);
+      expect(contract).toMatch(/ignored by the `filesystem` backend and whenever `notion\.repo_scope\.property` is null/);
+    });
+
+    it('contract adds the create_tasks row and says the value is never inferred from a task', () => {
+      expect(contract).toMatch(/`create_tasks`\s*\|\s*`tasks\[\]`/);
+      expect(contract).toMatch(/or with that task's own `repo_scope_value` when the caller supplies one/);
+      expect(contract).toMatch(/It is never inferred — not from a task's title, description, or file paths/);
+      expect(contract).toMatch(/It comes from an explicit, user-confirmed attribution in the plan/);
+    });
+
+    it('task store validates every resolved value before creating any row, and never adds an option', () => {
+      expect(taskStore).toMatch(/\*\*Validate every resolved value before creating any row\*\*/);
+      expect(taskStore).toMatch(/An unknown option is `error_code: schema_mismatch`/);
+      expect(taskStore).toMatch(/Never add an option to make a value fit \(Step 2\)/);
+    });
+
+    it('task store resolves the per-row value: the task-supplied one, else config, never empty', () => {
+      expect(taskStore).toMatch(
+        /the task's own `repo_scope_value` when the caller supplied one, otherwise `config\.repo_scope\.value` — never empty, regardless of `config\.repo_scope\.default`/,
+      );
+    });
+
+    it('task store does not read repo_scope_value at all when the dimension is unconfigured', () => {
+      expect(taskStore).toMatch(
+        /do not read a task's `repo_scope_value`, which callers send only when repo scoping is active/,
+      );
+    });
+
+    it('write-implementation-plan stanza gates the interview question on repo scoping being active', () => {
+      expect(wipStanza).toMatch(/Step 4 interview \(only when `notion\.repo_scope\.property` is set\)/);
+      expect(wipStanza).toMatch(/Where does this plan's work live\?/);
+    });
+
+    it('write-implementation-plan stanza has the confirmation gate and never stamps unconfirmed', () => {
+      expect(wipStanza).toMatch(/Confirmation gate, immediately before `create_tasks`/);
+      expect(wipStanza).toMatch(/Never stamp an unconfirmed attribution/);
+    });
+
+    it('write-implementation-plan stanza never offers a schema-mutation prompt for an unknown option', () => {
+      expect(wipStanza).toMatch(/Never offer to add the option here: schema-mutation consent stays solely in `configure-notion`/);
+    });
+
+    it('write-implementation-plan stanza forbids inferring a repo from task content', () => {
+      expect(wipStanza).toMatch(/Never infer a task's repo from its title, description, or file paths/);
+    });
+
+    it('product-manager.md gates the new section on the command telling it repo scoping is active', () => {
+      expect(productManager).toMatch(/^### Repo Attribution \(Notion backend with repo scoping only\)$/m);
+      expect(productManager).toMatch(
+        /This applies only when the invoking command tells you repo scoping is active; otherwise it does not exist for you/,
+      );
+    });
+
+    it('product-manager.md forbids repo prefixes in task titles', () => {
+      const section = productManager.split('### Repo Attribution')[1]?.split('\n### ')[0] ?? '';
+      expect(section).toMatch(/Do not write prefixes like "Dashboards repo: …" into a task's title/);
+    });
+
+    it('product-manager.md ties Task N Repo renumbering to the existing cross-reference rule', () => {
+      const section = productManager.split('### Repo Attribution')[1]?.split('\n### ')[0] ?? '';
+      expect(section).toMatch(/moves with its task under the existing renumbering rule, which updates every cross-reference/);
+    });
+
+    it('product-manager.md keeps the PM out of Notion I/O for this feature too', () => {
+      const section = productManager.split('### Repo Attribution')[1]?.split('\n### ')[0] ?? '';
+      expect(section).toMatch(/Do not read or write Notion yourself/);
+    });
+
+    it('defaults.yaml documents that per-task attribution never changes which rows this checkout reads', () => {
+      const yamlText = read('config/defaults.yaml');
+      expect(yamlText).toMatch(/A plan may attribute individual tasks to OTHER repos when creating them/);
+      expect(yamlText).toMatch(/that never changes which rows this\s*\n?\s*#?\s*checkout reads/);
+      expect(yamlText).toMatch(/stamped with it, unless the plan attributes that task to another repo/);
     });
   });
 });

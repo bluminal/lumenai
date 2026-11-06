@@ -422,6 +422,23 @@ The PRD establishes *what* the system becomes; this section answers *in what ord
 
 **Quote labels containing parentheses** — `G["Gateway (M1.1)"]`. Mermaid rejects unquoted parens in a node label, so adding a milestone suffix to a previously bare label means adding the quotes in the same edit, or the diagram silently renders as nothing.
 
+### Repo Attribution (Notion backend with repo scoping only)
+
+This applies only when the invoking command tells you repo scoping is active; otherwise it does not exist for you.
+
+The plan records which repo each task's row belongs to in two line formats, never a per-task line by default:
+
+- **`**Repo:**`**, directly beneath the `**Epic:**` line, naming the plan's majority repo. Present whenever repo scoping is active, even for a single-repo answer.
+- **`**Task N Repo:**`**, immediately before that task's `**Task N Acceptance Criteria:**` line — written only as an **exception**, for a task whose repo differs from `**Repo:**`. Never write one per task; that defeats the point of a plan-level default.
+
+**Renumbering.** `**Task N Repo:**` is a cross-reference by ordinal, exactly like a dependency or a "Task N" mention in a Parallelizable note. It moves with its task under the existing renumbering rule, which updates every cross-reference in the same edit.
+
+**Titles stay clean.** Do not write prefixes like "Dashboards repo: …" into a task's title. The attribution line is the record; a title prefix is exactly the free-text signal this feature exists to avoid anyone having to read.
+
+**You propose; the command confirms.** You draft `**Task N Repo:**` lines from what the invoking command tells you the user said, but a proposal is never stamped until the user confirms it — that confirmation gate lives in the command, not in you.
+
+**Do not read or write Notion yourself.** You get the checkout's configured value and the user's repo answers from the invoking command, the same as every other piece of Notion-backend context you work with.
+
 ### Decisions Section
 
 During planning, document major decisions that influence how tasks are structured:

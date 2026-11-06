@@ -45,7 +45,8 @@ You are never user-facing. You never prompt; missing configuration is an error y
                                    | resolve_task_refs
   task_ref:   string  (optional) — required for update_task_status | annotate_task
   task_refs:  array   (optional) — required for resolve_task_refs
-  tasks:      array   (optional) — required for create_tasks (canonical task shape)
+  tasks:      array   (optional) — required for create_tasks (canonical task
+                                   shape; each MAY carry repo_scope_value, Step 1c)
   status:     string  (optional) — required for update_task_status
                                    (canonical: pending | in_progress | done | blocked)
   notes:      string  (optional) — completion notes
@@ -141,7 +142,7 @@ When `config.assignee.property` is null, skip this step. Epic scoping alone appl
 
 An epic can span more than one git repository. Epic scoping alone does not separate those repos' rows from each other, so a run from one checkout could otherwise select a task whose code lives in a different repo entirely.
 
-**When `config.repo_scope.property` is null — the default — skip this step entirely.** Run no new logic: no extra filter term, no stamping, no counting. This is the same discipline as every other optional dimension in this contract: the absent case must cost nothing.
+**When `config.repo_scope.property` is null — the default — skip this step entirely.** Run no new logic: no extra filter term, no stamping, no counting — and do not read a task's `repo_scope_value`, which callers send only when repo scoping is active. This is the same discipline as every other optional dimension in this contract: the absent case must cost nothing.
 
 **When it is set:**
 
@@ -150,7 +151,7 @@ An epic can span more than one git repository. Epic scoping alone does not separ
 3. Add the predicate to every `list_tasks` filter, ANDed alongside the epic predicate and the assignee `or`-group (when Step 1b applies).
 4. A row that is in-epic (and assignee-eligible) but has **no value at all** on the repo property does not match the filter — it is unclaimed work, not this repo's work. Separately from ordinary non-matches, count these and return the count so the caller can report a partial backfill rather than "no work." See Step 3's `list_tasks` result shape.
    **Exception — `config.repo_scope.default: true`.** This repo is the implicit catch-all: treat a row with no value on the property as matching `config.repo_scope.value` and include it in the result. Nothing is excluded for being unset, so `repo_scope_unset_count` is always `0` under this config — there is no ambiguous bucket left to report. At most one repo sharing the database should set this; you verify only your own `config`, never anyone else's.
-5. Every `create_tasks` row is stamped with `config.repo_scope.value`, alongside the epic value (Step 3).
+5. Every `create_tasks` row is stamped with a repo value alongside the epic value (Step 3): the task's own `repo_scope_value` when the caller supplied one, otherwise `config.repo_scope.value` — never empty, regardless of `config.repo_scope.default`. **Validate every resolved value before creating any row**: non-empty, same type rules as `config.repo_scope.value`, and — for a select, multi-select, or status property — an existing option (multi-select: stamp exactly one). An unknown option is `error_code: schema_mismatch`, naming each offending task and value and listing the property's existing options; create nothing. Never add an option to make a value fit (Step 2).
 6. Every `update_task_status` and `annotate_task` additionally verifies the target row's repo value against `config.repo_scope.value` before writing — `error_code: permission_denied` otherwise. This matters specifically because `resolve_task_refs` (below) deliberately returns refs this filter excludes; nothing should let a caller then act on one.
 
 ### Step 2 — Map Properties, Never Migrate Schema (FR-NB5)
@@ -212,7 +213,7 @@ Use `enum_is` rather than `relation_contains` when the epic property is a select
 
 #### Creating items
 
-`create_tasks` sets the title, the canonical status mapped through `config.status_values`, the epic link, the repo value when Step 1c applies, and any optional fields that are mapped. It leaves the assignee **empty**: a planned task is available work, not work already owned.
+`create_tasks` sets the title, the canonical status mapped through `config.status_values`, the epic link, each task's resolved repo value (Step 1c, point 5) when Step 1c applies, and any optional fields that are mapped. It leaves the assignee **empty**: a planned task is available work, not work already owned.
 
 #### Resolving cross-repo dependency refs
 

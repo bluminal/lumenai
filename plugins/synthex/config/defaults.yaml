@@ -1055,8 +1055,13 @@ notion:
   # Leave `property` null to skip repo scoping entirely — the default, and the
   # correct choice for any epic whose work lives in one repo. When set, every
   # task query additionally filters on it, every task Synthex creates is
-  # stamped with it, and legacy rows with no value on this property are
-  # excluded (not matched) rather than silently included.
+  # stamped with it, unless the plan attributes that task to another repo,
+  # and legacy rows with no value on this property are excluded (not
+  # matched) rather than silently included.
+  #
+  # A plan may attribute individual tasks to OTHER repos when creating them
+  # (see write-implementation-plan); that never changes which rows this
+  # checkout reads.
   #
   # No filesystem-backend equivalent: a filesystem plan is already
   # one-per-initiative-per-repo, so there is nothing to scope.

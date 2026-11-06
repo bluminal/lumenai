@@ -133,6 +133,7 @@ Prefer `patch` over `write` whenever the change is localized. `write` replaces t
 | Operation | Input | Output |
 |-----------|-------|--------|
 | `list_tasks` | `plan_handle`, optional `filter` | `task[]` |
+| `create_tasks` | `tasks[]` (canonical shape; each MAY carry `repo_scope_value`) | `{ task_ref, repo_scope_value? }[]` |
 | `update_task_status` | `task_ref`, `status`, optional `notes` | `{ version }` |
 | `annotate_task` | `task_ref`, `annotations` | `{ version }` |
 | `resolve_task_refs` | `task_refs[]` | `{ task_ref, title, repo_scope_value }[]` |
@@ -157,6 +158,8 @@ Prefer `patch` over `write` whenever the change is localized. `write` replaces t
   ]
 }
 ```
+
+**Create-time only: `repo_scope_value`.** A task passed to `create_tasks` MAY carry `repo_scope_value`, the repo that row belongs to under repo scoping (§4, Repo scoping). It is input-only — `list_tasks` does not return it — and is ignored by the `filesystem` backend and whenever `notion.repo_scope.property` is null. It shares its name with `resolve_task_refs`' output field deliberately: the same value, written here and read there.
 
 ### Canonical status enum
 
@@ -268,13 +271,15 @@ Epic scoping separates Synthex from other teams' tickets; it does not separate o
 **Present — enforced with the same rigor as epic scoping, no partial credit:**
 
 1. Every `list_tasks` query MUST additionally filter on the configured property/value.
-2. Every task row Synthex creates MUST be stamped with the configured value, alongside the epic value.
+2. Every task row Synthex creates MUST be stamped with the configured value, alongside the epic value — or with that task's own `repo_scope_value` when the caller supplies one (below).
 3. Every `update_task_status` and `annotate_task` MUST additionally verify the target row carries the configured value before writing, failing `permission_denied` otherwise — the same write-time check epic scoping requires, for the same reason: a query-time filter protects reads, not a write against a ref obtained some other way.
 4. Once `property` is set, there is **no degradation path.** A misconfigured property (absent from the schema, or not filterable) MUST fail `schema_mismatch` rather than silently running unscoped — falling back to "scope by epic only" when the user asked for repo scoping would reintroduce the exact failure this feature exists to prevent.
 
 **Legacy rows are excluded, not matched, and that exclusion is counted — unless this repo is the configured default.** A row within the epic (and assignee-eligible) that has no value at all on the repo property does not satisfy the filter by default — it is work nobody has tagged yet, not work that belongs to this repo. Because an unscoped-looking exclusion can be indistinguishable from "no work left," `list_tasks` MUST also return a count of in-epic rows excluded specifically for having an empty repo property, separate from the normal "doesn't match this repo" exclusions, so a caller can report a partial backfill instead of reporting nothing.
 
-**`repo_scope.default: true` flips that for exactly one repo.** A long-lived primary repo whose existing rows were never tagged can set `default: true` to treat an empty repo property as matching its own value — the implicit catch-all. Every other repo sharing the database keeps strict matching untouched. `default` only changes what a **read** matches; `create_tasks` still always stamps the literal configured value regardless of `default`, so new rows stay unambiguous and only genuinely old rows are ever implicit. With `default: true`, every row resolves one way or the other, so there is no "unset" bucket left to count — `list_tasks` MUST report `repo_scope_unset_count: 0` in that case, never a non-zero count that nothing will ever act on. This is a per-repo choice made in that repo's own config; Synthex has no mechanism to verify, and does not attempt to verify, that only one repo sharing a database has set it.
+**`repo_scope.default: true` flips that for exactly one repo.** A long-lived primary repo whose existing rows were never tagged can set `default: true` to treat an empty repo property as matching its own value — the implicit catch-all. Every other repo sharing the database keeps strict matching untouched. `default` only changes what a **read** matches; `create_tasks` still always stamps the literal configured value regardless of `default` (or the task's own `repo_scope_value`, which is equally literal), so new rows stay unambiguous and only genuinely old rows are ever implicit. With `default: true`, every row resolves one way or the other, so there is no "unset" bucket left to count — `list_tasks` MUST report `repo_scope_unset_count: 0` in that case, never a non-zero count that nothing will ever act on. This is a per-repo choice made in that repo's own config; Synthex has no mechanism to verify, and does not attempt to verify, that only one repo sharing a database has set it.
+
+**Reading is per-checkout; attribution on create is per-task.** `value` says which rows *this checkout* reads, and no plan changes that. But a plan for a multi-repo epic creates rows belonging to several repos from whichever checkout runs it, so `create_tasks` accepts a per-task `repo_scope_value`. It is never inferred — not from a task's title, description, or file paths. It comes from an explicit, user-confirmed attribution in the plan, or it is absent and the configured value applies.
 
 **Cross-repo dependencies are named, never dropped.** A task's `dependencies` can reference a `task_ref` that repo scoping excludes from the caller's own queue. `resolve_task_refs` (§3) exists to resolve exactly that ref — by title and its own `repo_scope` value — so a caller can report "blocked on `<title>`, scoped to a different repo (`<value>`)" instead of treating the dependency as satisfied, missing, or unknown.
 
