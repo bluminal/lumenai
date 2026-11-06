@@ -113,7 +113,7 @@ describe('wrapper catalog diet (Task 19, FR-HM9/FR-HM10)', () => {
 
   it('never gives a canonical command definition a frontmatter description: key (OQ-2 guard)', () => {
     const files = readdirSync(commandsRoot).filter((file) => file.endsWith('.md'));
-    expect(files.length).toBe(22);
+    expect(files.length).toBe(25);
 
     for (const file of files) {
       const contents = readFileSync(join(commandsRoot, file), 'utf8');

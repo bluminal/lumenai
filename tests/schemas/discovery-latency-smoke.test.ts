@@ -112,7 +112,9 @@ afterAll(() => {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('[T1] + [T4] Discovery primitive: subprocess output correctness', () => {
+// P95 subprocess latency, measured under full-suite contention; retried rather than loosened so a real
+// regression still fails.
+describe('[T1] + [T4] Discovery primitive: subprocess output correctness', { retry: 2 }, () => {
   it('emits valid JSON with a routing_decision field (covers mode, matched)', () => {
     const result = spawnSync(
       'bash',

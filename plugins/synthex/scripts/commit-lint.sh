@@ -254,7 +254,8 @@ const cwd = payload.cwd || process.cwd();
 const gitDir = resolveGitDir(cwd);
 if (gitDir && fs.existsSync(path.join(gitDir, 'MERGE_HEAD'))) process.exit(0);
 
-// Extract the first -m/--message subject, or the -F/--file argument.
+// Extract the first -m/--message subject, or the -F/--file argument (the
+// `-F -` case gets full stdin-literal handling below; see stdinMessage()).
 let subject = null;
 let fileArg = null;
 for (let i = 0; i < rest.length; i += 1) {

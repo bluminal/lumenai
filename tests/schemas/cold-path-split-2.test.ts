@@ -172,7 +172,12 @@ describe('Task 14: performance-audit.md + write-implementation-plan.md cold-path
 
     it('write-implementation-plan.md is at or under 26,112 bytes (25.5 KB)', () => {
       const bytes = Buffer.byteLength(wipContent, 'utf-8');
-      expect(bytes).toBeLessThanOrEqual(26_496);
+      // Raised from 26,112 to 26,496 by Task 59 (FR-HM19) when it added the
+      // loop-engine gate; raised again to 28,288 by the Notion backend: one
+      // cold-path Read gate (docs/document-backends.md) plus the Target
+      // State by Milestone row in the plan template. A gate is the minimum
+      // inline cost of a new cold-path capability.
+      expect(bytes).toBeLessThanOrEqual(28_288);
     });
   });
 });
