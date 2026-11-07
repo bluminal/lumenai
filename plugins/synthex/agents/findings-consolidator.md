@@ -57,7 +57,10 @@ You receive:
 
 For each reviewer block, extract the list of findings. A finding has:
 
-- **Severity** (CRITICAL / HIGH / MEDIUM / LOW / Nit)
+- **Severity** (CRITICAL / HIGH / MEDIUM / LOW / Nit). Match it whatever case
+  it arrives in: a reviewer returning the canonical schema writes `critical`,
+  `high`, `medium`, `low` in lowercase, while a reviewer writing a markdown
+  report heading uses uppercase. They are the same four levels.
 - **Title** (short description)
 - **Location or section** (file, line, plan section, task number, etc.)
 - **Issue** (what's wrong)
