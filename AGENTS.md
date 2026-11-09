@@ -292,6 +292,7 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 | `documents.specs` | `docs/specs` | Specs directory |
 | `notion.repo_scope.property` | `null` | Notion backend only (FR-NB10): property on `tasks_database` identifying which repo a work item belongs to. Optional — leave `null` to skip repo scoping entirely |
 | `notion.repo_scope.value` | `null` | Notion backend only (FR-NB10): this checkout's repo identifier, as it appears (or will appear) in that property. Unlike `notion.epic.value`, this is set only here — there is no per-plan resolution |
+| `notion.repo_scope.default` | `false` | Notion backend only (FR-NB10): when `true`, this repo's reads also match rows with no value on `repo_scope.property` — lets one long-lived primary repo adopt scoping without backfilling existing rows. At most one repo sharing a database should set this |
 
 ### Design Pattern
 
