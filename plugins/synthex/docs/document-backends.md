@@ -135,7 +135,6 @@ This matters when several engineers share one epic. Without it, two of them runn
 - **Identity.** A task's identity is its `task_ref`, which is opaque. `ordinal` is display-only and gets renumbered whenever tasks are inserted or removed. Never look a task up by ordinal and never treat a renumber as re-identifying a task.
 - **Prose vs. rows.** Under the `notion` backend an implementation plan is two things: an overview page holding the prose sections (Overview, Decisions, Open Questions, milestone summaries) and a set of task rows in the task database. Read and write each through the matching adapter.
 - **Degraded fields.** When the target database has no home for `complexity`, `milestone`, or `dependencies`, the adapter reports a degradation and that data belongs in the overview page instead. Honor that — do not invent a property to hold it.
-- **Repo scoping (optional, FR-NB10) passes straight from config, unlike the epic reference.** When `notion.repo_scope.property` is set, pass `notion.repo_scope` to the task store exactly as configured — there's no plan-level resolution step for it, because it identifies the checkout, not the initiative. See [`_shared/document-store-contract.md`](../agents/_shared/document-store-contract.md) § Repo scoping for the filtering, stamping, and cross-repo-dependency-naming rules. That governs filtering, and the stamp on any row created without a per-task attribution; `write-implementation-plan` is the one caller that supplies one (see its section).
 
 ---
 
@@ -180,14 +179,11 @@ This command reads the implementation plan's task queue and writes task state ba
 - **Work is additionally scoped to what you may take.** When `notion.assignee.property` is set, the task store returns only items assigned to the current user or unassigned, and claims an item by assigning it to that user when Step 3 moves it to `in_progress`. Two consequences for this command:
   - **Another engineer's in-flight work never enters your queue**, so two engineers can run this command against the same epic concurrently without selecting the same item.
   - **"No actionable tasks" can mean "all remaining work is claimed by someone else."** That is a normal outcome, not a completion. Do not emit the completion promise; report what remains and who holds it, exactly as with blocked or `[H]`-gated tasks.
-- **Repo scoping passes straight through, unlike the epic reference.** When `notion.repo_scope.property` is set, pass `notion.repo_scope` to `notion-task-store` exactly as configured — there is no per-plan resolution step for it, because it identifies this checkout, not an initiative, and this repo's own `.synthex/config.yaml` already carries the right value. `list_tasks` excludes rows outside this repo and additionally returns `repo_scope_unset_count`: how many in-epic rows have no value on that property at all. Report that count once per run, when non-zero, distinct from "no actionable tasks" — it means some of this epic's work hasn't been tagged with a repo yet, not that none exists.
-- **A dependency excluded by repo scoping is named, not dropped.** When checking whether a selected task's dependencies are satisfied (Step 1), a `task_ref` that doesn't appear anywhere in the fetched (repo-scoped) queue is not automatically "missing" — it may belong to a different repo within the same epic. Before reporting such a task as blocked on an unknown dependency, call `resolve_task_refs` for exactly that ref. If it resolves, report: `blocked on "<title>", scoped to a different repo (<repo_scope_value>)`. If it does not resolve (truly nonexistent, or cross-epic), report it as missing as before. Only call `resolve_task_refs` when `notion.repo_scope.property` is set and a ref is actually absent from the queue — never as a matter of course.
 - This is the one command that mutates task state, so it is the one most affected by the backend. Under `notion`, delegate every task read and write to `notion-task-store`:
 
   | Workflow step | Task-store operation |
   |---------------|---------------------|
-  | Step 1 — select work | `list_tasks` (epic-filtered, additionally repo-filtered when configured) |
-  | Step 1 — name a cross-repo dependency | `resolve_task_refs` (only when repo scoping is active and a dependency ref is absent from the queue) |
+  | Step 1 — select work | `list_tasks` (epic-filtered) |
   | Step 3 — mark in progress | `update_task_status` with `in_progress` |
   | Step 9 — mark done | `update_task_status` with `done`, then `annotate_task` |
   | Error handling — blocker | `update_task_status` with `blocked` |
@@ -264,29 +260,6 @@ This command a PRD and writes an implementation plan. When the Notion backend is
 
   Ask the user only when the PRD has no `**Epic:**` link — for a PRD written before this convention, or on a plan with no PRD. Then search the epics database by title and let them pick. Do not create an epic row unless the user asks — an epics row usually carries owner, dates, and business context that this command has no basis to fill in. Do not derive a value from a filename or branch: one matching no rows yields an empty task queue that reads as "all work complete." For a `select` or text epic property, a plain name is correct and no link is needed.
 - Create task rows with the canonical status `pending`, stamped with that epic value. The adapter translates the status to whatever the target database calls it.
-- **Step 4 interview (only when `notion.repo_scope.property` is set).** Add one question to the Product Manager's existing first `AskUserQuestion` batch, so it costs no extra round-trip:
-
-  > **Where does this plan's work live?** Repo scoping is active; this checkout is `<repo_scope.value>`.
-  >
-  > 1. **All of it in `<repo_scope.value>`.** (default)
-  > 2. **It spans more than one repository.**
-
-  On option 1, write `**Repo:** <repo_scope.value>` and you are done: no gate, no per-task lines. On option 2, ask a follow-up: which repos are involved, and which holds most of the work. That repo becomes `**Repo:**`. Pass both answers to the Product Manager.
-- **Drafting.** The Product Manager *proposes* `**Task N Repo:**` lines from what the user said. A proposal is never stamped until the user confirms it.
-- **Confirmation gate, immediately before `create_tasks`.** Applies only when the plan carries at least one `**Task N Repo:**` line or names more than one repo. Runs after peer review, so tasks added or split during review are covered:
-
-  > **Confirm which repo each work item belongs to before rows are created.**
-  >
-  > `<Repo value>` (plan default): Tasks 1–3, 5–9
-  > `<other>`: Task 4 "<title>", Task 10 "<title>"
-  >
-  > 1. **Confirm** 2. **Change an attribution**
-
-  Never stamp an unconfirmed attribution — a non-interactive run (the native loop) stops here instead, the same posture as the blocking `[A]` assumption policy for PRDs.
-- **Resolution, caller side.** For each task: `**Task N Repo:**`, else the plan's `**Repo:**`. Send `repo_scope_value` on **every** task whenever the plan has a `**Repo:**` line, so the checkout's value is never an implicit default for a multi-repo plan. A plan with no `**Repo:**` line — one that predates this feature — sends nothing, so the configured value applies.
-- **Checkout mismatch.** If `**Repo:**` differs from this checkout's `repo_scope.value`, mention it once and proceed — the same posture as the epic discrepancy rule.
-- **Unknown option.** If `schema_mismatch` comes back for an unknown option, show the returned option list as choices and re-ask or retry. Never offer to add the option here: schema-mutation consent stays solely in `configure-notion`.
-- **Never inferred.** Never infer a task's repo from its title, description, or file paths, and never encode it in the title — the attribution line is the record.
 - When the task database has no property mapped for `complexity`, `milestone`, or `dependencies`, the adapter reports a degradation and that data belongs in the overview page instead. Keep it in the plan prose rather than inventing a property for it.
 - The `plan-linter` structural audit in Step 5.5 runs against the **draft markdown**, before any backend write. It is unaffected by this section.
 

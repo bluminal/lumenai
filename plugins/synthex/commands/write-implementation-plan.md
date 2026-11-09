@@ -114,8 +114,6 @@ Launch the **Product Manager sub-agent** to conduct an interactive Q&A with the 
 
 **Important:** Claude Code strips `AskUserQuestion` from sub-agents, so the PM returns its questions (3-5 at a time) in a `## Questions for the User` section. YOU ask them via `AskUserQuestion`, then resume the PM with the answers. Repeat until it returns no questions. Never answer them yourself.
 
-**Repo scoping, when `notion.repo_scope.property` is set:** fold the interview question, the `**Repo:**`/`**Task N Repo:**` template rules, and the pre-`create_tasks` confirmation gate from `docs/document-backends.md`'s `write-implementation-plan` section (already Read per Document Backend above) into this step and Step 6, respectively.
-
 ### 5. Draft the Implementation Plan
 
 The Product Manager produces an initial implementation plan draft following the standard template (see Output below) and writes it directly to `@{plan_path}` with a `<!-- DRAFT: pending peer review (write-implementation-plan Step 6) -->` marker after the title. The draft must include:
@@ -277,7 +275,6 @@ The implementation plan will follow this structure:
 # Implementation Plan: [Product Name]
 
 **Epic:** [This initiative's epic reference]
-**Repo:** [Only when repo scoping is active — this plan's majority repo]
 
 ## Overview
 [Brief summary linking back to the PRD. Keep this to 2-3 sentences.]
@@ -326,7 +323,6 @@ Items requiring further discovery that could lead to future decisions and plan c
 - `[T]` [Another testable criterion]
 - `[H]` [Human-validated criterion — requires user approval before merge]
 
-**Task 2 Repo:** [Exception only — present only when this task's repo differs from the plan's `**Repo:**`]
 **Task 2 Acceptance Criteria:**
 - `[T]` [Testable criterion]
 
