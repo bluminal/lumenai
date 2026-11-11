@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Bluminal Labs AI plugin marketplace — collections of AI agents, commands, and skills for autonomous software delivery.",
-    "version": "2.7.0"
+    "version": "2.7.1"
   },
   "plugins": [
     {
