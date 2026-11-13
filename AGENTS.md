@@ -12,6 +12,8 @@ lumenai/
 │   └── marketplace.json        # Claude Code marketplace registry
 ├── .grok-plugin/
 │   └── marketplace.json        # Grok marketplace registry (Synthex only)
+├── .cursor-plugin/
+│   └── marketplace.json        # Cursor marketplace registry (Synthex only)
 ├── .github/
 │   └── workflows/
 │       └── agent-tests.yml     # CI pipeline (3-tier agent testing)
@@ -47,8 +49,8 @@ lumenai/
 
 - **Agents** are markdown files in `agents/` that define an AI role (identity, responsibilities, behavioral rules, output format)
 - **Commands** are markdown files in `commands/` that define orchestration workflows (parameters, workflow steps, which agents to invoke)
-- **plugin.json** registers agents and commands within a plugin. Claude Code reads `.claude-plugin/plugin.json`. Codex and Grok read their own manifests and load the generated `skills/` wrappers, which point back at those same files.
-- **marketplace.json** registers plugins within the marketplace. Claude Code, Codex, and Grok each have their own marketplace file (`.claude-plugin/`, `.agents/plugins/`, `.grok-plugin/`).
+- **plugin.json** registers agents and commands within a plugin. Claude Code reads `.claude-plugin/plugin.json`. Codex, Grok, and Cursor read their own manifests and load the generated `skills/` wrappers, which point back at those same files.
+- **marketplace.json** registers plugins within the marketplace. Claude Code, Codex, Grok, and Cursor each have their own marketplace file (`.claude-plugin/`, `.agents/plugins/`, `.grok-plugin/`, `.cursor-plugin/`). The Cursor manifest has no per-plugin `version` in the marketplace entry (its schema forbids it); the version Cursor shows comes from `plugins/synthex/.cursor-plugin/plugin.json`.
 - After adding or renaming a command or agent, regenerate the shared skill wrappers with `node plugins/synthex/scripts/generate-codex-skills.mjs`. Do not hand-edit `skills/*/SKILL.md` or `cursor-agents/*.md` / `.cursor/agents/*.md` (Cursor Task discovery wrappers).
 
 ## Adding a New Agent
@@ -71,7 +73,7 @@ lumenai/
 
 ## Releasing
 
-Releases are **automated** by `.github/workflows/release.yml` on every merge to `main`. Do **not** hand-edit marketplace versions, `plugins/*/.claude-plugin/plugin.json`, `plugins/synthex/.codex-plugin/plugin.json`, `plugins/synthex/.grok-plugin/plugin.json` versions, or `CHANGELOG.md` in feature PRs — the workflow owns all of those.
+Releases are **automated** by `.github/workflows/release.yml` on every merge to `main`. Do **not** hand-edit marketplace versions, `plugins/*/.claude-plugin/plugin.json`, `plugins/synthex/.codex-plugin/plugin.json`, `plugins/synthex/.grok-plugin/plugin.json`, `plugins/synthex/.cursor-plugin/plugin.json` versions, `.cursor-plugin/marketplace.json` `metadata.version`, or `CHANGELOG.md` in feature PRs — the workflow owns all of those.
 
 How it works:
 
