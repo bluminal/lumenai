@@ -64,7 +64,9 @@ const skillsRoot = join(pluginRoot, 'portable-skills');
 // folded in 3 pool agents from synthex-plus (standing-pool-cleanup,
 // standing-pool-submitter, team-orchestrator-bridge), taking 23 to 26.
 // team-orchestrator-bridge was later removed as dead code, taking 26 to 25.
-const TOTAL_AGENT_COUNT = 25;
+// The document-store contract (notion-document-store) and the Notion task
+// store (notion-task-store) then added 2 agents, taking 25 to 27.
+const TOTAL_AGENT_COUNT = 27;
 
 // Every utility agent Phase 5 retires (docs/plans/harness-modernization.md)
 // is gone: context-bundle-assembler (Task 41), audit-artifact-writer
