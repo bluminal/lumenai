@@ -134,6 +134,9 @@ Prefer `patch` over `write` whenever the change is localized. `write` replaces t
 | `list_tasks` | `plan_handle`, optional `filter` | `task[]` |
 | `update_task_status` | `task_ref`, `status`, optional `notes` | `{ version }` |
 | `annotate_task` | `task_ref`, `annotations` | `{ version }` |
+| `ensure_epic_view` | — | `{ view_url, created }` |
+
+`ensure_epic_view` makes sure the epic page carries an inline view of the work database filtered to the epic, the list a reader uses to see the epic's tickets. It is Notion-only, like `epic_page`, and idempotent: when such a view already exists it returns that view with `created: false` and changes nothing. It only ever adds a view. It never edits, moves, or removes an existing one.
 
 ### Canonical task shape
 

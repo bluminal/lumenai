@@ -187,11 +187,14 @@ This command reads the implementation plan's task queue and writes task state ba
   | Step 3 — mark in progress | `update_task_status` with `in_progress` |
   | Step 9 — mark done | `update_task_status` with `done`, then `annotate_task` |
   | Error handling — blocker | `update_task_status` with `blocked` |
+  | End of run — navigation refresh | `ensure_epic_view` |
 
 - **The plan-complete check in Step 1 uses the epic-filtered queue.** `list_tasks` returns only this project's rows, so "every task is `done`" means every Synthex task in this epic, not every row in a shared database. That is the intended semantics — other teams' tickets are none of this command's business and must never gate its completion.
 - **Never resolve a task by ordinal.** Use the `task_ref` returned by `list_tasks`. Ordinals are display-only and get renumbered when tasks are inserted or removed; treating one as identity would silently retarget a write to the wrong row.
 - Acceptance-criteria evidence from Step 9 — `[T]` test linkage, `[H]` approval, and the `--auto-decide` decision record — goes through `annotate_task`. When `acceptance_criteria` is unmapped, the adapter records it in the task page body.
 - **Refresh the epic's navigation block once, at the end of the run.** The epic page carries a `## Where the detail lives` section listing the requirements page, the plan, and the work-item view, each with a current-state line. Rewrite that section via `notion-document-store` `patch` on the `epic_page` document type, updating the phase, the done/total task counts, the in-progress and to-do counts, and the dates.
+
+  Call `notion-task-store` `ensure_epic_view` before the patch, so an epic that lacks its filtered ticket list gains one. The call is idempotent, so running it every time is safe.
 
   This is the one volatile thing in an epic body, and it is Synthex's to maintain. It exists because a stakeholder once read a detailed-but-stale epic as the live plan; the freshness line is what makes staleness visible instead of invisible. Keeping it current is therefore not cosmetic.
 

@@ -40,6 +40,7 @@ You are never user-facing. You never prompt; missing configuration is an error y
 {
   operation:  string  (required) — list_tasks | create_tasks
                                    | update_task_status | annotate_task
+                                   | ensure_epic_view
   task_ref:   string  (optional) — required for update_task_status | annotate_task
   tasks:      array   (optional) — required for create_tasks (canonical task shape)
   status:     string  (optional) — required for update_task_status
@@ -161,6 +162,7 @@ Report every degradation in the response's `degradations` array so the caller ca
 | `create_tasks` | `create-pages` into the database | Every row MUST be linked to the epic, and left **unassigned** |
 | `update_task_status` | `update-page` | MUST verify the row's epic and assignee eligibility first; claims the item on `in_progress` |
 | `annotate_task` | `update-page` | MUST verify the row's epic and assignee eligibility first |
+| `ensure_epic_view` | `fetch` the epic page, then `create-view` with `parent_page_id` | The view's filter MUST be the epic predicate |
 
 #### Filter shape
 
@@ -179,6 +181,19 @@ Use `enum_is` rather than `relation_contains` when the epic property is a select
 #### Creating items
 
 `create_tasks` sets the title, the canonical status mapped through `config.status_values`, the epic link, and any optional fields that are mapped. It leaves the assignee **empty**: a planned task is available work, not work already owned.
+
+#### Ensuring the epic's work-item view
+
+Every epic page shows its tickets in an inline view of the work database. The Epics template adds one, but a page whose body was written outside the template has none, and a reader then has no list to scan.
+
+The epic page is the epic row itself, so this needs a `relation` epic property: the resolved UUID is the page to check. With any other property type, return `schema_mismatch`.
+
+1. `fetch` the epic page and look for an inline `<database>` block. Fetch each one you find. It is the epic's view when its data source is `config.tasks_database` and its filter includes the epic predicate. If one exists, return its view URL with `created: false` and stop.
+2. Otherwise call `create-view` with `parent_page_id` = the epic page, `data_source_id` = the work database's data source, `type: table`, and `name: All work items`. Configure it to filter on the epic predicate, group by the mapped `status` property, and show the mapped title, status, assignee, priority, size, and timeline properties. Leave out any that are unmapped. Return the new view URL with `created: true`.
+
+Do not apply the assignee predicate here. The view is for people reading the epic, and it shows the whole epic's work, whoever owns it.
+
+Never edit, move, or remove an existing view, even one that looks wrong. Report it in `error_message` instead.
 
 #### Claiming items
 

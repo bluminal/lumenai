@@ -48,6 +48,7 @@ export const OPERATION_VALUES = [
   'create_tasks',
   'update_task_status',
   'annotate_task',
+  'ensure_epic_view',
 ] as const;
 
 /** Document types — the keys of the `documents` config block. */

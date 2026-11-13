@@ -175,6 +175,8 @@ The epic page carries a `## Where the detail lives` section directly after `## W
 
 > This page is a summary, not the plan. For current status, follow the links above.
 
+**Ensure the work-item view exists first.** Call `notion-task-store` `ensure_epic_view`. It adds the epic's filtered ticket list when the page has none, and leaves an existing one alone. Point the work-items row at that view ("the work-item view below on this page"), never at the epic's relation property, which a reader cannot scan. If the call fails, keep the row, say the view is missing, and report the failure.
+
 Populate what exists. On a first run the plan does not exist yet, so list it as *not yet created* rather than omitting the row; a reader should see that the plan is absent, not be left unable to tell.
 
 This section is the reason the epic page has a navigation block at all: an epic is skimmed, and a stakeholder once read a detailed-but-stale epic body as the live plan because nothing pointed elsewhere and nothing signalled age. It is also the only volatile content permitted in an epic body, and Synthex owns it — `next-priority` refreshes it at the end of each run.
@@ -274,7 +276,7 @@ Surfacing the provenance counts is the point of tagging. A PRD that is mostly as
 
 This command reads source material and writes a PRD. When the Notion backend is enabled for `requirements`, resolve it through the document-store contract rather than reading the path parameters directly. The mechanical framework — backend resolution order, delegation to `notion-document-store` and `notion-task-store`, response handling, and the strict-mode vs. fail-soft degradation policy — lives once in [`plugins/synthex/docs/document-backends.md`](../docs/document-backends.md). Only the command-specific bits are inlined below.
 
-**Document types touched:** `epic_page` (read and **patch**, Notion only), `requirements` (write), `specs` (read)
+**Document types touched:** `epic_page` (read and **patch**, Notion only), `requirements` (write), `specs` (read). Task operation: `ensure_epic_view` (Notion only).
 
 **When `notion.enabled` is `false` — the default — skip this section entirely** and resolve `requirements_path` directly against the filesystem exactly as the Workflow above describes. The disabled path must stay byte-identical to pre-Notion behavior (FR-NB2), and the surest way to guarantee that is to run no new logic at all.
 
