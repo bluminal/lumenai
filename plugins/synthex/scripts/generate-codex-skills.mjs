@@ -94,7 +94,7 @@ export const COMMAND_DESCRIPTIONS = {
   'refine-requirements': {
     description:
       'Run a PRD through multi-agent review for clarity and completeness, then apply the edits.',
-    argumentHint: '[requirements_path] [specs_path] [--loop]',
+    argumentHint: '[requirements_path] [specs_path] [--from <path>]... [--loop]',
   },
   'write-prd': {
     description:

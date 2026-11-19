@@ -1,7 +1,7 @@
 ---
 name: refine-requirements
 description: "Run a PRD through multi-agent review for clarity and completeness, then apply the edits."
-argument-hint: "[requirements_path] [specs_path] [--loop]"
+argument-hint: "[requirements_path] [specs_path] [--from <path>]... [--loop]"
 compatibility: "Requires a shell tool; node or jq optional"
 metadata:
   short-description: "Run a PRD through multi-agent review for clarity and completeness, then apply the edits."
