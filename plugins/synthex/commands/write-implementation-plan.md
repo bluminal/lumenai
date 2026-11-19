@@ -118,6 +118,7 @@ The Product Manager produces an initial implementation plan draft following the 
 - Parallelizable work explicitly called out (limit to `@{concurrent_tasks}` concurrent tasks per milestone, per config), with scheduling notes when a batch includes `[H]`-criteria tasks (start them early so user review overlaps with autonomous work)
 - A **Decisions** section documenting major planning decisions and rationale
 - An **Open Questions** section tracking items needing further discovery
+- A **Target State by Milestone** diagram derived from the PRD's `Current and Target State`, omitted when the PRD has none (rules in `product-manager.md`)
 
 ### 5.5. Structural Lint Pass
 
@@ -264,11 +265,21 @@ Remove the `<!-- DRAFT -->` marker from `@{plan_path}` to finalize.
 
 The implementation plan will follow this structure:
 
-```markdown
+````markdown
 # Implementation Plan: [Product Name]
 
 ## Overview
 [Brief summary linking back to the PRD. Keep this to 2-3 sentences.]
+
+## Target State by Milestone
+[The PRD's `Once delivered` diagram, labelled by delivering milestone. Omit when the PRD has none.]
+
+```mermaid
+graph LR
+  A[Client] --> G["Gateway (M1.1)"]
+  G --> B[API]
+  B --> D["Cache (M1.2)"]
+```
 
 ## Decisions
 
@@ -316,7 +327,7 @@ Items requiring further discovery that could lead to future decisions and plan c
 
 ## Phase 2: [Name — Delivers Y Value]
 ...
-```
+````
 
 ---
 
