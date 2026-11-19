@@ -41,9 +41,15 @@ const BASELINE = 26_426;
 // 783 B: the --in-workspace row, the resolution rule and Read gate, and the
 // Claude Code isolation rule, which is the default Claude Code local path.
 const HOST_CHECKOUT_DELTA = 289 + 783;
-const BUDGET = BASELINE - 7_613 + HOST_CHECKOUT_DELTA;
+// The external-source gate (CONTRIBUTING.md "Adding an External Source",
+// rule 2) is one cold-path Read gate whose first sentence skips it when
+// `external_source` is unset. Everything else lives in
+// docs/external-sources.md. A gate is the minimum inline cost of a new
+// cold-path capability: 293 B, measured against the pre-change file.
+const EXTERNAL_SOURCE_GATE_DELTA = 293;
+const BUDGET = BASELINE - 7_613 + HOST_CHECKOUT_DELTA + EXTERNAL_SOURCE_GATE_DELTA;
 const CLOUD_DELTA = 579 + HOST_CHECKOUT_DELTA;
-const NP_CAP = 15_729 + HOST_CHECKOUT_DELTA;
+const NP_CAP = 15_729 + HOST_CHECKOUT_DELTA + EXTERNAL_SOURCE_GATE_DELTA;
 const LW_CAP = 3_084;
 
 const SEP = '<!-- premove-block -->\n';
@@ -81,7 +87,7 @@ function premoveBlocks(): string[] {
 
 describe('Task 59 (FR-HM19, D34): next-priority cold-path split and Claude-path budget', () => {
   it('next-priority.md plus docs/engines/loop-workflow.md is at most 26,426 - 8,192 = 18,234 bytes (AC2)', () => {
-    expect(BUDGET).toBe(18_813 + HOST_CHECKOUT_DELTA);
+    expect(BUDGET).toBe(18_813 + HOST_CHECKOUT_DELTA + EXTERNAL_SOURCE_GATE_DELTA);
     expect(size(NP_PATH) + size(LW_PATH)).toBeLessThanOrEqual(BUDGET);
   });
 
@@ -95,9 +101,12 @@ describe('Task 59 (FR-HM19, D34): next-priority cold-path split and Claude-path 
 
   it('the Stage 1 prose path (next-priority.md plus docs/next-priority-loop.md) is at most the 26,426-byte baseline (NFR-HM3)', () => {
     // The pre-move baseline is kept as the historical constant; cloud
-    // execution's unavoidable in-command cost is called out separately so it
-    // stays visible rather than being folded into the baseline.
-    expect(size(NP_PATH) + size(NPL_PATH)).toBeLessThanOrEqual(BASELINE + CLOUD_DELTA);
+    // execution's unavoidable in-command cost and the external-source gate
+    // are called out separately so they stay visible rather than being
+    // folded into the baseline.
+    expect(size(NP_PATH) + size(NPL_PATH)).toBeLessThanOrEqual(
+      BASELINE + CLOUD_DELTA + EXTERNAL_SOURCE_GATE_DELTA,
+    );
   });
 
   it('the pre-move fixture has 4 blocks and the pinned substitution applies exactly once to the last', () => {

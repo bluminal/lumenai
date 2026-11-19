@@ -172,7 +172,11 @@ describe('Task 14: performance-audit.md + write-implementation-plan.md cold-path
 
     it('write-implementation-plan.md is at or under 26,112 bytes (25.5 KB)', () => {
       const bytes = Buffer.byteLength(wipContent, 'utf-8');
-      expect(bytes).toBeLessThanOrEqual(26_496);
+      // Raised from 26,496 to 26,801 (+305 B) by the external-source gate
+      // (CONTRIBUTING.md "Adding an External Source", rule 2): one cold-path
+      // Read gate, skipped when `external_source` is unset. A gate is the
+      // minimum inline cost of a new cold-path capability.
+      expect(bytes).toBeLessThanOrEqual(26_801);
     });
   });
 });

@@ -53,6 +53,10 @@ Every task in the implementation plan must have acceptance criteria. Each criter
 
 ---
 
+## External Source
+
+When `external_source` is unset — the default — skip this section entirely. Otherwise Read `${CLAUDE_PLUGIN_ROOT}/docs/external-sources.md` and follow it and its `write-implementation-plan` section. On other hosts, use `plugin_root` from `.synthex/state.json` as the plugin root.
+
 ## Workflow
 
 ### 1. Load Configuration

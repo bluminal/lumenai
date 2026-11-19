@@ -36,6 +36,10 @@ This command does NOT produce an implementation plan. It improves the PRD so tha
 
 ---
 
+## External Source
+
+When `external_source` is unset — the default — skip this section entirely. Otherwise Read `${CLAUDE_PLUGIN_ROOT}/docs/external-sources.md` and follow it and its `refine-requirements` section. On other hosts, use `plugin_root` from `.synthex/state.json` as the plugin root.
+
 ## Workflow
 
 ### 1. Load Configuration
