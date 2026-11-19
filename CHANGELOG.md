@@ -5,6 +5,48 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 2.8.0] - 2026-11-19
+
+### Added
+
+- (synthex) configure-multi-model detects grok and cursor-agent (multi-model-review Task 70)
+- (synthex) cursor-review.sh runner and cursor-review-prompter adapter (multi-model-review Task 69)
+- (synthex) grok-review.sh runner, grok-review-prompter adapter and orchestrator runner sentence (multi-model-review Task 68)
+- (synthex) harden validate-findings and add grok/cursor permission keys (multi-model-review Task 66, D29, D32)
+
+### Fixed
+
+- (synthex) wizard keeps manual opt-ins on re-run and takes the host id from the host (Task 70 review)
+- (synthex) pin the captured Cursor logged-in status and accept its text form (Task 69)
+- (synthex) cursor runner re-checks the deny file per spawn, scrubs CURSOR_API_ENDPOINT, stops the process group (Task 69 review)
+- (synthex) grok runner exact stopReason check, interrupt envelope and full tool deny list (Task 68 review)
+- (synthex) grok runner bounds the auth probe, scrubs the key alias, disables memory (Task 68 review)
+- (synthex) validate-findings parses raw text before fences, validates usage, and the claude adapter unwraps .result (Task 66 review)
+
+### Changed
+
+- (plans,reqs) A19 wording; count-independent Codex catalog row
+- (plans,reqs) make the OpenCode catalog budget per skill (amends A17)
+- (compat) budget OpenCode's skill catalog per skill, not as a fixed total
+- (plans) record Task 70 done; Milestone 9.1 complete (Phase 9)
+- (reqs) align FR-MR19 and the Grok-host note with the Task 70 wizard fixes
+- (reqs) add Grok and Cursor to the multi-model-review PRD (Task 70)
+- (synthex) list the grok and cursor review adapters (multi-model-review Task 70)
+- (specs) note the Task 69 logged-in status capture on the spike's U13 row
+- (plans) record Task 69 done; Task 70 in progress (Phase 9)
+- (synthex) give the runner wall-clock tests room under a loaded suite
+- (plans) record Task 68 done; resolve Q10; Task 69 in progress (Phase 9)
+- (plans) record Cursor spike decisions D37-D43; Task 67 done; align Task 69 (Phase 9)
+- (specs) mark the Grok sandbox retry as approved D34 in the spike report
+- (specs) record C8 stdin run and Cursor approvals in the Phase 9 spike (multi-model-review Task 67)
+- (specs) Cursor half of the Phase 9 CLI spike (multi-model-review Task 67)
+- (plans) record Task 67 approvals, Task 66 size met, Task 68 in progress
+- (plans) record Grok spike decisions D33-D36; align Task 68 (Phase 9)
+- (specs) Grok half of the Phase 9 CLI spike (multi-model-review Task 67)
+- (plans) record Task 66 done (Phase 9)
+- (plans) Tasks 66-67 in progress; guard against Grok max-turns false negatives (U25, U26, Risk 15)
+- (plans) plan Grok and Cursor multi-model review adapters (multi-model-review Phase 9)
+
 ## [synthex 2.7.4] - 2026-11-19
 
 ### Fixed
