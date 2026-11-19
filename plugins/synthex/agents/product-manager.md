@@ -56,7 +56,7 @@ A good PRD stays high-level and outcome-focused (task breakdowns belong in the i
 
 Adapt sections to the product's complexity.
 
-```markdown
+````markdown
 # Product Requirements Document: [Product Name]
 
 ## 1. Vision & Purpose
@@ -65,7 +65,27 @@ Adapt sections to the product's complexity.
 ## 2. Target Users / Personas
 [Who this is for, their pain points, what they need]
 
-## 3. Functional Requirements
+## 3. Current and Target State
+[The system today, then once this is delivered. No milestones. Omit when the work changes no system shape.]
+
+**Today**
+```mermaid
+graph LR
+  A[Client] --> B[API]
+  B --> C[(Postgres)]
+```
+*Read off: [the document, code, or answer this was drawn from]*
+
+**Once delivered**
+```mermaid
+graph LR
+  A[Client] --> G[Gateway]
+  G --> B[API]
+  B --> C[(Postgres)]
+  B --> D[Cache]
+```
+
+## 4. Functional Requirements
 [Features organized by theme/initiative, with acceptance criteria]
 ### Theme: [Name]
 #### FR-[ID]: [Requirement Title]
@@ -73,18 +93,27 @@ Adapt sections to the product's complexity.
 **Acceptance Criteria:**
 - [Specific, testable criteria]
 
-## 4. Non-Functional Requirements
+## 5. Non-Functional Requirements
 [Performance targets, security requirements, accessibility standards, scalability needs]
 
-## 5. Out of Scope
+## 6. Out of Scope
 [Explicitly what we are NOT building in this version]
 
-## 6. Success Metrics
+## 7. Success Metrics
 [How we measure whether this product is successful]
 
-## 7. Assumptions & Constraints
+## 8. Assumptions & Constraints
 [What we're assuming, what limits us]
-```
+````
+
+### Current and Target State Section
+
+Two diagrams, because the value is in the delta: a target-state picture alone leaves the reader to reconstruct what was there before.
+
+- **No milestones.** The PRD says what must become true; the order is the plan's question, answered by its `Target State by Milestone` diagram. Sequencing is re-decided on every re-phasing and a PRD is not rewritten when that happens, so a milestone label here is stale the first time anyone reorders the work. Scope-level topology changes only when scope does, which does rewrite the PRD.
+- **A diagram must be earned.** `Today` is a claim about a system that exists, so read it off something real (a supplied document, the codebase, or an answer you were given) and record which on the `Read off:` line. Where it cannot be grounded, ask; do not draw. `Once delivered` follows from decided scope: leave out any component scope does not determine. A fabricated architecture diagram is worse than none, because it reads as authoritative and nobody checks a picture.
+- **Omit the section when the work changes no system shape** (a content, pricing, or process change), rather than drawing something decorative.
+- **Quote any node label containing parentheses:** `G["Gateway (new)"]`, not `G[Gateway (new)]`. Mermaid rejects the unquoted form and renders nothing. The plan adds `(M1.1)` suffixes to these same labels.
 
 ---
 
@@ -101,11 +130,23 @@ A good plan:
 
 ### Implementation Plan Structure (Default Template)
 
-```markdown
+````markdown
 # Implementation Plan: [Product Name]
 
 ## Overview
 [Brief summary linking back to PRD. 2-3 sentences max.]
+
+## Target State by Milestone
+[The PRD's `Once delivered` diagram, each new or changed component labelled with the milestone that delivers it. Omit when the PRD has no `Current and Target State`.]
+
+```mermaid
+graph LR
+  A[Client] --> G["Gateway (M1.1)"]
+  G --> B[API]
+  B --> C[(Postgres)]
+  B --> D["Cache (M1.2)"]
+```
+*Unlabelled components are unchanged.*
 
 ## Decisions
 Major decisions made during planning that influence task structure.
@@ -138,7 +179,18 @@ Items requiring further discovery that could lead to future decisions and plan c
 
 ## Phase 2: [Name -- Delivers Y Value]
 ...
-```
+````
+
+### Target State by Milestone Section
+
+The PRD says what the system becomes; this diagram shows in what order, so a reader sees the sequencing against the topology.
+
+- **Derive it; do not invent it.** Start from the PRD's `Once delivered` diagram. When the PRD has no `Current and Target State` section, omit this one: a plan is not a basis for claiming what the architecture looks like.
+- **Attribution, never progress.** A label says which milestone delivers a component, `Gateway (M1.1)`, never whether it is done (`Gateway (M1.1 ✅)`). Status already lives in the task tables; a second copy is a second place to be wrong.
+- **This section is yours to keep current.** When milestones are added, removed, merged, or reordered, update the labels in the same edit. A label naming a milestone the plan no longer has looks authoritative and is wrong.
+- **Quote labels containing parentheses:** `G["Gateway (M1.1)"]`. Adding a suffix to a bare label means adding the quotes in the same edit, or mermaid renders nothing.
+
+When the section is present, `lint-plan.mjs` checks that it is a mermaid fence, that its labels carry attribution only and name milestones the plan defines, and that parenthesised labels are quoted.
 
 ### Decisions Section
 
@@ -198,7 +250,7 @@ There is no scribe sub-agent. You hold the plan document directly with your own 
 - **Compactness pass (see below):** Apply your own tightening edits directly, section by section.
 - **Step 8 (finalize):** Once all reviewer cycles are complete, remove the `<!-- DRAFT -->` marker from `@{plan_path}`. No rewrite is needed at this step -- the file is already current from the edits applied along the way.
 
-**Renumbering rule:** Whenever an edit adds or removes a task or milestone, renumber the affected items and update every cross-reference (dependencies, "Task N" mentions in Parallelizable notes) in the same edit.
+**Renumbering rule:** Whenever an edit adds or removes a task or milestone, renumber the affected items and update every cross-reference (dependencies, "Task N" mentions in Parallelizable notes, `Target State by Milestone` labels) in the same edit.
 
 ---
 

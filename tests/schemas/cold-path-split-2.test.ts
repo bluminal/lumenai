@@ -172,7 +172,11 @@ describe('Task 14: performance-audit.md + write-implementation-plan.md cold-path
 
     it('write-implementation-plan.md is at or under 26,112 bytes (25.5 KB)', () => {
       const bytes = Buffer.byteLength(wipContent, 'utf-8');
-      expect(bytes).toBeLessThanOrEqual(26_496);
+      // Raised from 26,112 to 26,496 by Task 59 (FR-HM19) for the
+      // loop-engine gate, then to 26,880 for the Target State by Milestone
+      // section: one Step 5 bullet plus the diagram in the Output template.
+      // The rules behind it live in product-manager.md, not here.
+      expect(bytes).toBeLessThanOrEqual(26_880);
     });
   });
 });
