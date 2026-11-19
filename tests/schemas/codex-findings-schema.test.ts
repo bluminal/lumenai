@@ -220,3 +220,15 @@ describe('recorded Codex last message (successful fixture)', () => {
     expect(strictErrors(STRICT, bad).join('\n')).toContain('unexpected source');
   });
 });
+
+describe('multi-model-review Task 68 (D33): the Grok runner shares this strict schema', () => {
+  const runner = readFileSync(
+    join(REPO_ROOT, 'plugins', 'synthex', 'scripts', 'adapters', 'grok-review.sh'),
+    'utf8',
+  );
+
+  it('grok-review.sh reads agents/_shared/codex-findings.schema.json for --json-schema (one file, no copy)', () => {
+    expect(runner).toMatch(/SCHEMA_FILE="\$PLUGIN_ROOT\/agents\/_shared\/codex-findings\.schema\.json"/);
+    expect(runner).toContain('--json-schema "$SCHEMA_JSON"');
+  });
+});

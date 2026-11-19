@@ -1,0 +1,6 @@
+Usage: agent models [options]
+
+List available models for this account
+
+Options:
+  -h, --help  Display help for command

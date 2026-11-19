@@ -25,7 +25,7 @@ The exceptions are:
 
 ## 2. error_code Enum (FR-MR16)
 
-When an adapter returns `status: "failed"`, `error_code` MUST be one of these 7 values:
+When an adapter returns `status: "failed"`, `error_code` MUST be one of these 8 values:
 
 | Value | Meaning | Trigger | Retry behavior |
 |-------|---------|---------|---------------|
@@ -36,6 +36,7 @@ When an adapter returns `status: "failed"`, `error_code` MUST be one of these 7 
 | `timeout` | Adapter exceeded per-reviewer timeout | Per-reviewer timeout fires | NOT auto-retried; surfaces to FR-MR17 |
 | `sandbox_violation` | CLI attempted operation forbidden by sandbox | Sandbox enforcement | Terminal — no retry |
 | `unknown_error` | Catch-all for unexpected failures | Last-resort fallback | NOT auto-retried |
+| `cli_unsupported_mode` | Resolved `external_permission_mode` unsupported by this CLI (e.g. `parent-mediated` on a non-proxying CLI) | Permission-mode resolution; CLI never spawned | Terminal — no retry |
 
 **Adapters MUST NOT introduce new error_code values.** Any new failure mode requires updating FR-MR16 AND `adapter-contract.md`.
 
@@ -131,7 +132,7 @@ Cloud-surface (all `which <cli>` fail) is a separate pre-fan-out check; the deci
 
 ## Source Authority
 
-- FR-MR16 (error_code enum — 7 values; no new values permitted)
+- FR-MR16 (error_code enum — 8 values; no new values permitted)
 - FR-MR17 (native-only continuation; all-externals-failed; all-natives-failed CRITICAL stop; cloud-surface)
 - FR-MR18 (strict_mode default false; fail-hard conditions)
 - NFR-MR2 (cloud-surface single remediation — not per-CLI cascade)

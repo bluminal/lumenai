@@ -1,12 +1,12 @@
 # Adapter Common Procedure (FR-MR8, FR-HM28)
 
 Shared prose for every `*-review-prompter` adapter agent (`bedrock`, `claude`,
-`codex`, `gemini`, `llm`, `ollama`). Each adapter's own file documents only
-what is CLI-specific — invocation flags, auth check command, model/family
-default, parse quirks, Known Gotchas, and the Permission Model table. This
-doc is the single source for everything generic so it is not duplicated six
-times (Task 43, FR-HM28). Not a standalone command — no frontmatter, never
-registered in `plugin.json`.
+`codex`, `cursor`, `gemini`, `grok`, `llm`, `ollama`). Each adapter's own file
+documents only what is CLI-specific — invocation flags, auth check command,
+model/family default, parse quirks, Known Gotchas, and the Permission Model
+table. This doc is the single source for everything generic so it is not
+duplicated eight times (Task 43, FR-HM28). Not a standalone command — no
+frontmatter, never registered in `plugin.json`.
 
 ## Identity
 
@@ -56,7 +56,12 @@ are never user-facing.
    normalizes a `null` findings array to `[]`, validates each finding
    against `canonical-finding-schema.md`, drops invalid ones (folding the
    drop count into `error_message` rather than aborting the whole review),
-   and injects `source`.
+   and injects `source`. Unwrap the CLI's own wrapper first (e.g. Gemini's
+   `.response`): a top-level object with no `findings` key, a CLI error
+   object, or NDJSON with no finding lines is `parse_failed`, never a clean
+   zero-finding review (multi-model-review D32). When the wrapper reports
+   usage, pass it as `--usage-json '<json>'`: it wins over any `usage` key in
+   the model's own output (NFR-MR4: the CLI's measured usage, verbatim).
 6. **Retry-Once on Parse Failure** — on `error_code: parse_failed`, append a
    clarification ("Your previous response could not be parsed as JSON.
    Respond with ONLY valid JSON, no markdown fences, no prose.") to the
@@ -78,6 +83,29 @@ are never user-facing.
    reported usage object (NFR-MR4); the script sets it to `null` when the
    CLI did not report one.
 
+## Judge mode (`config.judge_mode_prompt`)
+
+When the input envelope's `config.judge_mode_prompt` is present (the
+orchestrator picked this adapter as the D17 aggregator), the adapter MUST
+surface `config.judge_mode_prompt` to the underlying CLI ahead of the review
+prompt — as a system message, a rules flag, or a `--- ROLE ---` prompt
+prefix, whichever the CLI supports — and say which in its own file. When the
+field is absent, nothing changes. The six pre-Phase-9 adapters do not do this
+yet; fixing them is the multi-model-review D31 follow-up.
+
+## Runner scripts (optional)
+
+An adapter may delegate responsibilities 1–8 to an executable runner,
+`${CLAUDE_PLUGIN_ROOT}/scripts/adapters/<name>-review.sh` (multi-model-review
+D28). The runner takes `--input <envelope.json> [--envelope-out <path>]`,
+does the presence and auth checks, prompt construction, isolated CLI
+invocation, raw-output write, unwrap, retry-once and `validate-findings`
+call itself, and prints the FR-MR9 envelope; `--auth-check` runs only the
+auth probe. The adapter then writes the input envelope to a file, runs the
+runner in one Bash call, and returns its envelope unchanged. The
+orchestrator's depth-1 direct-CLI path runs the same runner, so no CLI
+logic depends on prose being rebuilt correctly.
+
 ## Error Code Reference (FR-MR16)
 
 | error_code | Generic trigger |
@@ -89,9 +117,10 @@ are never user-facing.
 | `timeout` | adapter exceeded its per-reviewer timeout |
 | `sandbox_violation` | CLI attempted a forbidden operation under its resolved permission mode |
 | `unknown_error` | catch-all for unexpected failures |
-| `cli_unsupported_mode` | `external_permission_mode` resolved to `parent-mediated` on a CLI that doesn't support it |
+| `cli_unsupported_mode` | `external_permission_mode` resolved to `parent-mediated` on a CLI that doesn't support it; the CLI is never spawned |
 
-Adapters MUST NOT introduce new `error_code` values (FR-MR16).
+These eight codes are the closed FR-MR16 enum (multi-model-review D32);
+`validate-findings --error` rejects anything else. Adapters MUST NOT introduce new `error_code` values (FR-MR16).
 
 ## Other hosts
 

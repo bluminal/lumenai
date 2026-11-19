@@ -17,7 +17,7 @@ describe('Task 82 (MMT): per-CLI external_permission_mode defaults', () => {
     expect(block).toBeTruthy();
   });
 
-  describe('[T] config block has entries for all six v1 CLI names', () => {
+  describe('[T] config block has entries for all eight CLI names (six v1 + grok, cursor per multi-model-review Task 66)', () => {
     it.each([
       ['codex'],
       ['claude'],
@@ -25,6 +25,8 @@ describe('Task 82 (MMT): per-CLI external_permission_mode defaults', () => {
       ['bedrock'],
       ['llm'],
       ['ollama'],
+      ['grok'],
+      ['cursor'],
     ])('CLI "%s" has an entry', (cli) => {
       expect(block[cli]).toBeDefined();
     });
@@ -45,6 +47,8 @@ describe('Task 82 (MMT): per-CLI external_permission_mode defaults', () => {
       ['bedrock'],
       ['llm'],
       ['ollama'],
+      ['grok'],
+      ['cursor'],
     ])('%s defaults to read-only', (cli) => {
       expect(block[cli]).toBe('read-only');
     });
@@ -64,6 +68,8 @@ describe('Task 82 (MMT): per-CLI external_permission_mode defaults', () => {
       ['bedrock'],
       ['llm'],
       ['ollama'],
+      ['grok'],
+      ['cursor'],
     ])('%s uses an allowed mode value', (key) => {
       expect(VALID_MODES.has(block[key])).toBe(true);
     });
@@ -74,10 +80,30 @@ describe('Task 82 (MMT): per-CLI external_permission_mode defaults', () => {
     expect(content).toMatch(/claude:\s*parent-mediated/);
   });
 
-  it('inline rationale comments reference read-only for the other four', () => {
+  it('inline rationale comments reference read-only for the other six', () => {
     expect(content).toMatch(/gemini:\s*read-only/);
     expect(content).toMatch(/bedrock:\s*read-only/);
     expect(content).toMatch(/llm:\s*read-only/);
     expect(content).toMatch(/ollama:\s*read-only/);
+    expect(content).toMatch(/grok:\s*read-only/);
+    expect(content).toMatch(/cursor:\s*read-only/);
+  });
+
+  // multi-model-review Task 66 (D25, D29)
+  it('grok and cursor carry inline rationale comments on their read-only lines', () => {
+    expect(content).toMatch(/^\s*grok:\s*read-only\s+#\s*Pattern 1\b.*--deny '\*'/m);
+    expect(content).toMatch(/^\s*cursor:\s*read-only\s+#\s*Pattern 1\b.*--mode ask/m);
+  });
+
+  it('the allowed-keys comment lists grok and cursor and names their binaries (grok, cursor-agent)', () => {
+    expect(content).toMatch(/`ollama`, `grok`,\s*#?\s*`cursor`/);
+    expect(content).toMatch(/`grok` key's binary is `grok`/);
+    expect(content).toMatch(/`cursor` key's is `cursor-agent`/);
+  });
+
+  it('the gemini rationale comment no longer claims a `--readonly` flag', () => {
+    const geminiLine = content.split('\n').find((l) => /^\s*gemini:\s*read-only/.test(l)) ?? '';
+    expect(geminiLine).not.toContain('--readonly');
+    expect(geminiLine).toContain('--approval-mode default');
   });
 });

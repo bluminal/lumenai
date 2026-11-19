@@ -14,7 +14,9 @@
     "gemini": "sandbox-yolo",
     "bedrock": "read-only",
     "llm": "read-only",
-    "ollama": "read-only"
+    "ollama": "read-only",
+    "grok": "read-only",
+    "cursor": "read-only"
   },
   "expected_warning_string": "⚠ gemini is configured in sandbox-yolo mode — CLI will run with full tool permissions inside an OS sandbox.",
   "expected_prompts_per_command": {

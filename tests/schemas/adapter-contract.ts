@@ -25,6 +25,10 @@ export const ERROR_CODE_VALUES = [
   'timeout',
   'sandbox_violation',
   'unknown_error',
+  // D32 (multi-model-review Task 66): the FR-MR16 enum grows to eight —
+  // returned when the resolved external_permission_mode is unsupported by a
+  // CLI (e.g. parent-mediated on grok/cursor/gemini/bedrock/llm/ollama).
+  'cli_unsupported_mode',
 ] as const;
 export type ErrorCodeValue = (typeof ERROR_CODE_VALUES)[number];
 

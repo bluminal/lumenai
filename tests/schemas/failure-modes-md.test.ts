@@ -29,8 +29,8 @@ describe('Task 51: failure-modes.md', () => {
     expect(content).toContain('## Status: Final');
   });
 
-  // Test 3: All 7 FR-MR16 error_code values documented
-  describe('FR-MR16 error_code enum — all 7 values documented', () => {
+  // Test 3: All 8 FR-MR16 error_code values documented (D32 added cli_unsupported_mode)
+  describe('FR-MR16 error_code enum — all 8 values documented', () => {
     it.each([
       'cli_missing',
       'cli_auth_failed',
@@ -39,6 +39,7 @@ describe('Task 51: failure-modes.md', () => {
       'timeout',
       'sandbox_violation',
       'unknown_error',
+      'cli_unsupported_mode',
     ])('error_code value "%s" present', (errorCode) => {
       expect(content).toContain(errorCode);
     });

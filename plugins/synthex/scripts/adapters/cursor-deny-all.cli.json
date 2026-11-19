@@ -1,0 +1,1 @@
+{ "permissions": { "allow": [], "deny": ["Read(**)", "Read(/**)", "Read(~/**)", "Write(**)", "Write(/**)", "Shell(*)", "Mcp(*:*)"] } }

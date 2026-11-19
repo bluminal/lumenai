@@ -191,9 +191,11 @@ describe('write-implementation-plan.md — Task 44: plan-scribe retired (FR-HM26
   it('[T] agent inventory drops by one (26 -> 25)', () => {
     // Upper bound, not equality: later Phase 5 retirements (Tasks 45, 46)
     // lowered it further, and Task 47 (FR-HM24, D11, Phase 6) then folded
-    // 3 pool agents in from synthex-plus, raising the ceiling again;
+    // 3 pool agents in from synthex-plus, raising the ceiling again, and
+    // multi-model-review Task 68 added grok-review-prompter (27) and Task 69
+    // cursor-review-prompter (28);
     // inventory.mjs pins the exact current count.
-    expect(AGENT_COUNT).toBeLessThanOrEqual(26);
+    expect(AGENT_COUNT).toBeLessThanOrEqual(28);
   });
 
 });

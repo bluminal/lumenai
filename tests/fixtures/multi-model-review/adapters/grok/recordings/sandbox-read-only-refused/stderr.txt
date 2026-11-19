@@ -1,0 +1,2 @@
+warning: sandbox could not be applied: socket deny resolution failed: could not resolve runtime-socket deny path /var/run/docker.sock: endpoint is a symlink
+error: could not apply the 'read-only' sandbox profile; see the warning above for the cause. Refusing to start with its protections missing.

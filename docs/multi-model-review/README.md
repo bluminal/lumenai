@@ -30,7 +30,7 @@
 
 ## What this is
 
-Multi-model review is a Synthex feature that takes a review artifact — a code diff, an implementation plan, a PRD, an RFC — and fans it out to **multiple LLM families running in parallel** through CLIs you already have installed (`claude`, `codex`, `gemini`, `ollama`, `llm`, `aws bedrock-runtime`, etc.). An orchestrator then consolidates all of their feedback into a single deduplicated, severity-reconciled, attributed review.
+Multi-model review is a Synthex feature that takes a review artifact — a code diff, an implementation plan, a PRD, an RFC — and fans it out to **multiple LLM families running in parallel** through CLIs you already have installed (`claude`, `codex`, `gemini`, `ollama`, `llm`, `aws bedrock-runtime`, `grok`, `cursor-agent`, etc.). An orchestrator then consolidates all of their feedback into a single deduplicated, severity-reconciled, attributed review.
 
 The shape, in one diagram:
 
@@ -138,7 +138,7 @@ Combine these four shifts and a CLI-orchestrated multi-model review system becom
 |-------|-------|-------|------|
 | Calling agent | e.g., `tech-lead`, `product-manager`, or a command like `/review-code` | (existing) | Hands a review artifact to the orchestrator |
 | Orchestrator | `multi-model-review-orchestrator` | Sonnet | Fans out to adapters in parallel, runs the consolidation pipeline, returns one unified review |
-| Adapter (one per provider) | `claude-review-prompter`, `codex-review-prompter`, `gemini-review-prompter`, `ollama-review-prompter`, `llm-review-prompter`, `bedrock-review-prompter` | Haiku | Wraps a specific CLI; handles invocation, output parsing, error normalization |
+| Adapter (one per provider) | `claude-review-prompter`, `codex-review-prompter`, `gemini-review-prompter`, `ollama-review-prompter`, `llm-review-prompter`, `bedrock-review-prompter`, `grok-review-prompter`, `cursor-review-prompter` | Haiku | Wraps a specific CLI; handles invocation, output parsing, error normalization. `grok-review-prompter` (xAI Grok CLI, family `xai`) and `cursor-review-prompter` (Cursor Agent CLI, family set in config with an explicit model) are opt-in, `text-only`, and delegate every CLI step to a runner script under `plugins/synthex/scripts/adapters/` |
 | Proposer (the actual external LLM) | Claude Opus, GPT-5, Gemini 2.5 Pro, Qwen 2.5 Coder, etc. | (whichever the user's CLI selects) | Reads the artifact, emits structured findings |
 | Aggregator | One of the proposers, picked automatically or by config | (the strongest proposer by default) | Takes the consolidated draft from the orchestrator and produces the final judgement on contested findings |
 
@@ -192,7 +192,7 @@ The full research synthesis lives in the implementation plan and the PRD (`docs/
 CLIs are not equivalent. They differ in a way that has direct quality implications for review:
 
 - **Agentic CLIs** (`claude -p`, `codex exec`, `gemini -p`, `opencode run`) support tool-use natively. They can read additional files in their sandboxed working directory, follow imports, check sibling code, look up specs.
-- **Text-only CLIs** (`ollama`, `llm`, `aws bedrock-runtime`, `mods`) are pure prompt-in / text-out. They cannot read files at all — whatever context they're going to get, they get in their initial prompt.
+- **Text-only CLIs** (`ollama`, `llm`, `aws bedrock-runtime`, `mods`) are pure prompt-in / text-out. Synthex also runs `grok` and `cursor-agent` this way: their runners remove or deny every tool, so they review the inlined bundle only. They cannot read files at all — whatever context they're going to get, they get in their initial prompt.
 
 Without intervention, this would systematically disadvantage text-only reviewers on context-sensitive findings ("this duplicates a utility in `src/utils/helpers.ts`", "this violates the auth pattern in `docs/specs/auth.md`"). The orchestrator levels the field by **pre-assembling a context bundle** for every reviewer regardless of tier — diff + full contents of touched files + matching specs + CLAUDE.md + optional project overview. Agentic reviewers get that bundle *plus* read-only sandbox access for further exploration; text-only reviewers get the bundle alone. Bundle is size-capped (200 KB default) with Haiku-driven file summarization above the cap.
 

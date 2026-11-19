@@ -2,14 +2,45 @@
   "scenario": "enabled-later-with-snippet",
   "description": "User picks option 2. No config written. Commented-out YAML snippet printed with detected CLIs.",
   "detection_results": {
-    "detected_and_authenticated": ["codex", "ollama"],
-    "detected_but_unauthenticated": [{ "cli": "gemini", "remediation_hint": "run `gcloud auth login` to enable" }],
-    "not_detected": ["llm", "aws", "claude"]
+    "detected_and_authenticated": [
+      "codex",
+      "ollama"
+    ],
+    "detected_but_unauthenticated": [
+      {
+        "cli": "gemini",
+        "remediation_hint": "run `gcloud auth login` to enable"
+      }
+    ],
+    "detected_opt_in_manually": [
+      {
+        "cli": "cursor-agent",
+        "auth_exit": 12,
+        "reason": "always opt in manually (D43): set per_reviewer.cursor-review-prompter.model and family; named models need a paid Cursor plan"
+      },
+      {
+        "cli": "grok",
+        "auth_exit": 12,
+        "reason": "only XAI_API_KEY is available and per_reviewer.grok-review-prompter.allow_api_key_billing is not true"
+      }
+    ],
+    "not_detected": [
+      "llm",
+      "aws",
+      "claude"
+    ]
   },
+  "synthex_host": "",
   "user_choice": 2,
   "expected_config_writes": {},
   "expected_yaml_snippet_starts_with": "multi_model_review:",
-  "expected_yaml_snippet_includes_commented_reviewers": ["codex-review-prompter", "gemini-review-prompter", "ollama-review-prompter"],
+  "expected_yaml_snippet_includes_commented_reviewers": [
+    "codex-review-prompter",
+    "gemini-review-prompter",
+    "ollama-review-prompter",
+    "grok-review-prompter",
+    "cursor-review-prompter"
+  ],
   "expected_yaml_snippet_yaml_valid": true,
   "expected_docs_reviews_created": false
 }

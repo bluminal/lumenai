@@ -46,7 +46,7 @@ If unreadable, abort `error_code: cli_failed`: "Pattern 2 (sandbox-yolo) sandbox
 
 Run `which codex`. Missing → `validate-findings --error cli_missing --message "npm install -g @openai/codex" --raw-output-path <echoed>`.
 
-**Safe-name assertion (Task 88):** The binary name `codex` is HARDCODED above; the adapter does NOT derive the binary name from any config key (`external-permission-mode-key-validation.test.ts` allows only `{codex, claude, gemini, bedrock, llm, ollama, default}`). CWE-20.
+**Safe-name assertion (Task 88):** The binary name `codex` is HARDCODED above; the adapter does NOT derive the binary name from any config key (`external-permission-mode-key-validation.test.ts` allows only `{codex, claude, gemini, bedrock, llm, ollama, grok, cursor, default}`). CWE-20.
 
 ### 2. Auth Check
 

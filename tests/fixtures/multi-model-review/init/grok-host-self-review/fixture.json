@@ -1,0 +1,45 @@
+{
+  "scenario": "grok-host-self-review",
+  "description": "The wizard runs on a Grok host (host id grok, the SYNTHEX_HOST value the Grok wrapper exports). grok is installed and logged in (auth exit 0) but is listed for manual opt-in with the self-review note; codex is authenticated. User picks option 1. Config gets codex-review-prompter only.",
+  "detection_results": {
+    "detected_and_authenticated": [
+      "codex"
+    ],
+    "detected_but_unauthenticated": [],
+    "detected_opt_in_manually": [
+      {
+        "cli": "grok",
+        "auth_exit": 0,
+        "reason": "host id grok: the native reviewers are already xAI models, so a grok reviewer adds no family diversity (self-review note)"
+      }
+    ],
+    "not_detected": [
+      "gemini",
+      "ollama",
+      "llm",
+      "aws",
+      "claude",
+      "cursor-agent"
+    ]
+  },
+  "synthex_host": "grok",
+  "user_choice": 1,
+  "expected_config_writes": {
+    "multi_model_review.enabled": true,
+    "multi_model_review.reviewers": [
+      "codex-review-prompter"
+    ]
+  },
+  "expected_option_label_includes": [
+    "codex"
+  ],
+  "expected_option_label_excludes": [
+    "grok"
+  ],
+  "expected_manual_listing_includes": [
+    "grok",
+    "this session runs on Grok",
+    "no family diversity"
+  ],
+  "expected_docs_reviews_created": true
+}

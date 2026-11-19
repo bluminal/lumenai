@@ -1,0 +1,69 @@
+{
+  "scenario": "rerun-keeps-manual",
+  "description": "Multi-model review is already enabled and the user added cursor-review-prompter by hand (with model and family). They pick Re-run the wizard, then option 1. Detection finds codex and gemini authenticated and cursor-agent logged in (auth exit 0), which still goes to the manual bucket (D43). Option 1 keeps the hand-added cursor-review-prompter after the authenticated adapters and says so.",
+  "existing_config": {
+    "multi_model_review": {
+      "enabled": true,
+      "reviewers": [
+        "codex-review-prompter",
+        "cursor-review-prompter"
+      ],
+      "per_reviewer": {
+        "cursor-review-prompter": {
+          "model": "gpt-5.6-sol-high",
+          "family": "openai"
+        }
+      }
+    }
+  },
+  "reentry_choice": "Re-run the wizard",
+  "detection_results": {
+    "detected_and_authenticated": [
+      "codex",
+      "gemini"
+    ],
+    "detected_but_unauthenticated": [],
+    "detected_opt_in_manually": [
+      {
+        "cli": "cursor-agent",
+        "auth_exit": 0,
+        "reason": "always opt in manually (D43); model and family are already set and it is logged in"
+      }
+    ],
+    "not_detected": [
+      "ollama",
+      "llm",
+      "aws",
+      "claude",
+      "grok"
+    ]
+  },
+  "synthex_host": "",
+  "user_choice": 1,
+  "expected_config_writes": {
+    "multi_model_review.enabled": true,
+    "multi_model_review.reviewers": [
+      "codex-review-prompter",
+      "gemini-review-prompter",
+      "cursor-review-prompter"
+    ]
+  },
+  "expected_kept_manual": [
+    "cursor-review-prompter"
+  ],
+  "expected_confirmation_includes": [
+    "Kept cursor-review-prompter (manual opt-in)"
+  ],
+  "expected_option_label_includes": [
+    "codex",
+    "gemini"
+  ],
+  "expected_option_label_excludes": [
+    "cursor-agent"
+  ],
+  "expected_manual_listing_includes": [
+    "cursor-agent",
+    "logged in, model and family set"
+  ],
+  "expected_docs_reviews_created": true
+}
