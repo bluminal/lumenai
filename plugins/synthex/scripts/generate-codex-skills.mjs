@@ -73,6 +73,11 @@ export const COMMAND_DESCRIPTIONS = {
       'Wizard to enable or reconfigure multi-model code review (fan out to OpenAI, Google, Ollama, etc.).',
     argumentHint: '[config_path]',
   },
+  'configure-notion': {
+    description:
+      'Re-runnable wizard: walk the convention map to declare where Synthex documents and tasks live in Notion.',
+    argumentHint: '[config_path] [--document-set <page url>]',
+  },
   'dismiss-upgrade-nudge': {
     description:
       'Silence the Synthex SessionStart upgrade nudge for this project until manually re-enabled.',
@@ -203,6 +208,10 @@ export const AGENT_DESCRIPTIONS = {
     'Reports DORA, HEART, and AARRR metrics and tracks OKR progress from engineering data.',
   'multi-model-review-orchestrator':
     'Fans a review out to native and external CLI proposers in parallel and consolidates findings.',
+  'notion-document-store':
+    'Reads and writes Synthex documents at the Notion locations the user declared, implementing the document-store contract.',
+  'notion-task-store':
+    "Reads and writes plan task state in the user's Notion tracker, always through the user's scope filter.",
   'ollama-review-prompter':
     'Adapter that POSTs to a local Ollama server as an external code-review proposer.',
   'performance-engineer':

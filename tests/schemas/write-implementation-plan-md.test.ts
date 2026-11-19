@@ -193,9 +193,9 @@ describe('write-implementation-plan.md — Task 44: plan-scribe retired (FR-HM26
     // lowered it further, and Task 47 (FR-HM24, D11, Phase 6) then folded
     // 3 pool agents in from synthex-plus, raising the ceiling again, and
     // multi-model-review Task 68 added grok-review-prompter (27) and Task 69
-    // cursor-review-prompter (28);
-    // inventory.mjs pins the exact current count.
-    expect(AGENT_COUNT).toBeLessThanOrEqual(28);
+    // cursor-review-prompter (28), and the Notion external source added its
+    // two adapters (29); inventory.mjs pins the exact current count.
+    expect(AGENT_COUNT).toBeLessThanOrEqual(29);
   });
 
 });

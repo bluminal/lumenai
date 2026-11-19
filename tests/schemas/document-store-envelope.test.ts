@@ -1,6 +1,7 @@
 /**
  * Layer 1 tests for the document-store response envelope (contract §7), the
- * canonical task shape (§4) and the closed error-code list (§6).
+ * canonical task shape (§4) and the closed error-code list (§6), plus the
+ * adapters' declared output shape.
  *
  * Cost: $0 (no LLM calls — pure shape assertions)
  */
@@ -191,3 +192,34 @@ describe('Contract and validator agree', () => {
   });
 });
 
+describe('Adapters declare the contract envelope', () => {
+  const adapters = ['notion-document-store.md', 'notion-task-store.md'];
+
+  it.each(adapters)('%s returns the §7 envelope with its own source name', (file) => {
+    const text = readFileSync(join(AGENTS, file), 'utf8');
+    expect(text).toMatch(/§7 envelope with `backend: "notion"`/);
+  });
+
+  it.each(adapters)('%s uses only contract error codes', (file) => {
+    const text = readFileSync(join(AGENTS, file), 'utf8');
+    const used = new Set(
+      [...text.matchAll(/→ `([a-z_]+)`/g)].map((m) => m[1]),
+    );
+    for (const code of used) {
+      expect(ERROR_CODE_VALUES).toContain(code);
+    }
+    expect(used.size).toBeGreaterThan(0);
+  });
+
+  it('the document store performs only contract document operations', () => {
+    const text = readFileSync(join(AGENTS, 'notion-document-store.md'), 'utf8');
+    expect(text).toMatch(/operation: string {2}\(required\) — resolve \| read \| write \| patch \| create \| list/);
+  });
+
+  it('the task store performs only contract task operations', () => {
+    const text = readFileSync(join(AGENTS, 'notion-task-store.md'), 'utf8');
+    expect(text).toMatch(
+      /operation: {3}string \(required\) — list_tasks \| create_tasks \| update_task_status \| annotate_task/,
+    );
+  });
+});

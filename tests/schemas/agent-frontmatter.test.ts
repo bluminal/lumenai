@@ -65,8 +65,9 @@ const skillsRoot = join(pluginRoot, 'portable-skills');
 // standing-pool-submitter, team-orchestrator-bridge), taking 23 to 26.
 // team-orchestrator-bridge was later removed as dead code, taking 26 to 25;
 // multi-model-review Tasks 68 and 69 added grok-review-prompter and
-// cursor-review-prompter, taking 25 to 27.
-const TOTAL_AGENT_COUNT = 27;
+// cursor-review-prompter, taking 25 to 27; the Notion external source added
+// notion-document-store and notion-task-store, taking 27 to 29.
+const TOTAL_AGENT_COUNT = 29;
 
 // Every utility agent Phase 5 retires (docs/plans/harness-modernization.md)
 // is gone: context-bundle-assembler (Task 41), audit-artifact-writer
