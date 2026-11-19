@@ -93,6 +93,17 @@ parity proof):
       documents this as the one known, intentional divergence rather than
       silently asserting exact parity.
 
+  15. `Target State by Milestone` diagram: ADDED, no plan-linter
+      equivalent. When the section is present it must be a fenced mermaid
+      block whose milestone labels carry attribution and never progress,
+      name a milestone the plan actually defines, and quote any node label
+      containing parentheses (all HIGH). The last is not style: mermaid
+      rejects unquoted parentheses in a node label and renders nothing at
+      all, so adding a `(M1.1)` suffix to a bare label silently destroys
+      the diagram. The section itself is optional -- a plan omits it when
+      its PRD has no `Current and Target State` diagram -- so its absence
+      is never a finding.
+
 Plans that don't follow the `# Implementation Plan:` / `## Phase` /
 `### Milestone` template at all (e.g. docs/plans/cross-harness-compatibility
 -testing.md, which is a different kind of document) simply fail the
@@ -282,6 +293,87 @@ function lintPlan(text) {
         'Add at least one "### Milestone N.N: [Name]" section under a Phase.',
       ),
     );
+  }
+
+  // ── Target State by Milestone diagram (reconciliation decision #15) ────
+
+  {
+    const tsbm = headings.find((h) => h.title.toLowerCase().includes('target state by milestone'));
+    if (tsbm) {
+      const next = headings.find((h) => h.lineIndex > tsbm.lineIndex && h.level <= tsbm.level);
+      const body = lines.slice(tsbm.lineIndex + 1, next ? next.lineIndex : lines.length).join('\n');
+      const loc = `Target State by Milestone (line ${tsbm.lineIndex + 1})`;
+      const rulePrefix = 'Document-Level: `## Target State by Milestone`';
+
+      if (!/```mermaid/.test(body)) {
+        findings.push(
+          makeFinding(
+            'HIGH',
+            'Target State by Milestone is not a mermaid diagram',
+            loc,
+            `${rulePrefix} is a fenced \`\`\`mermaid block`,
+            'The section contains no fenced mermaid block, so it renders as literal text.',
+            'Tag the diagram fence as ```mermaid.',
+          ),
+        );
+      }
+
+      // Attribution only. Status already lives in the task tables; a second
+      // copy is a second thing to update and a second thing to be wrong.
+      const progress = body.match(/\((M[\d.]+)[^)]*(?:\u2705|\u2714|done|complete|shipped|in progress|\d+%)[^)]*\)/i);
+      if (progress) {
+        findings.push(
+          makeFinding(
+            'HIGH',
+            'Progress marker on a milestone label',
+            loc,
+            `${rulePrefix} labels carry attribution, never progress`,
+            `\`${progress[0]}\` states progress. Status lives in the task tables; duplicating it here creates a second place to be wrong.`,
+            'Reduce the label to the milestone that delivers the component.',
+          ),
+        );
+      }
+
+      // A label pointing at a merged or deleted milestone is worse than no
+      // label, because it looks authoritative.
+      const planMilestones = new Set(
+        milestoneHeadings.map((h) => (h.title.match(/^Milestone\s+(\d+\.\d+)/i) ?? [])[1]).filter(Boolean),
+      );
+      if (planMilestones.size > 0) {
+        for (const m of body.matchAll(/\(M(\d+\.\d+)\)/g)) {
+          if (!planMilestones.has(m[1])) {
+            findings.push(
+              makeFinding(
+                'HIGH',
+                `Diagram labels milestone ${m[1]}, which this plan does not contain`,
+                loc,
+                `${rulePrefix} labels name a milestone that exists in the plan`,
+                `The diagram references M${m[1]}; the plan defines ${[...planMilestones].map((x) => `M${x}`).join(', ') || 'none'}.`,
+                'Update the labels to match the current phasing, in the same edit that changed it.',
+              ),
+            );
+          }
+        }
+      }
+
+      for (const block of body.matchAll(/```mermaid\n([\s\S]*?)```/g)) {
+        for (const label of block[1].matchAll(/\[([^\]]*)\]/g)) {
+          const inner = label[1];
+          if (inner.includes('(') && !inner.startsWith('(') && !inner.startsWith('"')) {
+            findings.push(
+              makeFinding(
+                'HIGH',
+                'Unquoted parentheses in a mermaid node label',
+                loc,
+                `${rulePrefix} node labels containing parentheses are quoted`,
+                `\`${label[0]}\` — mermaid rejects unquoted parentheses and renders nothing at all.`,
+                `Quote the label: ["${inner}"]`,
+              ),
+            );
+          }
+        }
+      }
+    }
   }
 
   // ── Decisions / Open Questions table column checks ─────────────────────

@@ -52,6 +52,17 @@ Do **not** flag a task for lacking a `` `[T]` `` criterion just because all its 
 - No task may depend on a task that appears LATER in the document (a forward reference). **CRITICAL**.
 - An `` `[O]` `` tag must appear only at milestone/phase level (in a `**Observational Outcomes:**` line), never inside a `**Task N Acceptance Criteria:**` block. **MEDIUM**.
 
+## Target State by Milestone (when present)
+
+| Check | Severity |
+|-------|----------|
+| It is a fenced ```mermaid block | HIGH |
+| Milestone labels carry attribution, never progress | HIGH |
+| Every milestone label names a milestone the plan defines | HIGH |
+| Node labels containing parentheses are quoted | HIGH |
+
+`Gateway (M1.1)` is attribution and is correct. `Gateway (M1.1 shipped)` states progress, which already lives in the task tables. A label naming a merged or deleted milestone is worse than no label, because it looks authoritative. Unquoted parentheses are a mermaid parse error that renders nothing at all, so adding a milestone suffix to a bare label means adding the quotes in the same edit.
+
 ## Reporting
 
 Present the findings to the Product Manager exactly as `lint-plan.mjs` would: a total count broken down by CRITICAL/HIGH/MEDIUM, and one entry per finding with its severity, location (milestone + task, or document section), the rule it violates, the issue, and a concrete fix. The PM addresses every CRITICAL and HIGH finding; MEDIUM findings are addressed at the PM's discretion.
