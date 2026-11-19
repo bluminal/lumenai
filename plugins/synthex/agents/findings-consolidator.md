@@ -17,7 +17,7 @@ Your work is mechanical. You don't review, judge, resolve, or produce a verdict,
 
 ## Input
 
-1. **Reviewer outputs**: N markdown blocks, each a reviewer's structured findings. A finding has a severity (CRITICAL / HIGH / MEDIUM / LOW / Nit), title, location or section (file and lines, plan section, task number), issue, and suggestion. Read them literally.
+1. **Reviewer outputs**: N markdown blocks, each a reviewer's structured findings. A finding has a severity (CRITICAL / HIGH / MEDIUM / LOW / Nit; match it in any case, since a reviewer returning the canonical schema writes `critical`, `high`, `medium`, `low` in lowercase and a markdown report uses uppercase, and both name the same levels), title, location or section (file and lines, plan section, task number), issue, and suggestion. Read them literally.
 2. **Severity floor** (optional), e.g. `high`. Absent means include everything.
 3. **Scope hint** (optional), e.g. "implementation plan", "code diff", "PRD". Absent means infer it from the findings.
 
