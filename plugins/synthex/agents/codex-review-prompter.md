@@ -2,6 +2,9 @@
 model: haiku
 description: "Adapter that invokes the OpenAI Codex CLI as an external proposer in multi-model review."
 tools: Bash, Read, Write
+maxTurns: 20
+omitClaudeMd: true
+color: cyan
 ---
 
 # Codex Review Prompter
@@ -25,7 +28,7 @@ Resolved per `multi_model_review.external_permission_mode.codex`:
 
 **Pattern 3 is not implemented.** It must drive the `codex app-server` protocol (`initialize`, `thread/start`, `turn/start`; proxy `item/*/requestApproval` to the parent Claude session), which this adapter does not do. Do not probe `codex app-server --help`: it exits 0 either way.
 
-**`--output-schema` (FR-HM28):** pass the strict `agents/_shared/codex-findings.schema.json` (Codex needs every property `required` and `additionalProperties: false`); `validate-findings` re-applies the canonical rules.
+**`--output-schema` (FR-HM28):** pass the strict `agents/_shared/codex-findings.schema.json`; `validate-findings` re-applies the canonical rules.
 
 ### Step 0 — Pattern 2 profile-existence check (Task 87)
 
@@ -47,7 +50,7 @@ Run `which codex`. Missing → `validate-findings --error cli_missing --message 
 
 ### 2. Auth Check
 
-Per-token API billing is opt-in: unless `config.allow_api_key_billing` is true, unset `CODEX_API_KEY` and `OPENAI_API_KEY` for Steps 2 and 4. If opted in with a key set, skip this check. Otherwise run `codex login status` (no model call) and judge by **exit code only**: it prints `Logged in using ...` on stderr, not stdout. Non-zero → `validate-findings --error cli_auth_failed --message "Run codex login"`.
+Per-token API billing is opt-in: unless `config.allow_api_key_billing` (from `per_reviewer.codex-review-prompter`) is true, unset `CODEX_API_KEY` and `OPENAI_API_KEY` for Steps 2 and 4. If opted in with a key set, skip this check. Otherwise run `codex login status` (no model call) and judge by **exit code only**: it prints `Logged in using ...` on stderr, not stdout. Non-zero → `validate-findings --error cli_auth_failed --message "Run codex login"`.
 
 ### 3. Prompt Construction
 
@@ -85,18 +88,18 @@ On `error_code: parse_failed`, see adapter-common.md.
 
 ### 8. Return Canonical Envelope
 
-Return `validate-findings`'s printed stdout unchanged.
+Return `validate-findings`'s printed stdout unchanged. Reply with nothing else; the orchestrator parses it.
 
 ## Install One-Liner
 
-`npm install -g @openai/codex`, then auth with `codex login`.
+`npm install -g @openai/codex`, then `codex login`.
 
 ## Known Gotchas
 
 1. **Flag order:** all flags precede the `-` prompt argument.
 2. **No approval flag:** `codex exec` never prompts; it has no `--approval-mode` and rejects `-a`. Never pass `--dangerously-bypass-approvals-and-sandbox`.
 3. **Auth token expiry:** `codex login status` can exit 0 near expiry; treat a 401 as `cli_auth_failed`.
-4. **zsh word-splitting:** keep `${MODEL:+--model="$MODEL"}` one word; zsh would pass `-m "$MODEL"` as a single argument.
+4. **zsh word-splitting:** keep `${MODEL:+--model="$MODEL"}` one word; under zsh `-m "$MODEL"` arrives as one argument.
 
 ## Source Authority
 

@@ -2,6 +2,18 @@
 
 Cold-path detail for `/synthex:review-code`'s FR-MR21 8-step decision order (FR-HM5, D17). Read only when multi-model review is enabled after Steps 1-3 (config + flags) resolve; the gate that includes this file, plus Steps 1-3, the Invocation Flags (FR-MR6), and the Path-and-Reason Header Spec (D21), live at `plugins/synthex/commands/review-code.md`. This is not a standalone command — it has no frontmatter and is never registered in `plugin.json`.
 
+**Prompt-file reviewers on this branch.** Step 5 below passes `native_reviewers`
+as agent names, and a `code_review.reviewers` entry of the form
+`- prompt: <path>` has no agent behind it — the orchestrator Tasks these names
+and would fail on a prompt path. Drop those entries from `native_reviewers`, and
+launch them yourself per `docs/prompt-file-reviewers.md` in the same turn you
+invoke the orchestrator, then merge their findings into its `findings` AND into
+the `report` text Step 8 surfaces, under their severity headings — the
+orchestrator builds that report before these reviewers have run, so merging into
+`findings` alone leaves them out of what the user sees. Dropping them from `native_reviewers` without
+launching them silently skips a configured reviewer; the multi-model branch
+replaces Steps 4-5, so nothing else runs them.
+
 **Step 4 — Complexity gate (FR-MR21a)**
 
 If multi-model is enabled at this point, evaluate the complexity gate (see "### Complexity Gate (FR-MR21a)" below):
@@ -16,11 +28,11 @@ When the decision framework selects the multi-model branch, invoke the `multi-mo
 - `command: "review-code"`
 - `artifact_path` from the target parameter
 - `touched_files` computed from the diff
-- `native_reviewers` from `code_review.reviewers` config (or `--reviewers` flag)
+- `native_reviewers` from `code_review.reviewers` config (or `--reviewers` flag), minus any `- prompt:` entry (see the preamble above)
 - `config`: the resolved `multi_model_review` block
 - `per_reviewer_timeout_seconds`: from `multi_model_review.per_reviewer_timeout_seconds` (default 180)
 
-The orchestrator returns the unified consolidated envelope. Render its `report` field as the command's final output, prefixed with the path-and-reason header per D21 (Step 7 below).
+The orchestrator returns the unified consolidated envelope. Merge any prompt-file reviewer's findings into its `report` first (see the preamble above), then render that report as the command's final output, prefixed with the path-and-reason header per D21 (Step 7 below).
 
 Native-only branch continues to call today's review-code logic byte-identically (FR-MR23 regression — verified by Task 38(a) snapshot diff against Task 0 baseline).
 
@@ -35,7 +47,7 @@ Render the **path-and-reason header** per the D21 spec (see "### Path-and-Reason
 **Step 8 — Emit consolidated review**
 
 Emit the consolidated review per the chosen branch:
-- **Multi-model branch:** surface the orchestrator's `report` field, prefixed with the D21 header.
+- **Multi-model branch:** surface the orchestrator's `report` field with any prompt-file findings merged in (see the preamble above), prefixed with the D21 header.
 - **Native-only branch:** surface the review from the native workflow, prefixed with the D21 header.
 
 ---
@@ -54,4 +66,5 @@ The complexity gate decides whether multi-model review is warranted for a given 
 4. Otherwise → native-only
 
 **Cached for the loop's duration (D9):** The gate decision is computed ONCE at the start of the review and cached for all cycles within the same review-loop invocation. This prevents oscillation when the diff hasn't changed but the loop iterates (e.g., re-reviews after fixes).
+
 

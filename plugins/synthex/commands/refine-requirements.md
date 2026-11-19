@@ -46,7 +46,7 @@ Check for a project configuration file at `@{config_path}`. If it exists, load t
 
 | Setting | Default |
 |---------|---------|
-| Reviewers | product-manager, tech-lead, designer (all enabled) |
+| Reviewers | product-manager, tech-lead, lead-frontend-engineer (all enabled) |
 | `review_loops.max_cycles` | 2 (per-command override; global default is 2) |
 | `review_loops.min_severity_to_address` | high (inherited from global) |
 | `documents.requirements` | `docs/reqs/main.md` |
@@ -116,12 +116,14 @@ This is the core quality mechanism. The PRD is reviewed by specialist sub-agents
 
 **Step 4a: Spawn Reviewers**
 
-For each enabled reviewer in the configuration, launch a **fresh** sub-agent IN PARALLEL with:
+For each enabled reviewer in the configuration (legacy `agent: designer` means `lead-frontend-engineer`), launch a **fresh** sub-agent IN PARALLEL with:
 - The full PRD (current version)
 - Technical context gathered in Step 3
 - The reviewer's specific focus area
 - Instructions to review from a PRD clarity perspective (see feedback format below)
 - On cycles 2+: a compact summary of unresolved findings from the prior cycle
+
+**Prompt-file reviewers:** when a `reviewers` entry is `- prompt: <path>`, Read `${CLAUDE_PLUGIN_ROOT}/docs/prompt-file-reviewers.md` and follow it; a bad path skips that one reviewer, never the review. On other hosts, resolve the plugin root from `.synthex/state.json`.
 
 **Context Management:** Each review cycle spawns **new** sub-agent instances — never resume prior reviewer agents. Between cycles, carry forward only:
 1. The updated PRD (full text)
@@ -233,7 +235,7 @@ Each reviewer evaluates the PRD from their professional perspective:
 - Are there missing requirements that would only surface during implementation?
 - Are edge cases and error states addressed for core flows?
 
-### Lead Frontend Engineer (Designer)
+### Lead Frontend Engineer
 - Are UX requirements clear enough to design from?
 - Are interaction patterns described (not just data requirements)?
 - Are responsive/accessibility requirements specified?
@@ -259,7 +261,7 @@ refine_requirements:
       enabled: true
       focus: "Technical clarity, implicit assumptions, NFR targets, missing requirements"
 
-    - agent: designer
+    - agent: lead-frontend-engineer
       enabled: true
       focus: "UX clarity, interaction patterns, accessibility, user flow completeness"
 
@@ -279,7 +281,7 @@ refine_requirements:
     - agent: tech-lead
       enabled: true
       focus: "Technical clarity, implicit assumptions, NFR targets"
-    - agent: designer
+    - agent: lead-frontend-engineer
       enabled: true
       focus: "UX clarity, interaction patterns, accessibility"
     - agent: security-reviewer

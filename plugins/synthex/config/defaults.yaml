@@ -9,6 +9,28 @@
 # Unspecified values use the defaults shown here.
 #
 # To create this file automatically, run the `init` command.
+#
+# Where settings can live, highest precedence first (mirrors Claude Code's
+# settings precedence, so project settings beat personal ones):
+#
+#   1. <project>/.synthex/config.local.yaml  your settings for this one repo
+#                                              (gitignored, not committed)
+#   2. <project>/.synthex/config.yaml        the team's settings for this repo
+#   3. ~/.config/synthex/config.yaml          your settings for every repo
+#                                              ($XDG_CONFIG_HOME aware)
+#   4. this file
+#
+# Two narrow key classes break that order:
+#
+#   multi_model_review.per_reviewer.*  is USER-OWNED. Which external models are
+#     installed on a machine and what they are called is a fact about the
+#     machine, not the repo, so the user layer is consulted first.
+#
+#   multi_model_review.enabled and any multi_model_review.*.enabled are
+#     RESTRICTIVE-WINS. `false` in any hand-written layer disables it, the way
+#     Claude Code unions permission deny rules rather than replacing them. A
+#     repo cannot switch on sending your code to an external CLI when you have
+#     switched it off. (The `false` shipped below is the default, not a veto.)
 
 # -------------------------------------------------------------------
 # Review Loop Settings (Global)
@@ -136,12 +158,14 @@ implementation_plan:
   #   - Add project-specific reviewers (e.g., security-reviewer, compliance)
   #   - Disable default reviewers by setting enabled: false
   #   - Customize the focus area for each reviewer
+  #   - Point an entry at a markdown prompt file in this project instead of a
+  #     Synthex agent, with `- prompt: <path>` (docs/prompt-file-reviewers.md)
   reviewers:
     - agent: architect
       enabled: true
       focus: "Technical architecture, feasibility, NFR coverage, missing technical tasks"
 
-    - agent: designer
+    - agent: design-system-agent
       enabled: true
       focus: "Design tasks, UX impact, visual/interaction design clarity"
 
@@ -167,7 +191,9 @@ refine_requirements:
 
   # Sub-agents that review the PRD for clarity and completeness.
   # Each reviewer identifies ambiguities, gaps, and unclear areas
-  # from their professional perspective.
+  # from their professional perspective. An entry may also point at a markdown
+  # prompt file in this project with `- prompt: <path>` instead of naming a
+  # Synthex agent (docs/prompt-file-reviewers.md).
   reviewers:
     - agent: product-manager
       enabled: true
@@ -177,7 +203,7 @@ refine_requirements:
       enabled: true
       focus: "Technical clarity, implicit assumptions, NFR targets, missing requirements"
 
-    - agent: designer
+    - agent: lead-frontend-engineer
       enabled: true
       focus: "UX clarity, interaction patterns, accessibility, user flow completeness"
 
@@ -201,10 +227,17 @@ code_review:
   # Reviewers to run in parallel during code review.
   # code-reviewer and security-reviewer are always recommended.
   # Add performance-engineer for performance-critical codebases.
+  #
+  # An entry may also point at a markdown prompt file in this project instead of
+  # naming a Synthex agent. Its findings are deduped and severity-ranked with
+  # everyone else's. See docs/prompt-file-reviewers.md.
   reviewers:
     - code-reviewer
     - security-reviewer
     # - performance-engineer  # Uncomment for performance-critical code
+    # - prompt: .github/scripts/pr-guardian/prompt.md
+    #   id: pr-guardian       # Optional; defaults to frontmatter `name`
+    #   enabled: true         # Optional; defaults to true
 
   # Maximum diff size (in lines) before warning about review quality.
   # Large diffs produce lower-quality reviews. Google recommends < 300 LOC.
@@ -378,6 +411,20 @@ next_priority:
   # Can be overridden per-invocation via the `concurrent_tasks` parameter.
   concurrent_tasks: 3
 
+  # Where parallel Tech Lead workers run for next-priority (FR-CA2, FR-HW1).
+  # Options: local | cloud | workspace. Default local keeps today's worktree
+  # fan-out (on Claude Code, via Agent isolation: "worktree" when
+  # worktrees.base_path is .claude/worktrees — FR-HW8).
+  # cloud is Cursor-first: Task tool environment=cloud (own VM + branch).
+  # workspace runs each worker in an Orca or Herdr child workspace; other
+  # sessions fall back to local with a one-line notice (FR-HW3).
+  # Overridden per call by --in-cloud / --in-workspace / --local
+  # (flag > this key > local; --local wins any conflict).
+  # On hosts without Cursor-style Task environment support, cloud falls
+  # back to local with a one-line notice (FR-CA5) — Claude cloud parent
+  # orchestration is deferred until bidirectional messaging exists.
+  execution_environment: local
+
 # -------------------------------------------------------------------
 # Native Looping Settings
 # Used by every --loop command (next-priority, loop, review-code,
@@ -504,11 +551,13 @@ multi_model_review:
   #                                # needs per_reviewer model + family below)
 
   # Per-reviewer overrides. Each adapter may override its default model, family
-  # tag, or invocation flags. Use the agent name as the key.
+  # tag, or invocation flags. Use the agent name as the key. The orchestrator
+  # forwards the adapter's whole block verbatim as its input envelope `config`.
   per_reviewer:
     # codex-review-prompter:
     #   model: gpt-5
     #   family: openai
+    #   allow_api_key_billing: false  # Opt-in: true lets codex use CODEX_API_KEY/OPENAI_API_KEY (per-token billing); otherwise they are unset
     # ollama-review-prompter:
     #   model: qwen2.5-coder:32b
     #   family: local-qwen
@@ -579,10 +628,6 @@ multi_model_review:
     write_implementation_plan:
       enabled: false               # When true, plan-review uses multi-model
       # No complexity gate for plan review (FR-MR22): plans are always reviewed.
-    team_review:
-      enabled: false               # FR-MMT3: when true, /team-review uses multi-model orchestration
-      # No complexity gate for team-review (parallels FR-MR22's design for write-implementation-plan):
-      # team-review is invoked deliberately for high-risk changes; the user has already opted in
 
   # Consolidation pipeline configuration.
   consolidation:

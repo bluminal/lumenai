@@ -5,6 +5,121 @@ All notable changes to LumenAI and its plugins are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [synthex 2.7.3] - 2026-11-19
+
+### Changed
+
+- (synthex) align agent prompts with Anthropic's per-model prompting guides
+
+## [synthex 2.7.2] - 2026-11-19
+
+### Changed
+
+- define rules and framework for adding external sources
+
+## [synthex 2.7.1] - 2026-11-11
+
+### Fixed
+
+- (synthex) add Cursor plugin manifests so the Cursor marketplace sees current versions
+
+## [synthex 2.7.0] - 2026-11-05
+
+### Added
+
+- (synthex) run next-priority workers in host workspaces and Claude Code worktree isolation
+
+### Fixed
+
+- (synthex) apply live Orca, Herdr and RTK smoke-test findings to next-priority
+
+## [synthex 2.6.1] - 2026-11-05
+
+### Fixed
+
+- (synthex) skip worktree setup when the host isolates next-priority workers
+
+## [synthex 2.6.0] - 2026-11-03
+
+### Added
+
+- (synthex) generate Cursor Task agent discovery wrappers
+- (synthex) keep review fan-out foreground on Cursor Task
+- (synthex) add Cursor cloud execution for next-priority
+
+### Fixed
+
+- (synthex) restore the next-priority test suite
+- (synthex) finish AGENTS.md merge and size-gated review FG/BG
+- (review) keep a borrowed prompt's own report sections out of the report
+
+## [synthex 2.5.5] - 2026-11-01
+
+### Fixed
+
+- (synthex) route product-manager questions through the caller; tune subagent frontmatter
+
+## [synthex 2.5.4] - 2026-11-01
+
+### Changed
+
+- read AGENTS.md in loop-engine-selector config-table check
+- move developer instructions from CLAUDE.md to AGENTS.md
+
+## [synthex 2.5.3] - 2026-10-31
+
+### Fixed
+
+- (synthex) replace the nonexistent designer reviewer with real agents
+- (multi-model) forward per_reviewer settings to adapters
+- (multi-model) make configure-multi-model actually enable review
+- (synthex) lint `git commit -F -` messages supplied in the same command
+
+### Changed
+
+- (release) open an issue when the docs-PR agent fails
+- (synthex) remove synthex-plus dead code
+
+## [synthex 2.5.2] - 2026-10-30
+
+### Changed
+
+- (synthex) remove stale synthex-plus references
+
+## [synthex 2.5.1] - 2026-10-30
+
+### Changed
+
+- (release) stand down instead of failing when main moves mid-release
+
+## [synthex 2.5.0] - 2026-10-30
+
+### Added
+
+- (synthex) auto-answer recommended questions under next-priority --auto-decide
+
+### Fixed
+
+- (review) name a prompt-file reviewer after its directory
+
+## [synthex 2.4.0] - 2026-10-30
+
+### Added
+
+- (review) allow a repository prompt file as a review-loop reviewer
+
+## [synthex 2.3.0] - 2026-10-29
+
+### Added
+
+- (config) add user-level and project-local config layers
+
+### Fixed
+
+- (synthex) codex adapter makes per-token API-key billing opt-in (allow_api_key_billing)
+- (synthex) codex adapter defaults reach codex exec, fail closed on empty output, and auth check works
+- (synthex) codex adapter uses commands and flags that exist on Codex CLI
+
 ## [synthex 2.2.0] - 2026-10-06
 
 ### Added

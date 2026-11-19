@@ -14,7 +14,7 @@ If `SendMessage` and `ListAgents` are both in your tool list, continue to Step 1
 
 ### 1. Enumerate Non-Standing Teams
 
-Scan `~/.claude/teams/` for directories that contain a `config.json` file, excluding the `standing/` subdirectory. Each matching directory is a non-standing (ephemeral) team created by a previous per-invocation command (`team-review`, `team-implement`, etc.).
+Scan `~/.claude/teams/` for directories that contain a `config.json` file, excluding the `standing/` subdirectory. Each matching directory is a non-standing (ephemeral) team — for example, one left behind by a previous Agent Teams session.
 
 For each non-standing team directory found, record:
 - `name` — directory name

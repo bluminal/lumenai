@@ -17,6 +17,7 @@
  *      under plugins/synthex/agents/, and every model value is in the
  *      accepted set.
  *   5. Every new defaults.yaml key under `models:` has a comment.
+ * Raised again for the prompt-file-reviewers gate (`docs/prompt-file-reviewers.md`): review-code.md by 256 B, write-implementation-plan.md by 384 B.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -128,7 +129,7 @@ describe('Task 31 (FR-HM15, D29): Model Resolution paragraph', () => {
 
   it('review-code.md stays at or under its 16,000-byte D17 budget (Task 13; raised by Task 48/D6, then Task 49/FR-HM21 by 256 B for the Step 4 capability-ladder gate, then Task 57 by 128 B for the deterministic, FR-HM3-gated "never call Workflow unless" level-2 pointer — the live-run gate-leak fix)', () => {
     const content = readFileSync(join(COMMANDS_DIR, 'review-code.md'), 'utf-8');
-    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(16_000);
+    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(16_256);
   });
 
   it('performance-audit.md stays at or under its 9,472-byte D17 budget (Task 14; raised by Task 48/D6, then Task 49/FR-HM21 by 512 B for the Step 4 capability-ladder gate)', () => {
@@ -138,7 +139,7 @@ describe('Task 31 (FR-HM15, D29): Model Resolution paragraph', () => {
 
   it('write-implementation-plan.md stays at or under its 26,112-byte D17 budget (Task 14)', () => {
     const content = readFileSync(join(COMMANDS_DIR, 'write-implementation-plan.md'), 'utf-8');
-    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(26_112);
+    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(26_496);
   });
 
   describe.each([...INLINE_COMMANDS, ...GATED_COMMANDS])('%s has a --profile Parameters row', (file) => {

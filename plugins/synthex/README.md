@@ -94,6 +94,7 @@ This creates:
 | Path | Purpose |
 |------|---------|
 | `.synthex/config.yaml` | Project configuration (overrides defaults) |
+| `.synthex/config.local.yaml` | Your personal overrides for this repo (gitignored) |
 | `docs/reqs/` | Product requirements (PRDs) |
 | `docs/plans/` | Implementation plans |
 | `docs/specs/` | Technical specifications |
@@ -152,7 +153,7 @@ Agents focused on understanding users, measuring outcomes, and driving improveme
 | `/loop` | Generic looping primitive — loops a prompt (literal or file) until a completion promise is emitted or `--max-iterations` is reached. See "Native Looping" below. | -- |
 | `/list-loops` | Enumerate running and recently-terminal loops in the project. Read-only. | -- |
 | `/cancel-loop` | Cancel a loop by id, or `--all` running loops. Idempotent on terminal-status loops. | -- |
-| `/next-priority` | Execute next highest-priority tasks. Supports `--auto-decide` for unattended runs (see "Autonomous Decisions" below). | Tech Lead |
+| `/next-priority` | Execute next highest-priority tasks. Supports `--auto-decide` for unattended runs (see "Autonomous Decisions" below) `--in-cloud` / `execution_environment: cloud` for Cursor cloud subagents (see "Cloud Execution" below), and `--in-workspace` / `execution_environment: workspace` for Orca or Herdr child workspaces (see "Host Workspaces" below). | Tech Lead |
 | `/write-implementation-plan` | Transform PRD into implementation plan | PM + Architect + Design System Agent + Tech Lead |
 | `/review-code` | Multi-perspective code review | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
 | `/write-adr` | Create Architecture Decision Record | Architect (interactive) |
@@ -180,16 +181,57 @@ Synthex uses a **convention over configuration** approach:
 - **With a config file:** Projects override specific settings in `.synthex/config.yaml`. Only include what you want to change.
 - **Config lives in the repo:** Version-controlled alongside code, so the team shares the same configuration.
 
+### Prompt-file reviewers
+
+A `reviewers` entry can point at a markdown prompt file in your project instead of naming a Synthex agent, so a review prompt you already maintain runs as part of a Synthex review:
+
+```yaml
+code_review:
+  reviewers:
+    - code-reviewer
+    - security-reviewer
+    - prompt: .github/scripts/pr-guardian/prompt.md
+      id: pr-guardian
+```
+
+Its findings are deduped, severity-ranked and attributed alongside every other reviewer's rather than landing in a section of their own. Accepted in `code_review.reviewers`, `implementation_plan.reviewers` and `refine_requirements.reviewers`. See [`docs/prompt-file-reviewers.md`](docs/prompt-file-reviewers.md) for frontmatter handling, the read-only rule, and failure modes.
+
+### Where settings can live
+
+Settings resolve across four layers, highest precedence first:
+
+| Layer | Path | Scope |
+|-------|------|-------|
+| Project-local | `.synthex/config.local.yaml` | Your settings for this one repo. Gitignored by `/synthex:init` — never committed. |
+| Project (shared) | `.synthex/config.yaml` | The team's settings for this repo. Committed. |
+| User | `~/.config/synthex/config.yaml` | Your settings for every repo. Honors `$XDG_CONFIG_HOME`. |
+| Plugin defaults | `config/defaults.yaml` | Shipped with Synthex. |
+
+Project settings beat user settings, matching [Claude Code's settings precedence](https://docs.claude.com/en/docs/claude-code/settings#settings-precedence) — a repo can pin behavior for everyone who works in it. Only include the keys you want to change at each layer; the rest fall through.
+
+Two narrow key classes break that order:
+
+- **User-owned — `multi_model_review.per_reviewer.*`.** Which external models are installed on a machine and what they are called is a fact about the machine, not the repo, so the user layer is consulted first. A repo asking for `qwen2.5-coder:32b` cannot override the model you actually pulled.
+- **Restrictive-wins — `multi_model_review.enabled` and any `multi_model_review.*.enabled`.** `false` in any hand-written layer disables it, the way Claude Code unions permission deny rules rather than replacing them. A repo cannot switch on sending your code to an external CLI when you have switched it off. (Plugin defaults do not vote here, so the shipped `false` is still just a default.)
+
+Setting these in your user config disables external review everywhere, whatever a repo asks for:
+
+```yaml
+# ~/.config/synthex/config.yaml
+multi_model_review:
+  enabled: false
+```
+
 See [`config/defaults.yaml`](config/defaults.yaml) for the full reference. Key settings:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `review_loops.max_cycles` | 2 | Global max review loop iterations for all commands |
 | `review_loops.min_severity_to_address` | high | Global minimum severity that must be resolved |
-| `implementation_plan.reviewers` | architect, designer, tech-lead | Sub-agents that review draft implementation plans |
+| `implementation_plan.reviewers` | architect, design-system-agent, tech-lead | Sub-agents that review draft implementation plans |
 | `implementation_plan.concurrent_tasks` | 3 | Max parallelizable tasks per milestone in the plan |
 | `implementation_plan.review_loops.max_cycles` | 3 | Per-command override (higher for high-stakes plans) |
-| `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `/review-code` |
+| `code_review.reviewers` | code-reviewer, security-reviewer | Reviewers for `/review-code`. An entry may be `- prompt: <path>` instead of an agent name — see [Prompt-file reviewers](#prompt-file-reviewers). |
 | `code_review.max_diff_lines` | 300 | Warn when diff exceeds this size |
 | `code_review.spec_paths` | `[docs/specs]` | Specifications for compliance checking |
 | `quality.coverage_thresholds` | line: 80, branch: 70, function: 80 | Coverage thresholds |
@@ -203,6 +245,7 @@ See [`config/defaults.yaml`](config/defaults.yaml) for the full reference. Key s
 | `retrospective.format` | start-stop-continue | Retrospective format |
 | `retrospective.max_improvement_items` | 3 | Max items per cycle |
 | `next_priority.concurrent_tasks` | 3 | Max parallel tasks for `/next-priority` |
+| `next_priority.execution_environment` | `local` | `local` worktrees, `cloud` Cursor Task subagents, or `workspace` Orca/Herdr child workspaces (`--in-cloud` / `--in-workspace` / `--local` override) |
 | `documents.requirements` | `docs/reqs/main.md` | Default PRD path |
 | `documents.implementation_plan` | `docs/plans/main.md` | Default plan path |
 | `documents.specs` | `docs/specs` | Specs directory |
@@ -228,9 +271,44 @@ Synthex 0.8+ ships a **native looping primitive** that iterates a command until 
 
 `--loop` is supported on `next-priority`, `write-implementation-plan`, `refine-requirements`, and `review-code`. The flag is opt-in — when absent, every command behaves identically to today. See [`plugins/synthex/docs/native-looping.md`](./docs/native-looping.md) for the full framework spec, state-file schema, and emission-point details per command.
 
+## Cloud Execution (`--in-cloud`)
+
+On Cursor, `/next-priority` can fan out each parallel Tech Lead as a **cloud subagent** under the parent session (`Task` with `environment: "cloud"`, `run_in_background: true`). Each worker gets its own VM and branch; the parent merges by fetching that branch after validation. Set a project default with `next_priority.execution_environment: cloud` in `.synthex/config.yaml`, or pass `--in-cloud` / `--local` per call (flag wins; `--local` wins if both are set).
+
+Parallel plan-task workers run in the **background**; advisory reviewers stay **foreground**. Cloud workers never use standing-pool filesystem inboxes — completion is via Task result / resume and git. Non-Cursor hosts print a one-line notice and fall back to local worktrees (Claude cloud parent orchestration is deferred). Uncommitted local edits are invisible to cloud clones; commit and push (or use `--local`) first. See `docs/plans/cursor-cloud-agent-support.md`.
+
+```
+/synthex:next-priority --in-cloud --loop
+```
+
+## Host Workspaces (`--in-workspace`)
+
+If you run Synthex inside [Orca](https://github.com/stablyai/orca) or [Herdr](https://herdr.dev), `/next-priority --in-workspace` launches each parallel Tech Lead as its own agent session in a **child workspace** (`orca worktree create --parent-worktree current --agent …`, or `herdr worktree create` + `herdr agent start`). The workspace owns the checkout, so Synthex creates nothing under `worktrees.base_path`. You can watch each task in the host's UI and step in when it is blocked. Once a task is validated and merged, Synthex removes its workspace through the host CLI. Opt in per call, or set `next_priority.execution_environment: workspace`. `scripts/lib/detect-workspace-host.sh` does the detection. Conductor is detected but not supported, and any other session prints a one-line notice and falls back to local worktrees. Commit local edits first: child workspaces are fresh checkouts. See `docs/plans/next-priority-host-workspaces.md`.
+
+```
+/synthex:next-priority --in-workspace --loop
+```
+
+On Claude Code, local runs (the default) use the Agent tool's `isolation: "worktree"` for each Tech Lead whenever `worktrees.base_path` is the default `.claude/worktrees`. Each worker renames its harness branch to the task branch, and Synthex removes the worktree right after merging. A custom `base_path`, or any other host, keeps the manual `git worktree add`.
+
+## Cursor Task agents
+
+Synthex ships generated Cursor subagent wrappers at `plugins/synthex/cursor-agents/` (regenerate with `node plugins/synthex/scripts/generate-codex-skills.mjs`; do not hand-edit). Each file has Cursor-native frontmatter (`name`, `description`, `model: inherit`, `readonly` for advisory roles) and points at the canonical `agents/<slug>.md`.
+
+- **This marketplace repo:** wrappers are also written to `.cursor/agents/` so the Agents Window discovers them automatically.
+- **Consumer projects:** copy or symlink the plugin's `cursor-agents/` directory to your project `.cursor/agents/` (or merge selected roles). Cursor also loads `.claude/agents/`; these wrappers are the Cursor-frontmatter path.
+
+Foreground vs background remains a per-call Task argument (`run_in_background`) — wrappers never set `is_background`.
+
 ## Autonomous Decisions (`--auto-decide`)
 
 `/next-priority` accepts an opt-in `--auto-decide` flag for unattended `--loop` runs. Normally, when the Tech Lead sub-agent reaches a high-impact decision or an ambiguous requirement it already has a recommendation for, it stops and asks via `AskUserQuestion` — which halts an unattended loop. With `--auto-decide` set, the Tech Lead takes its own recommended option instead of asking, and records the decision, the alternatives it considered, and its reasoning in the implementation plan for later human review.
+
+On Claude Code the flag also arms a PreToolUse hook (`scripts/auto-decide-gate.sh`) for that session only. Any `AskUserQuestion` whose questions each have exactly one `(Recommended)` option is answered with that option automatically; the dialog never opens. Every auto-decision is then:
+
+- logged to `.synthex/auto-decide/<session_id>.jsonl`, with the commit before it;
+- recorded as an `Auto-Decision: <question> => <choice>` trailer on the commit that implements it, so `git log --grep '^Auto-Decision:'` finds it and `<sha>^` is the code before it;
+- listed in a bold **Auto-decisions** section at the top of the PR description.
 
 This is scoped narrowly: `[H]` (human-validated) acceptance criteria are **never** affected. Those always require explicit user approval via `AskUserQuestion` before merge, with or without `--auto-decide` — the flag only removes discretionary escalations that already have a clear recommendation, not formal sign-off gates.
 

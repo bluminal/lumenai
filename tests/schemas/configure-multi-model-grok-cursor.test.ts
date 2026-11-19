@@ -109,8 +109,8 @@ describe('Task 70 Step 1a: grok and cursor-agent detection', () => {
   });
 
   it('presence checks are `command -v grok` and `command -v cursor-agent`', () => {
-    expect(s1a).toMatch(/^\| `grok` \| `command -v grok` \|/m);
-    expect(s1a).toMatch(/^\| `cursor-agent` \| `command -v cursor-agent` \|/m);
+    expect(s1a).toMatch(/^\| `grok` \| `grok-review-prompter` \| `command -v grok` \|/m);
+    expect(s1a).toMatch(/^\| `cursor-agent` \| `cursor-review-prompter` \| `command -v cursor-agent` \|/m);
   });
 
   it('never checks for or runs a binary named `agent` (it can be Grok\'s)', () => {
@@ -308,7 +308,7 @@ describe('Task 70 Step 1b: "detected — opt in manually" listing', () => {
     expect(keep).toContain('`Kept cursor-review-prompter (manual opt-in)`');
     expect(keep).toContain('the wizard never removes it');
     // Step 0's re-run option and Option 1's label both point at the rule
-    expect(wizard).toContain('overwrite `multi_model_review.reviewers`, keeping any manual opt-in adapter already in the list (Step 1d)');
+    expect(wizard).toContain('keeping any manual opt-in adapter already in `reviewers` (Step 1d)');
     expect(s1b).toContain('a re-run also keeps manual opt-in adapters already in `reviewers`; Step 1d');
   });
 });
@@ -519,7 +519,7 @@ describe('Task 70 defaults.yaml examples', () => {
     expect(per['cursor-review-prompter'].family).toBe('openai');
     expect(per['cursor-review-prompter'].allow_api_key_billing).toBe(false);
     // the pre-existing examples still parse
-    expect(per['codex-review-prompter']).toEqual({ model: 'gpt-5', family: 'openai' });
+    expect(per['codex-review-prompter']).toEqual({ model: 'gpt-5', family: 'openai', allow_api_key_billing: false });
   });
 
   it('the grok example says family defaults to xai only for an unset or grok-* model (grok-review.sh)', () => {
@@ -596,7 +596,11 @@ describe('Task 70 U23: no validator rejects per_reviewer.<id>.allow_api_key_bill
   });
 
   it('the only code that reads per_reviewer.<id> keys is the two runners, and both read allow_api_key_billing', () => {
-    const readers = CODE.filter((p) => PER_REVIEWER.test(readFileSync(p, 'utf8'))).map((p) => relative(ROOT, p));
+    // config-get.sh is the generic layered reader: it only gives per_reviewer.* user-layer
+    // precedence and never validates or rejects a key, so it is not a reader of a specific key.
+    const readers = CODE.filter((p) => PER_REVIEWER.test(readFileSync(p, 'utf8')))
+      .map((p) => relative(ROOT, p))
+      .filter((p) => p !== 'plugins/synthex/scripts/lib/config-get.sh');
     expect(readers.sort()).toEqual([
       'plugins/synthex/scripts/adapters/cursor-review.sh',
       'plugins/synthex/scripts/adapters/grok-review.sh',
@@ -649,8 +653,8 @@ describe('Task 70 docs', () => {
   it.each([
     ['grok-review-prompter', 'family `xai`'],
     ['cursor-review-prompter', 'family from config'],
-  ])('root CLAUDE.md Utility Layer has a %s row matching the adapter frontmatter and tier', (adapter, family) => {
-    const claude = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8');
+  ])('root AGENTS.md Utility Layer has a %s row matching the adapter frontmatter and tier', (adapter, family) => {
+    const claude = readFileSync(join(ROOT, 'AGENTS.md'), 'utf8');
     const utility = claude.slice(claude.indexOf('### Utility Layer'), claude.indexOf('## Commands'));
     const row = utility.split('\n').find((l) => l.startsWith(`| \`${adapter}\` |`));
     expect(row).toBeDefined();

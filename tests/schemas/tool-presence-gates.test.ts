@@ -210,7 +210,8 @@ export const KNOWN_UNGATED: KnownUngatedEntry[] = [
   // already confirmed available by an upstream Step 0 gate, not a
   // capability branch), matching the pattern start-review-team.md and
   // list-teams.md already used for their own downstream mentions. See
-  // docs/plans/harness-modernization.md Task 49.
+  // docs/plans/harness-modernization.md Task 49. team-orchestrator-bridge.md
+  // was later removed as dead code.
 ];
 
 // ── Acceptance criteria ─────────────────────────────────────────────────

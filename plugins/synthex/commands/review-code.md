@@ -129,6 +129,8 @@ FR-HM21 levels 3-4 (Capability Ladder, `${CLAUDE_PLUGIN_ROOT}/docs/standing-pool
 - **Performance Engineer** (optional, if enabled in config): performance-focused review (algorithmic complexity, bundle impact, query patterns, caching).
 - **Design System Agent** (automatic for UI changes): if the diff contains frontend/UI files (`.tsx`, `.jsx`, `.css`, `.scss`, `.vue`, `.svelte`), invoke for compliance review, in parallel with the other reviewers.
 
+**Prompt-file reviewers:** when a `reviewers` entry is `- prompt: <path>`, Read `${CLAUDE_PLUGIN_ROOT}/docs/prompt-file-reviewers.md` and follow it; a bad path skips that one reviewer, never the review. On other hosts, resolve the plugin root from `.synthex/state.json`.
+
 ### 5. Consolidate Results
 
 Invoke the **findings-consolidator** sub-agent (Haiku-backed) with all reviewer outputs from Step 4 to dedupe findings multiple reviewers raised, group by file/location, sort by severity, preserve reviewer attribution, and flag severity disagreements (e.g., Code Reviewer: MEDIUM, Security Reviewer: HIGH). The consolidator never drops CRITICAL/HIGH findings regardless of severity floor. Merge its output into the unified report format:

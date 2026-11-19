@@ -12,6 +12,7 @@
  * commands, L_SEL (derived from J_SEL) for loop.md.
  *
  * Plan: docs/plans/harness-modernization.md Task 59 (D34).
+ * Raised again for the prompt-file-reviewers gate (`docs/prompt-file-reviewers.md`): review-code.md by 256 B, write-implementation-plan.md by 384 B.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -137,8 +138,8 @@ describe('Task 59 (FR-HM19, D34): loop engine selector in the other --loop comma
   });
 
   it('review-code.md stays at or under 16,000 bytes and write-implementation-plan.md at or under 26,112 bytes', () => {
-    expect(statSync(join(COMMANDS, 'review-code.md')).size).toBeLessThanOrEqual(16000);
-    expect(statSync(join(COMMANDS, 'write-implementation-plan.md')).size).toBeLessThanOrEqual(26112);
+    expect(statSync(join(COMMANDS, 'review-code.md')).size).toBeLessThanOrEqual(16256);
+    expect(statSync(join(COMMANDS, 'write-implementation-plan.md')).size).toBeLessThanOrEqual(26496);
   });
 
   it('defaults.yaml ships native_looping.engine: prose in its own top-level block', () => {
@@ -177,14 +178,18 @@ describe('Task 59 (FR-HM19, D34): loop engine selector in the other --loop comma
     }
   });
 
-  it("CLAUDE.md's What's Configurable table has the native_looping.engine row", () => {
-    const text = readFileSync(join(REPO_ROOT, 'CLAUDE.md'), 'utf-8');
+  it("AGENTS.md's What's Configurable table has the native_looping.engine row", () => {
+    const text = readFileSync(join(REPO_ROOT, 'AGENTS.md'), 'utf-8');
     const row =
       "| `native_looping.engine` | `prose` | FR-HM19 Stage 2 loop engine for every `--loop` command (Claude Code only, opt-in, D34); `workflow` only takes effect with a `Workflow` tool in the caller's tool list and without `--loop-isolated` (`docs/engines/loop-workflow.md`) |";
     expect(countOccurrences(text, row)).toBe(1);
+    // concurrent_tasks, then execution_environment (FR-CA2), then native_looping.engine
     expect(
       text.includes(
-        '| `next_priority.concurrent_tasks` | `3` | Max parallel tasks for `next-priority` command |\n' + row + '\n',
+        '| `next_priority.concurrent_tasks` | `3` | Max parallel tasks for `next-priority` command |\n' +
+          '| `next_priority.execution_environment` | `local` | `local` (worktrees; Claude Code uses Agent `isolation: "worktree"`), `cloud` (Cursor Task `environment: "cloud"`) or `workspace` (Orca/Herdr child workspaces); overridden by `--in-cloud` / `--in-workspace` / `--local` |\n' +
+          row +
+          '\n',
       ),
     ).toBe(true);
   });

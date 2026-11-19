@@ -177,8 +177,8 @@ describe('Task 48: every folded-in template and doc exists', () => {
     'templates/review.md',
     'templates/_skeleton.md',
     'docs/standing-pools.md',
-    'docs/context-management.md',
-    'docs/output-formats.md',
+    // docs/context-management.md and docs/output-formats.md were later deleted:
+    // both documented only the retired team-* commands and nothing referenced them.
     'scripts/task-completed-gate.sh',
     'scripts/teammate-idle-gate.sh',
   ];

@@ -1,7 +1,7 @@
 /**
  * Build-time host data table (decision D9, docs/plans/harness-modernization.md).
  *
- * This is the single source of truth for the six harnesses Synthex targets
+ * This is the single source of truth for the harnesses Synthex targets
  * and how each one's tools relate to Claude Code's native tool names, per
  * the FR-HM12 table in docs/reqs/harness-modernization.md. Nothing in this
  * repo imports it yet -- Task 19 wires it into the generator so the tool
@@ -112,8 +112,9 @@ function skipListEntries(value) {
 }
 
 /**
- * The six harnesses Synthex targets, keyed by host id, in the order the
- * PRD and implementation plan introduce them (D9, D14, D27, FR-HM45).
+ * The harnesses Synthex targets, keyed by host id, in the order the
+ * PRD and implementation plan introduce them (D9, D14, D27, FR-HM45),
+ * with Cursor appended (FR-CA6 / docs/plans/cursor-cloud-agent-support.md).
  *
  * Each entry:
  * - `id` / `displayName`: stable identifier and prose name for docs/wrappers.
@@ -313,6 +314,32 @@ export const HOSTS = Object.freeze({
       shellCapSeconds: 600,
       idleMaxSeconds: 540,
       writabilityHint: 'Hermes: run from a trusted, writable project (`hermes skills trust`); Skills Guard quarantines untrusted trees.',
+      backgroundPoll: null,
+    }),
+  }),
+
+  // FR-CA6: Cursor IDE / Agents Window. Task tool supports run_in_background
+  // and environment=local|cloud (cloud_base_branch only when cloud).
+  cursor: Object.freeze({
+    id: 'cursor',
+    displayName: 'Cursor',
+    toolMap: toolMap({
+      Read: 'Read',
+      Edit: 'StrReplace',
+      Write: 'Write',
+      Bash: 'Shell',
+      Agent: 'Task',
+      Task: 'Task',
+      AskUserQuestion: 'ask in chat (no AskUserQuestion tool)',
+      ...skipListEntries(SKIP_THE_STEP),
+    }),
+    gapMessages: GAP_MESSAGES,
+    hookAllowlist: null,
+    headless: Object.freeze({
+      approvalFlag: 'Cursor Agents Window / Cloud Agents (in-product approvals; Cloud Agents use team env + repo write access)',
+      shellCapSeconds: 600,
+      idleMaxSeconds: 540,
+      writabilityHint: 'Cursor: ensure the workspace is writable; for --in-cloud, configure the repo environment at cursor.com/agents and grant cloud write access to the remote.',
       backgroundPoll: null,
     }),
   }),

@@ -27,9 +27,10 @@ export const COMMAND_COUNT = 22;
 // scripts/lint-plan.mjs), dropping 28 to 23. Task 47 (FR-HM24, D11) then
 // folded in 3 pool agents (standing-pool-cleanup, standing-pool-submitter,
 // team-orchestrator-bridge) from synthex-plus, taking 23 to 26.
-// multi-model-review Task 68 added grok-review-prompter, taking 26 to 27,
-// and Task 69 added cursor-review-prompter, taking 27 to 28.
-export const AGENT_COUNT = 28;
+// team-orchestrator-bridge was then removed as dead code (only the retired
+// /team-review invoked it), taking 26 to 25. multi-model-review Tasks 68 and 69
+// then added grok-review-prompter and cursor-review-prompter, taking 25 to 27.
+export const AGENT_COUNT = 27;
 
 /** Wrappers = every generated portable skill, one per command + agent. */
 export const WRAPPER_COUNT = COMMAND_COUNT + AGENT_COUNT;

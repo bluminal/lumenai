@@ -2,6 +2,8 @@
 
 # Multi-Model Teams — Architecture
 
+> **Note:** This architecture was written for the `synthex-plus` plugin. In v2.0.0 Feature B (standing review pools) was folded into `synthex` (`/synthex:start-review-team` and friends, config in `.synthex/config.yaml`) and synthex-plus was later removed. Feature A (multi-model `/team-review`) was retired along with the other `team-*` commands. See [`docs/migrations/synthex-plus.md`](../../migrations/synthex-plus.md).
+
 > Final architecture for the synthex-plus multi-model-teams feature. Adds two capabilities on top of the parent `multi-model-review` orchestrator: (1) **Feature A** — multi-model in `/team-review`; (2) **Feature B** — standing review pools for `/review-code` and `/performance-audit`. This document covers Option B rationale, the Feature A bridge mechanism (FR-MMT20), cross-session pool lifetime (FR-MMT5a), identity drift mitigation (FR-MMT5b), pool state machine, audit-artifact extensions (FR-MMT30/30a), and deferred Stage 3 inheritance.
 
 ## Related Documentation
@@ -9,7 +11,7 @@
 - [`pool-lifecycle.md`](pool-lifecycle.md) — Pool state machine, storage layout, locking primitive, and lifecycle event sequence
 - [`routing.md`](routing.md) — Pool discovery, TTL enforcement, routing mode semantics
 - [`recovery.md`](recovery.md) — FR-MMT24 per-task recovery and native-recovery dedup partial pass
-- [`standing-pools.md`](../../../plugins/synthex-plus/docs/standing-pools.md) — User-facing design guide for standing review pools
+- [`standing-pools.md`](../../../plugins/synthex/docs/standing-pools.md) — User-facing design guide for standing review pools
 - [Parent: multi-model-review architecture](../../specs/multi-model-review/architecture.md) — Parent plan architecture reference
 
 ---

@@ -31,6 +31,10 @@ const TECH_LEAD_PATH = join(
   'tech-lead.md'
 );
 const content = readFileSync(COMMAND_PATH, 'utf8');
+const autoDecideDoc = readFileSync(
+  join(__dirname, '..', '..', 'plugins', 'synthex', 'docs', 'auto-decide.md'),
+  'utf8'
+);
 const techLeadContent = readFileSync(TECH_LEAD_PATH, 'utf8');
 
 function section(startMarker: string, endMarker: string): string {
@@ -55,7 +59,12 @@ describe('next-priority --auto-decide parameter', () => {
 });
 
 describe('next-priority --auto-decide delegation directive (Step 5)', () => {
-  const step5 = () => section('### 5. Delegate to Tech Lead', '### 6. Monitor Progress');
+  // The directive is `--auto-decide`-only detail, so it sits in the cold-path
+  // doc the command already gates on rather than in Step 5 itself.
+  const step5 = () =>
+    autoDecideDoc.slice(
+      autoDecideDoc.indexOf('## Delegating the directive (next-priority Step 5)')
+    );
 
   it('is conditional on --auto-decide, leaving the default path unchanged', () => {
     expect(step5()).toContain('only when `--auto-decide` is set');
@@ -92,6 +101,39 @@ describe('next-priority autonomous decision record (Step 9)', () => {
     const step9 = section('### 9. Update the Plan', '## Native Looping');
     expect(step9).toContain('Autonomous decision record (when `--auto-decide` was set)');
     expect(step9).toContain('the decision taken, the alternatives considered, and the reasoning');
+  });
+});
+
+describe('next-priority --auto-decide hook, trailer, and PR rules', () => {
+  const doc = readFileSync(
+    join(__dirname, '..', '..', 'plugins', 'synthex', 'docs', 'auto-decide.md'),
+    'utf8'
+  );
+
+  it('points at docs/auto-decide.md from the command', () => {
+    expect(section('## Auto-Decide Mode', '## Native Looping')).toContain('docs/auto-decide.md');
+  });
+
+  it('arms the auto-decide-gate hook and disarms it when the command ends', () => {
+    expect(doc).toContain('auto-decide-gate.sh" on');
+    expect(doc).toContain('auto-decide-gate.sh" off');
+  });
+
+  it('requires an Auto-Decision commit trailer for every auto-decision', () => {
+    expect(autoDecideDoc).toContain(
+      'Add an `Auto-Decision: <question> => <choice>` git trailer'
+    );
+    expect(doc).toContain('never a squash');
+  });
+
+  it('requires a bold Auto-decisions section at the top of any PR', () => {
+    expect(doc).toContain('must start its description, before the summary, with a bold section');
+    expect(doc).toContain('**Auto-decisions');
+  });
+
+  it('keeps [H] approval questions out of the hook', () => {
+    const step7 = section('### 7. Validate Completion', '### 8. Merge Results');
+    expect(step7).toContain('with `[H]` in each question and no `(Recommended)` option');
   });
 });
 

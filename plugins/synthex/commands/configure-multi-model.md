@@ -34,18 +34,22 @@ Read `@{config_path}` (default `.synthex/config.yaml`).
 >
 > - `enabled: true`
 > - `reviewers: [<list from config>]`
+> - `per_command.review_code.enabled: <value from config>`
+> - `per_command.write_implementation_plan.enabled: <value from config>`
 > - `aggregator.command: <value from config>`
+>
+> (If both `per_command` values are `false`, add: "No command uses multi-model review yet — choose Re-run to turn it on.")
 >
 > What would you like to do?
 >
-> 1. **Re-run the wizard** — re-detect installed CLIs and overwrite `multi_model_review.reviewers`, keeping any manual opt-in adapter already in the list (Step 1d). The data-transmission warning (Step 1c) will be re-displayed before any write.
+> 1. **Re-run the wizard** — re-detect installed CLIs and overwrite `multi_model_review.reviewers` and the two `per_command` switches, keeping any manual opt-in adapter already in `reviewers` (Step 1d). The data-transmission warning (Step 1c) will be re-displayed before any write.
 > 2. **Reset to disabled** — set `multi_model_review.enabled: false` (preserve the rest of the block, per D-UO5). The user can re-enable later by re-running this wizard.
 > 3. **Leave as-is** — exit without changes.
 
 Apply the chosen option:
 
 - **Re-run the wizard:** proceed to Step 1.
-- **Reset to disabled:** edit `@{config_path}` so that `multi_model_review.enabled: false`. Do NOT delete the `multi_model_review` block — the explicit `false` value is the signal that the user opted out (D-UO5). Print a one-line confirmation: `Multi-model review disabled. Re-run /synthex:configure-multi-model to re-enable.` Exit.
+- **Reset to disabled:** edit `@{config_path}` so that `multi_model_review.enabled: false` (the master switch gates every `per_command` switch, so leave those as-is). Do NOT delete the `multi_model_review` block — the explicit `false` value is the signal that the user opted out (D-UO5). Print a one-line confirmation: `Multi-model review disabled. Re-run /synthex:configure-multi-model to re-enable.` Exit.
 - **Leave as-is:** print `No changes made.` Exit.
 
 ### 1. Configure Multi-Model Review (optional)
@@ -64,16 +68,18 @@ For each candidate CLI in `[codex, gemini, ollama, llm, aws, claude, grok, curso
 
 **Host id (for Step 1b).** Determine the host id from where you are running, not from a separate environment read: it is the id the wrapper's `SYNTHEX_HOST` step tells you to export (`grok` when you run in Grok Build, and likewise `codex`, `gemini`, `opencode`, `hermes`); on Claude Code it is empty. Export it in the same Bash command as the runner auth checks (`export SYNTHEX_HOST=<id>; ...`). Do not decide it from a separate `echo $SYNTHEX_HOST`: shell state does not carry over between tool calls, so that read is usually empty even on Grok.
 
-| CLI | Presence check | Auth check command |
-|-----|---------------|--------------------|
-| `codex` | `which codex` | `codex login status` |
-| `gemini` | `which gemini` | `gcloud auth list` |
-| `ollama` | `which ollama` | `curl -sf http://localhost:11434/api/tags > /dev/null` |
-| `llm` | `which llm` | `llm keys list` |
-| `aws` | `which aws` | `aws sts get-caller-identity --output text` |
-| `claude` | `which claude` | `claude --version` |
-| `grok` | `command -v grok` | the Grok runner's `--auth-check` (below) |
-| `cursor-agent` | `command -v cursor-agent` | the Cursor runner's `--auth-check` (below) |
+Each auth check mirrors Step 2 of the named adapter (`agents/<adapter>.md`), so the wizard never lists a CLI that the adapter would then reject, or the reverse:
+
+| CLI | Adapter (`reviewers` entry) | `which` check | Auth check command |
+|-----|-----------------------------|---------------|--------------------|
+| `codex` | `codex-review-prompter` | `which codex` | `codex login status`, run with `CODEX_API_KEY`/`OPENAI_API_KEY` unset (API-key billing is opt-in per adapter) |
+| `gemini` | `gemini-review-prompter` | `which gemini` | `[ -n "$GEMINI_API_KEY$GOOGLE_API_KEY" ] \|\| [ -n "$(gcloud auth list 2>/dev/null)" ]` (API key first, then gcloud) |
+| `ollama` | `ollama-review-prompter` | `which ollama` | `curl -sf http://localhost:11434/api/tags > /dev/null` |
+| `llm` | `llm-review-prompter` | `which llm` | none — the adapter skips auth (keys are per provider plugin); treat as authenticated |
+| `aws` | `bedrock-review-prompter` | `which aws` | `aws sts get-caller-identity --output text` |
+| `claude` | `claude-review-prompter` | `which claude` | `claude auth status` |
+| `grok` | `grok-review-prompter` | `command -v grok` | the Grok runner's `--auth-check` (below) |
+| `cursor-agent` | `cursor-review-prompter` | `command -v cursor-agent` | the Cursor runner's `--auth-check` (below) |
 
 Never check for, or run, a binary named `agent`: the Cursor installer's second name for `cursor-agent` can be Grok's binary.
 
@@ -122,13 +128,13 @@ Use the `AskUserQuestion` tool to present the options:
 >
 > Detection results: detected-and-authenticated [`<list of authenticated CLIs>`]; detected-but-unauthenticated [`<list with remediation hints>`]; detected — opt in manually [`<list>`]; not-detected [`<list>`].
 >
-> 1. **Enable with detected CLIs** — write `multi_model_review.enabled: true` + `reviewers: [<adapter names of ONLY authenticated CLIs>]` to `.synthex/config.yaml` (a re-run also keeps manual opt-in adapters already in `reviewers`; Step 1d). Option label lists ONLY authenticated CLIs (D22 — option only includes CLIs that pass both `which` AND auth check), never a manual opt-in CLI. When the config sets `per_reviewer.grok-review-prompter.allow_api_key_billing: true`, show grok in the label as `grok (may bill XAI_API_KEY per token)`.
+> 1. **Enable with detected CLIs** — write `multi_model_review.enabled: true`, `reviewers: [<adapter names of ONLY authenticated CLIs>]`, and `per_command.review_code.enabled: true` + `per_command.write_implementation_plan.enabled: true` to `.synthex/config.yaml` (a re-run also keeps manual opt-in adapters already in `reviewers`; Step 1d). Option label lists ONLY authenticated CLIs (D22 — option only includes CLIs that pass both `which` AND auth check), never a manual opt-in CLI. When the config sets `per_reviewer.grok-review-prompter.allow_api_key_billing: true`, show grok in the label as `grok (may bill XAI_API_KEY per token)`.
 > 2. **Enable later (show snippet)** — print a commented-out `multi_model_review:` YAML snippet matching the `multi_model_review:` block structure from `defaults.yaml`; detected CLIs appear as commented-out reviewers. User can uncomment when ready.
 > 3. **Skip** — do not write any `multi_model_review` config. Default behavior preserved.
 
 Print the two text listings below as plain text BEFORE asking the question, so the user reads them before choosing.
 
-If the detection results include detected-but-unauthenticated CLIs, surface them SEPARATELY with remediation hints (per D22 — e.g., `"Detected but unauthenticated: gemini — run \`gcloud auth login\` to enable"`).
+If the detection results include detected-but-unauthenticated CLIs, surface them SEPARATELY with remediation hints (per D22 — e.g., `"Detected but unauthenticated: gemini — set \`GEMINI_API_KEY\` or run \`gcloud auth login\` to enable"`).
 
 **Detected — opt in manually.** If that bucket is non-empty, print this listing as plain text before the question. It is NOT an option and adds no question; Option 1 never adds anything in it (a re-run only keeps what is already in `reviewers`; Step 1d). `cursor-agent` is always listed when detected (D43). Print one line per entry that applies (for `cursor-agent`, exactly one of its four lines):
 
@@ -169,6 +175,8 @@ Proceed to write the config only after this warning is displayed. (The Grok and 
    - `multi_model_review.enabled: true`
    - `multi_model_review.reviewers: [<adapter names>]` — `reviewers` holds adapter names, never CLI names: map each CLI through the Step 1a table (e.g. `codex` → `codex-review-prompter`). Write authenticated CLIs only: the CLIs that passed both the presence check AND the auth check (D22) and are not in the "detected — opt in manually" bucket. Do NOT include detected-but-unauthenticated CLIs or manual opt-in CLIs in this list.
    - **Re-run: keep manual opt-ins.** When the existing `multi_model_review.reviewers` already holds the adapter of a CLI that is in this run's "detected — opt in manually" bucket (`cursor-review-prompter`; `grok-review-prompter` when grok is in that bucket), keep it: write the authenticated adapters first, then each kept entry in its existing order, without duplicates. Print one line per kept entry, e.g. `Kept cursor-review-prompter (manual opt-in)`. The user added it by hand, so the wizard never removes it; to remove it, edit `reviewers` or choose Reset to disabled.
+   - `multi_model_review.per_command.review_code.enabled: true`
+   - `multi_model_review.per_command.write_implementation_plan.enabled: true` — `/synthex:review-code` and `/synthex:write-implementation-plan` run multi-model only when the master switch AND their own switch are on. (`per_command.team_review` is retired; never write it.)
 3. Run the orchestrator's preflight subroutine (FR-MR20). Report the preflight summary in FR-MR20 format:
    - `N reviewers configured, M available, K families, aggregator: <name>`
    - **Preflight failure during init prints remediation but does NOT abort init.** The user can fix CLI auth and re-run preflight later.
@@ -194,6 +202,11 @@ Print the following commented-out YAML snippet (structure matches the `multi_mod
 #       model: gpt-5.6-sol-high        # placeholder: a named slug from `cursor-agent models`, never auto
 #       family: openai                 # placeholder: the slug's vendor
 #       allow_api_key_billing: false   # true bills CURSOR_API_KEY per request
+#   per_command:
+#     review_code:
+#       enabled: true
+#     write_implementation_plan:
+#       enabled: true
 #   aggregator:
 #     command: auto   # a Cursor reviewer with a flagship slug can win auto; pin another adapter (see defaults.yaml)
 ```

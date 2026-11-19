@@ -117,7 +117,76 @@ describe('configure-multi-model.md — Task 18 structural validation', () => {
       expect(step0!).toMatch(/enabled:\s*false.*skip to Step 1/);
     });
   });
+
+  // Regression: option 1 used to write only `enabled` + `reviewers`, but review-code and
+  // write-implementation-plan also require their `per_command.<cmd>.enabled` switch, so
+  // multi-model never ran after the wizard.
+  describe('Option 1 turns multi-model on for each live command', () => {
+    it('writes per_command.review_code.enabled: true', () => {
+      expect(extractOption1(content)).toContain('multi_model_review.per_command.review_code.enabled: true');
+    });
+
+    it('writes per_command.write_implementation_plan.enabled: true', () => {
+      expect(extractOption1(content)).toContain(
+        'multi_model_review.per_command.write_implementation_plan.enabled: true'
+      );
+    });
+
+    it('never enables the retired per_command.team_review', () => {
+      expect(content).not.toMatch(/team_review\.enabled:\s*true/);
+    });
+
+    it('"Enable later" snippet includes both per_command switches', () => {
+      const snippet = content.slice(content.indexOf('**Option 2'), content.indexOf('**Option 3'));
+      expect(snippet).toMatch(/#\s+review_code:\n#\s+enabled: true/);
+      expect(snippet).toMatch(/#\s+write_implementation_plan:\n#\s+enabled: true/);
+    });
+
+    it('re-entry display shows both per_command switches', () => {
+      const step0 = extractStep0(content)!;
+      expect(step0).toContain('per_command.review_code.enabled');
+      expect(step0).toContain('per_command.write_implementation_plan.enabled');
+    });
+  });
+
+  // Regression: wizard auth checks drifted from the adapters' own Step 2 checks.
+  describe("Detection table mirrors each adapter's auth check", () => {
+    const row = (cli: string) => content.split('\n').find((l) => l.startsWith(`| \`${cli}\` |`)) ?? '';
+
+    it('gemini checks the API key first, then gcloud (gemini-review-prompter Step 2)', () => {
+      expect(row('gemini')).toMatch(/GEMINI_API_KEY.*GOOGLE_API_KEY.*gcloud auth list/);
+    });
+
+    it('claude uses `claude auth status`, not `claude --version`', () => {
+      expect(row('claude')).toContain('claude auth status');
+      expect(content).not.toContain('claude --version');
+    });
+
+    it('llm has no auth check (llm-review-prompter skips auth)', () => {
+      expect(content).not.toContain('llm keys list');
+    });
+
+    it('codex runs login status with API keys unset (billing is opt-in)', () => {
+      expect(row('codex')).toMatch(/codex login status.*CODEX_API_KEY.*OPENAI_API_KEY.*unset/);
+    });
+
+    it.each([
+      ['codex', 'codex-review-prompter'],
+      ['gemini', 'gemini-review-prompter'],
+      ['ollama', 'ollama-review-prompter'],
+      ['llm', 'llm-review-prompter'],
+      ['aws', 'bedrock-review-prompter'],
+      ['claude', 'claude-review-prompter'],
+    ])('%s maps to the %s reviewers entry', (cli, adapter) => {
+      expect(row(cli)).toContain(adapter);
+    });
+  });
 });
+
+/** Extract the "Option 1 — Enable with detected CLIs" apply block. */
+function extractOption1(markdown: string): string {
+  return markdown.slice(markdown.indexOf('**Option 1'), markdown.indexOf('**Option 2'));
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────
 

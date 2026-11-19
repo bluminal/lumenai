@@ -2,6 +2,9 @@
 model: haiku
 description: "Adapter that invokes the Gemini CLI as an external code-review proposer in multi-model review."
 tools: Bash, Read, Write
+maxTurns: 20
+omitClaudeMd: true
+color: cyan
 ---
 
 # Gemini Review Prompter
@@ -71,7 +74,7 @@ On `error_code: parse_failed`, see adapter-common.md; repeat the Step 5 unwrap o
 
 ### 8. Return Canonical Envelope
 
-Return `validate-findings`'s printed stdout unchanged — e.g. `{"status": "success", "error_code": null, "findings": [{"source": {"reviewer_id": "gemini-review-prompter", "family": "google", "source_type": "external"}}], "raw_output_path": "..."}`.
+Return `validate-findings`'s printed stdout unchanged — e.g. `{"status": "success", "error_code": null, "findings": [{"source": {"reviewer_id": "gemini-review-prompter", "family": "google", "source_type": "external"}}], "raw_output_path": "..."}`. Reply with nothing else; the orchestrator parses it.
 
 ---
 

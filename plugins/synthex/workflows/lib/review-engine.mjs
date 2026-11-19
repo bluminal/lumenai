@@ -561,3 +561,39 @@ export function buildVerificationRecord(votes) {
     failure_scenario: failureScenario,
   };
 }
+
+/**
+ * Normalizes a configured `reviewers` list into what the engine launches.
+ *
+ * An entry is an agent name (a bare string, or `{agent}`) or a prompt-file
+ * reviewer the caller already resolved (`{id, promptBody}`). A prompt-file
+ * reviewer gets no `agentType`: there is no plugin agent behind it, so it runs
+ * as a plain sub-agent carrying the borrowed prompt. The caller does the
+ * reading, because a Workflow script has no `fs`
+ * (plugins/synthex/docs/prompt-file-reviewers.md).
+ *
+ * Entries with `enabled: false`, and entries naming neither an agent nor a
+ * prompt body, are dropped: one malformed line must not cost the review the
+ * reviewers that are fine.
+ *
+ * @param {Array<string|{agent?: string, id?: string, promptBody?: string, enabled?: boolean}>} entries
+ * @returns {Array<{id: string, agentType?: string, promptBody?: string}>}
+ */
+export function normalizeReviewers(entries) {
+  return (Array.isArray(entries) ? entries : []).map((entry, index) => {
+    if (typeof entry === 'string') {
+      const id = entry.trim();
+      return id ? { id, agentType: `synthex:${id}` } : null;
+    }
+    if (!entry || typeof entry !== 'object') return null;
+    if (entry.enabled === false) return null;
+    if (typeof entry.promptBody === 'string' && entry.promptBody.trim()) {
+      return { id: entry.id || `prompt-reviewer-${index + 1}`, promptBody: entry.promptBody };
+    }
+    if (typeof entry.agent === 'string' && entry.agent.trim()) {
+      const agent = entry.agent.trim();
+      return { id: entry.id || agent, agentType: `synthex:${agent}` };
+    }
+    return null;
+  }).filter(Boolean);
+}

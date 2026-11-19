@@ -12,5 +12,6 @@ Every wrapper's SYNTHEX_HOST step reads this file. For each harness it names the
 | OpenCode (`opencode`) | `opencode run --command <slug> --auto` (`run` without `--auto` is read-only) | 120 | 90 | in-turn wait only |
 | Grok Build (`grok`) | `grok -p ... --yolo --max-turns N` (never `/loop` or `scheduler_create`) | 120 | 90 | Run the idle wait with `background: true` and poll `get_command_or_subagent_output` (up to one hour) instead of a foreground sleep. |
 | Hermes Agent (`hermes`) | `hermes -z "/<slug> ..."` after `hermes skills trust`; wrap in `timeout` (headless `clarify` hangs) | 600 | 540 | in-turn wait only |
+| Cursor (`cursor`) | Cursor Agents Window / Cloud Agents (in-product approvals; Cloud Agents use team env + repo write access) | 600 | 540 | in-turn wait only |
 
 Set `SYNTHEX_HOST=<id>` before running any `scripts/*.sh` so `loop-step.sh check-writable` prints that host's hint; when it is unset the script prints every host's hint.

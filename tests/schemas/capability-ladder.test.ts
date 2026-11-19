@@ -168,6 +168,13 @@ describe('Task 49 (FR-HM21, D22): capability-ladder.test.ts', () => {
       }
     });
 
+    it('level 3 requires foreground reviewer spawns (FR-CA1 / T5)', () => {
+      expect(section).toMatch(/Foreground vs background \(FR-CA1 \/ T5\)/);
+      expect(section).toMatch(/run_in_background:\s*false/);
+      expect(section).toMatch(/Do \*\*not\*\* use background mode here/);
+      expect(section).toContain('next-priority');
+    });
+
     it('level 4 (sequential) is documented as the always-working floor, not a degraded mode', () => {
       expect(section).toMatch(/\*\*Sequential reviewers\.\*\*/);
       expect(section).toMatch(/today's baseline/);
@@ -279,30 +286,19 @@ describe('Task 49 (FR-HM21, D22): capability-ladder.test.ts', () => {
       expect(src).not.toMatch(/\{ file: 'plugins\/synthex\/commands\/stop-review-team\.md'/);
     });
 
-    it('no longer allowlists team-orchestrator-bridge.md', () => {
-      expect(src).not.toMatch(/\{ file: 'plugins\/synthex\/agents\/team-orchestrator-bridge\.md'/);
-    });
-
-    it('the two pool prose sites were fixed instead: their downstream SendMessage mention is no longer backticked', () => {
-      // Both files legitimately still have ONE backticked `SendMessage` —
-      // their own upstream tool-presence gate (Step 0 in stop-review-team.md;
-      // the frontmatter `tools:` line and gate context in
-      // team-orchestrator-bridge.md's caller). What Task 49 fixed was the
-      // downstream OPERATIONAL mention further down each file, which no
-      // longer uses backticks at all (it is plain prose naming an already-
-      // available tool, not a capability branch).
+    it('the pool prose site was fixed instead: its downstream SendMessage mention is no longer backticked', () => {
+      // stop-review-team.md legitimately still has ONE backticked
+      // `SendMessage` — its own upstream tool-presence gate (Step 0). What
+      // Task 49 fixed was the downstream OPERATIONAL mention further down,
+      // which no longer uses backticks at all (it is plain prose naming an
+      // already-available tool, not a capability branch). The other Task 49
+      // site, team-orchestrator-bridge.md, was later removed as dead code.
       const stopReviewTeam = readFileSync(
         join(commandsRoot, 'stop-review-team.md'),
         'utf8',
       );
-      const bridge = readFileSync(
-        join(repoRoot, 'plugins', 'synthex', 'agents', 'team-orchestrator-bridge.md'),
-        'utf8',
-      );
       expect(stopReviewTeam).toMatch(/For each pool confirmed for stopping, send a SendMessage/);
       expect(stopReviewTeam).not.toMatch(/send a `SendMessage`/);
-      expect(bridge).toMatch(/send a clarification SendMessage/);
-      expect(bridge).not.toMatch(/clarification `SendMessage`/);
     });
   });
 

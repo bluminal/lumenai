@@ -532,7 +532,7 @@ tests:
   - description: "UO-B3: configure-teams enable/skip block surfaces, no pool-spawn"
     vars:
       agent: configure-teams
-      input: "Run the standing review pool configuration wizard. The project has no standing_pools block in .synthex-plus/config.yaml yet. Surface the enable/skip question."
+      input: "Run the standing review pool configuration wizard. The project has no standing_pools block in .synthex/config.yaml yet. Surface the enable/skip question."
     assert:
       - type: icontains
         value: "Enable"

@@ -20,12 +20,23 @@ Automatically identify and execute the next highest-priority tasks from the impl
 | `--max-iterations <int>` | Iteration cap. Hard ceiling 200. | `20` | No |
 | `--loop-isolated` | Fresh-subagent isolation mode per iteration. | off (shared-context default) | No |
 | `--name <slug>` | User-supplied loop-id slug `^[a-z0-9][a-z0-9-]{0,63}$`. | auto: `<command-slug>-<4-char-hex>` | No |
-| `--auto-decide` | Opt-in autonomy directive. When set, the Tech Lead sub-agent takes its own recommended option instead of calling `AskUserQuestion` at decision points where it already has a clear recommendation (high-impact escalations, ambiguous-task clarification) — and records the decision, alternatives, and reasoning in the plan for later review (see Step 9). Does **not** affect `[H]` acceptance-criteria approval, which always requires explicit user sign-off (see Step 7). Propagated to any sub-agent the Tech Lead delegates to. | off | No |
+| `--auto-decide` | Take the recommended option at discretionary decision points instead of asking, and record each one (see Auto-Decide Mode). Never applies to `[H]` approval (Step 7). | off | No |
 | `--profile <economy\|balanced\|premium>` | Override `models.profile` for spawned reviewers (see Model Resolution). | `models.profile` config (`balanced`) | No |
+| `--in-cloud` | Force cloud execution for this call's parallel Tech Lead workers (FR-CA3). | off | No |
+| `--in-workspace` | Run each worker in a child workspace of the Orca or Herdr session you are in (FR-HW1). | off | No |
+| `--local` | Force local worktree execution for this call, overriding a project `next_priority.execution_environment` of `cloud` or `workspace`. | off | No |
 
 ### Model Resolution
 
 Each spawned agent's model and effort resolve in this order: `--profile` flag > `models.agents.<name>` > `models.profile` delta > the agent's own frontmatter (FR-HM15, D29). On Claude Code, the resolved values are applied via the Agent tool's per-call `model` override; on every other host, `models`/`hosts.<harness>.models` are advisory only — applied where the host supports per-subagent model selection, otherwise ignored. Standing-pool routing is unaffected: pools never re-spawn, so a profile change reaches only newly spawned agents.
+
+### Execution Environment Resolution
+
+Resolved **before** Step 4 (FR-CA3, FR-HW1): `--local` beats `--in-cloud` and `--in-workspace`; passing both of those is refused with one line; then the flag, then `bash "${CLAUDE_PLUGIN_ROOT}/scripts/lib/config-get.sh" next_priority.execution_environment local`. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from.
+
+**When it resolves to `cloud`:** Read `${CLAUDE_PLUGIN_ROOT}/docs/next-priority-cloud.md` and follow it; it governs Steps 4, 5 and 8. On other hosts, resolve the plugin root from `.synthex/state.json`.
+
+**When it resolves to `workspace`:** Read `${CLAUDE_PLUGIN_ROOT}/docs/next-priority-workspace.md` and follow it; it governs Steps 4, 5, 6 and 8. On other hosts, resolve the plugin root from `.synthex/state.json`.
 
 ## Core Responsibilities
 
@@ -64,7 +75,11 @@ Immediately update the implementation plan marking selected tasks as "in progres
 
 ### 4. Set Up Work Environments
 
-For each selected task, create a git worktree using the configured base path and branch prefix:
+Resolve each selected task's branch name as `{worktrees.branch_prefix}[task-id]-[short-description]` (same in local and cloud).
+
+**Claude Code isolation (FR-HW8):** when local, your spawn tool accepts `isolation`, and `worktrees.base_path` is `.claude/worktrees`, create no worktree here — Step 5 spawns each Tech Lead with `isolation: "worktree"`. Rerun a worker that reports `blocked: git refused in isolated worktree` with a manual worktree below.
+
+**Local (otherwise; skip entirely for `cloud` or `workspace`):** For each selected task, create a git worktree using the configured base path and branch prefix:
 
 ```bash
 git worktree add {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short-description] -b {worktrees.branch_prefix}[task-id]-[short-description]
@@ -76,26 +91,24 @@ git worktree add {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short
 
 If the host refuses a nested subagent (depth-1 hosts such as OpenCode, Grok Build, and Hermes), perform the role inline in this session, then continue.
 
+Spawn parallel Tech Lead workers in the **background** (`run_in_background: true` on Cursor) so the batch runs concurrently; spawn advisory/gate agents foreground, so their verdict returns in-turn (FR-CA1).
+
 **This is the key orchestration step.** For each task, launch a **Tech Lead sub-agent** instance with:
 
 - The specific task description and acceptance criteria (with their type tags: `[T]`, `[H]`, `[O]`)
-- The worktree path as the working directory
+- The worktree path as the working directory (local), the branch name with `isolation: "worktree"` (Claude Code isolation), or the branch name and the cloud VM as its isolation (cloud)
 - Context about the project (link to specs, PRD, design system docs)
 - Acceptance criteria instructions:
   - For each `[T]` criterion: write an automated test that proves it, ensure the test passes, and report the test file path and test name in the completion summary
   - For `[H]` criteria: flag them in the completion summary as requiring user approval — do NOT consider the task complete until the user has been interviewed
   - For `[O]` criteria: note them as post-deployment metrics — no action required during implementation
 - Git workflow instructions:
-  - Work in the assigned worktree
+  - **Local:** Work in the assigned worktree
+  - **Isolated:** First run `git branch -m <task-branch>`. If a hook refuses git there, retry with the literal path `command -v git` prints (no `$(...)`); if still refused, stop and report `blocked: git refused in isolated worktree`
   - Commit changes with descriptive messages using `git commit --no-gpg-sign`
   - **Write the commit message yourself** (FR-HM27): follow the project's convention (`git.commit_convention` — Conventional Commits when it is `conventional`, otherwise match `git log`), carrying any task-level issue key (only if known with certainty — e.g., a Jira key embedded in the worktree branch name or supplied to you) verbatim, then pipe it into `git commit -F -`.
   - Do NOT merge — merging is handled by this command after completion
   - Respect pre-commit hooks and address all failures
-- **Autonomy directive — only when `--auto-decide` is set:**
-  - Tell the Tech Lead: for this task, when you reach a decision point where you already have a clear recommendation — a high-impact escalation per your Decision Authority table, or an ambiguous requirement under Behavioral Rule 7 — take the recommended option yourself instead of calling `AskUserQuestion`. Record the decision, the alternatives considered, and your reasoning so it can be reviewed later (see Step 9).
-  - This does **not** apply to `[H]` acceptance criteria: those always require explicit user approval via `AskUserQuestion` before merge, regardless of `--auto-decide` (see Step 7).
-  - Propagate this directive to any sub-agent you delegate to — an un-propagated directive just moves the blocking question one level down, where it still halts the loop.
-
 The Tech Lead will:
 - Analyze the task and determine which sub-agents are needed
 - Orchestrate implementation (coding, frontend work, security review, testing)
@@ -120,7 +133,7 @@ For each completed task, validate acceptance criteria by type:
 - If any `[T]` criterion lacks a linked test, send the task back to the Tech Lead to write the missing test
 
 **`[H]` criteria (human-validated):**
-- Present the implemented work to the user using `AskUserQuestion`
+- Present the implemented work to the user using `AskUserQuestion`, with `[H]` in each question and no `(Recommended)` option
 - Show what was built, how it addresses the criterion, and any alternatives considered
 - The user must explicitly approve each `[H]` criterion before the task can proceed to merge
 - If the user rejects, send specific feedback back to the Tech Lead for iteration
@@ -142,13 +155,15 @@ For each completed task, validate acceptance criteria by type:
 
 After the gate is satisfied:
 
+**Local:**
+
 ```bash
 git merge --ff-only {worktrees.branch_prefix}[task-id]-[short-description]
 ```
 
 If fast-forward merge is not possible, attempt a merge commit. If conflicts arise, resolve them carefully.
 
-**Immediate cleanup invariant:** A task is not complete when its merge succeeds; the merge handoff is complete only when its task worktree has been removed. Immediately after each successful merge — **before** merging or selecting another task, updating the plan, starting another loop iteration, or reporting success to the user — remove that task's exact worktree:
+**Immediate cleanup invariant (every local task checkout):** A task is not complete when its merge succeeds; the merge handoff is complete only when its task worktree has been removed. Immediately after each successful merge — **before** merging or selecting another task, updating the plan, starting another loop iteration, or reporting success to the user — remove that task's exact worktree (under isolation, the `worktreePath` its spawn returned):
 
 ```bash
 git worktree remove {worktrees.base_path}/{worktrees.branch_prefix}[task-id]-[short-description]
@@ -164,13 +179,17 @@ Mark completed tasks as "done" in the implementation plan with:
 - Completion notes
 - **Test linkage:** For each `[T]` criterion, record the test file and test name that proves it (e.g., `[T] Email validation → src/auth/__tests__/login.test.ts: "validates email format"`)
 - **`[H]` approval record:** Note that human approval was obtained for `[H]` criteria
-- **Autonomous decision record (when `--auto-decide` was set):** For each decision the Tech Lead resolved on its own recommendation instead of asking, record the decision taken, the alternatives considered, and the reasoning — one line is enough — so it can be reviewed later
+- **Autonomous decision record (when `--auto-decide` was set):** For each decision the Tech Lead resolved on its own recommendation instead of asking, record the decision taken, the alternatives considered, and the reasoning — one line is enough — plus its trailer commit
 - Any learnings or discoveries
 - Follow-up tasks identified during implementation
 
 Update the project instruction file (`CLAUDE.md` on Claude Code; otherwise the first of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.hermes.md` that exists) with any build/test optimization insights discovered.
 
 Under `--loop`, follow the loop protocol you loaded.
+
+## Auto-Decide Mode
+
+When `--auto-decide` is set, Read `${CLAUDE_PLUGIN_ROOT}/docs/auto-decide.md` before Step 1 and follow it. On other hosts, use the installed plugin root.
 
 ## Native Looping
 
@@ -190,6 +209,7 @@ Each iteration starts with ONE Bash call, `loop-step.sh advance <loop-id>` (FR-H
 - `/synthex:loop` — generic prompt loop (no command body).
 - `/synthex:list-loops`, `/synthex:cancel-loop` — loop management.
 - Plan: `docs/plans/native-looping.md` (Tasks 13–21, FR-NL1–FR-NL45).
+- Plan: `docs/plans/cursor-cloud-agent-support.md` (FR-CA1–FR-CA7, cloud/`--in-cloud`).
 
 ## Critical Requirements
 

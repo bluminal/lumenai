@@ -3,14 +3,15 @@
  * (Phase 1, Milestone 1.1, Task 4c; D9, FR-HM12, FR-HM14, NFR-HM5).
  *
  * `plugins/synthex/scripts/lib/host-matrix.mjs` is a build-time-only data
- * module (D9): a single constant table of the six harnesses Synthex
+ * module (D9): a single constant table of the harnesses Synthex
  * targets, keyed by host id, carrying the FR-HM12 Claude-tool-name map per
  * host plus the GAP_MESSAGES object (Task 47, D11) and hook
- * allowlists (Task 46, D25). Task 19 wires it into the generator; nothing
- * in this repo imports it yet, so this test only checks the module loads
- * and is internally consistent.
+ * allowlists (Task 46, D25), with Cursor appended (FR-CA6). Task 19 wires
+ * it into the generator; this test checks the module loads and is
+ * internally consistent.
  *
- * Plan: docs/plans/harness-modernization.md, Phase 1 / Milestone 1.1 / Task 4c.
+ * Plan: docs/plans/harness-modernization.md, Phase 1 / Milestone 1.1 / Task 4c;
+ * docs/plans/cursor-cloud-agent-support.md (FR-CA6).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -22,7 +23,7 @@ import {
   SKIP_LIST_TOOL_NAMES,
 } from '../../plugins/synthex/scripts/lib/host-matrix.mjs';
 
-const EXPECTED_HOST_IDS = ['claude', 'codex', 'gemini', 'opencode', 'grok', 'hermes'];
+const EXPECTED_HOST_IDS = ['claude', 'codex', 'gemini', 'opencode', 'grok', 'hermes', 'cursor'];
 
 // The four translated tool names/groups plus the seven skip-list tools from
 // the FR-HM12 table in docs/reqs/harness-modernization.md.
@@ -49,9 +50,16 @@ describe('host-matrix.mjs scaffold', () => {
     expect(typeof HOSTS).toBe('object');
   });
 
-  it('lists exactly the six supported hosts', () => {
+  it('lists exactly the supported hosts (six FR-HM12 + cursor)', () => {
     expect(HOST_IDS).toEqual(EXPECTED_HOST_IDS);
     expect(Object.keys(HOSTS)).toEqual(EXPECTED_HOST_IDS);
+  });
+
+  it('FR-CA6: cursor maps Agent/Task to Task and Bash to Shell', () => {
+    expect(HOSTS.cursor.toolMap.Agent).toBe('Task');
+    expect(HOSTS.cursor.toolMap.Task).toBe('Task');
+    expect(HOSTS.cursor.toolMap.Bash).toBe('Shell');
+    expect(HOSTS.cursor.toolMap.Edit).toBe('StrReplace');
   });
 
   it('enumerates every Claude tool name from the FR-HM12 table', () => {

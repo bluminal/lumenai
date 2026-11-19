@@ -69,7 +69,7 @@ Check for a project configuration file at `@{config_path}`. If it exists, load t
 
 | Setting | Default |
 |---------|---------|
-| Reviewers | architect, designer, tech-lead (all enabled) |
+| Reviewers | architect, design-system-agent, tech-lead (all enabled) |
 | `review_loops.max_cycles` | 3 (per-command override; global default is 2) |
 | `review_loops.min_severity_to_address` | high (inherited from global) |
 | `documents.requirements` | `docs/reqs/main.md` |
@@ -100,15 +100,13 @@ Read available technical specifications and project context:
 
 ### 4. User Interview
 
-Launch the **Product Manager sub-agent** to conduct an interactive Q&A with the user. The PM uses the `AskUserQuestion` tool to surface questions directly to the human user. The PM should:
+Launch the **Product Manager sub-agent** to conduct an interactive Q&A with the user. The PM should:
 - Clarify any ambiguous or incomplete requirements from the PRD
 - Confirm priorities and scope boundaries
 - Understand constraints not captured in the PRD
 - Fill gaps before drafting the plan
 
-The PM asks questions in small batches (3-5 at a time) using `AskUserQuestion`, adapting follow-ups based on answers. This ensures the plan is grounded in a thorough understanding of the user's intent.
-
-**Important:** The PM must use `AskUserQuestion` (not plain text output) so that questions reach the human user even when the PM is running as a sub-agent.
+**Important:** Claude Code strips `AskUserQuestion` from sub-agents, so the PM returns its questions (3-5 at a time) in a `## Questions for the User` section. YOU ask them via `AskUserQuestion`, then resume the PM with the answers. Repeat until it returns no questions. Never answer them yourself.
 
 ### 5. Draft the Implementation Plan
 
@@ -157,12 +155,14 @@ If multi-model is active, Read `${CLAUDE_PLUGIN_ROOT}/docs/plan-multi-model.md` 
 
 **Native-only active → spawn native reviewers directly:**
 
-When multi-model is NOT active (`multi_model_review.enabled: false` AND no `--multi-model` flag, OR `--no-multi-model` flag is set): run today's native-only path byte-identically (FR-MR23). For each enabled reviewer in the configuration, launch a **fresh** sub-agent IN PARALLEL with:
+When multi-model is NOT active (`multi_model_review.enabled: false` AND no `--multi-model` flag, OR `--no-multi-model` flag is set): run today's native-only path byte-identically (FR-MR23). For each enabled reviewer in the configuration (legacy `agent: designer` means `design-system-agent`), launch a **fresh** sub-agent IN PARALLEL with:
 - The full draft implementation plan (current version)
 - The PRD for reference
 - The reviewer's specific focus area
 - Instructions to provide structured feedback
 - On cycles 2+: a compact summary of unresolved findings from the prior cycle (see Context Management below)
+
+**Prompt-file reviewers:** when a `reviewers` entry is `- prompt: <path>`, Read `${CLAUDE_PLUGIN_ROOT}/docs/prompt-file-reviewers.md` and follow it; a bad path skips that one reviewer, never the review. On other hosts, resolve the plugin root from `.synthex/state.json`.
 
 **Context Management:** Each review cycle spawns **new** sub-agent instances — never resume prior reviewer agents. This prevents context exhaustion across multiple cycles. Between cycles, the orchestrating command carries forward only:
 1. The updated plan (full text — this is the artifact under review)
@@ -361,7 +361,7 @@ implementation_plan:
     - agent: architect
       enabled: true
       focus: "Technical architecture, feasibility, NFR coverage"
-    - agent: designer
+    - agent: design-system-agent
       enabled: true
       focus: "Design tasks, UX impact, visual design clarity"
     - agent: tech-lead
@@ -374,7 +374,7 @@ implementation_plan:
 
 ### Disabling a Default Reviewer
 
-To skip the designer reviewer for a backend-only project:
+To skip the design-system-agent reviewer for a backend-only project:
 
 ```yaml
 implementation_plan:
@@ -382,7 +382,7 @@ implementation_plan:
     - agent: architect
       enabled: true
       focus: "Technical architecture, feasibility, NFR coverage"
-    - agent: designer
+    - agent: design-system-agent
       enabled: false
     - agent: tech-lead
       enabled: true

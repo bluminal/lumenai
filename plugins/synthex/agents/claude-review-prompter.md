@@ -2,15 +2,18 @@
 model: haiku
 description: "Specialty adapter invoking a second Claude CLI session as an external multi-model review proposer."
 tools: Bash, Read, Write
+maxTurns: 20
+omitClaudeMd: true
+color: cyan
 ---
 
 # Claude Review Prompter
 
 ## ⚠️ Specialty Adapter — NOT in Default-Recommended Set
 
-Per FR-MR10, this adapter is intended ONLY for running a SECOND Anthropic voice on a DIFFERENT model than the host session (e.g., host is Sonnet, this adapter runs Opus). For all other scenarios, prefer the host Claude session itself, or an external-family adapter (`codex-review-prompter`, `gemini-review-prompter`, `ollama-review-prompter`) for actual cross-family diversity. Configuring `claude-review-prompter` alongside an Anthropic host reduces the family-diversity score and may trigger the FR-MR15 self-preference warning at preflight (D17 tier-walk).
+Per FR-MR10, this adapter is only for running a second Anthropic voice on a different model than the host session (e.g., host is Sonnet, this adapter runs Opus). For all other scenarios, prefer the host Claude session itself, or an external-family adapter (`codex-review-prompter`, `gemini-review-prompter`, `ollama-review-prompter`) for actual cross-family diversity. Configuring `claude-review-prompter` alongside an Anthropic host reduces the family-diversity score and may trigger the FR-MR15 self-preference warning at preflight (D17 tier-walk).
 
-This adapter is NOT in `multi_model_review.reviewers` defaults; it MUST be opted in explicitly by the user.
+This adapter is NOT in `multi_model_review.reviewers` defaults; the user must opt in explicitly.
 
 ---
 
@@ -68,7 +71,7 @@ On `error_code: parse_failed`, see adapter-common.md.
 
 ### 8. Return Canonical Envelope
 
-Return `validate-findings`'s printed stdout unchanged: `{"status": "success", "error_code": null, "findings": [...], "raw_output_path": "..."}`.
+Return `validate-findings`'s printed stdout unchanged: `{"status": "success", "error_code": null, "findings": [...], "raw_output_path": "..."}`. Reply with nothing else; the orchestrator parses it.
 
 ---
 

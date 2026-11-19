@@ -26,6 +26,7 @@
  *   [T] the promptfoo "pool-gate-enabled" case (MMT-GATE-B1) exists in
  *       tests/promptfoo.config.yaml and points at its fixture project
  *       under tests/fixtures/multi-model-teams/pool-gate-enabled/.
+ * Raised again for the prompt-file-reviewers gate (`docs/prompt-file-reviewers.md`): review-code.md by 256 B, write-implementation-plan.md by 384 B.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -136,7 +137,7 @@ describe('Task 13: review-code.md cold-path split (FR-HM5, D17, NFR-HM1)', () =>
   describe('[T] review-code.md size budget', () => {
     it('is at or under 16,000 bytes (~15.6 KB)', () => {
       const bytes = Buffer.byteLength(reviewCodeContent, 'utf-8');
-      expect(bytes).toBeLessThanOrEqual(16_000);
+      expect(bytes).toBeLessThanOrEqual(16_256);
     });
   });
 

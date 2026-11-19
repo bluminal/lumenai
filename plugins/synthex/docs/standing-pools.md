@@ -21,7 +21,7 @@ For occasional reviews (less than a few per day), stick with the default `/synth
 ### 1. Start a pool
 
 ```bash
-/synthex:start-review-team my-pool
+/synthex:start-review-team --name my-pool
 ```
 
 This creates a standing pool named `my-pool` with the default reviewers (`code-reviewer` and `security-reviewer`). The pool starts in the background and keeps reviewers warm.
@@ -34,52 +34,53 @@ Once the pool is running, `/synthex:review-code` automatically routes to it:
 /synthex:review-code
 ```
 
-No flags required — Synthex detects the running pool and routes your review to it. You can confirm routing by watching for `Routing to standing pool: my-pool` in the output.
+No flags required — Synthex detects the running pool and routes your review to it. You can confirm routing by watching for `Routing to standing pool 'my-pool' (multi-model: no).` in the output.
 
 ### 3. Stop the pool
 
 ```bash
-/synthex:stop-review-team my-pool
+/synthex:stop-review-team --name my-pool
 ```
 
 This sends a graceful shutdown signal. In-flight reviews complete before the pool stops.
 
 ## Commands
 
-### `/synthex:start-review-team <name>`
+### `/synthex:start-review-team`
 
-Creates and starts a named standing review pool.
+Creates and starts a named standing review pool. Every option is optional; omitted options come from `standing_pools.*` in `.synthex/config.yaml`.
 
 **Options:**
 
 | Option | Description | Default |
 |--------|-------------|---------|
+| `--name <name>` | Unique pool name | `review-pool` (`standing_pools.default_name`) |
 | `--reviewers <list>` | Comma-separated reviewer names | `code-reviewer,security-reviewer` |
-| `--multi-model` | Enable multi-model orchestration alongside the pool | `false` |
-| `--ttl <minutes>` | Idle TTL before automatic shutdown | `60` |
+| `--multi_model` | Enable multi-model orchestration alongside the pool | `false` |
+| `--ttl_minutes <minutes>` | Idle time after which the pool becomes eligible for reaping (see [Idle TTL](#idle-ttl)) | `60` |
 
 **Examples:**
 
 ```bash
 # Default pool with 2 reviewers
-/synthex:start-review-team my-pool
+/synthex:start-review-team --name my-pool
 
 # Pool with performance reviewer included
-/synthex:start-review-team my-pool --reviewers code-reviewer,security-reviewer,performance-engineer
+/synthex:start-review-team --name my-pool --reviewers code-reviewer,security-reviewer,performance-engineer
 
 # Multi-model pool (requires external CLI adapters configured)
-/synthex:start-review-team my-pool --multi-model
+/synthex:start-review-team --name my-pool --multi_model
 
 # Long-lived pool (4 hours idle TTL)
-/synthex:start-review-team my-pool --ttl 240
+/synthex:start-review-team --name my-pool --ttl_minutes 240
 ```
 
-### `/synthex:stop-review-team <name>`
+### `/synthex:stop-review-team`
 
-Gracefully shuts down a standing pool.
+Gracefully shuts down a standing pool. Pass `--name <name>` (or `--all`); with neither, it asks which pool to stop.
 
 ```bash
-/synthex:stop-review-team my-pool
+/synthex:stop-review-team --name my-pool
 ```
 
 In-flight reviews complete first. If a reviewer is stuck for more than `lifecycle.stuck_task_timeout_minutes` (default: 30 min), it's marked abandoned and shutdown proceeds.
@@ -109,7 +110,7 @@ Example:
 ```yaml
 standing_pools:
   enabled: false               # off by default; enable to activate pool routing
-  ttl_minutes: 60              # idle time before auto-shutdown
+  ttl_minutes: 60              # idle time before the pool is eligible for reaping (lazy; 0 disables)
   default_name: review-pool    # pool name used when no explicit name given
   default_reviewers:           # reviewers spawned in every new pool
     - code-reviewer
@@ -129,10 +130,10 @@ standing_pools:
 
 ## Multi-Model Pools
 
-When you start a pool with `--multi-model`, each review also runs the `multi-model-review-orchestrator` alongside the native reviewers. External adapters (Codex, Gemini, etc.) run in parallel with the pool reviewers and findings are consolidated into a single report.
+When you start a pool with `--multi_model`, each review also runs the `multi-model-review-orchestrator` alongside the native reviewers. External adapters (Codex, Gemini, etc.) run in parallel with the pool reviewers and findings are consolidated into a single report.
 
 ```bash
-/synthex:start-review-team my-pool --multi-model
+/synthex:start-review-team --name my-pool --multi_model
 ```
 
 **Reviewer requirements:** Only these four reviewers support multi-model mode in v1: `code-reviewer`, `security-reviewer`, `design-system-agent`, `performance-engineer`. Other reviewers (e.g., `quality-engineer`) are not compatible with multi-model pools in v1.
@@ -157,8 +158,8 @@ If the pool shows `stopping` or is absent, restart it with `/synthex:start-revie
 If you see a pool in `list-teams` but reviews aren't completing, the pool may have lost its reviewers (e.g., the host Claude Code session was closed). Stop and restart:
 
 ```bash
-/synthex:stop-review-team my-pool   # sends shutdown; pool cleans up its own state
-/synthex:start-review-team my-pool  # fresh pool
+/synthex:stop-review-team --name my-pool   # sends shutdown; pool cleans up its own state
+/synthex:start-review-team --name my-pool  # fresh pool
 ```
 
 For stuck pools that won't stop cleanly, you can manually remove pool state:
@@ -171,6 +172,10 @@ Then remove the pool's entry from `~/.claude/teams/standing/index.json` manually
 ### Stale pool from a previous Claude Code session
 
 Pools don't survive past the host Claude Code session that spawned them (`backendType: in-process`). When you reopen Claude Code, any previously running pools are stale. Synthex detects stale pools automatically (via `host_pid` check) and routes through them to fresh reviewers if needed, or falls back to direct review.
+
+## Idle TTL
+
+TTL is enforced lazily: a pool that has been idle longer than `ttl_minutes` is **not** shut down automatically. It keeps running until the next discovery event — a `/synthex:list-teams` call, or a `/synthex:review-code` or `/synthex:performance-audit` run that performs pool routing — notices the expiry and reaps it. A pool can therefore outlive its nominal TTL. Set `ttl_minutes: 0` to disable TTL reaping; the pool then stops only via `/synthex:stop-review-team` or when its host session dies (cleaned up as stale at the next discovery).
 
 ## Idle Cost
 

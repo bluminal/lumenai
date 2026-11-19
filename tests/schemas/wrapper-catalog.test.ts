@@ -12,6 +12,7 @@ import {
   RULE_ADOPT_INLINE,
   RULE_SKIP_UNAVAILABLE_TOOL,
 } from '../../plugins/synthex/scripts/lib/host-matrix.mjs';
+import { AGENT_COUNT, COMMAND_COUNT } from '../compat/lib/inventory.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../..');
 const pluginRoot = resolve(repoRoot, 'plugins/synthex');
@@ -55,9 +56,9 @@ function frontmatterBlock(contents: string): string {
 }
 
 describe('wrapper catalog diet (Task 19, FR-HM9/FR-HM10)', () => {
-  it('has a COMMAND_DESCRIPTIONS entry for all 22 commands and an AGENT_DESCRIPTIONS entry for all 28 agents (multi-model-review Tasks 68 and 69 added grok-review-prompter and cursor-review-prompter)', () => {
-    expect(Object.keys(COMMAND_DESCRIPTIONS)).toHaveLength(22);
-    expect(Object.keys(AGENT_DESCRIPTIONS)).toHaveLength(28);
+  it('has a COMMAND_DESCRIPTIONS entry for every command and an AGENT_DESCRIPTIONS entry for every agent', () => {
+    expect(Object.keys(COMMAND_DESCRIPTIONS)).toHaveLength(COMMAND_COUNT);
+    expect(Object.keys(AGENT_DESCRIPTIONS)).toHaveLength(AGENT_COUNT);
   });
 
   it('keeps every command wrapper description at or under 120 characters and equal to its COMMAND_DESCRIPTIONS entry', () => {
@@ -167,8 +168,11 @@ describe('wrapper tool-name map (Task 20, FR-HM12/FR-HM45)', () => {
   const allSlugs = [...Object.keys(COMMAND_DESCRIPTIONS), ...Object.keys(AGENT_DESCRIPTIONS)];
   const table = renderToolMapTable();
 
-  it('renders a non-empty table keyed by the five non-Claude hosts', () => {
-    expect(table).toMatch(/^\| Claude tool \| Codex CLI \| Gemini CLI \| OpenCode \| Grok Build \| Hermes Agent \|$/m);
+  it('renders a non-empty table keyed by the non-Claude hosts (incl. Cursor, FR-CA6)', () => {
+    const header = table.split('\n')[0] ?? '';
+    expect(header).toBe(
+      '| Claude tool | Codex CLI | Gemini CLI | OpenCode | Grok Build | Hermes Agent | Cursor |',
+    );
     expect(table).not.toContain('Claude Code');
   });
 
