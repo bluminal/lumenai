@@ -65,7 +65,7 @@ On `error_code: parse_failed`, see adapter-common.md.
 
 ### 8. Return Canonical Envelope
 
-Return `validate-findings`'s printed stdout unchanged: `{status, error_code, error_message, findings, usage, raw_output_path}`.
+Return `validate-findings`'s printed stdout unchanged: `{status, error_code, error_message, findings, usage, raw_output_path}`. Reply with nothing else; the orchestrator parses it.
 
 ---
 

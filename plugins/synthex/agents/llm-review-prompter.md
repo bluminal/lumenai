@@ -66,7 +66,7 @@ On `error_code: parse_failed`, see adapter-common.md.
 
 ### 8. Return Canonical Envelope
 
-Return `validate-findings`'s printed stdout unchanged: `{"status": "success", "error_code": null, "findings": [{"source": {"source_type": "external"}}], "raw_output_path": "..."}`.
+Return `validate-findings`'s printed stdout unchanged: `{"status": "success", "error_code": null, "findings": [{"source": {"source_type": "external"}}], "raw_output_path": "..."}`. Reply with nothing else; the orchestrator parses it.
 
 ---
 
