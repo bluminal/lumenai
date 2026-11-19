@@ -23,6 +23,10 @@ You orchestrate a structured retrospective by:
 
 ---
 
+## External Source
+
+When `external_source` is unset — the default — skip this section entirely. Otherwise Read `${CLAUDE_PLUGIN_ROOT}/docs/external-sources.md` and follow it and its `retrospective` section. On other hosts, use `plugin_root` from `.synthex/state.json` as the plugin root.
+
 ## Workflow
 
 ### 1. Load Configuration

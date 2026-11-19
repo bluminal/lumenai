@@ -139,7 +139,11 @@ describe('Task 31 (FR-HM15, D29): Model Resolution paragraph', () => {
 
   it('write-implementation-plan.md stays at or under its 26,112-byte D17 budget (Task 14)', () => {
     const content = readFileSync(join(COMMANDS_DIR, 'write-implementation-plan.md'), 'utf-8');
-    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(26_496);
+    // Raised from 26,496 to 26,801 (+305 B) by the external-source gate
+    // (CONTRIBUTING.md "Adding an External Source", rule 2): one cold-path
+    // Read gate, skipped when `external_source` is unset. A gate is the
+    // minimum inline cost of a new cold-path capability.
+    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(26_801);
   });
 
   describe.each([...INLINE_COMMANDS, ...GATED_COMMANDS])('%s has a --profile Parameters row', (file) => {
