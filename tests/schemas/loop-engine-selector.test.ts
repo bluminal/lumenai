@@ -139,7 +139,13 @@ describe('Task 59 (FR-HM19, D34): loop engine selector in the other --loop comma
 
   it('review-code.md stays at or under 16,000 bytes and write-implementation-plan.md at or under 26,112 bytes', () => {
     expect(statSync(join(COMMANDS, 'review-code.md')).size).toBeLessThanOrEqual(16256);
-    expect(statSync(join(COMMANDS, 'write-implementation-plan.md')).size).toBeLessThanOrEqual(26496);
+    // write-implementation-plan.md raised from 26,112 to 26,496 by Task 59
+    // (FR-HM19) when it added the loop-engine gate; raised again to 28,288
+    // by the Notion backend: one cold-path Read gate
+    // (docs/document-backends.md) plus the Target State by Milestone row in
+    // the plan template. A gate is the minimum inline cost of a new
+    // cold-path capability.
+    expect(statSync(join(COMMANDS, 'write-implementation-plan.md')).size).toBeLessThanOrEqual(28288);
   });
 
   it('defaults.yaml ships native_looping.engine: prose in its own top-level block', () => {

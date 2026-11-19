@@ -139,7 +139,12 @@ describe('Task 31 (FR-HM15, D29): Model Resolution paragraph', () => {
 
   it('write-implementation-plan.md stays at or under its 26,112-byte D17 budget (Task 14)', () => {
     const content = readFileSync(join(COMMANDS_DIR, 'write-implementation-plan.md'), 'utf-8');
-    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(26_496);
+    // Raised from 26,112 to 26,496 by Task 59 (FR-HM19) when it added the
+    // loop-engine gate; raised again to 28,288 by the Notion backend: one
+    // cold-path Read gate (docs/document-backends.md) plus the Target State
+    // by Milestone row in the plan template. A gate is the minimum inline
+    // cost of a new cold-path capability.
+    expect(Buffer.byteLength(content, 'utf-8')).toBeLessThanOrEqual(28_288);
   });
 
   describe.each([...INLINE_COMMANDS, ...GATED_COMMANDS])('%s has a --profile Parameters row', (file) => {

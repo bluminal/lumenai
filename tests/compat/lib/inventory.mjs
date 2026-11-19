@@ -17,7 +17,7 @@ import { readExpectedEntrypoints } from './contract.mjs';
 // (configure-teams, start-review-team, stop-review-team, list-teams) in
 // from synthex-plus, taking the count from 18 to 22 (Phase 6 target
 // 22/26/48 per D2/D5).
-export const COMMAND_COUNT = 22;
+export const COMMAND_COUNT = 25;
 // Phase 5 retired four utility agents: context-bundle-assembler (Task 41,
 // replaced by scripts/assemble-bundle.sh), audit-artifact-writer (Task 42,
 // replaced by scripts/write-audit.mjs), plan-scribe (Task 44, FR-HM26 --
@@ -28,8 +28,10 @@ export const COMMAND_COUNT = 22;
 // folded in 3 pool agents (standing-pool-cleanup, standing-pool-submitter,
 // team-orchestrator-bridge) from synthex-plus, taking 23 to 26.
 // team-orchestrator-bridge was then removed as dead code (only the retired
-// /team-review invoked it), taking 26 to 25.
-export const AGENT_COUNT = 25;
+// /team-review invoked it), taking 26 to 25. The document-store contract
+// (notion-document-store) and the Notion task store (notion-task-store)
+// then added 2 agents, taking 25 to 27.
+export const AGENT_COUNT = 27;
 
 /** Wrappers = every generated portable skill, one per command + agent. */
 export const WRAPPER_COUNT = COMMAND_COUNT + AGENT_COUNT;

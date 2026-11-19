@@ -332,3 +332,74 @@ describe('usage and contract', () => {
     expect(bundle.status).toBe('success');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Source-set mode (--source). Added for PRD source ingestion: the PRD's Source
+// Map claims these documents ground its requirements, so unlike every other
+// category a source that cannot be read is RECORDED with a reason rather than
+// skipped silently. A provenance claim for a document nobody could open is
+// worse than no claim at all.
+// ---------------------------------------------------------------------------
+
+describe('assemble-bundle.sh --source (source-set mode)', () => {
+  it('accepts --source with no --artifact and reports artifact: null', () => {
+    writeFile('a.md', 'alpha');
+    const out = run(['assemble', '--source', 'a.md']);
+    expect(out.code).toBe(0);
+    const bundle = readBundle(out.stdout.trim());
+    expect(bundle.manifest.artifact).toBeNull();
+    expect(bundle.manifest.sources).toHaveLength(1);
+  });
+
+  it('still requires one of --artifact or --source', () => {
+    const out = run(['assemble']);
+    expect(out.code).toBe(1);
+    expect(out.stderr).toMatch(/one of --artifact or --source is required/);
+  });
+
+  it('inlines an in-cap source and marks it read', () => {
+    writeFile('a.md', 'alpha');
+    const bundle = readBundle(run(['assemble', '--source', 'a.md']).stdout.trim());
+    expect(bundle.manifest.sources[0]).toMatchObject({ path: 'a.md', inlined: true, summarized: false, status: 'read' });
+    expect(bundle.files.some((f: { path: string }) => f.path === 'a.md')).toBe(true);
+  });
+
+  it('routes an over-cap source to needs_summary and marks it summarized', () => {
+    writeFile('big.md', 70_000);
+    const bundle = readBundle(run(['assemble', '--source', 'big.md']).stdout.trim());
+    expect(bundle.manifest.sources[0]).toMatchObject({ inlined: false, summarized: true, status: 'read' });
+    expect(
+      bundle.needs_summary.some((n: { path: string; category: string }) => n.path === 'big.md' && n.category === 'sources'),
+    ).toBe(true);
+    // Not read into files[] — the caller summarizes it, per FR-HM26.
+    expect(bundle.files.some((f: { path: string }) => f.path === 'big.md')).toBe(false);
+  });
+
+  it('RECORDS an unreadable source with a reason instead of dropping it', () => {
+    const bundle = readBundle(run(['assemble', '--source', 'ghost.md']).stdout.trim());
+    expect(bundle.manifest.sources).toHaveLength(1);
+    expect(bundle.manifest.sources[0]).toMatchObject({ path: 'ghost.md', status: 'unreadable' });
+    expect(bundle.manifest.sources[0].reason).toMatch(/not found/);
+  });
+
+  it('distinguishes a missing path from an unreadable non-file', () => {
+    mkdirSync(join(projectDir, 'adir'));
+    const bundle = readBundle(run(['assemble', '--source', 'adir']).stdout.trim());
+    expect(bundle.manifest.sources[0].reason).toMatch(/not a readable regular file/);
+  });
+
+  it('preserves caller order so a run is deterministic', () => {
+    for (const n of ['a', 'b', 'c']) writeFile(`${n}.md`, n);
+    const bundle = readBundle(run(['assemble', '--source', 'c.md', '--source', 'a.md', '--source', 'b.md']).stdout.trim());
+    expect(bundle.manifest.sources.map((s: { path: string }) => s.path)).toEqual(['c.md', 'a.md', 'b.md']);
+  });
+
+  it('composes with --artifact without disturbing the other categories', () => {
+    writeFile('art.md', 'artifact');
+    writeFile('a.md', 'alpha');
+    const bundle = readBundle(run(['assemble', '--artifact', 'art.md', '--source', 'a.md']).stdout.trim());
+    expect(bundle.manifest.artifact).toMatchObject({ path: 'art.md', inlined: true });
+    expect(bundle.manifest.sources[0]).toMatchObject({ path: 'a.md', status: 'read' });
+    expect(bundle.manifest.touched_files).toEqual([]);
+  });
+});

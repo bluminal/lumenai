@@ -253,7 +253,10 @@ describe('Init Command — "What This Command Does" Summary', () => {
     const numberedSteps = summaryMatch![1]
       .split('\n')
       .filter((l) => /^\d+\./.test(l.trim()));
-    expect(numberedSteps.length).toBe(8);
+    // 9 since the Notion backend added an optional configure step to the
+    // summary list (the workflow heading itself is 4.5, so the step
+    // headings other suites pin by name are unchanged).
+    expect(numberedSteps.length).toBe(9);
   });
 });
 

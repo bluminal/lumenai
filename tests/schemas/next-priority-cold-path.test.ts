@@ -41,9 +41,15 @@ const BASELINE = 26_426;
 // 783 B: the --in-workspace row, the resolution rule and Read gate, and the
 // Claude Code isolation rule, which is the default Claude Code local path.
 const HOST_CHECKOUT_DELTA = 289 + 783;
-const BUDGET = BASELINE - 7_613 + HOST_CHECKOUT_DELTA;
 const CLOUD_DELTA = 579 + HOST_CHECKOUT_DELTA;
-const NP_CAP = 15_729 + HOST_CHECKOUT_DELTA;
+// The Notion backend (FR-NB2) adds one more cold-path Read gate to
+// next-priority.md (docs/document-backends.md), carrying the FR-NB2 skip
+// rule inline since that must be read before any other backend logic. A
+// gate is the minimum inline cost of a new cold-path capability: 639 B,
+// measured against the pre-Notion next-priority.md.
+const NOTION_GATE_DELTA = 639;
+const BUDGET = BASELINE - 7_613 + HOST_CHECKOUT_DELTA + NOTION_GATE_DELTA;
+const NP_CAP = 15_729 + HOST_CHECKOUT_DELTA + NOTION_GATE_DELTA;
 const LW_CAP = 3_084;
 
 const SEP = '<!-- premove-block -->\n';
@@ -81,7 +87,7 @@ function premoveBlocks(): string[] {
 
 describe('Task 59 (FR-HM19, D34): next-priority cold-path split and Claude-path budget', () => {
   it('next-priority.md plus docs/engines/loop-workflow.md is at most 26,426 - 8,192 = 18,234 bytes (AC2)', () => {
-    expect(BUDGET).toBe(18_813 + HOST_CHECKOUT_DELTA);
+    expect(BUDGET).toBe(18_813 + HOST_CHECKOUT_DELTA + NOTION_GATE_DELTA);
     expect(size(NP_PATH) + size(LW_PATH)).toBeLessThanOrEqual(BUDGET);
   });
 
@@ -95,9 +101,10 @@ describe('Task 59 (FR-HM19, D34): next-priority cold-path split and Claude-path 
 
   it('the Stage 1 prose path (next-priority.md plus docs/next-priority-loop.md) is at most the 26,426-byte baseline (NFR-HM3)', () => {
     // The pre-move baseline is kept as the historical constant; cloud
-    // execution's unavoidable in-command cost is called out separately so it
-    // stays visible rather than being folded into the baseline.
-    expect(size(NP_PATH) + size(NPL_PATH)).toBeLessThanOrEqual(BASELINE + CLOUD_DELTA);
+    // execution's unavoidable in-command cost and the Notion backend's
+    // document-backends.md gate are called out separately so they stay
+    // visible rather than being folded into the baseline.
+    expect(size(NP_PATH) + size(NPL_PATH)).toBeLessThanOrEqual(BASELINE + CLOUD_DELTA + NOTION_GATE_DELTA);
   });
 
   it('the pre-move fixture has 4 blocks and the pinned substitution applies exactly once to the last', () => {
