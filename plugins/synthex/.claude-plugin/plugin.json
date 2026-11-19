@@ -43,6 +43,7 @@
     "./commands/loop.md",
     "./commands/next-priority.md",
     "./commands/refine-requirements.md",
+    "./commands/write-prd.md",
     "./commands/write-implementation-plan.md",
     "./commands/review-code.md",
     "./commands/write-adr.md",

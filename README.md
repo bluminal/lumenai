@@ -72,12 +72,13 @@ The organization spans the full software lifecycle: **discover, build, ship, ope
 | **Metrics Analyst** | DORA metrics, HEART/AARRR frameworks, OKR tracking | Advisory |
 | **Retrospective Facilitator** | Structured retrospectives, improvement item tracking | Planning + Advisory |
 
-#### Commands (12)
+#### Commands (13)
 
 | Command | Purpose | Agents Orchestrated |
 |---------|---------|-------------------|
 | **init** | Initialize project configuration and directories | -- |
 | **next-priority** | Execute next highest-priority tasks | Tech Lead |
+| **write-prd** | Author a PRD from supplied and discovered sources, with a provenance tag on every requirement | Product Manager |
 | **refine-requirements** | Improve PRD clarity through multi-agent review | PM + Tech Lead + Lead Frontend Engineer |
 | **write-implementation-plan** | Transform PRD into implementation plan | PM + Architect + Design System Agent + Tech Lead |
 | **review-code** | Multi-perspective code review | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |

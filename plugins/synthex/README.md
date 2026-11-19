@@ -154,6 +154,7 @@ Agents focused on understanding users, measuring outcomes, and driving improveme
 | `/list-loops` | Enumerate running and recently-terminal loops in the project. Read-only. | -- |
 | `/cancel-loop` | Cancel a loop by id, or `--all` running loops. Idempotent on terminal-status loops. | -- |
 | `/next-priority` | Execute next highest-priority tasks. Supports `--auto-decide` for unattended runs (see "Autonomous Decisions" below) `--in-cloud` / `execution_environment: cloud` for Cursor cloud subagents (see "Cloud Execution" below), and `--in-workspace` / `execution_environment: workspace` for Orca or Herdr child workspaces (see "Host Workspaces" below). | Tech Lead |
+| `/write-prd` | Author a PRD from supplied (`--from`) and discovered sources. Every requirement carries a provenance tag (`[S]`/`[U]`/`[D]`/`[A]`) and `lint-prd.mjs` blocks unconfirmed assumptions. | Product Manager |
 | `/write-implementation-plan` | Transform PRD into implementation plan | PM + Architect + Design System Agent + Tech Lead |
 | `/review-code` | Multi-perspective code review | Code Reviewer + Security Reviewer + Performance Engineer (opt.) |
 | `/write-adr` | Create Architecture Decision Record | Architect (interactive) |

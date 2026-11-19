@@ -96,6 +96,11 @@ export const COMMAND_DESCRIPTIONS = {
       'Run a PRD through multi-agent review for clarity and completeness, then apply the edits.',
     argumentHint: '[requirements_path] [specs_path] [--loop]',
   },
+  'write-prd': {
+    description:
+      'Author a PRD from supplied and discovered sources. Every requirement carries a provenance tag; assumptions block.',
+    argumentHint: '[--from <path>]... [requirements_path]',
+  },
   'write-implementation-plan': {
     description:
       'Turn a PRD into a prioritized, parallelizable implementation plan via multi-agent review.',
