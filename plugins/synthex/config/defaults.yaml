@@ -184,6 +184,24 @@ implementation_plan:
     max_cycles: 3
 
 # -------------------------------------------------------------------
+# PRD Settings
+# Used by the `write-prd` and `refine-requirements` commands
+# -------------------------------------------------------------------
+prd:
+  # What happens to requirements the Product Manager had to assume.
+  #
+  # `blocking` (default) — lint-prd.mjs raises an unconfirmed `[A]`
+  #   requirement as CRITICAL, so every assumption must be confirmed with the
+  #   user, grounded in a source, or demoted to an Open Question before the PRD
+  #   is final. This is the default because an unconfirmed assumption presented
+  #   as a requirement is indistinguishable from a fabricated one to whoever
+  #   builds from it.
+  #
+  # `warn` — assumptions are reported as MEDIUM and the PRD may ship with them
+  #   acknowledged. Use deliberately for a fast first draft, not as a habit.
+  assumption_policy: blocking
+
+# -------------------------------------------------------------------
 # Refine Requirements Settings
 # Used by the `refine-requirements` command
 # -------------------------------------------------------------------

@@ -10,6 +10,7 @@ Improve a Product Requirements Document (PRD) by running it through a multi-agen
 
 | Parameter | Description | Default | Required |
 |-----------|-------------|---------|----------|
+| `--from <path>` | New source material to fold into the PRD. Repeatable. Accepts a file, a glob, a directory, or a URL, as in `/synthex:write-prd`. | — | No |
 | `requirements_path` | Path to the PRD markdown file | `docs/reqs/main.md` | No |
 | `specs_path` | Path to technical specifications directory | `docs/specs` | No |
 | `config_path` | Path to synthex project config | `.synthex/config.yaml` | No |
@@ -72,9 +73,17 @@ Read available technical context to inform whether reviewer questions already ha
 
 This context is critical — it lets you answer reviewer questions without bothering the user when the answers are already documented.
 
+### 3.5. Ingest New Sources
+
+**Skip this step entirely when there is nothing to ingest**: no `--from` was supplied and the PRD's Source Map holds no row whose `Contributed` cell reads `pending`. That is the ordinary refinement run, and it must behave exactly as it did before this step existed.
+
+Otherwise Read `${CLAUDE_PLUGIN_ROOT}/docs/prd-amendment.md` and follow it before the review loop, so reviewers see the amended document. On other hosts, resolve the installed plugin root from `.synthex/state.json`'s `plugin_root` field and read the same file relative to it.
+
 ### 4. PRD Review Loop
 
 This is the core quality mechanism. The PRD is reviewed by specialist sub-agents who identify areas that are unclear, incomplete, or ambiguous from their perspective.
+
+**Reviewers must leave pending Source Map entries alone.** A row whose `Contributed` cell reads `pending` is a standing instruction, not an incomplete table: do not fill it, delete it, or raise it as a finding.
 
 **Process:**
 
@@ -202,13 +211,17 @@ If max cycles are reached with unresolved findings, add them to an "Open Questio
 
 ### 5. Write the Updated PRD
 
+**Lint before writing**, when the PRD carries a `**Provenance:**` legend or Step 3.5 ingested sources. A PRD written before provenance tagging is not retrofitted by an ordinary refinement run. Run `plugins/synthex/scripts/lint-prd.mjs` (resolved from the installed plugin root — Claude Code: `node "${CLAUDE_PLUGIN_ROOT}/scripts/lint-prd.mjs" <draft_path> [--sources <bundle_path>] --assumption-policy <prd.assumption_policy>`) as ONE Bash call against the refined draft (save it to `.synthex/tmp/prd-draft.md` first), guarded with `command -v node`. On other hosts (Codex, Gemini CLI, OpenCode, Grok, Hermes), or if `${CLAUDE_PLUGIN_ROOT}` is empty, use the installed plugin root: `plugin_root` from `.synthex/state.json`, else the directory two levels above the wrapper you were loaded from. Without node, Read `${CLAUDE_PLUGIN_ROOT}/docs/prd-lint-rubric.md` and self-check by hand, producing the same CRITICAL/HIGH/MEDIUM shape. Pass `--sources` when Step 3.5 assembled a bundle.
+
+**The lint covers the whole document, but only this run's findings block the write.** Report every finding, then resolve the CRITICAL and HIGH ones on requirements this run introduced or changed, and say which were already there. A pre-existing unconfirmed assumption is a reason to keep refining, not a reason to block; blocking on it pushes toward inventing a confirmation.
+
 Write the refined PRD back to `@{requirements_path}`.
 
 Preserve the existing PRD structure and style. Do not reorganize or reformat sections that weren't affected by findings. The changes should feel like natural improvements to the existing document, not a rewrite.
 
 ### 6. Summary
 
-Output a brief summary to the user:
+When Step 3.5 ingested sources, lead with the amendment delta it recorded; it is what tells a user their paste worked. Then output a brief summary to the user:
 - How many findings were identified across all reviewers
 - How many were addressed (and how: from context vs. user input)
 - Any remaining open questions added to the PRD

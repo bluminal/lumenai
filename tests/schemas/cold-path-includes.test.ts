@@ -299,14 +299,14 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
       'docs/plan-lint-rubric.md; Task 59 (FR-HM19) adds 6 more gates — next-priority.md\'s ' +
       'engine selector reads docs/engines/loop-workflow.md or docs/next-priority-loop.md, and ' +
       'loop.md, review-code.md, refine-requirements.md and write-implementation-plan.md each ' +
-      'read docs/engines/loop-workflow.md; prompt-file reviewers add 3 more — review-code.md, write-implementation-plan.md and refine-requirements.md each read docs/prompt-file-reviewers.md; next-priority.md adds 1 more gate for docs/auto-decide.md (--auto-decide); cloud execution adds 1 more in next-priority.md for docs/next-priority-cloud.md; host workspaces add 1 more in next-priority.md for docs/next-priority-workspace.md; multi-model-review Task 68 adds 1 more in grok-review-prompter.md and Task 69 1 more in cursor-review-prompter.md, both pointing at docs/adapter-common.md',
+      'read docs/engines/loop-workflow.md; prompt-file reviewers add 3 more — review-code.md, write-implementation-plan.md and refine-requirements.md each read docs/prompt-file-reviewers.md; next-priority.md adds 1 more gate for docs/auto-decide.md (--auto-decide); cloud execution adds 1 more in next-priority.md for docs/next-priority-cloud.md; host workspaces add 1 more in next-priority.md for docs/next-priority-workspace.md; multi-model-review Task 68 adds 1 more in grok-review-prompter.md and Task 69 1 more in cursor-review-prompter.md, both pointing at docs/adapter-common.md; PRD provenance adds 3 more — write-prd.md and refine-requirements.md each read docs/prd-lint-rubric.md as the no-node lint fallback, and refine-requirements.md reads docs/prd-amendment.md when there are sources to ingest',
     () => {
       const nativeLoopingMentions = files.reduce((count, relFile) => {
         const text = readFileSync(join(ROOT, relFile), 'utf8');
         return count + (text.match(/docs\/native-looping\.md/g) ?? []).length;
       }, 0);
       expect(nativeLoopingMentions).toBeGreaterThanOrEqual(32);
-      expect(allIncludes).toHaveLength(30);
+      expect(allIncludes).toHaveLength(33);
       expect(new Set(allIncludes.map((i) => i.file))).toEqual(
         new Set([
           'plugins/synthex/commands/review-code.md',
@@ -315,6 +315,7 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
           'plugins/synthex/commands/next-priority.md',
           'plugins/synthex/commands/loop.md',
           'plugins/synthex/commands/refine-requirements.md',
+          'plugins/synthex/commands/write-prd.md',
           'plugins/synthex/agents/bedrock-review-prompter.md',
           'plugins/synthex/agents/claude-review-prompter.md',
           'plugins/synthex/agents/codex-review-prompter.md',
@@ -341,6 +342,8 @@ describe('Task 12: cold-path-includes.test.ts (FR-HM43, D17, FR-HM13)', () => {
           '${CLAUDE_PLUGIN_ROOT}/docs/engines/loop-workflow.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/next-priority-loop.md',
           '${CLAUDE_PLUGIN_ROOT}/docs/prompt-file-reviewers.md',
+          '${CLAUDE_PLUGIN_ROOT}/docs/prd-lint-rubric.md',
+          '${CLAUDE_PLUGIN_ROOT}/docs/prd-amendment.md',
         ]),
       );
     },

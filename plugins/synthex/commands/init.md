@@ -255,10 +255,11 @@ Created:
 
 Next steps:
   1. Review .synthex/config.yaml and customize for your project
-  2. Create your PRD with the `write-implementation-plan` command
+  2. Create your PRD with /write-prd (pass --from <paths> to ground it in notes or specs)
   3. Or write your PRD manually at docs/reqs/main.md
 
 Available commands:
+  /write-prd                   — Author a PRD from supplied and discovered sources
   /write-implementation-plan   — Transform a PRD into an implementation plan
   /next-priority               — Execute the next highest-priority tasks
   /review-code                 — Multi-perspective code review
