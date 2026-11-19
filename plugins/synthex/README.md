@@ -149,6 +149,7 @@ Agents focused on understanding users, measuring outcomes, and driving improveme
 |---------|---------|-------------------|
 | `/init` | Initialize project configuration and directories. Delegates the multi-model review sub-step to `/configure-multi-model`. | -- |
 | `/configure-multi-model` | Re-runnable wizard for the `multi_model_review` config block. Detects CLIs, runs auth checks, surfaces three options, shows FR-MR27 data-transmission warning. Idempotent. | -- |
+| `/configure-notion` | Optional, re-runnable setup for Notion as an external source. You declare where requirements, plan and tasks live; anything you do not place stays in the repository. Not part of `/init`. | -- |
 | `/dismiss-upgrade-nudge` | Silence the SessionStart upgrade nudge for this project. No arguments; idempotent. | -- |
 | `/loop` | Generic looping primitive — loops a prompt (literal or file) until a completion promise is emitted or `--max-iterations` is reached. See "Native Looping" below. | -- |
 | `/list-loops` | Enumerate running and recently-terminal loops in the project. Read-only. | -- |
@@ -169,6 +170,7 @@ Agents focused on understanding users, measuring outcomes, and driving improveme
 Already initialized? Configuration changes don't require re-running full `/init`:
 
 - `/configure-multi-model` — reconfigure the `multi_model_review` block. If multi-model review is already enabled, the wizard offers Re-run / Reset to disabled / Leave as-is.
+- `/configure-notion` — set up, change or turn off Notion as the project's external source. `/configure-notion --document-set` switches only your own document set.
 - `/dismiss-upgrade-nudge` — permanently silence the SessionStart upgrade nudge for this project. To un-dismiss, delete `.synthex/state.json`.
 
 A `SessionStart` hook prints a one-line nudge once per project when synthex is upgraded across the `0.5.0` threshold (where multi-model review was introduced) and the `multi_model_review` block is absent from the project's config. The nudge fires at most once per threshold crossing and is dismissible.

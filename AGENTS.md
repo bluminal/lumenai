@@ -156,6 +156,8 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 | `codex-review-prompter` | Haiku-backed; OpenAI Codex CLI adapter for multi-model review (`agentic` tier; family `openai`) | Utility |
 | `gemini-review-prompter` | Haiku-backed; Google Gemini CLI adapter for multi-model review (`agentic` tier; family `google`) | Utility |
 | `ollama-review-prompter` | Haiku-backed; local Ollama HTTP API adapter for multi-model review (`text-only` tier; family `local-<model>`) | Utility |
+| `notion-document-store` | Haiku-backed; external-source adapter that reads and writes Synthex documents at the Notion locations the user declared (`agents/_shared/document-store-contract.md`). Runs only when `external_source: notion`. | Utility |
+| `notion-task-store` | Haiku-backed; external-source adapter for plan task state in the user's Notion tracker. Refuses to touch a database without the user's scope filter. Runs only when `external_source: notion`. | Utility |
 | `grok-review-prompter` | Haiku-backed; xAI Grok Build CLI adapter for multi-model review via the `grok-review.sh` runner; opt-in, subscription session only unless `allow_api_key_billing` (`text-only` tier; family `xai`) | Utility |
 | `cursor-review-prompter` | Haiku-backed; Cursor Agent CLI adapter for multi-model review via the `cursor-review.sh` runner; opt-in, needs an explicit non-Auto `model` and `family` and a paid plan (`text-only` tier; family from config) | Utility |
 
@@ -165,6 +167,7 @@ Narrow-scope agents that let expensive Opus/Sonnet agents delegate mechanical wo
 |---------|---------|-------------------|
 | `init` | Initialize project configuration and directories. During first-run, delegates the "Configure Multi-Model Review (optional)" sub-step to `/synthex:configure-multi-model` per FR-UO3. | — |
 | `configure-multi-model` | Re-runnable wizard for the `multi_model_review` config block. Detects installed CLIs, runs auth checks, surfaces 3 options (Enable with detected / Enable later / Skip), and shows FR-MR27 data-transmission warning. Idempotent — re-entering when already enabled offers Re-run / Reset to disabled / Leave as-is. | — |
+| `configure-notion` | Re-runnable setup for Notion as the project's external source. Walks every row of the convention map (`CONTRIBUTING.md`, "Adding an External Source"), verifies each answer with a read, shows the result and the data-transmission warning, then writes the `notion:` block and sets `external_source: notion`. `--document-set` switches the per-developer document set in `.synthex/config.local.yaml`. Not part of `init`; never writes to Notion. | — |
 | `dismiss-upgrade-nudge` | Silence the SessionStart upgrade nudge for this project by writing `dismissed: true` to `.synthex/state.json`. Idempotent; no arguments. | — |
 | `loop` | Generic native-looping primitive. Loops an arbitrary prompt (literal `--prompt` or `--prompt-file <path>`) until the completion promise is emitted or `--max-iterations` is reached. Per-session state at `.synthex/loops/<loop-id>.json`; supports `--resume <id>` / `--resume-last`. | — |
 | `list-loops` | Enumerate running and recent terminal-status loops in `.synthex/loops/`. Read-only. Output format: `RUNNING (N)` + `COMPLETED (M)` blocks sorted by recency. | — |
@@ -294,6 +297,7 @@ See `plugins/synthex/config/defaults.yaml` for the full reference. Key settings:
 | `documents.requirements` | `docs/reqs/main.md` | Default PRD path |
 | `documents.implementation_plan` | `docs/plans/main.md` | Default plan path |
 | `documents.specs` | `docs/specs` | Specs directory |
+| `external_source` | unset | Optional top-level key naming the active external source (e.g. `notion`). Deliberately absent from `defaults.yaml`: absent means off. Gated commands read `plugins/synthex/docs/external-sources.md` only when it is set; the source's own settings live under a block of the same name. |
 
 ### Design Pattern
 

@@ -1042,3 +1042,15 @@ against stub `grok` / `cursor-agent` binaries and the Task 67 spike recordings.
 
 The shared adapter suites (`adapter-size`, `external-permission-mode-key-validation`,
 `external-adapter-permission-model`, `portability-prose`) include both adapters.
+
+## External sources
+
+The external-source contract and the Notion source are covered by Layer 1
+suites only. None of them calls Notion.
+
+| Suite (`tests/schemas/`) | Covers |
+|--------------------------|--------|
+| `document-store-envelope.test.ts` | The contract §7 envelope and §4 task shape (`document-store-envelope.ts`), the closed §6 error codes, and the adapters' declared output shape |
+| `external-source-rule2.test.ts` | Rule 2: one identical gate per gated command, and nothing outside it reaches the feature; rule 6: the shared layer names no source; rule 3: no business vocabulary in what a source adds |
+| `external-source-scope.test.ts` | The scope refusal: a missing filter or an unresolved `{document_set}` is `scope_missing`, and the task store says so |
+| `configure-notion.test.ts` | `configure-notion` walks every convention-map row and meets the setup-command requirements |
